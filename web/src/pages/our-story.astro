@@ -1,16 +1,19 @@
 ---
+import PublicPageSections from "@/components/PublicPageSections.astro";
 import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
+import { getPublicPageContent } from "@/lib/public-website/content";
+
+const content = await getPublicPageContent(Astro, "our-story");
+const title = content.page?.title ?? "Our Story";
 ---
 
-<Layout title="NMC | Our Story">
+<Layout title={`NMC | ${title}`} description="NMC public story page.">
   <PageShell
     eyebrow="Public website"
-    title="Our Story page foundation"
-    description="This route is reserved for dynamic story content that will be implemented after the foundation phase."
+    title={title}
+    description="Published story content is loaded from the page and page section records."
   >
-    <p>
-      Dynamic page sections are out of scope for Phase 1.
-    </p>
+    <PublicPageSections sections={content.sections} />
   </PageShell>
 </Layout>

@@ -1,16 +1,19 @@
 ---
+import PublicPageSections from "@/components/PublicPageSections.astro";
 import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
+import { getPublicPageContent } from "@/lib/public-website/content";
+
+const content = await getPublicPageContent(Astro, "contact");
+const title = content.page?.title ?? "Contact";
 ---
 
-<Layout title="NMC | Contact">
+<Layout title={`NMC | ${title}`} description="NMC public contact page.">
   <PageShell
     eyebrow="Public website"
-    title="Contact route foundation"
-    description="This route is reserved for public contact content and inquiry submission work in later phases."
+    title={title}
+    description="Published contact content is loaded from the page and page section records."
   >
-    <p>
-      Contact inquiry forms and admin inquiry workflows are not part of Phase 1.
-    </p>
+    <PublicPageSections sections={content.sections} />
   </PageShell>
 </Layout>

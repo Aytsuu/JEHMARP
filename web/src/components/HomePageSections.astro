@@ -1,0 +1,164 @@
+---
+import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+
+type Props = {
+  sections: PublicPageSectionRecord[];
+};
+
+type GalleryImage = {
+  src: string;
+  alt: string;
+};
+
+const { sections } = Astro.props;
+
+const hero = sections.find((section) => section.type === "hero");
+const about = sections.find((section) => section.type === "about");
+const missionVisionCoreValues = sections.find(
+  (section) => section.type === "mission_vision_core_values",
+);
+const taglines = sections.find((section) => section.type === "taglines");
+const imagesGallery = sections.find((section) => section.type === "images_gallery");
+
+const coreValues = asStringArray(missionVisionCoreValues?.content.coreValues);
+const taglineItems = asStringArray(taglines?.content.items);
+const galleryImages = asGalleryImages(imagesGallery?.content.images);
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => (typeof item === "string" && item.trim().length > 0 ? [item.trim()] : []));
+}
+
+function asGalleryImages(value: unknown): GalleryImage[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") {
+      return [];
+    }
+
+    const src = "src" in item ? stringValue(item.src) : undefined;
+    const alt = "alt" in item ? stringValue(item.alt) : undefined;
+
+    return src && alt ? [{ src, alt }] : [];
+  });
+}
+---
+
+<div>
+  {
+    hero && (
+      <section aria-labelledby="home-hero">
+        <h2 id="home-hero">{stringValue(hero.content.heading) ?? "Hero"}</h2>
+        {stringValue(hero.content.summary) && <p>{stringValue(hero.content.summary)}</p>}
+        {stringValue(hero.content.supportingText) && <p>{stringValue(hero.content.supportingText)}</p>}
+        <p>
+          {stringValue(hero.content.primaryActionHref) && stringValue(hero.content.primaryActionLabel) && (
+            <a href={stringValue(hero.content.primaryActionHref) ?? "/shop"}>
+              {stringValue(hero.content.primaryActionLabel)}
+            </a>
+          )}{" "}
+          {stringValue(hero.content.secondaryActionHref) && stringValue(hero.content.secondaryActionLabel) && (
+            <a href={stringValue(hero.content.secondaryActionHref) ?? "/our-story"}>
+              {stringValue(hero.content.secondaryActionLabel)}
+            </a>
+          )}
+        </p>
+      </section>
+    )
+  }
+
+  {
+    about && (
+      <section aria-labelledby="home-about">
+        <h2 id="home-about">{stringValue(about.content.heading) ?? "About"}</h2>
+        {stringValue(about.content.summary) && <p>{stringValue(about.content.summary)}</p>}
+        {stringValue(about.content.body) && <p>{stringValue(about.content.body)}</p>}
+      </section>
+    )
+  }
+
+  {
+    missionVisionCoreValues && (
+      <section aria-labelledby="home-mission-vision-core-values">
+        <h2 id="home-mission-vision-core-values">
+          {stringValue(missionVisionCoreValues.content.heading) ?? "Mission, Vision, and Core Values"}
+        </h2>
+        <article>
+          <h3>Mission</h3>
+          <p>{stringValue(missionVisionCoreValues.content.mission) ?? "Mission content is not available yet."}</p>
+        </article>
+        <article>
+          <h3>Vision</h3>
+          <p>{stringValue(missionVisionCoreValues.content.vision) ?? "Vision content is not available yet."}</p>
+        </article>
+        <article>
+          <h3>Core Values</h3>
+          {
+            coreValues.length > 0 ? (
+              <ul>
+                {coreValues.map((value) => (
+                  <li>{value}</li>
+                ))}
+              </ul>
+            ) : (
+              <p>Core values have not been added yet.</p>
+            )
+          }
+        </article>
+      </section>
+    )
+  }
+
+  {
+    taglines && (
+      <section aria-labelledby="home-taglines">
+        <h2 id="home-taglines">{stringValue(taglines.content.heading) ?? "Taglines"}</h2>
+        {
+          taglineItems.length > 0 ? (
+            <ul>
+              {taglineItems.map((tagline) => (
+                <li>{tagline}</li>
+              ))}
+            </ul>
+          ) : (
+            <p>Taglines have not been added yet.</p>
+          )
+        }
+      </section>
+    )
+  }
+
+  {
+    imagesGallery && (
+      <section aria-labelledby="home-images-gallery">
+        <h2 id="home-images-gallery">{stringValue(imagesGallery.content.heading) ?? "Images Gallery"}</h2>
+        {
+          galleryImages.length > 0 ? (
+            <ul>
+              {galleryImages.map((image) => (
+                <li>
+                  <figure>
+                    <img src={image.src} alt={image.alt} />
+                    <figcaption>{image.alt}</figcaption>
+                  </figure>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>Gallery images have not been added yet.</p>
+          )
+        }
+      </section>
+    )
+  }
+</div>

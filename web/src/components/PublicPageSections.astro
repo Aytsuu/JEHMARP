@@ -1,0 +1,36 @@
+---
+import { getSectionEntries, getSectionHeading } from "@/lib/public-website/content";
+import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+
+type Props = {
+  sections: PublicPageSectionRecord[];
+};
+
+const { sections } = Astro.props;
+---
+
+{
+  sections.length > 0 ? (
+    <div>
+      {sections.map((section) => (
+        <section aria-labelledby={`section-${section.id}`}>
+          <h2 id={`section-${section.id}`}>{getSectionHeading(section)}</h2>
+          {getSectionEntries(section).length > 0 ? (
+            <dl>
+              {getSectionEntries(section).map(([label, value]) => (
+                <>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
+                </>
+              ))}
+            </dl>
+          ) : (
+            <p>Published content for this section is ready for display.</p>
+          )}
+        </section>
+      ))}
+    </div>
+  ) : (
+    <p>Published page sections have not been added yet.</p>
+  )
+}

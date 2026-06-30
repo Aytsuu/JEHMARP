@@ -8,17 +8,16 @@ Key foundation folders:
 
 ```text
 /
-├── src/
-│   ├── components/
-│   ├── config/
-│   ├── layouts/
-│   ├── lib/
-│   ├── pages/
-│   ├── styles/
-│   └── test/
-├── components.json
-├── astro.config.mjs
-└── package.json
+|-- src/
+|   |-- components/
+|   |-- config/
+|   |-- layouts/
+|   |-- lib/
+|   |-- pages/
+|   |-- styles/
+|   `-- test/
+|-- astro.config.mjs
+`-- package.json
 ```
 
 ## Environment

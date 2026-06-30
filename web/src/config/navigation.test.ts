@@ -3,15 +3,14 @@ import { describe, expect, it } from "vitest";
 import { primaryNavigation } from "./navigation";
 
 describe("primaryNavigation", () => {
-  it("defines the Phase 1 public, admin, and agent navigation routes", () => {
+  it("defines the public routes and a single shared login route", () => {
     expect(primaryNavigation).toEqual([
       { label: "Home", href: "/" },
       { label: "Our Story", href: "/our-story" },
       { label: "Shop", href: "/shop" },
       { label: "Business", href: "/business" },
       { label: "Contact", href: "/contact" },
-      { label: "Admin Login", href: "/admin/login" },
-      { label: "Agent Login", href: "/agent/login" },
+      { label: "Login", href: "/login" },
     ]);
   });
 

@@ -1,0 +1,24 @@
+---
+import PageShell from "@/components/PageShell.astro";
+import Layout from "@/layouts/Layout.astro";
+import { getDashboardHeading, getDashboardRoleForUserId, getSignedInUser } from "@/lib/auth";
+
+const user = await getSignedInUser(Astro);
+
+if (!user) {
+  return Astro.redirect("/login", 302);
+}
+
+const role = await getDashboardRoleForUserId(user.id);
+const heading = getDashboardHeading(role);
+---
+
+<Layout title={`NMC | ${heading}`} description="Mock authenticated dashboard entry page.">
+  <PageShell
+    eyebrow="Dashboard"
+    title={heading}
+    description="Temporary role-based dashboard placeholder."
+  >
+    <h1>{heading}</h1>
+  </PageShell>
+</Layout>

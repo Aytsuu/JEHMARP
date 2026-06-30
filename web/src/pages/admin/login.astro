@@ -1,16 +1,3 @@
 ---
-import PageShell from "@/components/PageShell.astro";
-import Layout from "@/layouts/Layout.astro";
+return Astro.redirect("/login", 301);
 ---
-
-<Layout title="NMC | Admin Login">
-  <PageShell
-    eyebrow="Admin surface"
-    title="Admin login route foundation"
-    description="This route reserves the admin authentication entry point. Authentication guards and dashboard workflows are implemented later."
-  >
-    <p>
-      Admin authentication is out of scope for Phase 1.
-    </p>
-  </PageShell>
-</Layout>

@@ -9,8 +9,7 @@ export const primaryNavigation = [
   { label: "Shop", href: "/shop" },
   { label: "Business", href: "/business" },
   { label: "Contact", href: "/contact" },
-  { label: "Admin Login", href: "/admin/login" },
-  { label: "Agent Login", href: "/agent/login" },
+  { label: "Login", href: "/login" },
 ] as const satisfies readonly NavigationItem[];
 
 export const publicRoutes = primaryNavigation.slice(0, 5);

@@ -20,8 +20,8 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 - [x] Create Astro + React app structure in `web/`.
 - [x] Install TailwindCSS foundation with `@tailwindcss/vite`; no CSS is applied to the base layout for now.
-- [x] Install shadcn/ui foundation via `components.json`, aliases, and `src/lib/utils.ts`; no design-system styles are applied to the base layout for now.
-- [x] Install and configure Magic UI only where needed: no Magic UI components are needed in Phase 1, so no component package/code was added.
+- [x] Defer shadcn/ui for now; remove `components.json` and the shadcn helper utility so the base layout stays plain HTML.
+- [x] Defer Magic UI for now; no Magic UI package or component code is installed in Phase 1.
 - [x] Install and configure TanStack Query with `src/components/providers/QueryProvider.tsx`.
 - [x] Add shared Supabase browser client in `src/lib/supabase/browser.ts`.
 - [x] Add shared Supabase server client in `src/lib/supabase/server.ts`.
@@ -34,147 +34,147 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 2 - Database Schema
 
-- [ ] Create `profile`.
-- [ ] Create `admin_role`.
-- [ ] Create `agent_profile`.
-- [ ] Create `customer`.
-- [ ] Add `customer.assigned_agent_id`.
-- [ ] Create `product`.
-- [ ] Add `product.category`.
-- [ ] Add `product.default_price`.
-- [ ] Add `product.reseller_price`.
-- [ ] Add `product.stock_status`.
-- [ ] Add `product.is_active`.
-- [ ] Create `order`.
-- [ ] Add `order.customer_id`.
-- [ ] Add `order.agent_id`.
-- [ ] Add `order.source`.
-- [ ] Add `order.order_status`.
-- [ ] Add `order.payment_status`.
-- [ ] Add `order.discount_amount`.
-- [ ] Add `order.delivery_fee`.
-- [ ] Add `order.submitted_by`.
-- [ ] Add `order.approved_by`.
-- [ ] Add `order.approved_at`.
-- [ ] Create `order_item`.
-- [ ] Add `order_item.order_id`.
-- [ ] Add `order_item.product_id`.
-- [ ] Add `order_item.partial_quantity`.
-- [ ] Add `order_item.final_quantity`.
-- [ ] Add `order_item.add_details`.
-- [ ] Add `order_item.agent_commission_amount`.
-- [ ] Add `order_item.agent_commission_status`.
-- [ ] Add `order_item.agent_commission_set_by`.
-- [ ] Add `order_item.agent_commission_set_at`.
-- [ ] Add `order_item.agent_commission_notes`.
-- [ ] Create `payment`.
-- [ ] Add `payment.order_id`.
-- [ ] Add `payment.amount`.
-- [ ] Add `payment.payment_method`.
-- [ ] Add `payment.payment_date`.
-- [ ] Add `payment.recorded_by`.
-- [ ] Add `payment.reference_number`.
-- [ ] Add `payment.notes`.
-- [ ] Create `invoice`.
-- [ ] Add `invoice.order_id`.
-- [ ] Add `invoice.invoice_number`.
-- [ ] Add `invoice.status`.
-- [ ] Add `invoice.issued_at`.
-- [ ] Add `invoice.due_at`.
-- [ ] Create `order_status_history`.
-- [ ] Add `order_status_history.order_id`.
-- [ ] Add `order_status_history.from_status`.
-- [ ] Add `order_status_history.to_status`.
-- [ ] Add `order_status_history.changed_by`.
-- [ ] Add `order_status_history.changed_at`.
-- [ ] Add `order_status_history.notes`.
-- [ ] Create `order_update`.
-- [ ] Add `order_update.order_id`.
-- [ ] Add `order_update.update_type`.
-- [ ] Add `order_update.title`.
-- [ ] Add `order_update.details`.
-- [ ] Add `order_update.created_by`.
-- [ ] Create `contact_inquiry`.
-- [ ] Create `reseller_application`.
-- [ ] Add `reseller_application.application_status`.
-- [ ] Add `reseller_application.email_delivery_status`.
-- [ ] Add `reseller_application.price_list_sent_at`.
-- [ ] Add `reseller_application.email_error`.
-- [ ] Add `reseller_application.internal_notes`.
-- [ ] Create `page`.
-- [ ] Create `page_section`.
-- [ ] Create `media_asset`.
-- [ ] Create `analytics_daily`.
-- [ ] Create `analytics_product_daily`.
-- [ ] Create `analytics_agent_daily`.
-- [ ] Add required foreign keys.
-- [ ] Add required check constraints for status fields.
-- [ ] Add required indexes for dashboard filters and RLS lookups.
-- [ ] Add seed data for required public pages.
-- [ ] Add seed data for product categories: `pork`, `chicken`, `egg`.
+- [x] Create `profile`.
+- [x] Create `admin_role`.
+- [x] Create `agent_profile`.
+- [x] Create `customer`.
+- [x] Add `customer.assigned_agent_id`.
+- [x] Create `product`.
+- [x] Add `product.category`.
+- [x] Add `product.default_price`.
+- [x] Add `product.reseller_price`.
+- [x] Add `product.stock_status`.
+- [x] Add `product.is_active`.
+- [x] Create `customer_order`.
+- [x] Add `customer_order.customer_id`.
+- [x] Add `customer_order.agent_id`.
+- [x] Add `customer_order.source`.
+- [x] Add `customer_order.order_status`.
+- [x] Add `customer_order.payment_status`.
+- [x] Add `customer_order.discount_amount`.
+- [x] Add `customer_order.delivery_fee`.
+- [x] Add `customer_order.submitted_by`.
+- [x] Add `customer_order.approved_by`.
+- [x] Add `customer_order.approved_at`.
+- [x] Create `customer_order_item`.
+- [x] Add `customer_order_item.order_id`.
+- [x] Add `customer_order_item.product_id`.
+- [x] Add `customer_order_item.partial_quantity`.
+- [x] Add `customer_order_item.final_quantity`.
+- [x] Add `customer_order_item.add_details`.
+- [x] Add `customer_order_item.agent_commission_amount`.
+- [x] Add `customer_order_item.agent_commission_status`.
+- [x] Add `customer_order_item.agent_commission_set_by`.
+- [x] Add `customer_order_item.agent_commission_set_at`.
+- [x] Add `customer_order_item.agent_commission_notes`.
+- [x] Create `payment`.
+- [x] Add `payment.order_id`.
+- [x] Add `payment.amount`.
+- [x] Add `payment.payment_method`.
+- [x] Add `payment.payment_date`.
+- [x] Add `payment.recorded_by`.
+- [x] Add `payment.reference_number`.
+- [x] Add `payment.notes`.
+- [x] Create `invoice`.
+- [x] Add `invoice.order_id`.
+- [x] Add `invoice.invoice_number`.
+- [x] Add `invoice.status`.
+- [x] Add `invoice.issued_at`.
+- [x] Add `invoice.due_at`.
+- [x] Create `customer_order_status_history`.
+- [x] Add `customer_order_status_history.order_id`.
+- [x] Add `customer_order_status_history.from_status`.
+- [x] Add `customer_order_status_history.to_status`.
+- [x] Add `customer_order_status_history.changed_by`.
+- [x] Add `customer_order_status_history.changed_at`.
+- [x] Add `customer_order_status_history.notes`.
+- [x] Create `customer_order_update`.
+- [x] Add `customer_order_update.order_id`.
+- [x] Add `customer_order_update.update_type`.
+- [x] Add `customer_order_update.title`.
+- [x] Add `customer_order_update.details`.
+- [x] Add `customer_order_update.created_by`.
+- [x] Create `contact_inquiry`.
+- [x] Create `reseller_application`.
+- [x] Add `reseller_application.application_status`.
+- [x] Add `reseller_application.email_delivery_status`.
+- [x] Add `reseller_application.price_list_sent_at`.
+- [x] Add `reseller_application.email_error`.
+- [x] Add `reseller_application.internal_notes`.
+- [x] Create `page`.
+- [x] Create `page_section`.
+- [x] Create `media_asset`.
+- [x] Create `analytics_daily`.
+- [x] Create `analytics_product_daily`.
+- [x] Create `analytics_agent_daily`.
+- [x] Add required foreign keys.
+- [x] Add required check constraints for status fields.
+- [x] Add required indexes for dashboard filters and RLS lookups.
+- [x] Add seed data for required public pages.
+- [x] Enforce product category values: `pork`, `chicken`, `egg`.
 
 ## Phase 3 - RLS And Auth
 
-- [ ] Enable RLS on all exposed tables.
-- [ ] Add explicit grants for `anon` and `authenticated` only where required.
-- [ ] Add admin role detection policy helpers.
-- [ ] Add agent role detection policy helpers.
-- [ ] Add public read policies for published `page`.
-- [ ] Add public read policies for published `page_section`.
-- [ ] Add public read policies for active `product`.
-- [ ] Ensure public product reads expose `default_price` only.
-- [ ] Block public reads of `product.reseller_price`.
-- [ ] Add guest insert path for `contact_inquiry`.
-- [ ] Add guest insert path for `reseller_application` through trusted workflow.
-- [ ] Add guest order creation through trusted workflow.
-- [ ] Add admin full-management policies for content tables.
-- [ ] Add admin full-management policies for product tables.
-- [ ] Add admin workflow policies for orders, order items, payments, invoices, and updates.
-- [ ] Add agent read policies for own `agent_profile`.
-- [ ] Add agent read policies for assigned customer records.
-- [ ] Add agent read policies for assigned/submitted orders.
-- [ ] Add agent read policies for own commission metrics.
-- [ ] Block agents from other agents' customer records.
-- [ ] Block agents from other agents' commission data.
-- [ ] Block guests from private operational tables.
-- [ ] Add RLS tests for guest, agent, and admin access.
+- [x] Enable RLS on all exposed tables.
+- [x] Add explicit grants for `anon` and `authenticated` only where required.
+- [x] Add admin role detection policy helpers.
+- [x] Add agent role detection policy helpers.
+- [x] Add public read policies for published `page`.
+- [x] Add public read policies for published `page_section`.
+- [x] Add public read policies for active `product`.
+- [x] Ensure public product reads expose `default_price` only.
+- [x] Block public reads of `product.reseller_price`.
+- [x] Add guest insert path for `contact_inquiry`.
+- [x] Add guest insert path for `reseller_application` through trusted workflow.
+- [x] Add guest order creation through trusted workflow.
+- [x] Add admin full-management policies for content tables.
+- [x] Add admin full-management policies for product tables.
+- [x] Add admin workflow policies for orders, order items, payments, invoices, and updates.
+- [x] Add agent read policies for own `agent_profile`.
+- [x] Add agent read policies for assigned customer records.
+- [x] Add agent read policies for assigned/submitted orders.
+- [x] Add agent read policies for own commission metrics.
+- [x] Block agents from other agents' customer records.
+- [x] Block agents from other agents' commission data.
+- [x] Block guests from private operational tables.
+- [x] Add RLS tests for guest, agent, and admin access.
 
 ## Phase 4 - Domain Logic
 
-- [ ] Implement computed order total from `order_item.partial_quantity` joined to `product`.
-- [ ] Implement computed invoice total from `order_item.final_quantity` joined to linked order data.
-- [ ] Implement payment balance calculation.
-- [ ] Implement payment status derivation: unpaid, partial, paid, refunded, void.
-- [ ] Implement order status transitions.
-- [ ] Implement invoice status transitions.
-- [ ] Implement append-only payment creation.
-- [ ] Implement order status history creation.
-- [ ] Implement order update creation.
-- [ ] Implement one-way quantity sync: `partial_quantity` changes copy to `final_quantity`, while `final_quantity` changes do not copy back.
-- [ ] Implement item-level commission total rollup.
-- [ ] Implement earned commission calculation from payment rule.
-- [ ] Implement product delete guard for products referenced by order items.
-- [ ] Implement product deactivation flow.
-- [ ] Add unit tests for totals, balances, statuses, and commissions.
+- [x] Implement computed order total from `order_item.partial_quantity` joined to `product`.
+- [x] Implement computed invoice total from `order_item.final_quantity` joined to linked order data.
+- [x] Implement payment balance calculation.
+- [x] Implement payment status derivation: unpaid, partial, paid, refunded, void.
+- [x] Implement order status transitions.
+- [x] Implement invoice status transitions.
+- [x] Implement append-only payment creation.
+- [x] Implement order status history creation.
+- [x] Implement order update creation.
+- [x] Implement one-way quantity sync: `partial_quantity` changes copy to `final_quantity`, while `final_quantity` changes do not copy back.
+- [x] Implement item-level commission total rollup.
+- [x] Implement earned commission calculation from payment rule.
+- [x] Implement product delete guard for products referenced by order items.
+- [x] Implement product deactivation flow.
+- [x] Add unit tests for totals, balances, statuses, and commissions.
 
 ## Phase 5 - Public Website
 
-- [ ] Build Home Page from `page` and `page_section`.
-- [ ] Build Our Story Page from `page` and `page_section`.
-- [ ] Build Contact Page from dynamic content and contact info.
-- [ ] Build Shop Page product listing.
-- [ ] Add category filter using `product.category`.
-- [ ] Add price range filter using `product.default_price`.
-- [ ] Add stock status filter.
-- [ ] Add sorting.
-- [ ] Add pagination.
-- [ ] Ensure public product UI never renders `reseller_price`.
-- [ ] Build guest order form.
-- [ ] Validate guest order fields.
-- [ ] Submit guest order through trusted workflow.
-- [ ] Show guest order confirmation.
-- [ ] Add public page/content integration tests.
-- [ ] Add guest order integration tests.
+- [x] Build Home Page from `page` and `page_section`.
+- [x] Build Our Story Page from `page` and `page_section`.
+- [x] Build Contact Page from dynamic content and contact info.
+- [x] Build Shop Page product listing.
+- [x] Add category filter using `product.category`.
+- [x] Add price range filter using `product.default_price`.
+- [x] Add stock status filter.
+- [x] Add sorting.
+- [x] Add pagination.
+- [x] Ensure public product UI never renders `reseller_price`.
+- [x] Build guest order form.
+- [x] Validate guest order fields.
+- [x] Submit guest order through trusted workflow.
+- [x] Show guest order confirmation.
+- [x] Add public page/content integration tests.
+- [x] Add guest order integration tests.
 
 ## Phase 6 - Admin Dashboard
 
