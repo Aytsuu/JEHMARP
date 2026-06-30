@@ -1,0 +1,21 @@
+---
+import { authRoutes, publicRoutes } from "@/config/navigation";
+---
+
+<header>
+  <nav aria-label="Primary navigation">
+    <a href="/">NMC</a>
+    <ul>
+      {publicRoutes.map((item) => (
+        <li>
+          <a href={item.href}>{item.label}</a>
+        </li>
+      ))}
+      {authRoutes.map((item) => (
+        <li>
+          <a href={item.href}>{item.label}</a>
+        </li>
+      ))}
+    </ul>
+  </nav>
+</header>
