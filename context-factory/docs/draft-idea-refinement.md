@@ -350,13 +350,17 @@ Each payment should record:
 - Notes/reference
 - Created at
 
-Order balance should be calculated from the computed order total:
+Order balance should be calculated from the computed invoice total:
 
 ```text
-computed_order_total - sum(successful payments)
+computed_invoice_total - sum(successful payments)
 ```
 
-`computed_order_total` comes from `order_item` joined to `product`, plus order-specific adjustments such as delivery fee, minus order-specific discounts. Do not duplicate product names, product prices, or line totals into `order_item`.
+`computed_order_total` comes from `order_item.partial_quantity` joined to `product`, plus order-specific adjustments such as delivery fee, minus order-specific discounts. It represents the order slip reference.
+
+`computed_invoice_total` comes from `order_item.final_quantity` joined to `product`, plus order-specific adjustments such as delivery fee, minus order-specific discounts. It represents the final billable invoice reference and is the basis for payment balance.
+
+Do not duplicate product names, product prices, or line totals into `order_item`.
 
 ### Invoice
 
@@ -376,7 +380,7 @@ invoice
   updated_at
 ```
 
-Invoice totals should be computed from the linked order, order items, products, delivery fee, discount amount, and payments. Do not duplicate product prices into the invoice.
+Invoice totals should be computed from the linked order, `order_item.final_quantity`, products, delivery fee, discount amount, and payments. Do not duplicate product prices into the invoice.
 
 Suggested invoice statuses:
 
@@ -605,12 +609,23 @@ order
 
 ### order_item
 
+`partial_quantity` is the order slip quantity. `final_quantity` is the sales invoice quantity. They are intentionally separate because the invoice may need a corrected final quantity after the original order slip is recorded.
+
+Quantity sync rule:
+
+- On insert, `final_quantity` must initially equal `partial_quantity`.
+- When `partial_quantity` changes, copy the new value to `final_quantity`.
+- When `final_quantity` changes, do not copy it back to `partial_quantity`.
+- Order slip references use `partial_quantity`.
+- Invoice references use `final_quantity`.
+
 ```text
 order_item
   id
   order_id
   product_id
-  quantity
+  partial_quantity
+  final_quantity
   created_at
   add_details
   agent_commission_amount
@@ -638,7 +653,7 @@ product
   updated_at
 ```
 
-Product data is the source of truth for product name, category, unit label, default price, and reseller price. `order_item` should reference `product.id` and store only the quantity, order relationship fields, and `add_details`.
+Product data is the source of truth for product name, category, unit label, default price, and reseller price. `order_item` should reference `product.id` and store only the two quantity fields, order relationship fields, and `add_details`.
 
 Because orders do not store product snapshots, product edits affect any order view that reads through `product`. To avoid accidental historical drift:
 

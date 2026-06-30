@@ -16,9 +16,10 @@ These decisions close Phase 0 and are the source of truth for Phase 1+ implement
 | Guest order email | Optional | Guest orders require name, delivery address, phone number, and order items. Email remains nullable unless automated confirmations or status links are added later. |
 | Customer assignment | Optional assigned agent | `customer.assigned_agent_id` is nullable. Guest and admin-created customers may exist without an agent. |
 | Agent-submitted order approval | Required | Agent-submitted orders start as `submitted` and must be approved by admin before processing/fulfillment. |
-| Commission earning rule | Proportional to successful payments | Expected commission is item-level commission total. Earned commission is calculated in proportion to successful payments against the computed order total. |
+| Commission earning rule | Proportional to successful payments | Expected commission is item-level commission total. Earned commission is calculated in proportion to successful payments against the computed invoice total. |
 | Invoice number generation | System-generated sequence | Use a database-backed sequence or deterministic server-side generator. Admins should not manually type primary invoice numbers in v1. |
 | Inventory scope | Status-only inventory | Track `product.stock_status` only. No quantity ledger, reservations, stock movements, or warehouse/location model in v1. |
+| Order item quantity model | Separate order-slip and invoice quantities | Use `customer_order_item.partial_quantity` as the order/order-slip quantity and `customer_order_item.final_quantity` as the invoice quantity. On insert and on every `partial_quantity` update, copy the same value into `final_quantity`. Updates to `final_quantity` must not change `partial_quantity`. |
 | Product changes after orders exist | New product row for material changes | For material price/name/unit/category changes after a product is referenced by orders, create a new product row and deactivate the old one. Minor description/image/status edits may update the existing row. |
 | SQL-safe table names | Singular snake_case, no reserved `order` table | Use SQL-safe names listed below. Do not create a table named `order`. |
 
@@ -52,6 +53,7 @@ analytics_agent_daily
 
 - Supabase RLS and grants must treat `reseller_price` as private data. Public product reads expose `default_price` only.
 - The reseller workflow must run Turnstile and rate limits before database insert and before email sending.
-- Payment records remain append-only. Commission calculations must use successful payment totals rather than mutable payment status shortcuts.
+- Payment records remain append-only. Commission calculations must use successful payment totals and `computed_invoice_total` rather than mutable payment status shortcuts.
+- Order slip displays and order reference calculations use `customer_order_item.partial_quantity`; invoice displays and invoice total calculations use `customer_order_item.final_quantity`.
 - Product rows referenced by orders must not be hard-deleted.
 - If formal historical accounting becomes required later, add a versioned product/price model instead of storing ad hoc product snapshots on order items.

@@ -59,7 +59,8 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 - [ ] Create `order_item`.
 - [ ] Add `order_item.order_id`.
 - [ ] Add `order_item.product_id`.
-- [ ] Add `order_item.quantity`.
+- [ ] Add `order_item.partial_quantity`.
+- [ ] Add `order_item.final_quantity`.
 - [ ] Add `order_item.add_details`.
 - [ ] Add `order_item.agent_commission_amount`.
 - [ ] Add `order_item.agent_commission_status`.
@@ -140,8 +141,8 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 4 - Domain Logic
 
-- [ ] Implement computed order total from `order_item` joined to `product`.
-- [ ] Implement computed invoice total from linked order data.
+- [ ] Implement computed order total from `order_item.partial_quantity` joined to `product`.
+- [ ] Implement computed invoice total from `order_item.final_quantity` joined to linked order data.
 - [ ] Implement payment balance calculation.
 - [ ] Implement payment status derivation: unpaid, partial, paid, refunded, void.
 - [ ] Implement order status transitions.
@@ -149,6 +150,7 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 - [ ] Implement append-only payment creation.
 - [ ] Implement order status history creation.
 - [ ] Implement order update creation.
+- [ ] Implement one-way quantity sync: `partial_quantity` changes copy to `final_quantity`, while `final_quantity` changes do not copy back.
 - [ ] Implement item-level commission total rollup.
 - [ ] Implement earned commission calculation from payment rule.
 - [ ] Implement product delete guard for products referenced by order items.
