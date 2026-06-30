@@ -141,3 +141,12 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Agentic Configuration
+.agents
+.codex
+.claude
+.gemini
+contexts
+.mcp.json
+/AGENTS.md
