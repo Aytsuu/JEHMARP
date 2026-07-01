@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getPublicEnv, getServerEnv, parsePublicEnv, parseServerEnv } from "./env";
+import {
+  getPublicEnv,
+  getRuntimeServerEnv,
+  getServerEnv,
+  parsePublicEnv,
+  parseServerEnv,
+} from "./env";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -50,6 +56,14 @@ describe("parseServerEnv", () => {
       supabasePublishableKey: "sb_publishable_test_key",
       supabaseServerKey: "sb_secret_test_key",
     });
+  });
+
+  it("includes process env values for SSR adapter runtime secrets", () => {
+    vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_runtime_key");
+
+    expect(getRuntimeServerEnv().SUPABASE_SECRET_KEY).toBe("sb_secret_runtime_key");
   });
 });
 

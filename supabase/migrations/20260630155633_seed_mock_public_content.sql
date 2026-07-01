@@ -102,7 +102,6 @@ on conflict (page_id, sort_order) do update set
   content = excluded.content,
   status = excluded.status,
   updated_at = now();
-
 insert into public.product (
   name,
   category,

@@ -1,7 +1,7 @@
 ---
-import AdminDashboard from "@/components/admin/AdminDashboard.astro";
+import AdminInquiryManagement from "@/components/admin/AdminInquiryManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import { formatAdminActionFeedback, getInquiryStatuses } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
@@ -18,11 +18,11 @@ const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
 <AdminPageFrame
-  title="NMC | Admin Dashboard"
-  description="Admin dashboard overview for operational workflows."
-  heading="Admin Dashboard"
-  intro="Review operational totals and choose a management area from the sidebar."
+  title="NMC | Admin Inquiries"
+  description="Admin contact inquiry management."
+  heading="Contact Inquiry Management"
+  intro="Review contact inquiries and update status or internal notes."
   feedback={feedback}
 >
-  <AdminDashboard data={data} />
+  <AdminInquiryManagement data={data} inquiryStatuses={getInquiryStatuses()} />
 </AdminPageFrame>

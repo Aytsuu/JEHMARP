@@ -1,5 +1,4 @@
 create schema if not exists private;
-
 create or replace function public.compute_order_total(target_order_id uuid)
 returns numeric
 language sql
@@ -24,7 +23,6 @@ as $$
   where customer_order.id = target_order_id
   group by customer_order.id, customer_order.delivery_fee, customer_order.discount_amount;
 $$;
-
 create or replace function public.compute_invoice_total(target_order_id uuid)
 returns numeric
 language sql
@@ -49,7 +47,6 @@ as $$
   where customer_order.id = target_order_id
   group by customer_order.id, customer_order.delivery_fee, customer_order.discount_amount;
 $$;
-
 create or replace function public.compute_payment_total(target_order_id uuid)
 returns numeric
 language sql
@@ -61,7 +58,6 @@ as $$
   from public.payment
   where payment.order_id = target_order_id;
 $$;
-
 create or replace function public.compute_payment_balance(target_order_id uuid)
 returns numeric
 language sql
@@ -78,7 +74,6 @@ as $$
     2
   );
 $$;
-
 create or replace function public.compute_expected_commission(target_order_id uuid)
 returns numeric
 language sql
@@ -91,7 +86,6 @@ as $$
   where order_id = target_order_id
     and agent_commission_status in ('set', 'paid');
 $$;
-
 create or replace function public.compute_earned_commission(target_order_id uuid)
 returns numeric
 language sql
@@ -111,7 +105,6 @@ as $$
   end
   from totals;
 $$;
-
 create or replace function public.deactivate_product(target_product_id uuid)
 returns public.product
 language plpgsql
@@ -134,7 +127,6 @@ begin
   return updated_product;
 end;
 $$;
-
 revoke all on function public.compute_order_total(uuid) from public;
 revoke all on function public.compute_invoice_total(uuid) from public;
 revoke all on function public.compute_payment_total(uuid) from public;
@@ -142,7 +134,6 @@ revoke all on function public.compute_payment_balance(uuid) from public;
 revoke all on function public.compute_expected_commission(uuid) from public;
 revoke all on function public.compute_earned_commission(uuid) from public;
 revoke all on function public.deactivate_product(uuid) from public;
-
 grant execute on function public.compute_order_total(uuid) to authenticated, service_role;
 grant execute on function public.compute_invoice_total(uuid) to authenticated, service_role;
 grant execute on function public.compute_payment_total(uuid) to authenticated, service_role;
@@ -150,7 +141,6 @@ grant execute on function public.compute_payment_balance(uuid) to authenticated,
 grant execute on function public.compute_expected_commission(uuid) to authenticated, service_role;
 grant execute on function public.compute_earned_commission(uuid) to authenticated, service_role;
 grant execute on function public.deactivate_product(uuid) to authenticated, service_role;
-
 create or replace function private.derive_payment_status(target_order_id uuid, current_status text)
 returns text
 language sql
@@ -172,7 +162,6 @@ as $$
   end
   from totals;
 $$;
-
 create or replace function private.derive_invoice_status(target_order_id uuid, current_status text)
 returns text
 language sql
@@ -208,7 +197,6 @@ as $$
   end
   from totals;
 $$;
-
 create or replace function private.is_valid_order_status_transition(from_status text, to_status text)
 returns boolean
 language sql
@@ -227,7 +215,6 @@ as $$
     else false
   end;
 $$;
-
 create or replace function private.is_valid_invoice_status_transition(from_status text, to_status text)
 returns boolean
 language sql
@@ -247,7 +234,6 @@ as $$
     else false
   end;
 $$;
-
 create or replace function private.refresh_order_financial_status(target_order_id uuid)
 returns void
 language plpgsql
@@ -289,7 +275,6 @@ begin
   end if;
 end;
 $$;
-
 create or replace function private.sync_order_item_final_quantity()
 returns trigger
 language plpgsql
@@ -305,7 +290,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function private.refresh_order_after_item_change()
 returns trigger
 language plpgsql
@@ -322,7 +306,6 @@ begin
   return old;
 end;
 $$;
-
 create or replace function private.refresh_order_after_adjustment_change()
 returns trigger
 language plpgsql
@@ -334,7 +317,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function private.block_payment_mutation()
 returns trigger
 language plpgsql
@@ -345,7 +327,6 @@ begin
   raise exception 'Payment records are append-only. Create a new compensating workflow record instead of updating or deleting an existing payment.';
 end;
 $$;
-
 create or replace function private.record_payment_insert()
 returns trigger
 language plpgsql
@@ -373,7 +354,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function private.validate_order_status_transition()
 returns trigger
 language plpgsql
@@ -395,7 +375,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function private.record_order_status_history()
 returns trigger
 language plpgsql
@@ -452,7 +431,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function private.validate_invoice_status_transition()
 returns trigger
 language plpgsql
@@ -468,7 +446,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function private.record_invoice_status_update()
 returns trigger
 language plpgsql
@@ -498,7 +475,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function private.refresh_order_after_invoice_insert()
 returns trigger
 language plpgsql
@@ -510,7 +486,6 @@ begin
   return new;
 end;
 $$;
-
 create or replace function private.block_referenced_product_delete()
 returns trigger
 language plpgsql
@@ -529,74 +504,62 @@ begin
   return old;
 end;
 $$;
-
 drop trigger if exists sync_order_item_final_quantity on public.customer_order_item;
 create trigger sync_order_item_final_quantity
 before insert or update of partial_quantity on public.customer_order_item
 for each row
 execute function private.sync_order_item_final_quantity();
-
 drop trigger if exists refresh_order_after_item_change on public.customer_order_item;
 create trigger refresh_order_after_item_change
 after insert or update of final_quantity, partial_quantity, product_id, agent_commission_amount, agent_commission_status or delete
 on public.customer_order_item
 for each row
 execute function private.refresh_order_after_item_change();
-
 drop trigger if exists refresh_order_after_adjustment_change on public.customer_order;
 create trigger refresh_order_after_adjustment_change
 after update of discount_amount, delivery_fee on public.customer_order
 for each row
 execute function private.refresh_order_after_adjustment_change();
-
 drop trigger if exists block_payment_mutation on public.payment;
 create trigger block_payment_mutation
 before update or delete on public.payment
 for each row
 execute function private.block_payment_mutation();
-
 drop trigger if exists record_payment_insert on public.payment;
 create trigger record_payment_insert
 after insert on public.payment
 for each row
 execute function private.record_payment_insert();
-
 drop trigger if exists validate_order_status_transition on public.customer_order;
 create trigger validate_order_status_transition
 before update of order_status on public.customer_order
 for each row
 execute function private.validate_order_status_transition();
-
 drop trigger if exists record_order_status_history on public.customer_order;
 create trigger record_order_status_history
 after insert or update of order_status on public.customer_order
 for each row
 execute function private.record_order_status_history();
-
 drop trigger if exists validate_invoice_status_transition on public.invoice;
 create trigger validate_invoice_status_transition
 before update of status on public.invoice
 for each row
 execute function private.validate_invoice_status_transition();
-
 drop trigger if exists record_invoice_status_update on public.invoice;
 create trigger record_invoice_status_update
 after update of status on public.invoice
 for each row
 execute function private.record_invoice_status_update();
-
 drop trigger if exists refresh_order_after_invoice_insert on public.invoice;
 create trigger refresh_order_after_invoice_insert
 after insert on public.invoice
 for each row
 execute function private.refresh_order_after_invoice_insert();
-
 drop trigger if exists block_referenced_product_delete on public.product;
 create trigger block_referenced_product_delete
 before delete on public.product
 for each row
 execute function private.block_referenced_product_delete();
-
 revoke all on function private.derive_payment_status(uuid, text) from public;
 revoke all on function private.derive_invoice_status(uuid, text) from public;
 revoke all on function private.is_valid_order_status_transition(text, text) from public;
@@ -613,7 +576,6 @@ revoke all on function private.validate_invoice_status_transition() from public;
 revoke all on function private.record_invoice_status_update() from public;
 revoke all on function private.refresh_order_after_invoice_insert() from public;
 revoke all on function private.block_referenced_product_delete() from public;
-
 grant execute on function private.derive_payment_status(uuid, text) to service_role;
 grant execute on function private.derive_invoice_status(uuid, text) to service_role;
 grant execute on function private.is_valid_order_status_transition(text, text) to service_role;

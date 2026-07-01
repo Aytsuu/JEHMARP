@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getDashboardHeading, getLoginErrorMessage } from "./auth";
+import { getDashboardHeading, getDashboardPath, getLoginErrorMessage } from "./auth";
 
 describe("getDashboardHeading", () => {
   it("returns the admin dashboard heading for admins", () => {
@@ -9,6 +9,13 @@ describe("getDashboardHeading", () => {
 
   it("returns the agent dashboard heading for agents", () => {
     expect(getDashboardHeading("agent")).toBe("Agent Dashboard");
+  });
+});
+
+describe("getDashboardPath", () => {
+  it("routes admins and agents to their own dashboard surfaces", () => {
+    expect(getDashboardPath("admin")).toBe("/admin");
+    expect(getDashboardPath("agent")).toBe("/agent");
   });
 });
 

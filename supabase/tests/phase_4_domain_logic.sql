@@ -7,6 +7,9 @@ declare
   test_order_id uuid;
   test_item_id uuid;
   test_invoice_id uuid;
+  reseller_customer_id uuid;
+  reseller_order_id uuid;
+  reseller_item_id uuid;
   blocked boolean;
   numeric_result numeric;
   text_result text;
@@ -87,6 +90,24 @@ begin
 
   if numeric_result <> 2 then
     raise exception 'Expected inserted final_quantity to copy partial_quantity, got %', numeric_result;
+  end if;
+
+  select unit_price
+  into numeric_result
+  from public.customer_order_item
+  where id = test_item_id;
+
+  if numeric_result <> 100 then
+    raise exception 'Expected retail customer item to use retail unit price 100, got %', numeric_result;
+  end if;
+
+  select price_type
+  into text_result
+  from public.customer_order_item
+  where id = test_item_id;
+
+  if text_result <> 'retail' then
+    raise exception 'Expected retail customer item price type retail, got %', text_result;
   end if;
 
   select public.compute_order_total(test_order_id)
@@ -262,6 +283,73 @@ begin
 
   if numeric_result <> 80 then
     raise exception 'Expected earned commission 80 after full payment, got %', numeric_result;
+  end if;
+
+  insert into public.customer (
+    first_name,
+    last_name,
+    phone_number,
+    address,
+    is_reseller
+  )
+  values (
+    'Phase',
+    'Reseller',
+    '09990000000',
+    'Temporary reseller address',
+    true
+  )
+  returning id into reseller_customer_id;
+
+  insert into public.customer_order (
+    customer_id,
+    source,
+    order_status
+  )
+  values (
+    reseller_customer_id,
+    'admin_manual',
+    'approved'
+  )
+  returning id into reseller_order_id;
+
+  insert into public.customer_order_item (
+    order_id,
+    product_id,
+    partial_quantity,
+    final_quantity
+  )
+  values (
+    reseller_order_id,
+    test_product_id,
+    2,
+    2
+  )
+  returning id into reseller_item_id;
+
+  select unit_price
+  into numeric_result
+  from public.customer_order_item
+  where id = reseller_item_id;
+
+  if numeric_result <> 80 then
+    raise exception 'Expected reseller customer item to use reseller unit price 80, got %', numeric_result;
+  end if;
+
+  select price_type
+  into text_result
+  from public.customer_order_item
+  where id = reseller_item_id;
+
+  if text_result <> 'reseller' then
+    raise exception 'Expected reseller customer item price type reseller, got %', text_result;
+  end if;
+
+  select public.compute_order_total(reseller_order_id)
+  into numeric_result;
+
+  if numeric_result <> 160 then
+    raise exception 'Expected reseller order total 160, got %', numeric_result;
   end if;
 
   update public.customer_order

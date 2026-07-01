@@ -1,0 +1,98 @@
+---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  escapeTextareaValue,
+  fullName,
+  selected,
+} from "@/lib/admin-dashboard/view";
+
+type Props = {
+  data: AdminDashboardData;
+};
+
+const { data } = Astro.props;
+---
+
+<section id="admin-customers" class="admin-panel" aria-labelledby="admin-customers-title">
+  <div class="admin-panel__header">
+    <h2 id="admin-customers-title">Customer Record Management</h2>
+    <p>Create or update customer records and optional agent assignment.</p>
+  </div>
+  <form method="post" class="admin-form" aria-label="Create customer">
+    <input type="hidden" name="action" value="save-customer" />
+    <h3>Create Customer</h3>
+    <div class="admin-form-grid">
+      <label class="field-row"><span>First name</span><input name="firstName" required /></label>
+      <label class="field-row"><span>Last name</span><input name="lastName" required /></label>
+      <label class="field-row"><span>Phone number</span><input name="phoneNumber" required /></label>
+      <label class="field-row"><span>Email</span><input name="email" type="email" /></label>
+      <label class="field-row">
+        <span>Assigned agent</span>
+        <select name="assignedAgentId">
+          <option value="">None</option>
+          {data.agents.map((agent) => <option value={agent.id}>{agent.display_name}</option>)}
+        </select>
+      </label>
+      <label class="checkbox-row">
+        <input name="isReseller" type="checkbox" />
+        <span>Reseller customer</span>
+      </label>
+    </div>
+    <label class="field-row"><span>Address</span><textarea name="address" required></textarea></label>
+    <button type="submit">Save customer</button>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <caption>Customer records</caption>
+      <thead>
+        <tr>
+          <th scope="col">Customer</th>
+          <th scope="col">Contact</th>
+          <th scope="col">Assigned agent</th>
+          <th scope="col">Manage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.customers.map((customer) => (
+          <tr>
+            <td>{fullName(customer)}</td>
+            <td>
+              {customer.phone_number}<br />
+              {customer.email ?? "No email"}<br />
+              {customer.is_reseller ? "Reseller" : "Retail"}
+            </td>
+            <td>{data.agents.find((agent) => agent.id === customer.assigned_agent_id)?.display_name ?? "None"}</td>
+            <td>
+              <form method="post" class="admin-table-form">
+                <input type="hidden" name="action" value="save-customer" />
+                <input type="hidden" name="customerId" value={customer.id} />
+                <label><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
+                <label><span>Last name</span><input name="lastName" value={customer.last_name} required /></label>
+                <label><span>Phone</span><input name="phoneNumber" value={customer.phone_number} required /></label>
+                <label><span>Email</span><input name="email" type="email" value={customer.email ?? ""} /></label>
+                <label class="checkbox-row">
+                  <input name="isReseller" type="checkbox" checked={customer.is_reseller} />
+                  <span>Reseller customer</span>
+                </label>
+                <label>
+                  <span>Agent</span>
+                  <select name="assignedAgentId">
+                    <option value="">None</option>
+                    {data.agents.map((agent) => (
+                      <option value={agent.id} selected={selected(customer.assigned_agent_id, agent.id)}>
+                        {agent.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label><span>Address</span><textarea name="address" required set:html={escapeTextareaValue(customer.address)}></textarea></label>
+                <button type="submit">Update customer</button>
+              </form>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>

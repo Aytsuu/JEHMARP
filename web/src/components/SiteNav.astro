@@ -6,19 +6,23 @@ import { authRoutes, publicRoutes } from "@/config/navigation";
   <nav class="site-nav__inner" aria-label="Primary navigation">
     <a class="site-nav__brand" href="/">
       <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
-      <span class="site-nav__brand-text">NMC</span>
+      <span class="site-nav__brand-text">NMC Meatshop</span>
     </a>
     <ul class="site-nav__list">
-      {publicRoutes.map((item) => (
-        <li>
-          <a href={item.href}>{item.label}</a>
-        </li>
-      ))}
-      {authRoutes.map((item) => (
-        <li>
-          <a href={item.href}>{item.label}</a>
-        </li>
-      ))}
+      {
+        publicRoutes.map((item) => (
+          <li>
+            <a href={item.href}>{item.label}</a>
+          </li>
+        ))
+      }
+      {
+        authRoutes.map((item) => (
+          <li>
+            <a href={item.href}>{item.label}</a>
+          </li>
+        ))
+      }
     </ul>
   </nav>
 </header>

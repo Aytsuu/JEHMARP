@@ -1,0 +1,59 @@
+import { describe, expect, it } from "vitest";
+
+import type { AdminOrder } from "./data";
+import { orderBalance, orderPaymentTotal, orderTotal } from "./view";
+
+describe("orderTotal", () => {
+  it("uses the order item unit price snapshot instead of the current product retail price", () => {
+    const order = {
+      discount_amount: 10,
+      delivery_fee: 5,
+      customer_order_item: [
+        {
+          partial_quantity: 2,
+          final_quantity: 3,
+          unit_price: 80,
+          product: {
+            default_price: 100,
+          },
+        },
+      ],
+    } as AdminOrder;
+
+    expect(orderTotal(order, "partial_quantity")).toBe(155);
+    expect(orderTotal(order, "final_quantity")).toBe(235);
+  });
+});
+
+describe("orderPaymentTotal", () => {
+  it("sums recorded order payments", () => {
+    const order = {
+      payment: [
+        { amount: 100 },
+        { amount: 25.5 },
+      ],
+    } as AdminOrder;
+
+    expect(orderPaymentTotal(order)).toBe(125.5);
+  });
+});
+
+describe("orderBalance", () => {
+  it("returns the unpaid invoice balance without going below zero", () => {
+    const order = {
+      discount_amount: 0,
+      delivery_fee: 0,
+      customer_order_item: [
+        {
+          final_quantity: 2,
+          unit_price: 80,
+        },
+      ],
+      payment: [
+        { amount: 200 },
+      ],
+    } as AdminOrder;
+
+    expect(orderBalance(order)).toBe(0);
+  });
+});

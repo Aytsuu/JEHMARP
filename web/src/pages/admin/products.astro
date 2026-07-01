@@ -1,0 +1,36 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminProductManagement from "@/components/admin/AdminProductManagement.astro";
+import {
+  formatAdminActionFeedback,
+  getProductCategories,
+  getStockStatuses,
+} from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const data = await loadAdminDashboardData();
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title="NMC | Admin Products"
+  description="Admin product management."
+  heading="Product Management"
+  intro="Create products, manage public and reseller pricing, update stock status, and deactivate products safely."
+  feedback={feedback}
+>
+  <AdminProductManagement
+    data={data}
+    productCategories={getProductCategories()}
+    stockStatuses={getStockStatuses()}
+  />
+</AdminPageFrame>

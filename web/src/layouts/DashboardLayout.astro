@@ -1,0 +1,60 @@
+---
+import type { NavigationItem } from "@/config/navigation";
+import "@/styles/global.css";
+
+type Props = {
+  title: string;
+  description: string;
+  navLabel: string;
+  navItems: readonly NavigationItem[];
+};
+
+const { title, description, navLabel, navItems } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="description" content={description} />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body class="dashboard-body">
+    <div class="dashboard-frame">
+      <aside
+        class="dashboard-sidebar"
+        aria-labelledby="dashboard-sidebar-title"
+      >
+        <a class="dashboard-sidebar__brand" href="/">
+          <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
+          <span>NMC Meatshop</span>
+        </a>
+        <nav class="dashboard-sidebar__nav" aria-label={navLabel}>
+          <ul>
+            {
+              navItems.map((item) => (
+                <li>
+                  <a href={item.href}>{item.label}</a>
+                </li>
+              ))
+            }
+          </ul>
+        </nav>
+        <form
+          class="dashboard-sidebar__logout-form"
+          method="post"
+          action="/api/logout"
+        >
+          <button type="submit">Logout</button>
+        </form>
+      </aside>
+      <main class="dashboard-main">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,363 @@
+---
+import { getAllowedNextOrderStatuses } from "@/lib/admin-dashboard/actions";
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  escapeTextareaValue,
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderTotal,
+  selected,
+  toDateTimeInput,
+} from "@/lib/admin-dashboard/view";
+
+type Props = {
+  data: AdminDashboardData;
+  commissionStatuses: readonly string[];
+  invoiceStatuses: readonly string[];
+};
+
+const { data, commissionStatuses, invoiceStatuses } = Astro.props;
+const activeProducts = data.products.filter((product) => product.is_active);
+const canCreateOrder = data.customers.length > 0 && activeProducts.length > 0;
+---
+
+<section id="admin-orders" class="admin-panel" aria-labelledby="admin-orders-title">
+  <div class="admin-panel__header">
+    <h2 id="admin-orders-title">Order Review And Workflow</h2>
+    <p>Review submitted orders, approve or reject, update status, edit item commissions, record payments, manage invoices, and add timeline updates.</p>
+  </div>
+
+  <form method="post" class="admin-form" aria-labelledby="create-order-title">
+    <input type="hidden" name="action" value="create-order" />
+    <h3 id="create-order-title">Create order</h3>
+
+    {!canCreateOrder && (
+      <p class="empty-state">
+        Add at least one customer and active product before creating an admin order.
+      </p>
+    )}
+
+    <div class="admin-form-grid">
+      <label class="field-row">
+        <span>Customer</span>
+        <select name="customerId" required disabled={data.customers.length === 0}>
+          <option value="">Select customer</option>
+          {data.customers.map((customer) => (
+            <option value={customer.id}>{fullName(customer)} - {customer.phone_number}</option>
+          ))}
+        </select>
+      </label>
+      <label class="field-row">
+        <span>Agent</span>
+        <select name="agentId">
+          <option value="">None</option>
+          {data.agents.map((agent) => (
+            <option value={agent.id}>{agent.display_name}</option>
+          ))}
+        </select>
+      </label>
+      <label class="field-row">
+        <span>Discount amount</span>
+        <input name="discountAmount" type="number" min="0" step="0.01" value="0" required />
+      </label>
+      <label class="field-row">
+        <span>Delivery fee</span>
+        <input name="deliveryFee" type="number" min="0" step="0.01" value="0" required />
+      </label>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <caption>Order items</caption>
+        <thead>
+          <tr>
+            <th scope="col">Product</th>
+            <th scope="col">Quantity</th>
+            <th scope="col">Details</th>
+            <th scope="col">Manage</th>
+          </tr>
+        </thead>
+        <tbody data-order-items>
+          <tr data-order-item-row>
+            <td>
+              <label class="field-row">
+                <span>Product <span data-row-number>1</span></span>
+                <select name="productId" required disabled={activeProducts.length === 0}>
+                  <option value="">Select product</option>
+                  {activeProducts.map((product) => (
+                    <option value={product.id}>
+                      {product.name} - retail {formatCurrency(product.default_price)} / reseller {formatCurrency(product.reseller_price)} per {product.unit_label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </td>
+            <td>
+              <label class="field-row">
+                <span>Quantity <span data-row-number>1</span></span>
+                <input name="quantity" type="number" min="0.001" step="0.001" required />
+              </label>
+            </td>
+            <td>
+              <label class="field-row">
+                <span>Details <span data-row-number>1</span></span>
+                <textarea name="addDetails" placeholder="Cut, packing, or delivery notes"></textarea>
+              </label>
+            </td>
+            <td>
+              <span class="empty-state">Required</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <template data-order-item-template>
+      <tr data-order-item-row>
+        <td>
+          <label class="field-row">
+            <span>Product <span data-row-number></span></span>
+            <select name="productId" required disabled={activeProducts.length === 0}>
+              <option value="">Select product</option>
+              {activeProducts.map((product) => (
+                <option value={product.id}>
+                  {product.name} - retail {formatCurrency(product.default_price)} / reseller {formatCurrency(product.reseller_price)} per {product.unit_label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </td>
+        <td>
+          <label class="field-row">
+            <span>Quantity <span data-row-number></span></span>
+            <input name="quantity" type="number" min="0.001" step="0.001" required />
+          </label>
+        </td>
+        <td>
+          <label class="field-row">
+            <span>Details <span data-row-number></span></span>
+            <textarea name="addDetails" placeholder="Cut, packing, or delivery notes"></textarea>
+          </label>
+        </td>
+        <td>
+          <button type="button" data-remove-order-item>Remove</button>
+        </td>
+      </tr>
+    </template>
+
+    <button type="button" data-add-order-item disabled={!canCreateOrder}>Add item</button>
+    <button type="submit" disabled={!canCreateOrder}>Create order</button>
+  </form>
+
+  {data.orders.length === 0 ? (
+    <p class="empty-state">No orders yet.</p>
+  ) : (
+    <div class="admin-card-list">
+      {data.orders.map((order) => {
+        const allowedStatuses = getAllowedNextOrderStatuses(order.order_status);
+        const invoice = order.invoice[0];
+        return (
+          <article class="admin-card" aria-labelledby={`order-${order.id}`}>
+            <div class="admin-card__header">
+              <h3 id={`order-${order.id}`}>Order for {fullName(order.customer)}</h3>
+              <p>{order.source} - {order.order_status} - payment {order.payment_status} - {formatDate(order.created_at)}</p>
+            </div>
+
+            <dl class="detail-list">
+              <dt>Order total</dt>
+              <dd>{formatCurrency(orderTotal(order, "partial_quantity"))}</dd>
+              <dt>Invoice total</dt>
+              <dd>{formatCurrency(orderTotal(order, "final_quantity"))}</dd>
+              <dt>Assigned agent</dt>
+              <dd>{order.agent?.display_name ?? "None"}</dd>
+              <dt>Approved at</dt>
+              <dd>{formatDate(order.approved_at)}</dd>
+            </dl>
+
+            <form method="post" class="admin-form">
+              <input type="hidden" name="action" value="update-order-status" />
+              <input type="hidden" name="orderId" value={order.id} />
+              <h4>Order status</h4>
+              <label class="field-row">
+                <span>Next status</span>
+                <select name="orderStatus" required>
+                  <option value={order.order_status}>{order.order_status}</option>
+                  {allowedStatuses.map((status) => <option value={status}>{status}</option>)}
+                </select>
+              </label>
+              <button type="submit" disabled={allowedStatuses.length === 0}>Update status</button>
+            </form>
+
+            <form method="post" class="admin-form">
+              <input type="hidden" name="action" value="update-order-adjustments" />
+              <input type="hidden" name="orderId" value={order.id} />
+              <h4>Assignment and adjustments</h4>
+              <div class="admin-form-grid">
+                <label class="field-row">
+                  <span>Agent</span>
+                  <select name="agentId">
+                    <option value="">None</option>
+                    {data.agents.map((agent) => (
+                      <option value={agent.id} selected={selected(order.agent_id, agent.id)}>
+                        {agent.display_name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label class="field-row"><span>Discount amount</span><input name="discountAmount" type="number" min="0" step="0.01" value={order.discount_amount} required /></label>
+                <label class="field-row"><span>Delivery fee</span><input name="deliveryFee" type="number" min="0" step="0.01" value={order.delivery_fee} required /></label>
+              </div>
+              <button type="submit">Save order details</button>
+            </form>
+
+            <div class="table-wrap">
+              <table>
+                <caption>Order items</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">Product</th>
+                    <th scope="col">Quantities</th>
+                    <th scope="col">Commission</th>
+                    <th scope="col">Manage commission</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {order.customer_order_item.map((item) => (
+                    <tr>
+                      <td>{item.product?.name ?? "Missing product"}</td>
+                      <td>
+                        Slip {item.partial_quantity}<br />
+                        Invoice {item.final_quantity}<br />
+                        {formatCurrency(item.unit_price)} {item.price_type}
+                      </td>
+                      <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
+                      <td>
+                        <form method="post" class="admin-table-form">
+                          <input type="hidden" name="action" value="update-commission" />
+                          <input type="hidden" name="orderItemId" value={item.id} />
+                          <label><span>Amount</span><input name="amount" type="number" min="0" step="0.01" value={item.agent_commission_amount} required /></label>
+                          <label>
+                            <span>Status</span>
+                            <select name="status" required>
+                              {commissionStatuses.map((status) => (
+                                <option value={status} selected={selected(item.agent_commission_status, status)}>{status}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label><span>Notes</span><textarea name="notes" set:html={escapeTextareaValue(item.agent_commission_notes)}></textarea></label>
+                          <button type="submit">Save commission</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div class="admin-two-column">
+              <form method="post" class="admin-form">
+                <input type="hidden" name="action" value="record-payment" />
+                <input type="hidden" name="orderId" value={order.id} />
+                <h4>Record payment</h4>
+                <label class="field-row"><span>Amount</span><input name="amount" type="number" min="0.01" step="0.01" required /></label>
+                <label class="field-row"><span>Method</span><input name="paymentMethod" required placeholder="cash, bank transfer" /></label>
+                <label class="field-row"><span>Payment date</span><input name="paymentDate" type="date" value={new Date().toISOString().slice(0, 10)} required /></label>
+                <label class="field-row"><span>Reference</span><input name="referenceNumber" /></label>
+                <label class="field-row"><span>Notes</span><textarea name="notes"></textarea></label>
+                <button type="submit">Record payment</button>
+              </form>
+
+              <form method="post" class="admin-form">
+                <input type="hidden" name="action" value="save-invoice" />
+                <input type="hidden" name="orderId" value={order.id} />
+                {invoice && <input type="hidden" name="invoiceId" value={invoice.id} />}
+                <h4>{invoice ? `Invoice ${invoice.invoice_number}` : "Create invoice"}</h4>
+                <label class="field-row">
+                  <span>Status</span>
+                  <select name="status" required>
+                    {invoiceStatuses.map((status) => (
+                      <option value={status} selected={selected(invoice?.status ?? "draft", status)}>{status}</option>
+                    ))}
+                  </select>
+                </label>
+                <label class="field-row"><span>Issued at</span><input name="issuedAt" type="datetime-local" value={toDateTimeInput(invoice?.issued_at ?? null)} /></label>
+                <label class="field-row"><span>Due at</span><input name="dueAt" type="datetime-local" value={toDateTimeInput(invoice?.due_at ?? null)} /></label>
+                <button type="submit">Save invoice</button>
+              </form>
+            </div>
+
+            <form method="post" class="admin-form">
+              <input type="hidden" name="action" value="add-order-update" />
+              <input type="hidden" name="orderId" value={order.id} />
+              <h4>Add order timeline update</h4>
+              <div class="admin-form-grid">
+                <label class="field-row"><span>Update type</span><input name="updateType" required placeholder="admin_note" /></label>
+                <label class="field-row"><span>Title</span><input name="title" required /></label>
+              </div>
+              <label class="field-row"><span>Details</span><textarea name="details"></textarea></label>
+              <button type="submit">Add update</button>
+            </form>
+
+            <div class="admin-two-column">
+              <section aria-labelledby={`payments-${order.id}`}>
+                <h4 id={`payments-${order.id}`}>Payments</h4>
+                {order.payment.length === 0 ? <p class="empty-state">No payments recorded.</p> : (
+                  <ul class="compact-list">
+                    {order.payment.map((payment) => (
+                      <li>{formatCurrency(payment.amount)} by {payment.payment_method} on {formatDate(payment.payment_date)}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+              <section aria-labelledby={`timeline-${order.id}`}>
+                <h4 id={`timeline-${order.id}`}>Timeline</h4>
+                {order.customer_order_update.length === 0 ? <p class="empty-state">No timeline updates.</p> : (
+                  <ul class="compact-list">
+                    {order.customer_order_update.map((update) => (
+                      <li><strong>{update.title}</strong> - {formatDate(update.created_at)}<br />{update.details}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  )}
+</section>
+
+<script>
+  const orderItems = document.querySelector("[data-order-items]");
+  const orderItemTemplate = document.querySelector<HTMLTemplateElement>("[data-order-item-template]");
+  const addOrderItemButton = document.querySelector<HTMLButtonElement>("[data-add-order-item]");
+
+  function refreshOrderItemRowNumbers() {
+    if (!orderItems) return;
+
+    orderItems.querySelectorAll("[data-order-item-row]").forEach((row, index) => {
+      row.querySelectorAll("[data-row-number]").forEach((label) => {
+        label.textContent = String(index + 1);
+      });
+    });
+  }
+
+  addOrderItemButton?.addEventListener("click", () => {
+    const templateRow = orderItemTemplate?.content.firstElementChild;
+
+    if (!orderItems || !templateRow) return;
+
+    orderItems.append(templateRow.cloneNode(true));
+    refreshOrderItemRowNumbers();
+  });
+
+  orderItems?.addEventListener("click", (event) => {
+    const target = event.target;
+
+    if (!(target instanceof HTMLElement) || !target.matches("[data-remove-order-item]")) return;
+
+    target.closest("[data-order-item-row]")?.remove();
+    refreshOrderItemRowNumbers();
+  });
+</script>

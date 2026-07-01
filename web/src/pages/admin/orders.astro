@@ -1,0 +1,36 @@
+---
+import AdminOrderManagement from "@/components/admin/AdminOrderManagement.astro";
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import {
+  formatAdminActionFeedback,
+  getCommissionStatuses,
+  getInvoiceStatuses,
+} from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const data = await loadAdminDashboardData();
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title="NMC | Admin Orders"
+  description="Admin order review, payment, invoice, commission, and timeline management."
+  heading="Order Review And Workflow"
+  intro="Review submitted orders, approve or reject, update status, edit commissions, record payments, manage invoices, and add timeline updates."
+  feedback={feedback}
+>
+  <AdminOrderManagement
+    data={data}
+    commissionStatuses={getCommissionStatuses()}
+    invoiceStatuses={getInvoiceStatuses()}
+  />
+</AdminPageFrame>

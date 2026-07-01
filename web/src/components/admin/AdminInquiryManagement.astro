@@ -1,0 +1,54 @@
+---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import { escapeTextareaValue, selected } from "@/lib/admin-dashboard/view";
+
+type Props = {
+  data: AdminDashboardData;
+  inquiryStatuses: readonly string[];
+};
+
+const { data, inquiryStatuses } = Astro.props;
+---
+
+<section id="admin-inquiries" class="admin-panel" aria-labelledby="admin-inquiries-title">
+  <div class="admin-panel__header">
+    <h2 id="admin-inquiries-title">Contact Inquiry Management</h2>
+    <p>Update inquiry status and internal notes.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <caption>Contact inquiries</caption>
+      <thead>
+        <tr>
+          <th scope="col">Inquiry</th>
+          <th scope="col">Message</th>
+          <th scope="col">Manage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.contactInquiries.map((inquiry) => (
+          <tr>
+            <td>{inquiry.name}<br />{inquiry.email ?? inquiry.phone_number ?? "No contact"}<br />{inquiry.inquiry_status}</td>
+            <td>{inquiry.message}</td>
+            <td>
+              <form method="post" class="admin-table-form">
+                <input type="hidden" name="action" value="update-inquiry" />
+                <input type="hidden" name="inquiryId" value={inquiry.id} />
+                <label>
+                  <span>Status</span>
+                  <select name="inquiryStatus" required>
+                    {inquiryStatuses.map((status) => (
+                      <option value={status} selected={selected(inquiry.inquiry_status, status)}>{status}</option>
+                    ))}
+                  </select>
+                </label>
+                <label><span>Internal notes</span><textarea name="internalNotes" set:html={escapeTextareaValue(inquiry.internal_notes)}></textarea></label>
+                <button type="submit">Update inquiry</button>
+              </form>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>

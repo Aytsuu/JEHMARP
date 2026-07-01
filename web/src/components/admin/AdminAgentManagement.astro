@@ -1,0 +1,110 @@
+---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import { selected } from "@/lib/admin-dashboard/view";
+
+type Props = {
+  data: AdminDashboardData;
+};
+
+const { data } = Astro.props;
+const agentStatuses = ["active", "inactive", "suspended"] as const;
+---
+
+<section
+  id="admin-agents"
+  class="admin-panel"
+  aria-labelledby="admin-agents-title"
+>
+  <div class="admin-panel__header">
+    <h2 id="admin-agents-title">Agent Management</h2>
+    <p>Create agent auth accounts and manage agent profile status.</p>
+  </div>
+  <form method="post" class="admin-form" aria-label="Create agent">
+    <input type="hidden" name="action" value="create-agent" />
+    <h3>Create Agent Account</h3>
+    <div class="admin-form-grid">
+      <label class="field-row"
+        ><span>Email</span><input name="email" type="email" required /></label
+      >
+      <label class="field-row"
+        ><span>Temporary password</span><input
+          name="password"
+          type="password"
+          minlength="8"
+          required
+        /></label
+      >
+      <label class="field-row"
+        ><span>Display name</span><input name="displayName" required /></label
+      >
+      <label class="field-row">
+        <span>Status</span>
+        <select name="status" required>
+          {
+            agentStatuses.map((status) => (
+              <option value={status}>{status}</option>
+            ))
+          }
+        </select>
+      </label>
+    </div>
+    <button type="submit">Create agent</button>
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <caption>Agents</caption>
+      <thead>
+        <tr>
+          <th scope="col">Agent</th>
+          <th scope="col">Status</th>
+          <th scope="col">Manage</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          data.agents.map((agent) => (
+            <tr>
+              <td>
+                {agent.display_name}
+                <br />
+                <span>{agent.user_id}</span>
+              </td>
+              <td>{agent.status}</td>
+              <td>
+                <form method="post" class="admin-table-form">
+                  <input type="hidden" name="action" value="update-agent" />
+                  <input type="hidden" name="agentId" value={agent.id} />
+                  <label>
+                    <>
+                      <span>Display name</span>
+                      <input
+                        name="displayName"
+                        value={agent.display_name}
+                        required
+                      />
+                    </>
+                  </label>
+                  <label>
+                    <span>Status</span>
+                    <select name="status" required>
+                      {agentStatuses.map((status) => (
+                        <option
+                          value={status}
+                          selected={selected(agent.status, status)}
+                        >
+                          {status}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button type="submit">Update agent</button>
+                </form>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</section>

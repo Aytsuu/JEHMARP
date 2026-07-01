@@ -1,5 +1,4 @@
 create extension if not exists pgcrypto with schema extensions;
-
 create sequence if not exists public.invoice_number_seq
   as bigint
   start with 1
@@ -7,14 +6,12 @@ create sequence if not exists public.invoice_number_seq
   no minvalue
   no maxvalue
   cache 1;
-
 create table public.profile (
   id uuid primary key references auth.users(id) on delete cascade,
   display_name text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table public.admin_role (
   id uuid primary key default extensions.gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -26,7 +23,6 @@ create table public.admin_role (
   constraint admin_role_role_check check (role in ('admin', 'owner')),
   constraint admin_role_status_check check (status in ('active', 'inactive'))
 );
-
 create table public.agent_profile (
   id uuid primary key default extensions.gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -37,7 +33,6 @@ create table public.agent_profile (
   constraint agent_profile_user_id_key unique (user_id),
   constraint agent_profile_status_check check (status in ('active', 'inactive', 'suspended'))
 );
-
 create table public.customer (
   id uuid primary key default extensions.gen_random_uuid(),
   first_name text not null,
@@ -50,7 +45,6 @@ create table public.customer (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-
 create table public.product (
   id uuid primary key default extensions.gen_random_uuid(),
   name text not null,
@@ -69,7 +63,6 @@ create table public.product (
   constraint product_reseller_price_check check (reseller_price >= 0),
   constraint product_stock_status_check check (stock_status in ('in_stock', 'limited', 'out_of_stock'))
 );
-
 create table public.customer_order (
   id uuid primary key default extensions.gen_random_uuid(),
   customer_id uuid not null references public.customer(id) on delete restrict,
@@ -96,7 +89,6 @@ create table public.customer_order (
     or (approved_by is not null and approved_at is not null)
   )
 );
-
 create table public.customer_order_item (
   id uuid primary key default extensions.gen_random_uuid(),
   order_id uuid not null references public.customer_order(id) on delete cascade,
@@ -120,7 +112,6 @@ create table public.customer_order_item (
     or agent_commission_status <> 'unset'
   )
 );
-
 create table public.payment (
   id uuid primary key default extensions.gen_random_uuid(),
   order_id uuid not null references public.customer_order(id) on delete restrict,
@@ -133,7 +124,6 @@ create table public.payment (
   created_at timestamptz not null default now(),
   constraint payment_amount_check check (amount > 0)
 );
-
 create table public.invoice (
   id uuid primary key default extensions.gen_random_uuid(),
   order_id uuid not null references public.customer_order(id) on delete restrict,
@@ -149,7 +139,6 @@ create table public.invoice (
   constraint invoice_invoice_number_key unique (invoice_number),
   constraint invoice_status_check check (status in ('draft', 'issued', 'partially_paid', 'paid', 'void', 'overdue'))
 );
-
 create table public.customer_order_status_history (
   id uuid primary key default extensions.gen_random_uuid(),
   order_id uuid not null references public.customer_order(id) on delete cascade,
@@ -166,7 +155,6 @@ create table public.customer_order_status_history (
     to_status in ('draft', 'submitted', 'approved', 'processing', 'fulfilled', 'rejected', 'cancelled', 'closed')
   )
 );
-
 create table public.customer_order_update (
   id uuid primary key default extensions.gen_random_uuid(),
   order_id uuid not null references public.customer_order(id) on delete cascade,
@@ -176,7 +164,6 @@ create table public.customer_order_update (
   created_by uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now()
 );
-
 create table public.contact_inquiry (
   id uuid primary key default extensions.gen_random_uuid(),
   name text not null,
@@ -189,7 +176,6 @@ create table public.contact_inquiry (
   updated_at timestamptz not null default now(),
   constraint contact_inquiry_status_check check (inquiry_status in ('new', 'reviewing', 'responded', 'closed', 'spam'))
 );
-
 create table public.reseller_application (
   id uuid primary key default extensions.gen_random_uuid(),
   name text not null,
@@ -211,7 +197,6 @@ create table public.reseller_application (
   ),
   constraint reseller_application_email_delivery_status_check check (email_delivery_status in ('pending', 'sent', 'failed'))
 );
-
 create table public.page (
   id uuid primary key default extensions.gen_random_uuid(),
   slug text not null,
@@ -225,7 +210,6 @@ create table public.page (
   constraint page_slug_key unique (slug),
   constraint page_status_check check (status in ('draft', 'published', 'archived'))
 );
-
 create table public.page_section (
   id uuid primary key default extensions.gen_random_uuid(),
   page_id uuid not null references public.page(id) on delete cascade,
@@ -240,7 +224,6 @@ create table public.page_section (
   constraint page_section_content_object_check check (jsonb_typeof(content) = 'object'),
   constraint page_section_status_check check (status in ('draft', 'published', 'archived'))
 );
-
 create table public.media_asset (
   id uuid primary key default extensions.gen_random_uuid(),
   path text not null,
@@ -252,7 +235,6 @@ create table public.media_asset (
   updated_at timestamptz not null default now(),
   constraint media_asset_path_key unique (path)
 );
-
 create table public.analytics_daily (
   day date primary key,
   order_count integer not null default 0,
@@ -268,7 +250,6 @@ create table public.analytics_daily (
   constraint analytics_daily_reseller_count_check check (new_reseller_applications >= 0),
   constraint analytics_daily_inquiry_count_check check (new_contact_inquiries >= 0)
 );
-
 create table public.analytics_product_daily (
   day date not null,
   product_id uuid not null references public.product(id) on delete cascade,
@@ -280,7 +261,6 @@ create table public.analytics_product_daily (
   constraint analytics_product_daily_quantity_sold_check check (quantity_sold >= 0),
   constraint analytics_product_daily_gross_sales_check check (gross_sales >= 0)
 );
-
 create table public.analytics_agent_daily (
   day date not null,
   agent_id uuid not null references public.agent_profile(id) on delete cascade,
@@ -294,7 +274,6 @@ create table public.analytics_agent_daily (
   constraint analytics_agent_daily_expected_commission_check check (expected_commission >= 0),
   constraint analytics_agent_daily_earned_commission_check check (earned_commission >= 0)
 );
-
 create index customer_assigned_agent_id_idx on public.customer (assigned_agent_id);
 create index customer_created_by_idx on public.customer (created_by);
 create index product_category_idx on public.product (category);
@@ -326,36 +305,12 @@ create index page_section_page_id_sort_order_idx on public.page_section (page_id
 create index media_asset_bucket_idx on public.media_asset (bucket);
 create index analytics_product_daily_product_id_idx on public.analytics_product_daily (product_id);
 create index analytics_agent_daily_agent_id_idx on public.analytics_agent_daily (agent_id);
-
-alter table public.profile enable row level security;
-alter table public.admin_role enable row level security;
-alter table public.agent_profile enable row level security;
-alter table public.customer enable row level security;
-alter table public.product enable row level security;
-alter table public.customer_order enable row level security;
-alter table public.customer_order_item enable row level security;
-alter table public.payment enable row level security;
-alter table public.invoice enable row level security;
-alter table public.customer_order_status_history enable row level security;
-alter table public.customer_order_update enable row level security;
-alter table public.contact_inquiry enable row level security;
-alter table public.reseller_application enable row level security;
-alter table public.page enable row level security;
-alter table public.page_section enable row level security;
-alter table public.media_asset enable row level security;
-alter table public.analytics_daily enable row level security;
-alter table public.analytics_product_daily enable row level security;
-alter table public.analytics_agent_daily enable row level security;
-
 comment on column public.product.category is
   'Allowed v1 product category values: pork, chicken, egg.';
-
 comment on column public.customer_order_item.partial_quantity is
   'Order slip quantity. Used for order reference totals.';
-
 comment on column public.customer_order_item.final_quantity is
   'Sales invoice quantity. Used for final invoice totals, payment balance, and proportional commission calculations.';
-
 insert into public.page (slug, title, status, published_at)
 values
   ('home', 'Home', 'published', now()),
@@ -368,4 +323,3 @@ on conflict (slug) do update set
   status = excluded.status,
   published_at = coalesce(public.page.published_at, excluded.published_at),
   updated_at = now();
-

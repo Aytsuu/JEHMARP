@@ -1,0 +1,34 @@
+---
+import AdminInvoiceManagement from "@/components/admin/AdminInvoiceManagement.astro";
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import {
+  formatAdminActionFeedback,
+  getInvoiceStatuses,
+} from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const data = await loadAdminDashboardData();
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title="NMC | Admin Invoices"
+  description="Admin invoice creation, payment tracking, and balance management."
+  heading="Invoice Management"
+  intro="Create invoices for approved orders, update invoice status and dates, review balances, and record payments."
+  feedback={feedback}
+>
+  <AdminInvoiceManagement
+    data={data}
+    invoiceStatuses={getInvoiceStatuses()}
+  />
+</AdminPageFrame>

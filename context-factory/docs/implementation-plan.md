@@ -178,25 +178,25 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 6 - Admin Dashboard
 
-- [ ] Build admin authentication guard.
-- [ ] Build admin dashboard shell.
-- [ ] Build public content management.
-- [ ] Build page section create/update/reorder/publish flow.
-- [ ] Build product management.
-- [ ] Build product deactivation flow.
-- [ ] Build customer record management.
-- [ ] Build agent management.
-- [ ] Build order review queue.
-- [ ] Build order approval/rejection flow.
-- [ ] Build order status update flow.
-- [ ] Build order item commission editing.
-- [ ] Build payment recording.
-- [ ] Build invoice management.
-- [ ] Build order update timeline.
-- [ ] Build contact inquiry management.
-- [ ] Build reseller application management.
-- [ ] Build failed reseller email resend action.
-- [ ] Add admin workflow tests.
+- [x] Build admin authentication guard.
+- [x] Build admin dashboard shell.
+- [x] Build public content management.
+- [x] Build page section create/update/reorder/publish flow.
+- [x] Build product management.
+- [x] Build product deactivation flow.
+- [x] Build customer record management.
+- [x] Build agent management.
+- [x] Build order review queue.
+- [x] Build order approval/rejection flow.
+- [x] Build order status update flow.
+- [x] Build order item commission editing.
+- [x] Build payment recording.
+- [x] Build invoice management.
+- [x] Build order update timeline.
+- [x] Build contact inquiry management.
+- [x] Build reseller application management.
+- [x] Build failed reseller email resend action.
+- [x] Add admin workflow tests.
 
 ## Phase 7 - Agent Dashboard
 

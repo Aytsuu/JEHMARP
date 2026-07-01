@@ -119,7 +119,6 @@ exception
     raise exception 'Guest order payload contains an invalid product id or quantity.';
 end;
 $$;
-
 revoke all on function public.submit_guest_order(jsonb, jsonb) from public;
 revoke execute on function public.submit_guest_order(jsonb, jsonb) from anon;
 revoke execute on function public.submit_guest_order(jsonb, jsonb) from authenticated;

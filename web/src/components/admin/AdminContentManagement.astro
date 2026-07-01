@@ -1,0 +1,104 @@
+---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  escapeTextareaValue,
+  jsonTextareaValue,
+  selected,
+} from "@/lib/admin-dashboard/view";
+
+type Props = {
+  data: AdminDashboardData;
+  pageStatuses: readonly string[];
+};
+
+const { data, pageStatuses } = Astro.props;
+const sectionsByPage = data.pages.map((page) => ({
+  page,
+  sections: data.pageSections.filter((section) => section.page_id === page.id),
+}));
+---
+
+<section id="admin-content" class="admin-panel" aria-labelledby="admin-content-title">
+  <div class="admin-panel__header">
+    <h2 id="admin-content-title">Public Content Management</h2>
+    <p>Update existing content sections for the predefined public pages.</p>
+  </div>
+
+  <div class="admin-card-list">
+    {sectionsByPage.map(({ page, sections }) => (
+      <article class="admin-card" aria-labelledby={`page-${page.id}`}>
+        <div class="admin-form admin-form--inline">
+          <h3 id={`page-${page.id}`}>{page.title}</h3>
+          <dl class="detail-list">
+            <dt>Slug</dt>
+            <dd>{page.slug}</dd>
+            <dt>Status</dt>
+            <dd>{page.status}</dd>
+          </dl>
+        </div>
+
+        {sections.length === 0 ? (
+          <p class="empty-state">No predefined sections for this page.</p>
+        ) : (
+          <div class="table-wrap">
+            <table>
+              <caption>Sections for {page.title}</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Type</th>
+                  <th scope="col">Order</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Content</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sections.map((section) => (
+                  <tr>
+                    <td>{section.type}</td>
+                    <td>{section.sort_order}</td>
+                    <td>{section.status}</td>
+                    <td>
+                      <details>
+                        <summary>View JSON</summary>
+                        <pre>{JSON.stringify(section.content, null, 2)}</pre>
+                      </details>
+                    </td>
+                    <td>
+                      <form method="post" class="admin-table-form">
+                        <input type="hidden" name="action" value="save-page-section" />
+                        <input type="hidden" name="sectionId" value={section.id} />
+                        <input type="hidden" name="pageId" value={page.id} />
+                        <label>
+                          <span>Type</span>
+                          <input name="type" value={section.type} required />
+                        </label>
+                        <label>
+                          <span>Order</span>
+                          <input name="sortOrder" type="number" min="0" step="1" value={section.sort_order} required />
+                        </label>
+                        <label>
+                          <span>Status</span>
+                          <select name="status" required>
+                            {pageStatuses.map((status) => (
+                              <option value={status} selected={selected(section.status, status)}>{status}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          <span>Content JSON</span>
+                          <textarea name="content" required set:html={escapeTextareaValue(jsonTextareaValue(section.content))}></textarea>
+                        </label>
+                        <button type="submit">Save section</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
+    ))}
+  </div>
+</section>

@@ -1,7 +1,7 @@
 ---
-import AdminDashboard from "@/components/admin/AdminDashboard.astro";
+import AdminContentManagement from "@/components/admin/AdminContentManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import { formatAdminActionFeedback, getPageStatuses } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
@@ -18,11 +18,11 @@ const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
 <AdminPageFrame
-  title="NMC | Admin Dashboard"
-  description="Admin dashboard overview for operational workflows."
-  heading="Admin Dashboard"
-  intro="Review operational totals and choose a management area from the sidebar."
+  title="NMC | Admin Content"
+  description="Admin public content management."
+  heading="Public Content Management"
+  intro="Update JSON content, ordering, and publish status for existing predefined public page sections."
   feedback={feedback}
 >
-  <AdminDashboard data={data} />
+  <AdminContentManagement data={data} pageStatuses={getPageStatuses()} />
 </AdminPageFrame>

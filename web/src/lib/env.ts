@@ -56,5 +56,20 @@ export function parseServerEnv(input: Record<string, unknown>): ServerEnv {
 }
 
 export function getServerEnv(): ServerEnv {
-  return parseServerEnv(import.meta.env);
+  return parseServerEnv(getRuntimeServerEnv());
+}
+
+export function getRuntimeServerEnv(): Record<string, unknown> {
+  return {
+    ...import.meta.env,
+    ...getProcessEnv(),
+  };
+}
+
+function getProcessEnv(): Record<string, unknown> {
+  if (typeof process === "undefined") {
+    return {};
+  }
+
+  return process.env;
 }

@@ -7,7 +7,7 @@ export default [
   ...tseslint.configs.recommended,
   ...astro.configs.recommended,
   {
-    ignores: ["dist/**", ".astro/**", "node_modules/**"],
+    ignores: ["dist/**", ".astro/**", ".vercel/**", "node_modules/**"],
   },
   {
     files: ["**/*.{js,mjs,ts,tsx,astro}"],
@@ -15,6 +15,7 @@ export default [
       globals: {
         URL: "readonly",
         console: "readonly",
+        process: "readonly",
       },
     },
     rules: {

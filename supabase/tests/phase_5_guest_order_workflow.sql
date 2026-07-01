@@ -6,6 +6,8 @@ declare
   test_order_id uuid;
   inserted_customer_id uuid;
   item_count integer;
+  numeric_result numeric;
+  text_result text;
   blocked boolean;
   can_anon_execute boolean;
 begin
@@ -75,6 +77,7 @@ begin
       and email = 'guest@example.com'
       and address = 'Temporary public order address'
       and assigned_agent_id is null
+      and is_reseller = false
   ) then
     raise exception 'Expected guest customer record to be inserted';
   end if;
@@ -90,6 +93,16 @@ begin
 
   if item_count <> 1 then
     raise exception 'Expected one guest order item with synced quantities, got %', item_count;
+  end if;
+
+  select unit_price, price_type
+  into numeric_result, text_result
+  from public.customer_order_item
+  where order_id = test_order_id
+    and product_id = test_product_id;
+
+  if numeric_result <> 150 or text_result <> 'retail' then
+    raise exception 'Expected guest order item to use retail price 150, got % type %', numeric_result, text_result;
   end if;
 
   blocked := false;

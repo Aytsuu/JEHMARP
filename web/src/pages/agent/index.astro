@@ -1,3 +1,67 @@
 ---
-return Astro.redirect("/dashboard", 302);
+import { agentDashboardRoutes } from "@/config/navigation";
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import {
+  getDashboardRoleForSignedInUser,
+  getSignedInUser,
+} from "@/lib/auth";
+
+export const prerender = false;
+
+const user = await getSignedInUser(Astro);
+
+if (!user) {
+  return Astro.redirect("/login", 302);
+}
+
+const role = await getDashboardRoleForSignedInUser(Astro, user.id);
+
+if (role !== "agent") {
+  return Astro.redirect("/admin", 302);
+}
 ---
+
+<DashboardLayout
+  title="NMC | Agent Dashboard"
+  description="Agent dashboard shell for assigned customers, submitted orders, payments, and commission workflows."
+  eyebrow="Agent"
+  heading="Agent Dashboard"
+  navLabel="Agent operations"
+  navItems={agentDashboardRoutes}
+>
+  <section class="admin-shell" aria-labelledby="agent-dashboard-title">
+    <header class="admin-header">
+      <p class="page-shell__eyebrow">Agent</p>
+      <h1 id="agent-dashboard-title" class="page-shell__title">Agent Dashboard</h1>
+      <p class="page-shell__description">
+        Agent workflow pages will be implemented in Phase 7. This authenticated shell is separated from public site navigation.
+      </p>
+    </header>
+
+    <section class="admin-summary-grid" aria-label="Agent dashboard placeholders">
+      <article id="agent-earnings" class="admin-summary-card">
+        <h2>Earnings</h2>
+        <p>Phase 7</p>
+      </article>
+      <article id="agent-customers" class="admin-summary-card">
+        <h2>Customers</h2>
+        <p>Phase 7</p>
+      </article>
+      <article id="agent-orders" class="admin-summary-card">
+        <h2>Orders</h2>
+        <p>Phase 7</p>
+      </article>
+      <article id="agent-payments" class="admin-summary-card">
+        <h2>Payments</h2>
+        <p>Phase 7</p>
+      </article>
+    </section>
+
+    <section id="agent-timeline" class="admin-panel" aria-labelledby="agent-timeline-title">
+      <div class="admin-panel__header">
+        <h2 id="agent-timeline-title">Timeline</h2>
+        <p>Accessible order update timelines are reserved for the Phase 7 agent dashboard implementation.</p>
+      </div>
+    </section>
+  </section>
+</DashboardLayout>

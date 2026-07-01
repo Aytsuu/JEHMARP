@@ -1,5 +1,5 @@
 ---
-import AdminDashboard from "@/components/admin/AdminDashboard.astro";
+import AdminCustomerManagement from "@/components/admin/AdminCustomerManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
@@ -18,11 +18,11 @@ const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
 <AdminPageFrame
-  title="NMC | Admin Dashboard"
-  description="Admin dashboard overview for operational workflows."
-  heading="Admin Dashboard"
-  intro="Review operational totals and choose a management area from the sidebar."
+  title="NMC | Admin Customers"
+  description="Admin customer record management."
+  heading="Customer Record Management"
+  intro="Create customer records and manage optional agent assignment."
   feedback={feedback}
 >
-  <AdminDashboard data={data} />
+  <AdminCustomerManagement data={data} />
 </AdminPageFrame>

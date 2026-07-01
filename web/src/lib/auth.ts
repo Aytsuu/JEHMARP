@@ -72,6 +72,10 @@ export function getDashboardHeading(role: DashboardRole) {
   return role === "admin" ? "Admin Dashboard" : "Agent Dashboard";
 }
 
+export function getDashboardPath(role: DashboardRole) {
+  return role === "admin" ? "/admin" : "/agent";
+}
+
 export function getLoginErrorMessage(value: string | null) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }

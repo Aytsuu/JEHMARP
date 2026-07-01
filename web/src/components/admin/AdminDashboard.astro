@@ -1,0 +1,42 @@
+---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+
+type Props = {
+  data: AdminDashboardData;
+};
+
+const { data } = Astro.props;
+---
+
+<section class="admin-summary-grid" aria-label="Dashboard summary">
+  <article class="admin-summary-card">
+    <h2>Submitted Orders</h2>
+    <p>{data.summary.submittedOrders}</p>
+    <a href="/admin/orders">Review orders</a>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Open Inquiries</h2>
+    <p>{data.summary.openInquiries}</p>
+    <a href="/admin/inquiries">Manage inquiries</a>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Customers</h2>
+    <p>{data.summary.customers}</p>
+    <a href="/admin/customers">Manage customers</a>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Active Products</h2>
+    <p>{data.summary.activeProducts}</p>
+    <a href="/admin/products">Manage products</a>
+  </article>
+</section>
+
+<section class="admin-panel" aria-labelledby="admin-overview-operations-title">
+  <div class="admin-panel__header">
+    <h2 id="admin-overview-operations-title">Operations</h2>
+    <p>
+      Select an admin operation from the sidebar. Each section now has its own
+      page, URL, and workflow context.
+    </p>
+  </div>
+</section>
