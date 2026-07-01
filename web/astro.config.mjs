@@ -1,17 +1,15 @@
 // @ts-check
 import { fileURLToPath } from 'node:url';
 
-import node from '@astrojs/node';
 import react from '@astrojs/react';
+import vercel from '@astrojs/vercel';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'astro/config';
 
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
-  adapter: node({
-    mode: 'standalone',
-  }),
+  adapter: vercel(),
   integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
