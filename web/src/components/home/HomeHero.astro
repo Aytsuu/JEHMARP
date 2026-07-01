@@ -1,0 +1,45 @@
+---
+import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+
+type Props = {
+  section: PublicPageSectionRecord;
+};
+
+const { section } = Astro.props;
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+const heading = stringValue(section.content.heading) ?? "NMC Premium";
+const summary = stringValue(section.content.summary);
+const supportingText = stringValue(section.content.supportingText);
+const primaryActionHref = stringValue(section.content.primaryActionHref);
+const primaryActionLabel = stringValue(section.content.primaryActionLabel);
+const secondaryActionHref = stringValue(section.content.secondaryActionHref);
+const secondaryActionLabel = stringValue(section.content.secondaryActionLabel);
+---
+
+<section class="home-hero" aria-labelledby="home-hero-heading">
+  <div class="home-hero__overlay"></div>
+  <div class="home-hero__content">
+    <h1 id="home-hero-heading" class="home-hero__title">{heading}</h1>
+    {summary && <p class="home-hero__summary">{summary}</p>}
+    {supportingText && <p class="home-hero__supporting-text">{supportingText}</p>}
+    
+    {((primaryActionHref && primaryActionLabel) || (secondaryActionHref && secondaryActionLabel)) && (
+      <div class="home-hero__actions">
+        {primaryActionHref && primaryActionLabel && (
+          <a href={primaryActionHref} class="home-hero__button home-hero__button--primary">
+            {primaryActionLabel}
+          </a>
+        )}
+        {secondaryActionHref && secondaryActionLabel && (
+          <a href={secondaryActionHref} class="home-hero__button home-hero__button--secondary">
+            {secondaryActionLabel}
+          </a>
+        )}
+      </div>
+    )}
+  </div>
+</section>

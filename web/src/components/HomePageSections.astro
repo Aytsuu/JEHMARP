@@ -5,24 +5,80 @@ type Props = {
   sections: PublicPageSectionRecord[];
 };
 
-type GalleryImage = {
-  src: string;
-  alt: string;
+type FeaturedItem = {
+  name: string;
+  description: string;
+  price: string;
 };
 
 const { sections } = Astro.props;
 
-const hero = sections.find((section) => section.type === "hero");
 const about = sections.find((section) => section.type === "about");
 const missionVisionCoreValues = sections.find(
   (section) => section.type === "mission_vision_core_values",
 );
 const taglines = sections.find((section) => section.type === "taglines");
-const imagesGallery = sections.find((section) => section.type === "images_gallery");
+const shopInfoSource = sections.find((section) => section.type === "images_gallery");
 
 const coreValues = asStringArray(missionVisionCoreValues?.content.coreValues);
 const taglineItems = asStringArray(taglines?.content.items);
-const galleryImages = asGalleryImages(imagesGallery?.content.images);
+const featuredItems: FeaturedItem[] = [
+  {
+    name: "Pork belly strips",
+    description: "Rich marbling, clean cut, ideal for grilling or braising.",
+    price: "From PHP 320/kg",
+  },
+  {
+    name: "Chicken breast fillet",
+    description: "Lean, fresh, and trimmed for quick family meals.",
+    price: "From PHP 245/kg",
+  },
+  {
+    name: "Beef short ribs",
+    description: "Meaty ribs prepared for slow cooking and soup stock.",
+    price: "From PHP 540/kg",
+  },
+  {
+    name: "Ground pork",
+    description: "Freshly ground on-site for lumpia, meatballs, and patties.",
+    price: "From PHP 295/kg",
+  },
+];
+const storefrontBenefits = [
+  "Fresh, not frozen meat prepared daily.",
+  "Cuts trimmed and packed on-site by the team.",
+  "Reliable quality for home cooking, bulk orders, and everyday meals.",
+  "Direct ordering flow with pickup or delivery coordination.",
+];
+const orderingSteps = [
+  "Choose your cuts and preferred quantities.",
+  "Confirm pickup or delivery details with the shop.",
+  "Receive fresh meat packed and ready for cooking.",
+];
+const storeDetails = [
+  { label: "Store hours", value: "Open daily, 7:00 AM to 7:00 PM" },
+  { label: "Phone", value: "+63 917 000 0000" },
+  { label: "Location", value: "Main public market area, easy pickup access" },
+  { label: "Ordering", value: "Message ahead for bulk, party, or custom-cut requests" },
+];
+const faqItems = [
+  {
+    question: "Is the meat fresh or frozen?",
+    answer: "Fresh cuts are prepared daily and packed on-site for the day’s orders.",
+  },
+  {
+    question: "Do you accept custom cuts?",
+    answer: "Yes. You can request preferred thickness, portioning, and preparation when ordering.",
+  },
+  {
+    question: "Can I order in bulk?",
+    answer: "Yes. Family packs, party orders, and business quantities can be arranged ahead of time.",
+  },
+  {
+    question: "Do you offer pickup and delivery?",
+    answer: "Pickup is supported directly, and delivery can be coordinated based on your area.",
+  },
+];
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
@@ -35,132 +91,160 @@ function asStringArray(value: unknown): string[] {
 
   return value.flatMap((item) => (typeof item === "string" && item.trim().length > 0 ? [item.trim()] : []));
 }
-
-function asGalleryImages(value: unknown): GalleryImage[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-
-  return value.flatMap((item) => {
-    if (!item || typeof item !== "object") {
-      return [];
-    }
-
-    const src = "src" in item ? stringValue(item.src) : undefined;
-    const alt = "alt" in item ? stringValue(item.alt) : undefined;
-
-    return src && alt ? [{ src, alt }] : [];
-  });
-}
 ---
 
 <div class="home-sections">
   {
-    hero && (
-      <section class="home-section" aria-labelledby="home-hero">
-        <h2 id="home-hero">{stringValue(hero.content.heading) ?? "Hero"}</h2>
-        {stringValue(hero.content.summary) && <p>{stringValue(hero.content.summary)}</p>}
-        {stringValue(hero.content.supportingText) && <p>{stringValue(hero.content.supportingText)}</p>}
-        <p class="actions-row">
-          {stringValue(hero.content.primaryActionHref) && stringValue(hero.content.primaryActionLabel) && (
-            <a href={stringValue(hero.content.primaryActionHref) ?? "/shop"}>
-              {stringValue(hero.content.primaryActionLabel)}
-            </a>
-          )}{" "}
-          {stringValue(hero.content.secondaryActionHref) && stringValue(hero.content.secondaryActionLabel) && (
-            <a href={stringValue(hero.content.secondaryActionHref) ?? "/our-story"}>
-              {stringValue(hero.content.secondaryActionLabel)}
-            </a>
-          )}
-        </p>
-      </section>
-    )
-  }
-
-  {
     about && (
-      <section class="home-section" aria-labelledby="home-about">
-        <h2 id="home-about">{stringValue(about.content.heading) ?? "About"}</h2>
-        {stringValue(about.content.summary) && <p>{stringValue(about.content.summary)}</p>}
-        {stringValue(about.content.body) && <p>{stringValue(about.content.body)}</p>}
-      </section>
+      <div class="home-container">
+        <section class="about-section" aria-labelledby="home-about">
+          <div class="about-section__grid">
+            <div class="about-section__image-container">
+              <img src="/images/meat_cluster.svg" alt="Pork, chicken, and egg cluster" class="about-section__image" />
+            </div>
+            <div class="about-section__content">
+              <h2 id="home-about" class="about-section__title">ABOUT THE MEATSHOP</h2>
+              {stringValue(about.content.summary) && <p class="about-section__summary">{stringValue(about.content.summary)}</p>}
+              {stringValue(about.content.body) && <p class="about-section__body">{stringValue(about.content.body)}</p>}
+            </div>
+          </div>
+        </section>
+      </div>
     )
   }
 
   {
     missionVisionCoreValues && (
-      <section class="home-section" aria-labelledby="home-mission-vision-core-values">
-        <h2 id="home-mission-vision-core-values">
-          {stringValue(missionVisionCoreValues.content.heading) ?? "Mission, Vision, and Core Values"}
-        </h2>
-        <div class="mission-grid">
-          <article class="content-section">
-            <h3>Mission</h3>
-            <p>{stringValue(missionVisionCoreValues.content.mission) ?? "Mission content is not available yet."}</p>
-          </article>
-          <article class="content-section">
-            <h3>Vision</h3>
-            <p>{stringValue(missionVisionCoreValues.content.vision) ?? "Vision content is not available yet."}</p>
-          </article>
-          <article class="content-section">
-            <h3>Core Values</h3>
-            {
-              coreValues.length > 0 ? (
-                <ul class="bullet-list">
-                  {coreValues.map((value) => (
-                    <li>{value}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>Core values have not been added yet.</p>
-              )
-            }
-          </article>
+      <div class="mission-section-outer">
+        <div class="home-container">
+          <section class="mission-section" aria-label="Mission, Vision, and Core Values">
+            <div class="mission-section__grid">
+              <article class="mission-card mission-card--mission">
+                <h3 class="mission-card__heading">Mission</h3>
+                <p class="mission-card__text">{stringValue(missionVisionCoreValues.content.mission) ?? "Mission content is not available yet."}</p>
+              </article>
+              <article class="mission-card mission-card--vision">
+                <h3 class="mission-card__heading">Vision</h3>
+                <p class="mission-card__text">{stringValue(missionVisionCoreValues.content.vision) ?? "Vision content is not available yet."}</p>
+              </article>
+              <article class="mission-card mission-card--values">
+                <h3 class="mission-card__heading">Core Values</h3>
+                {
+                  coreValues.length > 0 ? (
+                    <ul class="mission-card__list">
+                      {coreValues.map((value) => (
+                        <li class="mission-card__list-item">{value}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p class="mission-card__text">Core values have not been added yet.</p>
+                  )
+                }
+              </article>
+            </div>
+          </section>
         </div>
-      </section>
+      </div>
     )
   }
 
   {
     taglines && (
-      <section class="home-section" aria-labelledby="home-taglines">
-        <h2 id="home-taglines">{stringValue(taglines.content.heading) ?? "Taglines"}</h2>
-        {
-          taglineItems.length > 0 ? (
-            <ul class="tagline-list">
-              {taglineItems.map((tagline) => (
-                <li>{tagline}</li>
-              ))}
-            </ul>
-          ) : (
-            <p>Taglines have not been added yet.</p>
-          )
-        }
-      </section>
+      <div class="home-container">
+        <div class="tagline-card">
+          <div class="tagline-card__overlay"></div>
+          <div class="tagline-card__content">
+            {
+              taglineItems.length > 0 ? (
+                <div class="tagline-display">
+                  {taglineItems.map((tagline) => (
+                    <p class="tagline-display__item">“{tagline}”</p>
+                  ))}
+                </div>
+              ) : (
+                <p class="tagline-display__empty">Taglines have not been added yet.</p>
+              )
+            }
+          </div>
+        </div>
+      </div>
     )
   }
 
-  {
-    imagesGallery && (
-      <section class="home-section" aria-labelledby="home-images-gallery">
-        <h2 id="home-images-gallery">{stringValue(imagesGallery.content.heading) ?? "Images Gallery"}</h2>
-        {
-          galleryImages.length > 0 ? (
-            <ul class="gallery-grid gallery-list">
-              {galleryImages.map((image) => (
-                <li>
-                  <figure class="gallery-figure">
-                    <img src={image.src} alt={image.alt} />
-                    <figcaption>{image.alt}</figcaption>
-                  </figure>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>Gallery images have not been added yet.</p>
-          )
-        }
-      </section>
-    )
-  }
+  {shopInfoSource && (
+    <>
+      <div class="home-container">
+        <section class="home-section" aria-labelledby="home-why-buy">
+          <h2 id="home-why-buy">Why buy from NMC</h2>
+          <ul class="bullet-list">
+            {storefrontBenefits.map((benefit) => (
+              <li>{benefit}</li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <div class="home-container">
+        <section class="home-section" aria-labelledby="home-ordering-process">
+          <h2 id="home-ordering-process">How ordering works</h2>
+          <ol>
+            {orderingSteps.map((step) => (
+              <li>{step}</li>
+            ))}
+          </ol>
+        </section>
+      </div>
+
+      <div class="home-container">
+        <section class="home-section" aria-labelledby="home-featured-products">
+          <div class="actions-row">
+            <h2 id="home-featured-products">Featured products</h2>
+            <a href="/shop">Browse all products</a>
+          </div>
+          <ul class="product-grid gallery-list">
+            {featuredItems.map((item) => (
+              <li>
+                <article class="content-section">
+                  <h3>{item.name}</h3>
+                  <p>{item.description}</p>
+                  <p>{item.price}</p>
+                  <p>
+                    <a href="/shop">Shop now</a>
+                  </p>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </section>
+      </div>
+
+      <div class="home-container">
+        <section class="home-section" aria-labelledby="home-store-details">
+          <h2 id="home-store-details">Store details</h2>
+          <dl class="detail-list">
+            {storeDetails.map((detail) => (
+              <>
+                <dt>{detail.label}</dt>
+                <dd>{detail.value}</dd>
+              </>
+            ))}
+          </dl>
+        </section>
+      </div>
+
+      <div class="home-container">
+        <section class="home-section" aria-labelledby="home-faq">
+          <h2 id="home-faq">Frequently asked questions</h2>
+          <div class="content-stack">
+            {faqItems.map((item) => (
+              <article class="content-section">
+                <h3>{item.question}</h3>
+                <p>{item.answer}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      </div>
+    </>
+  )}
 </div>

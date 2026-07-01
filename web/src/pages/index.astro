@@ -1,15 +1,17 @@
 ---
 import HomePageSections from "@/components/HomePageSections.astro";
-import PageShell from "@/components/PageShell.astro";
+import HomeHero from "@/components/home/HomeHero.astro";
 import Layout from "@/layouts/Layout.astro";
 import { getPublicPageContent } from "@/lib/public-website/content";
 
 const content = await getPublicPageContent(Astro, "home");
 const title = content.page?.title ?? "Home";
+
+const heroSection = content.sections.find((section) => section.type === "hero");
+const otherSections = content.sections.filter((section) => section.type !== "hero");
 ---
 
 <Layout title={`NMC | ${title}`} description="NMC public home page.">
-	<PageShell title={title}>
-		<HomePageSections sections={content.sections} />
-	</PageShell>
+	{heroSection && <HomeHero section={heroSection} />}
+	<HomePageSections sections={otherSections} />
 </Layout>

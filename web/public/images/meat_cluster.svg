@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <defs>
+    <!-- Gradient for Pork -->
+    <linearGradient id="porkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fda4af" />
+      <stop offset="100%" stop-color="#e11d48" />
+    </linearGradient>
+    
+    <!-- Gradient for Chicken -->
+    <linearGradient id="chickenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a" />
+      <stop offset="100%" stop-color="#ca8a04" />
+    </linearGradient>
+    
+    <!-- Gradient for Eggs -->
+    <linearGradient id="eggGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#cbd5e1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Soft subtle background shadow glow -->
+  <circle cx="200" cy="200" r="140" fill="#f8fafc" opacity="0.6" stroke="#f1f5f9" stroke-width="2" />
+  
+  <!-- Cluster Group -->
+  <g transform="translate(10, 10)">
+    <!-- Pork Chop shape -->
+    <path d="M 120 220 
+             C 100 170, 140 100, 200 110 
+             C 250 120, 280 160, 270 210 
+             C 260 250, 220 280, 180 270 
+             C 140 260, 130 240, 120 220 Z" 
+          fill="url(#porkGrad)" 
+          stroke="#4c0519" 
+          stroke-width="4" 
+          stroke-linejoin="round" />
+    <!-- Bone detail in Pork Chop -->
+    <path d="M 220 140 C 235 145, 235 160, 225 165 C 215 170, 205 165, 205 155 C 205 145, 212 138, 220 140 Z" fill="#ffffff" stroke="#4c0519" stroke-width="3" />
+    
+    <!-- Chicken leg shape overlapping pork -->
+    <g transform="rotate(30, 200, 200)">
+      <!-- Bone shaft -->
+      <path d="M 195 160 L 260 200" stroke="#713f12" stroke-width="12" stroke-linecap="round" />
+      <path d="M 195 160 L 260 200" stroke="#ffffff" stroke-width="6" stroke-linecap="round" />
+      <!-- Bone joints -->
+      <circle cx="260" cy="200" r="10" fill="#ffffff" stroke="#713f12" stroke-width="4" />
+      <circle cx="268" cy="192" r="10" fill="#ffffff" stroke="#713f12" stroke-width="4" />
+      <!-- Meat bulb -->
+      <path d="M 170 120 C 135 120, 125 165, 155 185 C 180 195, 205 175, 205 145 C 205 125, 190 120, 170 120 Z" 
+            fill="url(#chickenGrad)" 
+            stroke="#713f12" 
+            stroke-width="4"
+            stroke-linejoin="round" />
+    </g>
+    
+    <!-- Egg shapes at the front -->
+    <!-- Egg 1 -->
+    <ellipse cx="230" cy="245" rx="30" ry="42" fill="url(#eggGrad)" stroke="#1e293b" stroke-width="4" transform="rotate(-15, 230, 245)" />
+    <!-- Egg 2 -->
+    <ellipse cx="165" cy="255" rx="28" ry="40" fill="url(#eggGrad)" stroke="#1e293b" stroke-width="4" transform="rotate(20, 165, 255)" />
+  </g>
+</svg>
