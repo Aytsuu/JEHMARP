@@ -1,16 +1,6 @@
----
-type Props = {
-  title: string;
-};
-
-const { title } = Astro.props;
----
-
 <section class="page-shell">
-  <header class="page-shell__header">
-    <h1 class="page-shell__title">{title}</h1>
-  </header>
   <div class="page-shell__content">
     <slot />
   </div>
-</section>
+</section>;
+
