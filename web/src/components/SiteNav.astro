@@ -2,10 +2,10 @@
 import { authRoutes, publicRoutes } from "@/config/navigation";
 ---
 
-<header>
-  <nav aria-label="Primary navigation">
-    <a href="/">NMC</a>
-    <ul>
+<header class="site-nav">
+  <nav class="site-nav__inner" aria-label="Primary navigation">
+    <a class="site-nav__brand" href="/">NMC</a>
+    <ul class="site-nav__list">
       {publicRoutes.map((item) => (
         <li>
           <a href={item.href}>{item.label}</a>

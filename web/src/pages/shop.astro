@@ -14,15 +14,14 @@ const orderReference = Astro.url.searchParams.get("reference");
 const orderMessage = Astro.url.searchParams.get("message");
 ---
 
-<Layout title="NMC | Shop" description="Browse active NMC products and submit a guest order.">
-  <PageShell
-    eyebrow="Public website"
-    title="Shop"
-    description="Browse active products by public price, category, stock status, and submit a guest order."
-  >
+<Layout
+  title="NMC | Shop"
+  description="Browse active NMC products and submit a guest order."
+>
+  <PageShell title="Shop">
     {
       orderStatus === "submitted" && (
-        <section aria-labelledby="order-confirmation">
+        <section class="message-block" aria-labelledby="order-confirmation">
           <h2 id="order-confirmation">Order submitted</h2>
           <p>Your guest order was submitted for review.</p>
           {orderReference && <p>Reference: {orderReference}</p>}
@@ -32,77 +31,123 @@ const orderMessage = Astro.url.searchParams.get("message");
 
     {
       orderStatus === "error" && (
-        <section aria-labelledby="order-error">
+        <section class="message-block" aria-labelledby="order-error">
           <h2 id="order-error">Order was not submitted</h2>
           <p>{orderMessage ?? "Please check the order form and try again."}</p>
         </section>
       )
     }
 
-    <section aria-labelledby="shop-filters">
+    <section class="form-section" aria-labelledby="shop-filters">
       <h2 id="shop-filters">Filter products</h2>
-      <form method="get" action="/shop">
-        <p>
+      <form class="form-grid form-grid--filters" method="get" action="/shop">
+        <div class="field-row">
           <label for="category">Category</label>
           <select id="category" name="category">
             <option value="">All categories</option>
-            <option value="pork" selected={filters.category === "pork"}>Pork</option>
-            <option value="chicken" selected={filters.category === "chicken"}>Chicken</option>
-            <option value="egg" selected={filters.category === "egg"}>Egg</option>
+            <option value="pork" selected={filters.category === "pork"}
+              >Pork</option
+            >
+            <option value="chicken" selected={filters.category === "chicken"}
+              >Chicken</option
+            >
+            <option value="egg" selected={filters.category === "egg"}
+              >Egg</option
+            >
           </select>
-        </p>
+        </div>
 
-        <p>
+        <div class="field-row">
           <label for="stockStatus">Stock status</label>
           <select id="stockStatus" name="stockStatus">
             <option value="">All stock statuses</option>
-            <option value="in_stock" selected={filters.stockStatus === "in_stock"}>In stock</option>
-            <option value="limited" selected={filters.stockStatus === "limited"}>Limited</option>
-            <option value="out_of_stock" selected={filters.stockStatus === "out_of_stock"}>Out of stock</option>
+            <option
+              value="in_stock"
+              selected={filters.stockStatus === "in_stock"}>In stock</option
+            >
+            <option value="limited" selected={filters.stockStatus === "limited"}
+              >Limited</option
+            >
+            <option
+              value="out_of_stock"
+              selected={filters.stockStatus === "out_of_stock"}
+              >Out of stock</option
+            >
           </select>
-        </p>
+        </div>
 
-        <p>
+        <div class="field-row">
           <label for="minPrice">Minimum price</label>
-          <input id="minPrice" name="minPrice" type="number" min="0" step="0.01" value={filters.minPrice} />
-        </p>
+          <input
+            id="minPrice"
+            name="minPrice"
+            type="number"
+            min="0"
+            step="0.01"
+            value={filters.minPrice}
+          />
+        </div>
 
-        <p>
+        <div class="field-row">
           <label for="maxPrice">Maximum price</label>
-          <input id="maxPrice" name="maxPrice" type="number" min="0" step="0.01" value={filters.maxPrice} />
-        </p>
+          <input
+            id="maxPrice"
+            name="maxPrice"
+            type="number"
+            min="0"
+            step="0.01"
+            value={filters.maxPrice}
+          />
+        </div>
 
-        <p>
+        <div class="field-row">
           <label for="sort">Sort</label>
           <select id="sort" name="sort">
-            <option value="name_asc" selected={filters.sort === "name_asc"}>Name, A to Z</option>
-            <option value="name_desc" selected={filters.sort === "name_desc"}>Name, Z to A</option>
-            <option value="price_asc" selected={filters.sort === "price_asc"}>Price, low to high</option>
-            <option value="price_desc" selected={filters.sort === "price_desc"}>Price, high to low</option>
-            <option value="newest" selected={filters.sort === "newest"}>Newest</option>
+            <option value="name_asc" selected={filters.sort === "name_asc"}
+              >Name, A to Z</option
+            >
+            <option value="name_desc" selected={filters.sort === "name_desc"}
+              >Name, Z to A</option
+            >
+            <option value="price_asc" selected={filters.sort === "price_asc"}
+              >Price, low to high</option
+            >
+            <option value="price_desc" selected={filters.sort === "price_desc"}
+              >Price, high to low</option
+            >
+            <option value="newest" selected={filters.sort === "newest"}
+              >Newest</option
+            >
           </select>
-        </p>
+        </div>
 
-        <button type="submit">Apply filters</button>
-        <a href="/shop">Reset filters</a>
+        <div class="button-row">
+          <button type="submit">Apply filters</button>
+          <a href="/shop">Reset filters</a>
+        </div>
       </form>
     </section>
 
-    <section aria-labelledby="product-list">
+    <section class="content-section" aria-labelledby="product-list">
       <h2 id="product-list">Products</h2>
       <p>
-        Showing page {pagination.currentPage} of {pagination.totalPages}. {pagination.count} product{pagination.count === 1 ? "" : "s"} found.
+        Showing page {pagination.currentPage} of {pagination.totalPages}. {
+          pagination.count
+        } product{pagination.count === 1 ? "" : "s"} found.
       </p>
 
       {
         products.length > 0 ? (
-          <ul>
+          <ul class="product-grid gallery-list">
             {products.map((product) => (
               <li>
-                <article>
+                <article class="product-listing">
                   <h3>{product.name}</h3>
-                  <p>{product.description ?? "No description has been published for this product."}</p>
-                  <dl>
+                  <p>
+                    {product.description ??
+                      "No description has been published for this product."}
+                  </p>
+                  <dl class="detail-list">
                     <dt>Category</dt>
                     <dd>{product.category}</dd>
                     <dt>Unit</dt>
@@ -121,10 +166,12 @@ const orderMessage = Astro.url.searchParams.get("message");
         )
       }
 
-      <nav aria-label="Product pagination">
+      <nav class="pagination-row" aria-label="Product pagination">
         {
           pagination.previousPage && (
-            <a href={buildShopUrl(filters, pagination.previousPage)}>Previous page</a>
+            <a href={buildShopUrl(filters, pagination.previousPage)}>
+              Previous page
+            </a>
           )
         }
         {
@@ -135,64 +182,105 @@ const orderMessage = Astro.url.searchParams.get("message");
       </nav>
     </section>
 
-    <section aria-labelledby="guest-order">
+    <section class="form-section" aria-labelledby="guest-order">
       <h2 id="guest-order">Guest order form</h2>
-      <form method="post" action="/api/guest-orders">
-        <fieldset>
+      <form class="form-grid" method="post" action="/api/guest-orders">
+        <fieldset class="fieldset-block">
           <legend>Customer details</legend>
-          <p>
-            <label for="firstName">First name</label>
-            <input id="firstName" name="firstName" required autocomplete="given-name" />
-          </p>
-          <p>
-            <label for="lastName">Last name</label>
-            <input id="lastName" name="lastName" required autocomplete="family-name" />
-          </p>
-          <p>
-            <label for="phoneNumber">Phone number</label>
-            <input id="phoneNumber" name="phoneNumber" required autocomplete="tel" />
-          </p>
-          <p>
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" autocomplete="email" />
-          </p>
-          <p>
+          <div class="form-grid form-grid--two-column">
+            <div class="field-row">
+              <label for="firstName">First name</label>
+              <input
+                id="firstName"
+                name="firstName"
+                required
+                autocomplete="given-name"
+              />
+            </div>
+            <div class="field-row">
+              <label for="lastName">Last name</label>
+              <input
+                id="lastName"
+                name="lastName"
+                required
+                autocomplete="family-name"
+              />
+            </div>
+            <div class="field-row">
+              <label for="phoneNumber">Phone number</label>
+              <input
+                id="phoneNumber"
+                name="phoneNumber"
+                required
+                autocomplete="tel"
+              />
+            </div>
+            <div class="field-row">
+              <label for="email">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autocomplete="email"
+              />
+            </div>
+          </div>
+          <div class="field-row">
             <label for="address">Delivery address</label>
-            <textarea id="address" name="address" required autocomplete="street-address"></textarea>
-          </p>
+            <textarea
+              id="address"
+              name="address"
+              required
+              autocomplete="street-address"></textarea>
+          </div>
         </fieldset>
 
-        <fieldset>
+        <fieldset class="fieldset-block">
           <legend>Order items</legend>
           {
             products.length > 0 ? (
-              products.map((product) => (
-                <section aria-labelledby={`order-product-${product.id}`}>
-                  <h3 id={`order-product-${product.id}`}>{product.name}</h3>
-                  <p>{Number(product.default_price).toFixed(2)} per {product.unit_label}</p>
-                  <p>
-                    <label for={`quantity-${product.id}`}>Quantity</label>
-                    <input
-                      id={`quantity-${product.id}`}
-                      name={`quantity:${product.id}`}
-                      type="number"
-                      min="0"
-                      step="0.001"
-                    />
-                  </p>
-                  <p>
-                    <label for={`details-${product.id}`}>Item details</label>
-                    <input id={`details-${product.id}`} name={`details:${product.id}`} />
-                  </p>
-                </section>
-              ))
+              <div class="order-items-grid">
+                {products.map((product) => (
+                  <section
+                    class="product-order-item"
+                    aria-labelledby={`order-product-${product.id}`}
+                  >
+                    <h3 id={`order-product-${product.id}`}>{product.name}</h3>
+                    <p>
+                      {Number(product.default_price).toFixed(2)} per{" "}
+                      {product.unit_label}
+                    </p>
+                    <div class="field-row">
+                      <label for={`quantity-${product.id}`}>Quantity</label>
+                      <input
+                        id={`quantity-${product.id}`}
+                        name={`quantity:${product.id}`}
+                        type="number"
+                        min="0"
+                        step="0.001"
+                      />
+                    </div>
+                    <div class="field-row">
+                      <label for={`details-${product.id}`}>Item details</label>
+                      <input
+                        id={`details-${product.id}`}
+                        name={`details:${product.id}`}
+                      />
+                    </div>
+                  </section>
+                ))}
+              </div>
             ) : (
               <p>No active products are available for guest ordering.</p>
             )
           }
         </fieldset>
 
-        <button type="submit" disabled={products.length === 0}>Submit guest order</button>
+        <div class="button-row">
+          <button type="submit" disabled={products.length === 0}
+            >Submit guest order</button
+          >
+        </div>
       </form>
     </section>
   </PageShell>

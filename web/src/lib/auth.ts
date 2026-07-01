@@ -1,11 +1,11 @@
 import type { APIContext } from "astro";
 
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type DashboardRole = "admin" | "agent";
 
 type RequestContext = Pick<APIContext, "cookies" | "request">;
+type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 
 export async function getSignedInUser(context: RequestContext) {
   const supabase = createSupabaseServerClient(context);
@@ -22,8 +22,19 @@ export async function getSignedInUser(context: RequestContext) {
   return data.user;
 }
 
-export async function getDashboardRoleForUserId(userId: string): Promise<DashboardRole> {
-  const supabase = createSupabaseAdminClient();
+export async function getDashboardRoleForSignedInUser(
+  context: RequestContext,
+  userId: string,
+): Promise<DashboardRole> {
+  const supabase = createSupabaseServerClient(context);
+
+  return getDashboardRoleWithClient(supabase, userId);
+}
+
+export async function getDashboardRoleWithClient(
+  supabase: SupabaseServerClient,
+  userId: string,
+): Promise<DashboardRole> {
   const { data: adminRole, error: adminError } = await supabase
     .from("admin_role")
     .select("id")

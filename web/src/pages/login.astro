@@ -12,23 +12,40 @@ if (user) {
 const errorMessage = getLoginErrorMessage(Astro.url.searchParams.get("error"));
 ---
 
-<Layout title="NMC | Login" description="Single authentication entry point for admin and agent access.">
-  <PageShell
-    eyebrow="Access"
-    title="Login"
-    description="Use one shared authentication page, then route to the correct dashboard after sign-in based on the account role."
-  >
-    {errorMessage && <p>{errorMessage}</p>}
+<Layout
+  title="NMC | Login"
+  description="Single authentication entry point for admin and agent access."
+>
+  <PageShell title="Login">
+    {
+      errorMessage && (
+        <section class="message-block">
+          <p>{errorMessage}</p>
+        </section>
+      )
+    }
 
-    <form method="post" action="/api/login">
-      <p>
+    <form class="form-section form-grid" method="post" action="/api/login">
+      <div class="field-row">
         <label for="email">Email</label>
-        <input id="email" name="email" type="email" required autocomplete="email" />
-      </p>
-      <p>
+        <input
+          id="email"
+          name="email"
+          type="email"
+          required
+          autocomplete="email"
+        />
+      </div>
+      <div class="field-row">
         <label for="password">Password</label>
-        <input id="password" name="password" type="password" required autocomplete="current-password" />
-      </p>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          required
+          autocomplete="current-password"
+        />
+      </div>
       <button type="submit">Sign in</button>
     </form>
   </PageShell>

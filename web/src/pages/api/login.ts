@@ -1,6 +1,6 @@
 import type { APIRoute } from "astro";
 
-import { getDashboardRoleForUserId } from "@/lib/auth";
+import { getDashboardRoleWithClient } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const prerender = false;
@@ -25,7 +25,7 @@ export const POST: APIRoute = async (context) => {
   }
 
   try {
-    await getDashboardRoleForUserId(data.user.id);
+    await getDashboardRoleWithClient(supabase, data.user.id);
   } catch {
     await supabase.auth.signOut();
     return context.redirect("/login?error=This%20account%20has%20no%20dashboard%20access.", 303);

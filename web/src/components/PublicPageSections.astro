@@ -11,12 +11,12 @@ const { sections } = Astro.props;
 
 {
   sections.length > 0 ? (
-    <div>
+    <div class="content-stack">
       {sections.map((section) => (
-        <section aria-labelledby={`section-${section.id}`}>
+        <section class="content-section" aria-labelledby={`section-${section.id}`}>
           <h2 id={`section-${section.id}`}>{getSectionHeading(section)}</h2>
           {getSectionEntries(section).length > 0 ? (
-            <dl>
+            <dl class="detail-list">
               {getSectionEntries(section).map(([label, value]) => (
                 <>
                   <dt>{label}</dt>

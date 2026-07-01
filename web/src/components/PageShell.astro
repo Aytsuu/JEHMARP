@@ -1,20 +1,16 @@
 ---
 type Props = {
-  eyebrow: string;
   title: string;
-  description: string;
 };
 
-const { eyebrow, title, description } = Astro.props;
+const { title } = Astro.props;
 ---
 
-<section>
-  <header>
-    <p>{eyebrow}</p>
-    <h1>{title}</h1>
-    <p>{description}</p>
+<section class="page-shell">
+  <header class="page-shell__header">
+    <h1 class="page-shell__title">{title}</h1>
   </header>
-  <div>
+  <div class="page-shell__content">
     <slot />
   </div>
 </section>

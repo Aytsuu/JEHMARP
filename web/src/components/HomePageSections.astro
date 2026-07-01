@@ -54,14 +54,14 @@ function asGalleryImages(value: unknown): GalleryImage[] {
 }
 ---
 
-<div>
+<div class="home-sections">
   {
     hero && (
-      <section aria-labelledby="home-hero">
+      <section class="home-section" aria-labelledby="home-hero">
         <h2 id="home-hero">{stringValue(hero.content.heading) ?? "Hero"}</h2>
         {stringValue(hero.content.summary) && <p>{stringValue(hero.content.summary)}</p>}
         {stringValue(hero.content.supportingText) && <p>{stringValue(hero.content.supportingText)}</p>}
-        <p>
+        <p class="actions-row">
           {stringValue(hero.content.primaryActionHref) && stringValue(hero.content.primaryActionLabel) && (
             <a href={stringValue(hero.content.primaryActionHref) ?? "/shop"}>
               {stringValue(hero.content.primaryActionLabel)}
@@ -79,7 +79,7 @@ function asGalleryImages(value: unknown): GalleryImage[] {
 
   {
     about && (
-      <section aria-labelledby="home-about">
+      <section class="home-section" aria-labelledby="home-about">
         <h2 id="home-about">{stringValue(about.content.heading) ?? "About"}</h2>
         {stringValue(about.content.summary) && <p>{stringValue(about.content.summary)}</p>}
         {stringValue(about.content.body) && <p>{stringValue(about.content.body)}</p>}
@@ -89,43 +89,45 @@ function asGalleryImages(value: unknown): GalleryImage[] {
 
   {
     missionVisionCoreValues && (
-      <section aria-labelledby="home-mission-vision-core-values">
+      <section class="home-section" aria-labelledby="home-mission-vision-core-values">
         <h2 id="home-mission-vision-core-values">
           {stringValue(missionVisionCoreValues.content.heading) ?? "Mission, Vision, and Core Values"}
         </h2>
-        <article>
-          <h3>Mission</h3>
-          <p>{stringValue(missionVisionCoreValues.content.mission) ?? "Mission content is not available yet."}</p>
-        </article>
-        <article>
-          <h3>Vision</h3>
-          <p>{stringValue(missionVisionCoreValues.content.vision) ?? "Vision content is not available yet."}</p>
-        </article>
-        <article>
-          <h3>Core Values</h3>
-          {
-            coreValues.length > 0 ? (
-              <ul>
-                {coreValues.map((value) => (
-                  <li>{value}</li>
-                ))}
-              </ul>
-            ) : (
-              <p>Core values have not been added yet.</p>
-            )
-          }
-        </article>
+        <div class="mission-grid">
+          <article class="content-section">
+            <h3>Mission</h3>
+            <p>{stringValue(missionVisionCoreValues.content.mission) ?? "Mission content is not available yet."}</p>
+          </article>
+          <article class="content-section">
+            <h3>Vision</h3>
+            <p>{stringValue(missionVisionCoreValues.content.vision) ?? "Vision content is not available yet."}</p>
+          </article>
+          <article class="content-section">
+            <h3>Core Values</h3>
+            {
+              coreValues.length > 0 ? (
+                <ul class="bullet-list">
+                  {coreValues.map((value) => (
+                    <li>{value}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Core values have not been added yet.</p>
+              )
+            }
+          </article>
+        </div>
       </section>
     )
   }
 
   {
     taglines && (
-      <section aria-labelledby="home-taglines">
+      <section class="home-section" aria-labelledby="home-taglines">
         <h2 id="home-taglines">{stringValue(taglines.content.heading) ?? "Taglines"}</h2>
         {
           taglineItems.length > 0 ? (
-            <ul>
+            <ul class="tagline-list">
               {taglineItems.map((tagline) => (
                 <li>{tagline}</li>
               ))}
@@ -140,14 +142,14 @@ function asGalleryImages(value: unknown): GalleryImage[] {
 
   {
     imagesGallery && (
-      <section aria-labelledby="home-images-gallery">
+      <section class="home-section" aria-labelledby="home-images-gallery">
         <h2 id="home-images-gallery">{stringValue(imagesGallery.content.heading) ?? "Images Gallery"}</h2>
         {
           galleryImages.length > 0 ? (
-            <ul>
+            <ul class="gallery-grid gallery-list">
               {galleryImages.map((image) => (
                 <li>
-                  <figure>
+                  <figure class="gallery-figure">
                     <img src={image.src} alt={image.alt} />
                     <figcaption>{image.alt}</figcaption>
                   </figure>

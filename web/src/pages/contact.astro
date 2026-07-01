@@ -9,11 +9,7 @@ const title = content.page?.title ?? "Contact";
 ---
 
 <Layout title={`NMC | ${title}`} description="NMC public contact page.">
-  <PageShell
-    eyebrow="Public website"
-    title={title}
-    description="Published contact content is loaded from the page and page section records."
-  >
+  <PageShell title={title}>
     <PublicPageSections sections={content.sections} />
   </PageShell>
 </Layout>

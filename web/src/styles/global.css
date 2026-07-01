@@ -1,0 +1,285 @@
+html {
+  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+  color: #111827;
+  background: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: inherit;
+}
+
+main {
+  display: block;
+}
+
+.site-nav,
+.page-shell,
+.site-footer {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.site-nav__inner,
+.page-shell,
+.site-footer__inner {
+  width: min(100%, 72rem);
+  margin: 0 auto;
+}
+
+.site-nav {
+  border-bottom: 1px solid #d1d5db;
+}
+
+.site-nav__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.site-nav__brand {
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-nav__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-nav__list a {
+  text-decoration: none;
+}
+
+.page-shell {
+  padding-top: 2rem;
+  padding-bottom: 3rem;
+}
+
+.page-shell__header {
+  max-width: 48rem;
+  margin-bottom: 2rem;
+}
+
+.page-shell__eyebrow {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.page-shell__title {
+  margin: 0;
+}
+
+.page-shell__description {
+  margin: 0.75rem 0 0;
+}
+
+.page-shell__content {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.content-stack,
+.home-sections {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.content-section,
+.home-section,
+.message-block,
+.form-section,
+.product-listing,
+.product-order-item {
+  border: 1px solid #d1d5db;
+  padding: 1rem;
+}
+
+.split-copy {
+  display: grid;
+  gap: 1rem;
+}
+
+.detail-list {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1rem;
+  margin: 0;
+}
+
+.detail-list dt {
+  font-weight: 700;
+}
+
+.detail-list dd {
+  margin: 0;
+}
+
+.gallery-list,
+.product-list,
+.bullet-list,
+.tagline-list,
+.footer-link-list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.gallery-grid,
+.product-grid,
+.order-items-grid,
+.footer-grid,
+.mission-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.gallery-grid,
+.product-grid,
+.order-items-grid,
+.footer-grid {
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.gallery-list {
+  list-style: none;
+  padding: 0;
+}
+
+.gallery-figure {
+  margin: 0;
+}
+
+.gallery-figure img {
+  width: 100%;
+}
+
+.actions-row,
+.pagination-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.form-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.field-row {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.field-row input,
+.field-row select,
+.field-row textarea,
+.button-row button {
+  font: inherit;
+}
+
+.field-row input,
+.field-row select,
+.field-row textarea {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #9ca3af;
+  background: #ffffff;
+}
+
+.field-row textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.fieldset-block {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid #d1d5db;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+button {
+  font: inherit;
+  padding: 0.625rem 1rem;
+  border: 1px solid #111827;
+  background: #ffffff;
+  color: #111827;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.site-footer {
+  border-top: 1px solid #d1d5db;
+}
+
+.site-footer__inner {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+
+.site-footer h2 {
+  margin-top: 0;
+}
+
+.site-footer__brand-copy {
+  margin-bottom: 0;
+}
+
+.site-footer address {
+  font-style: normal;
+}
+
+@media (min-width: 48rem) {
+  .split-copy {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid--two-column {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .form-grid--filters {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mission-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
