@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { AdminOrder } from "./data";
-import { orderBalance, orderPaymentTotal, orderTotal } from "./view";
+import {
+  canManageOrderCommissions,
+  orderBalance,
+  orderPaymentTotal,
+  orderTotal,
+} from "./view";
 
 describe("orderTotal", () => {
   it("uses the order item unit price snapshot instead of the current product retail price", () => {
@@ -55,5 +60,12 @@ describe("orderBalance", () => {
     } as AdminOrder;
 
     expect(orderBalance(order)).toBe(0);
+  });
+});
+
+describe("canManageOrderCommissions", () => {
+  it("requires an agent linked directly to the customer order", () => {
+    expect(canManageOrderCommissions({ agent_id: null } as AdminOrder)).toBe(false);
+    expect(canManageOrderCommissions({ agent_id: "64568f81-108b-42bd-b926-7e825dad67c6" } as AdminOrder)).toBe(true);
   });
 });

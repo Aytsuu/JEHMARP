@@ -7,6 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 const uuidSchema = z.uuid();
 const pageStatuses = ["draft", "published", "archived"] as const;
 const productCategories = ["pork", "chicken", "egg"] as const;
+const productUnitLabels = ["kg", "tray"] as const;
 const stockStatuses = ["in_stock", "limited", "out_of_stock"] as const;
 const orderStatuses = [
   "draft",
@@ -19,19 +20,31 @@ const orderStatuses = [
   "closed",
 ] as const;
 const commissionStatuses = ["unset", "set", "cancelled", "paid"] as const;
-const invoiceStatuses = ["draft", "issued", "partially_paid", "paid", "void", "overdue"] as const;
 const inquiryStatuses = ["new", "reviewing", "responded", "closed", "spam"] as const;
 
 export type PageStatus = (typeof pageStatuses)[number];
 export type ProductCategory = (typeof productCategories)[number];
+export type ProductUnitLabel = (typeof productUnitLabels)[number];
 export type StockStatus = (typeof stockStatuses)[number];
 export type OrderStatus = (typeof orderStatuses)[number];
 export type CommissionStatus = (typeof commissionStatuses)[number];
-export type InvoiceStatus = (typeof invoiceStatuses)[number];
+export type InvoiceStatus = "draft" | "issued" | "partially_paid" | "paid";
 export type InquiryStatus = (typeof inquiryStatuses)[number];
 
 type AdminDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect">;
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
+
+type CustomerFormPayload = {
+  first_name: string;
+  last_name: string;
+  phone_number: string;
+  email: string | null;
+  address: string;
+  assigned_agent_id: string | null;
+  is_reseller: boolean;
+  created_by?: string;
+  updated_at: string;
+};
 
 type ParseSuccess = {
   success: true;
@@ -65,7 +78,7 @@ export type AdminAction =
         name: string;
         category: ProductCategory;
         description: string | null;
-        unit_label: string;
+        unit_label: ProductUnitLabel;
         default_price: number;
         reseller_price: number;
         stock_status: StockStatus;
@@ -81,17 +94,7 @@ export type AdminAction =
   | {
       type: "save-customer";
       customerId?: string;
-      payload: {
-        first_name: string;
-        last_name: string;
-        phone_number: string;
-        email: string | null;
-        address: string;
-        assigned_agent_id: string | null;
-        is_reseller: boolean;
-        created_by?: string;
-        updated_at: string;
-      };
+      payload: CustomerFormPayload;
     }
   | {
       type: "create-agent";
@@ -113,8 +116,16 @@ export type AdminAction =
     }
   | {
       type: "create-order";
+      customer:
+        | {
+            type: "existing";
+            customerId: string;
+          }
+        | {
+            type: "new";
+            payload: CustomerFormPayload;
+          };
       payload: {
-        customer_id: string;
         agent_id: string | null;
         source: "admin_manual";
         order_status: OrderStatus;
@@ -140,16 +151,6 @@ export type AdminAction =
         order_status: OrderStatus;
         approved_by?: string | null;
         approved_at?: string | null;
-        updated_at: string;
-      };
-    }
-  | {
-      type: "update-order-adjustments";
-      orderId: string;
-      payload: {
-        discount_amount: number;
-        delivery_fee: number;
-        agent_id: string | null;
         updated_at: string;
       };
     }
@@ -182,7 +183,7 @@ export type AdminAction =
       payload: {
         order_id: string;
         status: InvoiceStatus;
-        issued_at: string | null;
+        issued_at: string;
         due_at: string | null;
         updated_at: string;
       };
@@ -281,9 +282,6 @@ export async function executeAdminAction(
     case "update-order-status":
       await executeTableUpdate(supabase, "customer_order", action.orderId, action.payload);
       return;
-    case "update-order-adjustments":
-      await executeTableUpdate(supabase, "customer_order", action.orderId, action.payload);
-      return;
     case "update-commission":
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
@@ -336,6 +334,10 @@ export function getProductCategories() {
   return [...productCategories];
 }
 
+export function getProductUnitLabels() {
+  return [...productUnitLabels];
+}
+
 export function getStockStatuses() {
   return [...stockStatuses];
 }
@@ -346,10 +348,6 @@ export function getOrderStatuses() {
 
 export function getCommissionStatuses() {
   return [...commissionStatuses];
-}
-
-export function getInvoiceStatuses() {
-  return [...invoiceStatuses];
 }
 
 export function getInquiryStatuses() {
@@ -386,7 +384,7 @@ function parseAdminActionFormDataOrThrow(
           name: requiredString(formData, "name"),
           category: enumValue(formData, "category", productCategories),
           description: optionalString(formData, "description"),
-          unit_label: requiredString(formData, "unitLabel"),
+          unit_label: enumValue(formData, "unitLabel", productUnitLabels),
           default_price: nonNegativeNumber(formData, "defaultPrice"),
           reseller_price: nonNegativeNumber(formData, "resellerPrice"),
           stock_status: enumValue(formData, "stockStatus", stockStatuses),
@@ -399,22 +397,14 @@ function parseAdminActionFormDataOrThrow(
         type: "deactivate-product",
         productId: uuidSchema.parse(requiredString(formData, "productId")),
       });
-    case "save-customer":
+    case "save-customer": {
+      const customerId = optionalUuid(formData, "customerId");
       return success({
         type: "save-customer",
-        customerId: optionalUuid(formData, "customerId"),
-        payload: {
-          first_name: requiredString(formData, "firstName"),
-          last_name: requiredString(formData, "lastName"),
-          phone_number: requiredString(formData, "phoneNumber"),
-          email: optionalEmail(formData, "email"),
-          address: requiredString(formData, "address"),
-          assigned_agent_id: optionalUuid(formData, "assignedAgentId") ?? null,
-          is_reseller: formData.get("isReseller") === "on",
-          created_by: optionalUuid(formData, "customerId") ? undefined : adminUserId,
-          updated_at: new Date().toISOString(),
-        },
+        customerId,
+        payload: parseCustomerFormPayload(formData, adminUserId, { isNew: !customerId }),
       });
+    }
     case "create-agent":
       return success({
         type: "create-agent",
@@ -439,11 +429,20 @@ function parseAdminActionFormDataOrThrow(
       });
     case "create-order": {
       const approvedAt = new Date().toISOString();
+      const existingCustomerId = optionalUuid(formData, "customerId");
 
       return success({
         type: "create-order",
+        customer: existingCustomerId
+          ? {
+              type: "existing",
+              customerId: existingCustomerId,
+            }
+          : {
+              type: "new",
+              payload: parseCustomerFormPayload(formData, adminUserId, { isNew: true }),
+            },
         payload: {
-          customer_id: uuidSchema.parse(requiredString(formData, "customerId")),
           agent_id: optionalUuid(formData, "agentId") ?? null,
           source: "admin_manual",
           order_status: "approved",
@@ -471,17 +470,6 @@ function parseAdminActionFormDataOrThrow(
         },
       });
     }
-    case "update-order-adjustments":
-      return success({
-        type: "update-order-adjustments",
-        orderId: uuidSchema.parse(requiredString(formData, "orderId")),
-        payload: {
-          discount_amount: nonNegativeNumber(formData, "discountAmount"),
-          delivery_fee: nonNegativeNumber(formData, "deliveryFee"),
-          agent_id: optionalUuid(formData, "agentId") ?? null,
-          updated_at: new Date().toISOString(),
-        },
-      });
     case "update-commission": {
       const status = enumValue(formData, "status", commissionStatuses);
       return success({
@@ -523,9 +511,9 @@ function parseAdminActionFormDataOrThrow(
         invoiceId: optionalUuid(formData, "invoiceId"),
         payload: {
           order_id: uuidSchema.parse(requiredString(formData, "orderId")),
-          status: enumValue(formData, "status", invoiceStatuses),
-          issued_at: optionalDateTime(formData, "issuedAt"),
-          due_at: optionalDateTime(formData, "dueAt"),
+          status: "issued",
+          issued_at: new Date().toISOString(),
+          due_at: null,
           updated_at: new Date().toISOString(),
         },
       });
@@ -588,13 +576,18 @@ async function executeOrderCreate(
   supabase: SupabaseServerClient,
   action: Extract<AdminAction, { type: "create-order" }>,
 ) {
+  const customer = await resolveOrderCustomer(supabase, action.customer);
   const { data, error } = await supabase
     .from("customer_order")
-    .insert(action.payload)
+    .insert({
+      customer_id: customer.customerId,
+      ...action.payload,
+    })
     .select("id")
     .single();
 
   if (error || !data?.id) {
+    await cleanupCreatedOrderCustomer(supabase, customer.createdCustomerId);
     throw new Error("Unable to create order.");
   }
 
@@ -611,7 +604,86 @@ async function executeOrderCreate(
     throw new Error("Unable to create order items. The order was created but cleanup failed.");
   }
 
+  await cleanupCreatedOrderCustomer(supabase, customer.createdCustomerId);
   throw new Error("Unable to create order items.");
+}
+
+async function resolveOrderCustomer(
+  supabase: SupabaseServerClient,
+  customer: Extract<AdminAction, { type: "create-order" }>["customer"],
+) {
+  if (customer.type === "existing") {
+    return {
+      customerId: customer.customerId,
+      createdCustomerId: null,
+    };
+  }
+
+  const existingCustomerId = await findExistingCustomerIdByPhone(supabase, customer.payload.phone_number);
+
+  if (existingCustomerId) {
+    await executeTableUpdate(supabase, "customer", existingCustomerId, toCustomerUpdatePayload(customer.payload));
+    return {
+      customerId: existingCustomerId,
+      createdCustomerId: null,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("customer")
+    .insert(customer.payload)
+    .select("id")
+    .single();
+
+  if (error || !data?.id) {
+    throw new Error("Unable to create customer.");
+  }
+
+  const customerId = String(data.id);
+  return {
+    customerId,
+    createdCustomerId: customerId,
+  };
+}
+
+async function findExistingCustomerIdByPhone(
+  supabase: SupabaseServerClient,
+  phoneNumber: string,
+) {
+  const { data, error } = await supabase
+    .from("customer")
+    .select("id")
+    .eq("phone_number", phoneNumber)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to check existing customer.");
+  }
+
+  return data?.id ? String(data.id) : null;
+}
+
+function toCustomerUpdatePayload(payload: CustomerFormPayload) {
+  return {
+    first_name: payload.first_name,
+    last_name: payload.last_name,
+    phone_number: payload.phone_number,
+    email: payload.email,
+    address: payload.address,
+    assigned_agent_id: payload.assigned_agent_id,
+    is_reseller: payload.is_reseller,
+    updated_at: payload.updated_at,
+  };
+}
+
+async function cleanupCreatedOrderCustomer(
+  supabase: SupabaseServerClient,
+  customerId: string | null,
+) {
+  if (!customerId) return;
+
+  await supabase.from("customer").delete().eq("id", customerId);
 }
 
 async function executeTableUpsert(
@@ -741,14 +813,6 @@ function dateString(formData: FormData, key: string) {
   return value;
 }
 
-function optionalDateTime(formData: FormData, key: string) {
-  const value = optionalString(formData, key);
-
-  if (!value) return null;
-
-  return new Date(value).toISOString();
-}
-
 function parseOrderItems(formData: FormData) {
   const productIds = formData.getAll("productId");
   const quantities = formData.getAll("quantity");
@@ -763,6 +827,24 @@ function parseOrderItems(formData: FormData) {
   }
 
   return parsedItems;
+}
+
+function parseCustomerFormPayload(
+  formData: FormData,
+  adminUserId: string,
+  options: { isNew: boolean },
+): CustomerFormPayload {
+  return {
+    first_name: requiredString(formData, "firstName"),
+    last_name: requiredString(formData, "lastName"),
+    phone_number: requiredString(formData, "phoneNumber"),
+    email: optionalEmail(formData, "email"),
+    address: requiredString(formData, "address"),
+    assigned_agent_id: optionalUuid(formData, "assignedAgentId") ?? null,
+    is_reseller: formData.get("isReseller") === "on",
+    created_by: options.isNew ? adminUserId : undefined,
+    updated_at: new Date().toISOString(),
+  };
 }
 
 function parseOrderItem(
@@ -842,8 +924,6 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Order created.";
     case "update-order-status":
       return "Order status updated.";
-    case "update-order-adjustments":
-      return "Order details updated.";
     case "update-commission":
       return "Commission updated.";
     case "record-payment":

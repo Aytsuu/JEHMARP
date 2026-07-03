@@ -30,8 +30,11 @@ describe("parseAdminActionFormData", () => {
       success: true,
       action: {
         type: "create-order",
+        customer: {
+          type: "existing",
+          customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        },
         payload: {
-          customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
           agent_id: null,
           source: "admin_manual",
           order_status: "approved",
@@ -77,6 +80,64 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("parses admin-created orders with inline customer details when no existing customer is selected", () => {
+    const formData = new FormData();
+    formData.set("action", "create-order");
+    formData.set("firstName", "  Luz  ");
+    formData.set("lastName", "Dela Cruz");
+    formData.set("phoneNumber", " 09171112222 ");
+    formData.set("email", "luz@example.test");
+    formData.set("address", "  Stall 8  ");
+    formData.set("assignedAgentId", "64568f81-108b-42bd-b926-7e825dad67c6");
+    formData.set("isReseller", "on");
+    formData.set("discountAmount", "0");
+    formData.set("deliveryFee", "25");
+    formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.append("quantity", "3");
+    formData.append("addDetails", "");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "create-order",
+        customer: {
+          type: "new",
+          payload: {
+            first_name: "Luz",
+            last_name: "Dela Cruz",
+            phone_number: "09171112222",
+            email: "luz@example.test",
+            address: "Stall 8",
+            assigned_agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+            created_by: adminUserId,
+            is_reseller: true,
+            updated_at: expect.any(String),
+          },
+        },
+        payload: {
+          agent_id: null,
+          source: "admin_manual",
+          order_status: "approved",
+          payment_status: "unpaid",
+          discount_amount: 0,
+          delivery_fee: 25,
+          submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          updated_at: expect.any(String),
+        },
+        items: [
+          {
+            product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+            partial_quantity: 3,
+            final_quantity: 3,
+            add_details: null,
+          },
+        ],
+      },
+    });
+  });
+
   it("rejects page saves because admin content only updates existing predefined pages", () => {
     const formData = new FormData();
     formData.set("action", "save-page");
@@ -119,6 +180,22 @@ describe("parseAdminActionFormData", () => {
           unit_label: "kg",
         },
       },
+    });
+  });
+
+  it("rejects unsupported product unit labels", () => {
+    const formData = new FormData();
+    formData.set("action", "save-product");
+    formData.set("name", "Pork Belly");
+    formData.set("category", "pork");
+    formData.set("unitLabel", "box");
+    formData.set("defaultPrice", "250.50");
+    formData.set("resellerPrice", "220");
+    formData.set("stockStatus", "limited");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Unit label is not supported."],
     });
   });
 
@@ -235,6 +312,40 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("parses invoice saves without date or status fields", () => {
+    const formData = new FormData();
+    formData.set("action", "save-invoice");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "save-invoice",
+        payload: {
+          order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+          status: "issued",
+          issued_at: expect.any(String),
+          due_at: null,
+          updated_at: expect.any(String),
+        },
+      },
+    });
+  });
+
+  it("rejects removed order adjustment saves", () => {
+    const formData = new FormData();
+    formData.set("action", "update-order-adjustments");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("agentId", "");
+    formData.set("discountAmount", "0");
+    formData.set("deliveryFee", "0");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Unknown admin action."],
+    });
+  });
+
 });
 
 describe("executeAdminAction", () => {
@@ -254,8 +365,11 @@ describe("executeAdminAction", () => {
 
     await executeAdminAction({ from } as never, {
       type: "create-order",
+      customer: {
+        type: "existing",
+        customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+      },
       payload: {
-        customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
         agent_id: null,
         source: "admin_manual",
         order_status: "approved",
@@ -301,6 +415,153 @@ describe("executeAdminAction", () => {
         add_details: null,
       },
     ]);
+  });
+
+  it("reuses and refreshes a phone-matched customer before creating an admin order", async () => {
+    const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const customerPayload = {
+      first_name: "Luz",
+      last_name: "Dela Cruz",
+      phone_number: "09171112222",
+      email: "luz@example.test",
+      address: "Stall 8",
+      assigned_agent_id: null,
+      created_by: adminUserId,
+      is_reseller: false,
+      updated_at: "2026-07-01T00:00:00.000Z",
+    };
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: { id: customerId }, error: null }));
+    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
+    const customerSelect = vi.fn(() => ({ eq: customerLookupEq }));
+    const customerUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const customerUpdate = vi.fn(() => ({ eq: customerUpdateEq }));
+    const orderInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
+      })),
+    }));
+    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return { select: customerSelect, update: customerUpdate };
+      if (table === "customer_order") return { insert: orderInsert };
+      if (table === "customer_order_item") return { insert: itemInsert };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from } as never, {
+      type: "create-order",
+      customer: {
+        type: "new",
+        payload: customerPayload,
+      },
+      payload: {
+        agent_id: null,
+        source: "admin_manual",
+        order_status: "approved",
+        payment_status: "unpaid",
+        discount_amount: 0,
+        delivery_fee: 50,
+        submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+      items: [
+        {
+          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          partial_quantity: 2,
+          final_quantity: 2,
+          add_details: null,
+        },
+      ],
+    });
+
+    expect(customerSelect).toHaveBeenCalledWith("id");
+    expect(customerLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
+    expect(customerUpdate).toHaveBeenCalledWith({
+      first_name: "Luz",
+      last_name: "Dela Cruz",
+      phone_number: "09171112222",
+      email: "luz@example.test",
+      address: "Stall 8",
+      assigned_agent_id: null,
+      is_reseller: false,
+      updated_at: "2026-07-01T00:00:00.000Z",
+    });
+    expect(customerUpdateEq).toHaveBeenCalledWith("id", customerId);
+    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
+      customer_id: customerId,
+    }));
+  });
+
+  it("creates a new customer before creating an admin order when no phone match exists", async () => {
+    const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const customerPayload = {
+      first_name: "Luz",
+      last_name: "Dela Cruz",
+      phone_number: "09171112222",
+      email: "luz@example.test",
+      address: "Stall 8",
+      assigned_agent_id: null,
+      created_by: adminUserId,
+      is_reseller: false,
+      updated_at: "2026-07-01T00:00:00.000Z",
+    };
+    const maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
+    const customerSelect = vi.fn(() => ({ eq: customerLookupEq }));
+    const customerInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: customerId }, error: null })),
+      })),
+    }));
+    const orderInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
+      })),
+    }));
+    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "customer_order") return { insert: orderInsert };
+      if (table === "customer_order_item") return { insert: itemInsert };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from } as never, {
+      type: "create-order",
+      customer: {
+        type: "new",
+        payload: customerPayload,
+      },
+      payload: {
+        agent_id: null,
+        source: "admin_manual",
+        order_status: "approved",
+        payment_status: "unpaid",
+        discount_amount: 0,
+        delivery_fee: 50,
+        submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+      items: [
+        {
+          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          partial_quantity: 2,
+          final_quantity: 2,
+          add_details: null,
+        },
+      ],
+    });
+
+    expect(customerInsert).toHaveBeenCalledWith(customerPayload);
+    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
+      customer_id: customerId,
+    }));
   });
 });
 

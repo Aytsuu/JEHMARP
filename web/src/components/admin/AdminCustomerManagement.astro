@@ -16,31 +16,8 @@ const { data } = Astro.props;
 <section id="admin-customers" class="admin-panel" aria-labelledby="admin-customers-title">
   <div class="admin-panel__header">
     <h2 id="admin-customers-title">Customer Record Management</h2>
-    <p>Create or update customer records and optional agent assignment.</p>
+    <p>Review customer records and update contact details, reseller status, or optional agent assignment.</p>
   </div>
-  <form method="post" class="admin-form" aria-label="Create customer">
-    <input type="hidden" name="action" value="save-customer" />
-    <h3>Create Customer</h3>
-    <div class="admin-form-grid">
-      <label class="field-row"><span>First name</span><input name="firstName" required /></label>
-      <label class="field-row"><span>Last name</span><input name="lastName" required /></label>
-      <label class="field-row"><span>Phone number</span><input name="phoneNumber" required /></label>
-      <label class="field-row"><span>Email</span><input name="email" type="email" /></label>
-      <label class="field-row">
-        <span>Assigned agent</span>
-        <select name="assignedAgentId">
-          <option value="">None</option>
-          {data.agents.map((agent) => <option value={agent.id}>{agent.display_name}</option>)}
-        </select>
-      </label>
-      <label class="checkbox-row">
-        <input name="isReseller" type="checkbox" />
-        <span>Reseller customer</span>
-      </label>
-    </div>
-    <label class="field-row"><span>Address</span><textarea name="address" required></textarea></label>
-    <button type="submit">Save customer</button>
-  </form>
 
   <div class="table-wrap">
     <table>

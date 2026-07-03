@@ -12,6 +12,84 @@ import type {
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
+const adminOrderSelect = `
+  id,
+  customer_id,
+  agent_id,
+  source,
+  order_status,
+  payment_status,
+  discount_amount,
+  delivery_fee,
+  approved_at,
+  created_at,
+  updated_at,
+  customer:customer_id (
+    id,
+    first_name,
+    last_name,
+    phone_number,
+    email,
+    address,
+    is_reseller
+  ),
+  agent:agent_id (
+    id,
+    display_name
+  ),
+  customer_order_item (
+    id,
+    product_id,
+    partial_quantity,
+    final_quantity,
+    unit_price,
+    price_type,
+    add_details,
+    agent_commission_amount,
+    agent_commission_status,
+    agent_commission_notes,
+    product:product_id (
+      id,
+      name,
+      unit_label,
+      default_price
+    )
+  ),
+  payment (
+    id,
+    amount,
+    payment_method,
+    payment_date,
+    reference_number,
+    notes,
+    created_at
+  ),
+  invoice (
+    id,
+    order_id,
+    invoice_number,
+    status,
+    issued_at,
+    due_at,
+    created_at,
+    updated_at
+  ),
+  customer_order_update (
+    id,
+    update_type,
+    title,
+    details,
+    created_at
+  ),
+  customer_order_status_history (
+    id,
+    from_status,
+    to_status,
+    changed_at,
+    notes
+  )
+`;
+
 export type AdminPage = {
   id: string;
   slug: string;
@@ -215,6 +293,19 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
   };
 }
 
+export async function loadAdminOrder(orderId: string): Promise<AdminOrder | null> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("customer_order")
+    .select(adminOrderSelect)
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (error) throw new Error("Unable to load admin order.");
+
+  return data ? normalizeAdminOrder(data) : null;
+}
+
 async function loadPages(supabase: SupabaseAdminClient) {
   const { data, error } = await supabase
     .from("page")
@@ -278,91 +369,33 @@ async function loadCustomers(supabase: SupabaseAdminClient) {
 async function loadOrders(supabase: SupabaseAdminClient) {
   const { data, error } = await supabase
     .from("customer_order")
-    .select(
-      `
-        id,
-        customer_id,
-        agent_id,
-        source,
-        order_status,
-        payment_status,
-        discount_amount,
-        delivery_fee,
-        approved_at,
-        created_at,
-        updated_at,
-        customer:customer_id (
-          id,
-          first_name,
-          last_name,
-          phone_number,
-          email,
-          address,
-          is_reseller
-        ),
-        agent:agent_id (
-          id,
-          display_name
-        ),
-        customer_order_item (
-          id,
-          product_id,
-          partial_quantity,
-          final_quantity,
-          unit_price,
-          price_type,
-          add_details,
-          agent_commission_amount,
-          agent_commission_status,
-          agent_commission_notes,
-          product:product_id (
-            id,
-            name,
-            unit_label,
-            default_price
-          )
-        ),
-        payment (
-          id,
-          amount,
-          payment_method,
-          payment_date,
-          reference_number,
-          notes,
-          created_at
-        ),
-        invoice (
-          id,
-          order_id,
-          invoice_number,
-          status,
-          issued_at,
-          due_at,
-          created_at,
-          updated_at
-        ),
-        customer_order_update (
-          id,
-          update_type,
-          title,
-          details,
-          created_at
-        ),
-        customer_order_status_history (
-          id,
-          from_status,
-          to_status,
-          changed_at,
-          notes
-        )
-      `,
-    )
+    .select(adminOrderSelect)
     .order("created_at", { ascending: false })
     .limit(50);
 
   if (error) throw new Error("Unable to load admin orders.");
 
-  return (data ?? []) as unknown as AdminOrder[];
+  return ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+}
+
+function normalizeAdminOrder(order: unknown): AdminOrder {
+  const adminOrder = order as AdminOrder;
+
+  return {
+    ...adminOrder,
+    customer_order_item: Array.isArray(adminOrder.customer_order_item) ? adminOrder.customer_order_item : [],
+    payment: Array.isArray(adminOrder.payment) ? adminOrder.payment : [],
+    invoice: normalizeRelationArray(adminOrder.invoice),
+    customer_order_update: Array.isArray(adminOrder.customer_order_update) ? adminOrder.customer_order_update : [],
+    customer_order_status_history: Array.isArray(adminOrder.customer_order_status_history)
+      ? adminOrder.customer_order_status_history
+      : [],
+  };
+}
+
+function normalizeRelationArray<T>(value: T[] | T | null | undefined): T[] {
+  if (Array.isArray(value)) return value;
+  return value ? [value] : [];
 }
 
 async function loadContactInquiries(supabase: SupabaseAdminClient) {

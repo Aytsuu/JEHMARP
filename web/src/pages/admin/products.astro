@@ -4,6 +4,7 @@ import AdminProductManagement from "@/components/admin/AdminProductManagement.as
 import {
   formatAdminActionFeedback,
   getProductCategories,
+  getProductUnitLabels,
   getStockStatuses,
 } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
@@ -31,6 +32,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   <AdminProductManagement
     data={data}
     productCategories={getProductCategories()}
+    productUnitLabels={getProductUnitLabels()}
     stockStatuses={getStockStatuses()}
   />
 </AdminPageFrame>

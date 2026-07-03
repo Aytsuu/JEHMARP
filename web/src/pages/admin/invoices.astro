@@ -3,7 +3,6 @@ import AdminInvoiceManagement from "@/components/admin/AdminInvoiceManagement.as
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
-  getInvoiceStatuses,
 } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
@@ -24,11 +23,8 @@ const feedback = formatAdminActionFeedback(Astro.url);
   title="NMC | Admin Invoices"
   description="Admin invoice creation, payment tracking, and balance management."
   heading="Invoice Management"
-  intro="Create invoices for approved orders, update invoice status and dates, review balances, and record payments."
+  intro="Review invoices created from orders, open sales invoice PDFs, and record payments."
   feedback={feedback}
 >
-  <AdminInvoiceManagement
-    data={data}
-    invoiceStatuses={getInvoiceStatuses()}
-  />
+  <AdminInvoiceManagement data={data} />
 </AdminPageFrame>

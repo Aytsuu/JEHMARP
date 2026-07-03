@@ -14,6 +14,7 @@ declare
   numeric_result numeric;
   text_result text;
   row_count integer;
+  timestamp_result timestamptz;
 begin
   insert into public.product (
     name,
@@ -154,9 +155,50 @@ begin
   set final_quantity = 4
   where id = test_item_id;
 
-  insert into public.invoice (order_id, status)
-  values (test_order_id, 'draft')
+  insert into public.invoice (order_id)
+  values (test_order_id)
   returning id into test_invoice_id;
+
+  select status, issued_at
+  into text_result, timestamp_result
+  from public.invoice
+  where id = test_invoice_id;
+
+  if text_result <> 'issued' then
+    raise exception 'Expected default invoice status issued, got %', text_result;
+  end if;
+
+  if timestamp_result is null then
+    raise exception 'Expected invoice issued_at to default automatically';
+  end if;
+
+  blocked := false;
+  begin
+    update public.invoice
+    set status = 'overdue'
+    where id = test_invoice_id;
+  exception
+    when others then
+      blocked := true;
+  end;
+
+  if not blocked then
+    raise exception 'Expected overdue invoice status to be blocked';
+  end if;
+
+  blocked := false;
+  begin
+    update public.invoice
+    set status = 'void'
+    where id = test_invoice_id;
+  exception
+    when others then
+      blocked := true;
+  end;
+
+  if not blocked then
+    raise exception 'Expected void invoice status to be blocked';
+  end if;
 
   select public.compute_payment_balance(test_order_id)
   into numeric_result;

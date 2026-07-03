@@ -7,33 +7,24 @@ import {
   orderBalance,
   orderPaymentTotal,
   orderTotal,
-  selected,
-  toDateTimeInput,
 } from "@/lib/admin-dashboard/view";
 
 type Props = {
   data: AdminDashboardData;
-  invoiceStatuses: readonly string[];
 };
 
-const { data, invoiceStatuses } = Astro.props;
-const invoiceOrders = data.orders.filter((order) => (
-  order.order_status === "approved"
-  || order.order_status === "processing"
-  || order.order_status === "fulfilled"
-  || order.order_status === "closed"
-  || order.invoice.length > 0
-));
+const { data } = Astro.props;
+const invoiceOrders = data.orders.filter((order) => order.invoice.length > 0);
 ---
 
 <section id="admin-invoices" class="admin-panel" aria-labelledby="admin-invoices-title">
   <div class="admin-panel__header">
     <h2 id="admin-invoices-title">Invoice Management</h2>
-    <p>Create invoices for approved orders, update invoice status and dates, review balances, and record payments.</p>
+    <p>Review created invoices, open sales invoice PDFs, and record payments.</p>
   </div>
 
   {invoiceOrders.length === 0 ? (
-    <p class="empty-state">No invoice-ready orders yet.</p>
+    <p class="empty-state">No invoices have been created from orders yet.</p>
   ) : (
     <div class="admin-card-list">
       {invoiceOrders.map((order) => {
@@ -46,7 +37,7 @@ const invoiceOrders = data.orders.filter((order) => (
           <article class="admin-card" aria-labelledby={`invoice-order-${order.id}`}>
             <div class="admin-card__header">
               <h3 id={`invoice-order-${order.id}`}>
-                {invoice ? invoice.invoice_number : "Create invoice"} - {fullName(order.customer)}
+                {invoice.invoice_number} - {fullName(order.customer)}
               </h3>
               <p>
                 Order {order.order_status} - payment {order.payment_status} - created {formatDate(order.created_at)}
@@ -60,12 +51,12 @@ const invoiceOrders = data.orders.filter((order) => (
               <dd>{formatCurrency(paidTotal)}</dd>
               <dt>Balance</dt>
               <dd>{formatCurrency(balance)}</dd>
-              <dt>Invoice status</dt>
-              <dd>{invoice?.status ?? "Not created"}</dd>
-              <dt>Issued at</dt>
-              <dd>{formatDate(invoice?.issued_at ?? null)}</dd>
-              <dt>Due at</dt>
-              <dd>{formatDate(invoice?.due_at ?? null)}</dd>
+              <dt>Invoice</dt>
+              <dd>
+                <a href={`/admin/orders/${order.id}/sales-invoice.pdf`} target="_blank" rel="noreferrer">
+                  View sales invoice PDF
+                </a>
+              </dd>
             </dl>
 
             <div class="table-wrap">
@@ -93,29 +84,14 @@ const invoiceOrders = data.orders.filter((order) => (
             </div>
 
             <div class="admin-two-column">
-              <form method="post" class="admin-form">
-                <input type="hidden" name="action" value="save-invoice" />
-                <input type="hidden" name="orderId" value={order.id} />
-                {invoice && <input type="hidden" name="invoiceId" value={invoice.id} />}
-                <h4>{invoice ? "Update invoice" : "Create invoice"}</h4>
-                <label class="field-row">
-                  <span>Status</span>
-                  <select name="status" required>
-                    {invoiceStatuses.map((status) => (
-                      <option value={status} selected={selected(invoice?.status ?? "draft", status)}>{status}</option>
-                    ))}
-                  </select>
-                </label>
-                <label class="field-row">
-                  <span>Issued at</span>
-                  <input name="issuedAt" type="datetime-local" value={toDateTimeInput(invoice?.issued_at ?? null)} />
-                </label>
-                <label class="field-row">
-                  <span>Due at</span>
-                  <input name="dueAt" type="datetime-local" value={toDateTimeInput(invoice?.due_at ?? null)} />
-                </label>
-                <button type="submit">Save invoice</button>
-              </form>
+              <section class="admin-form" aria-labelledby={`invoice-actions-${order.id}`}>
+                <h4 id={`invoice-actions-${order.id}`}>Invoice {invoice.invoice_number}</h4>
+                <p>
+                  <a href={`/admin/orders/${order.id}/sales-invoice.pdf`} target="_blank" rel="noreferrer">
+                    View sales invoice PDF
+                  </a>
+                </p>
+              </section>
 
               <form method="post" class="admin-form">
                 <input type="hidden" name="action" value="record-payment" />

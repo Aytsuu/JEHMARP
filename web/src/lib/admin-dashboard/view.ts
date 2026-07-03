@@ -15,10 +15,6 @@ export function formatDate(value: string | null) {
   return value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(new Date(value)) : "Not set";
 }
 
-export function toDateTimeInput(value: string | null) {
-  return value ? value.slice(0, 16) : "";
-}
-
 export function orderTotal(order: AdminOrder, quantityKey: "partial_quantity" | "final_quantity") {
   const subtotal = order.customer_order_item.reduce((total, item) => {
     return total + item[quantityKey] * item.unit_price;
@@ -33,6 +29,10 @@ export function orderPaymentTotal(order: AdminOrder) {
 
 export function orderBalance(order: AdminOrder) {
   return Math.max(orderTotal(order, "final_quantity") - orderPaymentTotal(order), 0);
+}
+
+export function canManageOrderCommissions(order: AdminOrder) {
+  return Boolean(order.agent_id);
 }
 
 export function selected(value: string | null | undefined, option: string) {
