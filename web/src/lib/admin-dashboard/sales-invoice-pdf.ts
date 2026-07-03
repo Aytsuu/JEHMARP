@@ -1,8 +1,8 @@
-import type { AdminOrder, AdminOrderItem } from "./data";
+import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
 import {
   fullName,
   orderTotal,
-} from "./view";
+} from "@/lib/order-documents/view";
 
 const pageWidth = 595;
 const pageHeight = 842;
@@ -17,12 +17,12 @@ type TextOptions = {
 };
 
 type SalesInvoicePage = {
-  items: AdminOrderItem[];
+  items: DocumentOrderItem[];
   pageNumber: number;
   pageCount: number;
 };
 
-export function buildSalesInvoicePdf(order: AdminOrder): Uint8Array {
+export function buildSalesInvoicePdf(order: DocumentOrder): Uint8Array {
   const pages = chunkOrderItems(order.customer_order_item);
   const contentStreams = pages.map((items, index) => buildSalesInvoicePageContent(order, {
     items,
@@ -33,7 +33,7 @@ export function buildSalesInvoicePdf(order: AdminOrder): Uint8Array {
   return buildPdfDocument(contentStreams);
 }
 
-function chunkOrderItems(items: AdminOrderItem[]) {
+function chunkOrderItems(items: DocumentOrderItem[]) {
   if (items.length === 0) return [[]];
 
   return Array.from({ length: Math.ceil(items.length / tableRowsPerPage) }, (_, index) => {
@@ -42,7 +42,7 @@ function chunkOrderItems(items: AdminOrderItem[]) {
   });
 }
 
-function buildSalesInvoicePageContent(order: AdminOrder, page: SalesInvoicePage) {
+function buildSalesInvoicePageContent(order: DocumentOrder, page: SalesInvoicePage) {
   const commands: string[] = [];
 
   drawHeader(commands, page);
@@ -66,7 +66,7 @@ function drawHeader(commands: string[], page: SalesInvoicePage) {
   addText(commands, 525, 778, "LOGO", { align: "center", size: 9 });
 }
 
-function drawInvoiceFields(commands: string[], order: AdminOrder) {
+function drawInvoiceFields(commands: string[], order: DocumentOrder) {
   const invoice = order.invoice[0];
   const invoiceDate = invoice?.issued_at ?? invoice?.created_at ?? order.created_at;
 
@@ -80,7 +80,7 @@ function drawInvoiceFields(commands: string[], order: AdminOrder) {
   drawLine(commands, 355, 691, 555, 691);
 }
 
-function drawItemsTable(commands: string[], items: AdminOrderItem[]) {
+function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
   const tableTopY = 665;
   const rowHeight = 24;
   const tableWidth = tableColumnWidths.reduce((total, width) => total + width, 0);
@@ -122,7 +122,7 @@ function drawItemsTable(commands: string[], items: AdminOrderItem[]) {
   return tableBottomY;
 }
 
-function drawInvoiceTotal(commands: string[], order: AdminOrder, tableBottomY: number) {
+function drawInvoiceTotal(commands: string[], order: DocumentOrder, tableBottomY: number) {
   const totalY = tableBottomY - 24;
 
   addText(commands, 330, totalY, `Total Amount Due ${formatMoney(orderTotal(order, "final_quantity"))}`, { size: 11 });

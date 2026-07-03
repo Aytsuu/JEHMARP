@@ -1,0 +1,40 @@
+---
+type Props = {
+  orderId: string;
+  basePath: string;
+  showOrderSlip?: boolean;
+  showSalesInvoice?: boolean;
+};
+
+const {
+  orderId,
+  basePath,
+  showOrderSlip = true,
+  showSalesInvoice = false,
+} = Astro.props;
+
+const normalizedBasePath = basePath.replace(/\/$/, "");
+const links = [
+  showOrderSlip
+    ? {
+        href: `${normalizedBasePath}/${orderId}/order-slip.pdf`,
+        label: "View order slip PDF",
+      }
+    : null,
+  showSalesInvoice
+    ? {
+        href: `${normalizedBasePath}/${orderId}/sales-invoice.pdf`,
+        label: "View sales invoice PDF",
+      }
+    : null,
+].filter((link): link is { href: string; label: string } => link !== null);
+---
+
+{links.map((link, index) => (
+  <>
+    {index > 0 && " | "}
+    <a href={link.href} target="_blank" rel="noreferrer">
+      {link.label}
+    </a>
+  </>
+))}

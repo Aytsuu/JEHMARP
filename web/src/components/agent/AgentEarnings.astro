@@ -1,0 +1,67 @@
+---
+import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import {
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderEarnedCommission,
+  orderExpectedCommission,
+} from "@/lib/agent-dashboard/view";
+
+type Props = {
+  data: AgentDashboardData;
+};
+
+const { data } = Astro.props;
+const agentOrders = data.orders.filter((order) => order.agent_id === data.agent.id);
+---
+
+<section class="admin-summary-grid" aria-label="Agent earnings summary">
+  <article class="admin-summary-card">
+    <h2>Monthly Earnings</h2>
+    <p>{formatCurrency(data.summary.monthlyEarnings)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Earned Today</h2>
+    <p>{formatCurrency(data.summary.earnedToday)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Expected Commission</h2>
+    <p>{formatCurrency(data.summary.expectedCommission)}</p>
+  </article>
+</section>
+
+<section class="admin-panel" aria-labelledby="agent-earnings-orders-title">
+  <div class="admin-panel__header">
+    <h2 id="agent-earnings-orders-title">Commission By Order</h2>
+    <p>Commission is earned proportionally as payments are recorded.</p>
+  </div>
+
+  {agentOrders.length === 0 ? (
+    <p class="empty-state">No agent-submitted or assigned commission orders yet.</p>
+  ) : (
+    <div class="table-wrap">
+      <table>
+        <caption>Commission detail</caption>
+        <thead>
+          <tr>
+            <th scope="col">Order</th>
+            <th scope="col">Payment Status</th>
+            <th scope="col">Expected</th>
+            <th scope="col">Earned</th>
+          </tr>
+        </thead>
+        <tbody>
+          {agentOrders.map((order) => (
+            <tr>
+              <td>{fullName(order.customer)}<br />{formatDate(order.created_at)}</td>
+              <td>{order.payment_status}</td>
+              <td>{formatCurrency(orderExpectedCommission(order))}</td>
+              <td>{formatCurrency(orderEarnedCommission(order))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>

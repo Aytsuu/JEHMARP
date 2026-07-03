@@ -1,0 +1,43 @@
+---
+import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import { fullName } from "@/lib/agent-dashboard/view";
+
+type Props = {
+  data: AgentDashboardData;
+};
+
+const { data } = Astro.props;
+---
+
+<section class="admin-panel" aria-labelledby="agent-customers-title">
+  <div class="admin-panel__header">
+    <h2 id="agent-customers-title">Customers</h2>
+    <p>Customer records for {data.agent.display_name}.</p>
+  </div>
+
+  {data.customers.length === 0 ? (
+    <p class="empty-state">No customers yet.</p>
+  ) : (
+    <div class="table-wrap">
+      <table>
+        <caption>Customer records</caption>
+        <thead>
+          <tr>
+            <th scope="col">Customer</th>
+            <th scope="col">Contact</th>
+            <th scope="col">Address</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.customers.map((customer) => (
+            <tr>
+              <td>{fullName(customer)}{customer.is_reseller ? " - reseller" : ""}</td>
+              <td>{customer.phone_number}<br />{customer.email ?? "No email"}</td>
+              <td>{customer.address}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>

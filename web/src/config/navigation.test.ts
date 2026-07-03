@@ -41,14 +41,17 @@ describe("dashboard routes", () => {
   });
 
   it("defines agent operations separately from public navigation", () => {
-    expect(agentDashboardRoutes.map((item) => item.label)).toEqual([
-      "Dashboard",
-      "Earnings",
-      "Customers",
-      "Orders",
-      "Payments",
-      "Timeline",
+    expect(agentDashboardRoutes).toEqual([
+      { label: "Dashboard", href: "/agent" },
+      { label: "Earnings", href: "/agent/earnings" },
+      { label: "Customers", href: "/agent/customers" },
+      { label: "Orders", href: "/agent/orders" },
+      { label: "Payments", href: "/agent/payments" },
     ]);
+  });
+
+  it("uses separate agent page routes instead of single-page hash anchors", () => {
+    expect(agentDashboardRoutes.every((item) => !item.href.includes("#"))).toBe(true);
   });
 
   it("does not include public routes in dashboard sidebars", () => {

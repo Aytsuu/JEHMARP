@@ -11,8 +11,6 @@ import {
 describe("orderTotal", () => {
   it("uses the order item unit price snapshot instead of the current product retail price", () => {
     const order = {
-      discount_amount: 10,
-      delivery_fee: 5,
       customer_order_item: [
         {
           partial_quantity: 2,
@@ -25,8 +23,8 @@ describe("orderTotal", () => {
       ],
     } as AdminOrder;
 
-    expect(orderTotal(order, "partial_quantity")).toBe(155);
-    expect(orderTotal(order, "final_quantity")).toBe(235);
+    expect(orderTotal(order, "partial_quantity")).toBe(160);
+    expect(orderTotal(order, "final_quantity")).toBe(240);
   });
 });
 
@@ -46,8 +44,6 @@ describe("orderPaymentTotal", () => {
 describe("orderBalance", () => {
   it("returns the unpaid invoice balance without going below zero", () => {
     const order = {
-      discount_amount: 0,
-      delivery_fee: 0,
       customer_order_item: [
         {
           final_quantity: 2,

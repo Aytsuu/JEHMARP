@@ -19,7 +19,6 @@ begin
       'payment',
       'invoice',
       'customer_order_status_history',
-      'customer_order_update',
       'contact_inquiry',
       'reseller_application',
       'page',

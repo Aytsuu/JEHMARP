@@ -1,0 +1,53 @@
+---
+import { agentDashboardRoutes } from "@/config/navigation";
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+
+type Props = {
+  title: string;
+  description: string;
+  heading: string;
+  intro: string;
+  feedback?: {
+    status?: string;
+    error?: string;
+  };
+};
+
+const { title, description, heading, intro, feedback } = Astro.props;
+const headingId = `${heading
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "")}-title`;
+---
+
+<DashboardLayout
+  title={title}
+  description={description}
+  navLabel="Agent operations"
+  navItems={agentDashboardRoutes}
+>
+  <section class="admin-shell" aria-labelledby={headingId}>
+    <header class="admin-header">
+      <p class="page-shell__eyebrow">Agent</p>
+      <h1 id={headingId} class="page-shell__title">{heading}</h1>
+      <p class="page-shell__description">{intro}</p>
+    </header>
+
+    {
+      feedback?.status && (
+        <p class="status-message" role="status">
+          {feedback.status}
+        </p>
+      )
+    }
+    {
+      feedback?.error && (
+        <p class="error-message" role="alert">
+          {feedback.error}
+        </p>
+      )
+    }
+
+    <slot />
+  </section>
+</DashboardLayout>

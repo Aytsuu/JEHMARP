@@ -1,0 +1,43 @@
+---
+import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import { formatCurrency } from "@/lib/agent-dashboard/view";
+
+type Props = {
+  data: AgentDashboardData;
+};
+
+const { data } = Astro.props;
+---
+
+<section class="admin-summary-grid" aria-label="Agent dashboard summary">
+  <article class="admin-summary-card">
+    <h2>Monthly Earnings</h2>
+    <p>{formatCurrency(data.summary.monthlyEarnings)}</p>
+    <a href="/agent/earnings">Review earnings</a>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Customers</h2>
+    <p>{data.summary.assignedCustomers}</p>
+    <a href="/agent/customers">View customers</a>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Submitted Orders</h2>
+    <p>{data.summary.submittedOrders}</p>
+    <a href="/agent/orders">Manage orders</a>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Outstanding Balance</h2>
+    <p>{formatCurrency(data.summary.outstandingBalance)}</p>
+    <a href="/agent/payments">Review payments</a>
+  </article>
+</section>
+
+<section class="admin-panel" aria-labelledby="agent-dashboard-overview-title">
+  <div class="admin-panel__header">
+    <h2 id="agent-dashboard-overview-title">Agent Operations</h2>
+    <p>
+      Use the sidebar to move between earnings, customers, order submission,
+      and payment status pages.
+    </p>
+  </div>
+</section>

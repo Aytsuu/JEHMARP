@@ -58,8 +58,6 @@ describe("loadAdminDashboardData", () => {
       source: "admin_manual",
       order_status: "approved",
       payment_status: "unpaid",
-      discount_amount: 0,
-      delivery_fee: 0,
       approved_at: null,
       created_at: "2026-07-03T00:00:00.000Z",
       updated_at: "2026-07-03T00:00:00.000Z",
@@ -68,7 +66,6 @@ describe("loadAdminDashboardData", () => {
       customer_order_item: null,
       payment: null,
       invoice: null,
-      customer_order_update: null,
       customer_order_status_history: null,
     };
     const from = vi.fn((table: string) => createQueryBuilder(
@@ -88,7 +85,6 @@ describe("loadAdminDashboardData", () => {
       customer_order_item: [],
       payment: [],
       invoice: [],
-      customer_order_update: [],
       customer_order_status_history: [],
     });
   });
@@ -101,8 +97,6 @@ describe("loadAdminDashboardData", () => {
       source: "admin_manual",
       order_status: "approved",
       payment_status: "unpaid",
-      discount_amount: 0,
-      delivery_fee: 0,
       approved_at: null,
       created_at: "2026-07-03T00:00:00.000Z",
       updated_at: "2026-07-03T00:00:00.000Z",
@@ -111,7 +105,6 @@ describe("loadAdminDashboardData", () => {
       customer_order_item: null,
       payment: null,
       invoice: null,
-      customer_order_update: null,
       customer_order_status_history: null,
     };
     const builder = createQueryBuilder({
@@ -151,8 +144,6 @@ describe("loadAdminDashboardData", () => {
       source: "admin_manual",
       order_status: "approved",
       payment_status: "unpaid",
-      discount_amount: 0,
-      delivery_fee: 0,
       approved_at: null,
       created_at: "2026-07-03T00:00:00.000Z",
       updated_at: "2026-07-03T00:00:00.000Z",
@@ -161,7 +152,6 @@ describe("loadAdminDashboardData", () => {
       customer_order_item: [],
       payment: [],
       invoice,
-      customer_order_update: [],
       customer_order_status_history: [],
     };
     const builder = createQueryBuilder({

@@ -16,11 +16,9 @@ export function formatDate(value: string | null) {
 }
 
 export function orderTotal(order: AdminOrder, quantityKey: "partial_quantity" | "final_quantity") {
-  const subtotal = order.customer_order_item.reduce((total, item) => {
+  return order.customer_order_item.reduce((total, item) => {
     return total + item[quantityKey] * item.unit_price;
   }, 0);
-
-  return Math.max(subtotal + order.delivery_fee - order.discount_amount, 0);
 }
 
 export function orderPaymentTotal(order: AdminOrder) {

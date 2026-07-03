@@ -53,16 +53,12 @@ begin
   insert into public.customer_order (
     customer_id,
     source,
-    order_status,
-    discount_amount,
-    delivery_fee
+    order_status
   )
   values (
     test_customer_id,
     'admin_manual',
-    'draft',
-    10,
-    5
+    'draft'
   )
   returning id into test_order_id;
 
@@ -114,8 +110,8 @@ begin
   select public.compute_order_total(test_order_id)
   into numeric_result;
 
-  if numeric_result <> 195 then
-    raise exception 'Expected order total 195 from partial quantity, got %', numeric_result;
+  if numeric_result <> 200 then
+    raise exception 'Expected order total 200 from partial quantity, got %', numeric_result;
   end if;
 
   update public.customer_order_item
@@ -134,8 +130,8 @@ begin
   select public.compute_invoice_total(test_order_id)
   into numeric_result;
 
-  if numeric_result <> 395 then
-    raise exception 'Expected invoice total 395 from final quantity, got %', numeric_result;
+  if numeric_result <> 400 then
+    raise exception 'Expected invoice total 400 from final quantity, got %', numeric_result;
   end if;
 
   update public.customer_order_item
@@ -203,8 +199,8 @@ begin
   select public.compute_payment_balance(test_order_id)
   into numeric_result;
 
-  if numeric_result <> 395 then
-    raise exception 'Expected unpaid balance 395, got %', numeric_result;
+  if numeric_result <> 400 then
+    raise exception 'Expected unpaid balance 400, got %', numeric_result;
   end if;
 
   select payment_status
@@ -250,15 +246,15 @@ begin
   select public.compute_payment_balance(test_order_id)
   into numeric_result;
 
-  if numeric_result <> 197.50 then
-    raise exception 'Expected balance 197.50 after first payment, got %', numeric_result;
+  if numeric_result <> 202.50 then
+    raise exception 'Expected balance 202.50 after first payment, got %', numeric_result;
   end if;
 
   select public.compute_earned_commission(test_order_id)
   into numeric_result;
 
-  if numeric_result <> 40 then
-    raise exception 'Expected earned commission 40 after half payment, got %', numeric_result;
+  if numeric_result <> 39.5 then
+    raise exception 'Expected earned commission 39.5 after partial payment, got %', numeric_result;
   end if;
 
   blocked := false;
@@ -283,7 +279,7 @@ begin
   )
   values (
     test_order_id,
-    197.50,
+    202.50,
     'cash',
     'phase-4-payment-2'
   );
@@ -419,15 +415,6 @@ begin
 
   if row_count < 2 then
     raise exception 'Expected order status history rows, got %', row_count;
-  end if;
-
-  select count(*)
-  into row_count
-  from public.customer_order_update
-  where order_id = test_order_id;
-
-  if row_count < 3 then
-    raise exception 'Expected order update timeline rows, got %', row_count;
   end if;
 
   blocked := false;

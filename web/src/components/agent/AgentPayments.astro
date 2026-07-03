@@ -1,0 +1,82 @@
+---
+import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
+import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import {
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderBalance,
+  orderPaymentTotal,
+  orderTotal,
+} from "@/lib/agent-dashboard/view";
+
+type Props = {
+  data: AgentDashboardData;
+};
+
+const { data } = Astro.props;
+---
+
+<section class="admin-panel" aria-labelledby="agent-payments-title">
+  <div class="admin-panel__header">
+    <h2 id="agent-payments-title">Payment Status Summary</h2>
+    <p>Accessible orders grouped by payment state.</p>
+  </div>
+
+  <div class="admin-summary-grid" aria-label="Payment status counts">
+    {Object.entries(data.paymentSummary).map(([status, count]) => (
+      <article class="admin-summary-card">
+        <h2>{status}</h2>
+        <p>{count}</p>
+      </article>
+    ))}
+  </div>
+</section>
+
+<section class="admin-panel" aria-labelledby="agent-payment-balances-title">
+  <div class="admin-panel__header">
+    <h2 id="agent-payment-balances-title">Order Balances</h2>
+    <p>Payment totals and remaining balances for accessible orders.</p>
+  </div>
+
+  {data.orders.length === 0 ? (
+    <p class="empty-state">No accessible order balances yet.</p>
+  ) : (
+    <div class="table-wrap">
+      <table>
+        <caption>Payment balances</caption>
+        <thead>
+          <tr>
+            <th scope="col">Order</th>
+            <th scope="col">Invoice Total</th>
+            <th scope="col">Paid</th>
+            <th scope="col">Balance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.orders.map((order) => (
+            <tr>
+              <td>{fullName(order.customer)}<br />{formatDate(order.created_at)}</td>
+              <td>
+                {formatCurrency(orderTotal(order, "final_quantity"))}
+                {order.invoice.length > 0 && (
+                  <>
+                    <br />
+                    <OrderPdfLinks
+                      orderId={order.id}
+                      basePath="/agent/orders"
+                      showOrderSlip={false}
+                      showSalesInvoice
+                    />
+                  </>
+                )}
+              </td>
+              <td>{formatCurrency(orderPaymentTotal(order))}</td>
+              <td>{formatCurrency(orderBalance(order))}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )}
+</section>

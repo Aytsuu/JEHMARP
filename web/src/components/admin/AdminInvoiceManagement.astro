@@ -1,4 +1,5 @@
 ---
+import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 import {
   formatCurrency,
@@ -53,9 +54,12 @@ const invoiceOrders = data.orders.filter((order) => order.invoice.length > 0);
               <dd>{formatCurrency(balance)}</dd>
               <dt>Invoice</dt>
               <dd>
-                <a href={`/admin/orders/${order.id}/sales-invoice.pdf`} target="_blank" rel="noreferrer">
-                  View sales invoice PDF
-                </a>
+                <OrderPdfLinks
+                  orderId={order.id}
+                  basePath="/admin/orders"
+                  showOrderSlip={false}
+                  showSalesInvoice
+                />
               </dd>
             </dl>
 
@@ -87,9 +91,12 @@ const invoiceOrders = data.orders.filter((order) => order.invoice.length > 0);
               <section class="admin-form" aria-labelledby={`invoice-actions-${order.id}`}>
                 <h4 id={`invoice-actions-${order.id}`}>Invoice {invoice.invoice_number}</h4>
                 <p>
-                  <a href={`/admin/orders/${order.id}/sales-invoice.pdf`} target="_blank" rel="noreferrer">
-                    View sales invoice PDF
-                  </a>
+                  <OrderPdfLinks
+                    orderId={order.id}
+                    basePath="/admin/orders"
+                    showOrderSlip={false}
+                    showSalesInvoice
+                  />
                 </p>
               </section>
 

@@ -1,5 +1,5 @@
 ---
-import AgentDashboard from "@/components/agent/AgentDashboard.astro";
+import AgentOrders from "@/components/agent/AgentOrders.astro";
 import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
 import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
 import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
@@ -18,11 +18,11 @@ const feedback = formatAgentActionFeedback(Astro.url);
 ---
 
 <AgentPageFrame
-  title="NMC | Agent Dashboard"
-  description="Agent dashboard for customers, submitted orders, payments, and commission workflows."
-  heading="Agent Dashboard"
-  intro="Review customer records, submit customer orders, and track commission and payment status."
+  title="NMC | Agent Orders"
+  description="Agent order submission and accessible order list."
+  heading="Agent Orders"
+  intro="Submit orders for customers and review orders connected to your work."
   feedback={feedback}
 >
-  <AgentDashboard data={data} />
+  <AgentOrders data={data} />
 </AgentPageFrame>

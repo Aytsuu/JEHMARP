@@ -51,8 +51,8 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 - [x] Add `customer_order.source`.
 - [x] Add `customer_order.order_status`.
 - [x] Add `customer_order.payment_status`.
-- [x] Add `customer_order.discount_amount`.
-- [x] Add `customer_order.delivery_fee`.
+- [x] Remove legacy `customer_order.discount_amount` from the active schema.
+- [x] Remove legacy `customer_order.delivery_fee` from the active schema.
 - [x] Add `customer_order.submitted_by`.
 - [x] Add `customer_order.approved_by`.
 - [x] Add `customer_order.approved_at`.
@@ -88,12 +88,7 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 - [x] Add `customer_order_status_history.changed_by`.
 - [x] Add `customer_order_status_history.changed_at`.
 - [x] Add `customer_order_status_history.notes`.
-- [x] Create `customer_order_update`.
-- [x] Add `customer_order_update.order_id`.
-- [x] Add `customer_order_update.update_type`.
-- [x] Add `customer_order_update.title`.
-- [x] Add `customer_order_update.details`.
-- [x] Add `customer_order_update.created_by`.
+- [x] Remove legacy `customer_order_update` from the active schema.
 - [x] Create `contact_inquiry`.
 - [x] Create `reseller_application`.
 - [x] Add `reseller_application.application_status`.
@@ -149,7 +144,7 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 - [x] Implement invoice status transitions.
 - [x] Implement append-only payment creation.
 - [x] Implement order status history creation.
-- [x] Implement order update creation.
+- [x] Remove legacy order update creation.
 - [x] Implement one-way quantity sync: `partial_quantity` changes copy to `final_quantity`, while `final_quantity` changes do not copy back.
 - [x] Implement item-level commission total rollup.
 - [x] Implement earned commission calculation from payment rule.
@@ -192,7 +187,7 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 - [x] Build order item commission editing.
 - [x] Build payment recording.
 - [x] Build invoice management.
-- [x] Build order update timeline.
+- [x] Remove legacy order update timeline.
 - [x] Build contact inquiry management.
 - [x] Build reseller application management.
 - [x] Build failed reseller email resend action.
@@ -200,20 +195,20 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 7 - Agent Dashboard
 
-- [ ] Build agent authentication guard.
-- [ ] Build agent dashboard shell.
-- [ ] Show monthly earnings.
-- [ ] Show commission earned today.
-- [ ] Show expected commission from unpaid and partial orders.
-- [ ] Show assigned customer records.
-- [ ] Show assigned/submitted orders.
-- [ ] Show payment status summary.
-- [ ] Build agent order submission form.
-- [ ] Attach `agent_id` to agent-submitted orders.
-- [ ] Restrict agent order submission to assigned customer records.
-- [ ] Show order update timeline for accessible orders.
-- [ ] Add agent RLS integration tests.
-- [ ] Add agent dashboard calculation tests.
+- [x] Build agent authentication guard.
+- [x] Build agent dashboard shell.
+- [x] Show monthly earnings.
+- [x] Show commission earned today.
+- [x] Show expected commission from unpaid and partial orders.
+- [x] Show assigned customer records.
+- [x] Show assigned/submitted orders.
+- [x] Show payment status summary.
+- [x] Build agent order submission form.
+- [x] Attach `agent_id` to agent-submitted orders.
+- [x] Allow agent order submission for assigned customers or new customers assigned to the submitting agent.
+- [x] Remove legacy order update timeline from agent-accessible orders.
+- [x] Add agent RLS integration tests.
+- [x] Add agent dashboard calculation tests.
 
 ## Phase 8 - Reseller Application And Email
 

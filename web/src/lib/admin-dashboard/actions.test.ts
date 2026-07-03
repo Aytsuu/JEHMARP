@@ -9,13 +9,11 @@ import {
 const adminUserId = "8bcce9f3-2a1b-43c0-9e51-70667e017111";
 
 describe("parseAdminActionFormData", () => {
-  it("parses admin-created orders with normalized adjustments and order items", () => {
+  it("parses admin-created orders with normalized order items", () => {
     const formData = new FormData();
     formData.set("action", "create-order");
     formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
     formData.set("agentId", "  ");
-    formData.set("discountAmount", "15.50");
-    formData.set("deliveryFee", "80");
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "2");
     formData.append("addDetails", "  Slice thin  ");
@@ -39,8 +37,6 @@ describe("parseAdminActionFormData", () => {
           source: "admin_manual",
           order_status: "approved",
           payment_status: "unpaid",
-          discount_amount: 15.5,
-          delivery_fee: 80,
           submitted_by: adminUserId,
           approved_by: adminUserId,
           approved_at: expect.any(String),
@@ -68,8 +64,6 @@ describe("parseAdminActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "create-order");
     formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
-    formData.set("discountAmount", "0");
-    formData.set("deliveryFee", "0");
     formData.append("productId", "");
     formData.append("quantity", "");
     formData.append("addDetails", "");
@@ -90,8 +84,6 @@ describe("parseAdminActionFormData", () => {
     formData.set("address", "  Stall 8  ");
     formData.set("assignedAgentId", "64568f81-108b-42bd-b926-7e825dad67c6");
     formData.set("isReseller", "on");
-    formData.set("discountAmount", "0");
-    formData.set("deliveryFee", "25");
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "3");
     formData.append("addDetails", "");
@@ -119,8 +111,6 @@ describe("parseAdminActionFormData", () => {
           source: "admin_manual",
           order_status: "approved",
           payment_status: "unpaid",
-          discount_amount: 0,
-          delivery_fee: 25,
           submitted_by: adminUserId,
           approved_by: adminUserId,
           approved_at: expect.any(String),
@@ -337,8 +327,19 @@ describe("parseAdminActionFormData", () => {
     formData.set("action", "update-order-adjustments");
     formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
     formData.set("agentId", "");
-    formData.set("discountAmount", "0");
-    formData.set("deliveryFee", "0");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Unknown admin action."],
+    });
+  });
+
+  it("rejects removed order update saves", () => {
+    const formData = new FormData();
+    formData.set("action", "add-order-update");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("updateType", "admin_note");
+    formData.set("title", "Removed order update action");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
       success: false,
@@ -374,8 +375,6 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "approved",
         payment_status: "unpaid",
-        discount_amount: 0,
-        delivery_fee: 50,
         submitted_by: adminUserId,
         approved_by: adminUserId,
         approved_at: "2026-07-01T00:00:00.000Z",
@@ -399,8 +398,6 @@ describe("executeAdminAction", () => {
       source: "admin_manual",
       order_status: "approved",
       payment_status: "unpaid",
-      discount_amount: 0,
-      delivery_fee: 50,
       submitted_by: adminUserId,
       approved_by: adminUserId,
       approved_at: "2026-07-01T00:00:00.000Z",
@@ -460,8 +457,6 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "approved",
         payment_status: "unpaid",
-        discount_amount: 0,
-        delivery_fee: 50,
         submitted_by: adminUserId,
         approved_by: adminUserId,
         approved_at: "2026-07-01T00:00:00.000Z",
@@ -541,8 +536,6 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "approved",
         payment_status: "unpaid",
-        discount_amount: 0,
-        delivery_fee: 50,
         submitted_by: adminUserId,
         approved_by: adminUserId,
         approved_at: "2026-07-01T00:00:00.000Z",

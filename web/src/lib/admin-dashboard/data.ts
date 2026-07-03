@@ -19,8 +19,6 @@ const adminOrderSelect = `
   source,
   order_status,
   payment_status,
-  discount_amount,
-  delivery_fee,
   approved_at,
   created_at,
   updated_at,
@@ -73,13 +71,6 @@ const adminOrderSelect = `
     due_at,
     created_at,
     updated_at
-  ),
-  customer_order_update (
-    id,
-    update_type,
-    title,
-    details,
-    created_at
   ),
   customer_order_status_history (
     id,
@@ -188,14 +179,6 @@ export type AdminInvoice = {
   updated_at: string;
 };
 
-export type AdminOrderUpdate = {
-  id: string;
-  update_type: string;
-  title: string;
-  details: string | null;
-  created_at: string;
-};
-
 export type AdminOrderStatusHistory = {
   id: string;
   from_status: OrderStatus | null;
@@ -211,8 +194,6 @@ export type AdminOrder = {
   source: "guest_shop" | "agent_submitted" | "admin_manual";
   order_status: OrderStatus;
   payment_status: "unpaid" | "partial" | "paid" | "refunded" | "void";
-  discount_amount: number;
-  delivery_fee: number;
   approved_at: string | null;
   created_at: string;
   updated_at: string;
@@ -221,7 +202,6 @@ export type AdminOrder = {
   customer_order_item: AdminOrderItem[];
   payment: AdminPayment[];
   invoice: AdminInvoice[];
-  customer_order_update: AdminOrderUpdate[];
   customer_order_status_history: AdminOrderStatusHistory[];
 };
 
@@ -386,7 +366,6 @@ function normalizeAdminOrder(order: unknown): AdminOrder {
     customer_order_item: Array.isArray(adminOrder.customer_order_item) ? adminOrder.customer_order_item : [],
     payment: Array.isArray(adminOrder.payment) ? adminOrder.payment : [],
     invoice: normalizeRelationArray(adminOrder.invoice),
-    customer_order_update: Array.isArray(adminOrder.customer_order_update) ? adminOrder.customer_order_update : [],
     customer_order_status_history: Array.isArray(adminOrder.customer_order_status_history)
       ? adminOrder.customer_order_status_history
       : [],

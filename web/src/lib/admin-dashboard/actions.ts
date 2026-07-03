@@ -130,8 +130,6 @@ export type AdminAction =
         source: "admin_manual";
         order_status: OrderStatus;
         payment_status: "unpaid";
-        discount_amount: number;
-        delivery_fee: number;
         submitted_by: string;
         approved_by?: string | null;
         approved_at?: string | null;
@@ -186,16 +184,6 @@ export type AdminAction =
         issued_at: string;
         due_at: string | null;
         updated_at: string;
-      };
-    }
-  | {
-      type: "add-order-update";
-      payload: {
-        order_id: string;
-        update_type: string;
-        title: string;
-        details: string | null;
-        created_by: string;
       };
     }
   | {
@@ -290,9 +278,6 @@ export async function executeAdminAction(
       return;
     case "save-invoice":
       await executeTableUpsert(supabase, "invoice", action.invoiceId, action.payload);
-      return;
-    case "add-order-update":
-      await executeTableInsert(supabase, "customer_order_update", action.payload);
       return;
     case "update-inquiry":
       await executeTableUpdate(supabase, "contact_inquiry", action.inquiryId, action.payload);
@@ -447,8 +432,6 @@ function parseAdminActionFormDataOrThrow(
           source: "admin_manual",
           order_status: "approved",
           payment_status: "unpaid",
-          discount_amount: nonNegativeNumber(formData, "discountAmount"),
-          delivery_fee: nonNegativeNumber(formData, "deliveryFee"),
           submitted_by: adminUserId,
           approved_by: adminUserId,
           approved_at: approvedAt,
@@ -515,17 +498,6 @@ function parseAdminActionFormDataOrThrow(
           issued_at: new Date().toISOString(),
           due_at: null,
           updated_at: new Date().toISOString(),
-        },
-      });
-    case "add-order-update":
-      return success({
-        type: "add-order-update",
-        payload: {
-          order_id: uuidSchema.parse(requiredString(formData, "orderId")),
-          update_type: requiredString(formData, "updateType"),
-          title: requiredString(formData, "title"),
-          details: optionalString(formData, "details"),
-          created_by: adminUserId,
         },
       });
     case "update-inquiry":
@@ -930,8 +902,6 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Payment recorded.";
     case "save-invoice":
       return "Invoice saved.";
-    case "add-order-update":
-      return "Order timeline update added.";
     case "update-inquiry":
       return "Inquiry updated.";
   }

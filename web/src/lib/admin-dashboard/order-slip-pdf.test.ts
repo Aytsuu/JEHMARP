@@ -12,8 +12,6 @@ describe("buildOrderSlipPdf", () => {
       source: "admin_manual",
       order_status: "approved",
       payment_status: "unpaid",
-      discount_amount: 10,
-      delivery_fee: 50,
       approved_at: null,
       created_at: "2026-07-03T00:00:00.000Z",
       updated_at: "2026-07-03T00:00:00.000Z",
@@ -52,7 +50,6 @@ describe("buildOrderSlipPdf", () => {
       ],
       payment: [],
       invoice: [],
-      customer_order_update: [],
       customer_order_status_history: [],
     } as AdminOrder);
     const text = new TextDecoder().decode(pdf);
@@ -64,7 +61,7 @@ describe("buildOrderSlipPdf", () => {
     expect(text).toContain("Maria Santos");
     expect(text).toContain("Pork Belly");
     expect(text).toContain("Cut small");
-    expect(text).toContain("Total PHP 290.00");
+    expect(text).toContain("Total PHP 250.00");
     expect(text).toContain("Name: Ana Agent");
     expect(text).not.toContain("40 401 515 264 re S");
     expect(text).toContain("%%EOF");
@@ -73,8 +70,6 @@ describe("buildOrderSlipPdf", () => {
   it("creates additional PDF pages when an order has more than ten items", () => {
     const order = {
       created_at: "2026-07-03T00:00:00.000Z",
-      discount_amount: 0,
-      delivery_fee: 0,
       customer: null,
       agent: null,
       customer_order_item: Array.from({ length: 11 }, (_, index) => ({

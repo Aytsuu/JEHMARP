@@ -1,8 +1,8 @@
-import type { AdminOrder, AdminOrderItem } from "./data";
+import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
 import {
   fullName,
   orderTotal,
-} from "./view";
+} from "@/lib/order-documents/view";
 
 const pageWidth = 595;
 const pageHeight = 842;
@@ -16,12 +16,12 @@ type TextOptions = {
 };
 
 type OrderSlipPage = {
-  items: AdminOrderItem[];
+  items: DocumentOrderItem[];
   pageNumber: number;
   pageCount: number;
 };
 
-export function buildOrderSlipPdf(order: AdminOrder): Uint8Array {
+export function buildOrderSlipPdf(order: DocumentOrder): Uint8Array {
   const pages = chunkOrderItems(order.customer_order_item);
   const contentStreams = pages.map((items, index) => buildOrderSlipPageContent(order, {
     items,
@@ -32,7 +32,7 @@ export function buildOrderSlipPdf(order: AdminOrder): Uint8Array {
   return buildPdfDocument(contentStreams);
 }
 
-function chunkOrderItems(items: AdminOrderItem[]) {
+function chunkOrderItems(items: DocumentOrderItem[]) {
   if (items.length === 0) return [[]];
 
   return Array.from({ length: Math.ceil(items.length / tableRowsPerPage) }, (_, index) => {
@@ -41,7 +41,7 @@ function chunkOrderItems(items: AdminOrderItem[]) {
   });
 }
 
-function buildOrderSlipPageContent(order: AdminOrder, page: OrderSlipPage) {
+function buildOrderSlipPageContent(order: DocumentOrder, page: OrderSlipPage) {
   const commands: string[] = [];
 
   drawHeader(commands, page);
@@ -65,7 +65,7 @@ function drawHeader(commands: string[], page: OrderSlipPage) {
   addText(commands, 525, 778, "LOGO", { align: "center", size: 9 });
 }
 
-function drawOrderFields(commands: string[], order: AdminOrder) {
+function drawOrderFields(commands: string[], order: DocumentOrder) {
   const orderedBy = fullName(order.customer);
   const seller = sellerName(order);
 
@@ -77,7 +77,7 @@ function drawOrderFields(commands: string[], order: AdminOrder) {
   drawLine(commands, 370, 691, 555, 691);
 }
 
-function drawItemsTable(commands: string[], items: AdminOrderItem[]) {
+function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
   const tableTopY = 665;
   const rowHeight = 24;
   const tableWidth = tableColumnWidths.reduce((total, width) => total + width, 0);
@@ -121,14 +121,14 @@ function drawItemsTable(commands: string[], items: AdminOrderItem[]) {
   return tableBottomY;
 }
 
-function drawOrderTotal(commands: string[], order: AdminOrder, tableBottomY: number) {
+function drawOrderTotal(commands: string[], order: DocumentOrder, tableBottomY: number) {
   const totalY = tableBottomY - 24;
 
   addText(commands, 390, totalY, `Total ${formatMoney(orderTotal(order, "partial_quantity"))}`, { size: 11 });
   drawLine(commands, 440, totalY - 4, 555, totalY - 4);
 }
 
-function drawTermsAndSignatures(commands: string[], order: AdminOrder) {
+function drawTermsAndSignatures(commands: string[], order: DocumentOrder) {
   const acceptedBy = sellerName(order);
 
   addText(commands, 40, 348, "Delivery Preference", { size: 10 });
@@ -160,7 +160,7 @@ function drawTermsAndSignatures(commands: string[], order: AdminOrder) {
   addText(commands, 330, 76, "Date: ________________________", { size: 9 });
 }
 
-function sellerName(order: AdminOrder) {
+function sellerName(order: DocumentOrder) {
   return order.agent?.display_name ?? "Narcisan S. Galamiton";
 }
 

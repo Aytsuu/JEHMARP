@@ -28,10 +28,9 @@ export const adminDashboardRoutes = [
 ] as const satisfies readonly NavigationItem[];
 
 export const agentDashboardRoutes = [
-  { label: "Dashboard", href: "/agent#agent-dashboard-title" },
-  { label: "Earnings", href: "/agent#agent-earnings" },
-  { label: "Customers", href: "/agent#agent-customers" },
-  { label: "Orders", href: "/agent#agent-orders" },
-  { label: "Payments", href: "/agent#agent-payments" },
-  { label: "Timeline", href: "/agent#agent-timeline" },
+  { label: "Dashboard", href: "/agent" },
+  { label: "Earnings", href: "/agent/earnings" },
+  { label: "Customers", href: "/agent/customers" },
+  { label: "Orders", href: "/agent/orders" },
+  { label: "Payments", href: "/agent/payments" },
 ] as const satisfies readonly NavigationItem[];

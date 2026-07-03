@@ -1,4 +1,5 @@
 ---
+import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
 import { getAllowedNextOrderStatuses } from "@/lib/admin-dashboard/actions";
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 import {
@@ -28,7 +29,7 @@ const customerOptions = data.customers.map((customer) => ({
 <section id="admin-orders" class="admin-panel" aria-labelledby="admin-orders-title">
   <div class="admin-panel__header">
     <h2 id="admin-orders-title">Order Review And Workflow</h2>
-    <p>Review submitted orders, approve or reject, update status, edit item commissions, record payments, manage invoices, and add timeline updates.</p>
+    <p>Review submitted orders, approve or reject, update status, edit item commissions, record payments, and manage invoices.</p>
   </div>
 
   <form method="post" class="admin-form" aria-labelledby="create-order-title">
@@ -98,17 +99,6 @@ const customerOptions = data.customers.map((customer) => ({
       </div>
       <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
     </fieldset>
-
-    <div class="admin-form-grid">
-      <label class="field-row">
-        <span>Discount amount</span>
-        <input name="discountAmount" type="number" min="0" step="0.01" value="0" required />
-      </label>
-      <label class="field-row">
-        <span>Delivery fee</span>
-        <input name="deliveryFee" type="number" min="0" step="0.01" value="0" required />
-      </label>
-    </div>
 
     <div class="table-wrap">
       <table>
@@ -207,17 +197,11 @@ const customerOptions = data.customers.map((customer) => ({
               <h3 id={`order-${order.id}`}>Order for {fullName(order.customer)}</h3>
               <p>{order.source} - {order.order_status} - payment {order.payment_status} - {formatDate(order.created_at)}</p>
               <p>
-                <a href={`/admin/orders/${order.id}/order-slip.pdf`} target="_blank" rel="noreferrer">
-                  View order slip PDF
-                </a>
-                {invoice && (
-                  <>
-                    {" | "}
-                    <a href={`/admin/orders/${order.id}/sales-invoice.pdf`} target="_blank" rel="noreferrer">
-                      View sales invoice PDF
-                    </a>
-                  </>
-                )}
+                <OrderPdfLinks
+                  orderId={order.id}
+                  basePath="/admin/orders"
+                  showSalesInvoice={Boolean(invoice)}
+                />
               </p>
             </div>
 
@@ -311,9 +295,12 @@ const customerOptions = data.customers.map((customer) => ({
                 <section class="admin-form" aria-labelledby={`order-invoice-${order.id}`}>
                   <h4 id={`order-invoice-${order.id}`}>Invoice {invoice.invoice_number}</h4>
                   <p>
-                    <a href={`/admin/orders/${order.id}/sales-invoice.pdf`} target="_blank" rel="noreferrer">
-                      View sales invoice PDF
-                    </a>
+                    <OrderPdfLinks
+                      orderId={order.id}
+                      basePath="/admin/orders"
+                      showOrderSlip={false}
+                      showSalesInvoice
+                    />
                   </p>
                 </section>
               ) : (
@@ -326,40 +313,16 @@ const customerOptions = data.customers.map((customer) => ({
               )}
             </div>
 
-            <form method="post" class="admin-form">
-              <input type="hidden" name="action" value="add-order-update" />
-              <input type="hidden" name="orderId" value={order.id} />
-              <h4>Add order timeline update</h4>
-              <div class="admin-form-grid">
-                <label class="field-row"><span>Update type</span><input name="updateType" required placeholder="admin_note" /></label>
-                <label class="field-row"><span>Title</span><input name="title" required /></label>
-              </div>
-              <label class="field-row"><span>Details</span><textarea name="details"></textarea></label>
-              <button type="submit">Add update</button>
-            </form>
-
-            <div class="admin-two-column">
-              <section aria-labelledby={`payments-${order.id}`}>
-                <h4 id={`payments-${order.id}`}>Payments</h4>
-                {order.payment.length === 0 ? <p class="empty-state">No payments recorded.</p> : (
-                  <ul class="compact-list">
-                    {order.payment.map((payment) => (
-                      <li>{formatCurrency(payment.amount)} by {payment.payment_method} on {formatDate(payment.payment_date)}</li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-              <section aria-labelledby={`timeline-${order.id}`}>
-                <h4 id={`timeline-${order.id}`}>Timeline</h4>
-                {order.customer_order_update.length === 0 ? <p class="empty-state">No timeline updates.</p> : (
-                  <ul class="compact-list">
-                    {order.customer_order_update.map((update) => (
-                      <li><strong>{update.title}</strong> - {formatDate(update.created_at)}<br />{update.details}</li>
-                    ))}
-                  </ul>
-                )}
-              </section>
-            </div>
+            <section aria-labelledby={`payments-${order.id}`}>
+              <h4 id={`payments-${order.id}`}>Payments</h4>
+              {order.payment.length === 0 ? <p class="empty-state">No payments recorded.</p> : (
+                <ul class="compact-list">
+                  {order.payment.map((payment) => (
+                    <li>{formatCurrency(payment.amount)} by {payment.payment_method} on {formatDate(payment.payment_date)}</li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </article>
         );
       })}
