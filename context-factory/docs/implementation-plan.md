@@ -231,15 +231,15 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 9 - Contact Inquiry
 
-- [ ] Build contact inquiry form.
-- [ ] Add server-side validation.
-- [ ] Add CAPTCHA or Turnstile.
-- [ ] Add rate limiting by IP and email.
-- [ ] Insert `contact_inquiry`.
-- [ ] Build admin inquiry list.
-- [ ] Build inquiry status update flow.
-- [ ] Build internal notes flow.
-- [ ] Add contact inquiry tests.
+- [x] Build contact inquiry form.
+- [x] Add server-side validation.
+- [x] Add CAPTCHA or Turnstile.
+- [x] Add rate limiting by IP and email.
+- [x] Insert `contact_inquiry`.
+- [x] Build admin inquiry list.
+- [x] Build inquiry status update flow.
+- [x] Build internal notes flow.
+- [x] Add contact inquiry tests.
 
 ## Phase 10 - Analytics
 

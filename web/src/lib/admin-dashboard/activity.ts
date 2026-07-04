@@ -2,7 +2,7 @@ import type { AdminDashboardData } from "./data";
 
 export type AdminActivityItem = {
   id: string;
-  category: "order" | "customer" | "product" | "invoice" | "content" | "reseller";
+  category: "order" | "customer" | "product" | "invoice" | "content" | "inquiry" | "reseller";
   title: string;
   detail: string;
   occurredAt: string;
@@ -18,6 +18,7 @@ export function buildAdminActivityItems(
     ...buildProductActivity(data),
     ...buildInvoiceActivity(data),
     ...buildContentActivity(data),
+    ...buildContactInquiryActivity(data),
     ...buildResellerApplicationActivity(data),
   ];
 
@@ -170,6 +171,16 @@ function buildResellerApplicationActivity(data: AdminDashboardData): AdminActivi
     title: "New reseller application",
     detail: `${application.name} - ${application.planned_transaction_type}, price list ${application.email_delivery_status}`,
     occurredAt: application.created_at,
+  }));
+}
+
+function buildContactInquiryActivity(data: AdminDashboardData): AdminActivityItem[] {
+  return data.contactInquiries.map((inquiry) => ({
+    id: `contact-inquiry-created:${inquiry.id}`,
+    category: "inquiry",
+    title: "New contact inquiry",
+    detail: `${inquiry.name} - ${inquiry.inquiry_status}`,
+    occurredAt: inquiry.created_at,
   }));
 }
 

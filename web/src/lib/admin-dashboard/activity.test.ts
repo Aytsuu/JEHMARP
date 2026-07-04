@@ -5,12 +5,13 @@ import { buildAdminActivityItems } from "./activity";
 import type { AdminDashboardData } from "./data";
 
 describe("buildAdminActivityItems", () => {
-  it("builds a sorted operational activity feed including new reseller applications", () => {
+  it("builds a sorted operational activity feed including new inquiries and reseller applications", () => {
     const data = createAdminDashboardData();
 
     const activity = buildAdminActivityItems(data);
 
     expect(activity.map((item) => item.title)).toEqual([
+      "New contact inquiry",
       "New reseller application",
       "Updated content page",
       "Created invoice",
@@ -21,6 +22,10 @@ describe("buildAdminActivityItems", () => {
       "Created content page",
     ]);
     expect(activity[0]).toMatchObject({
+      category: "inquiry",
+      detail: "Contact Customer - new",
+    });
+    expect(activity[1]).toMatchObject({
       category: "reseller",
       detail: "Reseller Applicant - retail_resale, price list sent",
     });
@@ -30,8 +35,8 @@ describe("buildAdminActivityItems", () => {
     const activity = buildAdminActivityItems(createAdminDashboardData(), 2);
 
     expect(activity).toHaveLength(2);
-    expect(activity[0]?.title).toBe("New reseller application");
-    expect(activity[1]?.title).toBe("Updated content page");
+    expect(activity[0]?.title).toBe("New contact inquiry");
+    expect(activity[1]?.title).toBe("New reseller application");
   });
 });
 
@@ -114,7 +119,17 @@ function createAdminDashboardData(): AdminDashboardData {
         notes: null,
       }],
     }],
-    contactInquiries: [],
+    contactInquiries: [{
+      id: "inquiry-id",
+      name: "Contact Customer",
+      email: "contact@example.com",
+      phone_number: "09172222222",
+      message: "Do you deliver?",
+      inquiry_status: "new",
+      internal_notes: null,
+      created_at: "2026-07-04T15:00:00.000Z",
+      updated_at: "2026-07-04T15:00:00.000Z",
+    }],
     resellerApplications: [{
       id: "reseller-id",
       name: "Reseller Applicant",

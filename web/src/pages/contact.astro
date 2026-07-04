@@ -2,14 +2,92 @@
 import PublicPageSections from "@/components/PublicPageSections.astro";
 import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
+import { getPublicEnv } from "@/lib/env";
 import { getPublicPageContent } from "@/lib/public-website/content";
+import { getContactInquiryFeedback } from "@/lib/public-website/contact-inquiries";
 
 const content = await getPublicPageContent(Astro, "contact");
 const title = content.page?.title ?? "Contact";
+const { turnstileSiteKey } = getPublicEnv();
+const feedback = getContactInquiryFeedback(Astro.url);
 ---
 
 <Layout title={`${title} - JEHMARP`} description="JEHMARP public contact page.">
   <PageShell title={title}>
+    {
+      feedback?.status === "submitted" && (
+        <section class="message-block" aria-labelledby="contact-confirmation">
+          <h2 id="contact-confirmation">Inquiry submitted</h2>
+          <p>Your message was sent to the JEHMARP team.</p>
+          {feedback.reference && <p>Reference: {feedback.reference}</p>}
+        </section>
+      )
+    }
+
+    {
+      feedback?.status === "error" && (
+        <section class="message-block" aria-labelledby="contact-error">
+          <h2 id="contact-error">Inquiry was not submitted</h2>
+          <p>{feedback.message}</p>
+        </section>
+      )
+    }
+
     <PublicPageSections sections={content.sections} />
+
+    <section class="form-section" aria-labelledby="contact-inquiry-title">
+      <h2 id="contact-inquiry-title">Contact inquiry</h2>
+      <form class="form-grid" method="post" action="/api/contact-inquiries">
+        <fieldset class="fieldset-block">
+          <legend>Contact details</legend>
+          <div class="form-grid form-grid--two-column">
+            <div class="field-row">
+              <label for="name">Name</label>
+              <input id="name" name="name" required autocomplete="name" maxlength="120" />
+            </div>
+            <div class="field-row">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" autocomplete="email" maxlength="254" />
+            </div>
+            <div class="field-row">
+              <label for="phoneNumber">Phone number</label>
+              <input id="phoneNumber" name="phoneNumber" autocomplete="tel" maxlength="50" />
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset-block">
+          <legend>Message</legend>
+          <div class="field-row">
+            <label for="message">How can we help?</label>
+            <textarea id="message" name="message" required maxlength="2000"></textarea>
+          </div>
+        </fieldset>
+
+        <div class="fieldset-block">
+          {
+            turnstileSiteKey ? (
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+            ) : (
+              <p class="error-message">Contact verification is not configured.</p>
+            )
+          }
+        </div>
+
+        <div class="button-row">
+          <button type="submit" disabled={!turnstileSiteKey}>Send inquiry</button>
+        </div>
+      </form>
+    </section>
+
+    {
+      turnstileSiteKey && (
+        <script
+          is:inline
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          async
+          defer></script>
+      )
+    }
   </PageShell>
 </Layout>
