@@ -11,7 +11,7 @@ const heroSection = content.sections.find((section) => section.type === "hero");
 const otherSections = content.sections.filter((section) => section.type !== "hero");
 ---
 
-<Layout title={`JEHMARP | ${title}`} description="JEHMARP public home page.">
+<Layout title={`${title} - JEHMARP`} description="JEHMARP public home page.">
 	{heroSection && <HomeHero section={heroSection} />}
 	<HomePageSections sections={otherSections} />
 </Layout>

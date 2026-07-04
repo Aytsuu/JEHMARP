@@ -8,7 +8,7 @@ const content = await getPublicPageContent(Astro, "contact");
 const title = content.page?.title ?? "Contact";
 ---
 
-<Layout title={`JEHMARP | ${title}`} description="JEHMARP public contact page.">
+<Layout title={`${title} - JEHMARP`} description="JEHMARP public contact page.">
   <PageShell title={title}>
     <PublicPageSections sections={content.sections} />
   </PageShell>
