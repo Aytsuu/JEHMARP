@@ -1,0 +1,254 @@
+---
+import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
+import { formatCurrency } from "@/lib/admin-dashboard/view";
+
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+
+type Props = {
+  data: AdminDashboardData;
+};
+
+const { data } = Astro.props;
+const analytics = buildAdminAnalytics(data);
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-PH").format(value);
+}
+---
+
+<section class="admin-summary-grid" aria-label="Analytics summary">
+  <article class="admin-summary-card">
+    <h2>Total Paid</h2>
+    <p>{formatCurrency(analytics.summary.totalPaidAmount)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Outstanding Balance</h2>
+    <p>{formatCurrency(analytics.summary.outstandingBalance)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Orders</h2>
+    <p>{formatNumber(analytics.summary.orderCount)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>New Applications</h2>
+    <p>{formatNumber(analytics.summary.newResellerApplications)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>New Inquiries</h2>
+    <p>{formatNumber(analytics.summary.newContactInquiries)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Assigned Customers</h2>
+    <p>{formatNumber(analytics.summary.assignedCustomerCount)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Agent Monthly Earnings</h2>
+    <p>{formatCurrency(analytics.summary.agentMonthlyEarnings)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Agent Earned Today</h2>
+    <p>{formatCurrency(analytics.summary.agentEarnedToday)}</p>
+  </article>
+  <article class="admin-summary-card">
+    <h2>Agent Expected Commission</h2>
+    <p>{formatCurrency(analytics.summary.agentExpectedCommission)}</p>
+  </article>
+</section>
+
+<section class="admin-panel" aria-labelledby="sales-by-day-title">
+  <div class="admin-panel__header">
+    <h2 id="sales-by-day-title">Sales By Day</h2>
+    <p>Gross order value grouped by order creation date.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <caption>Sales by day</caption>
+      <thead>
+        <tr>
+          <th scope="col">Period</th>
+          <th scope="col">Orders</th>
+          <th scope="col">Gross Sales</th>
+        </tr>
+      </thead>
+      <tbody>
+        {analytics.salesByDay.map((row) => (
+          <tr>
+            <td>{row.label}</td>
+            <td>{formatNumber(row.orderCount)}</td>
+            <td>{formatCurrency(row.grossSales)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="admin-panel" aria-labelledby="sales-by-month-title">
+  <div class="admin-panel__header">
+    <h2 id="sales-by-month-title">Sales By Month</h2>
+    <p>Gross order value grouped by order creation month.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <caption>Sales by month</caption>
+      <thead>
+        <tr>
+          <th scope="col">Period</th>
+          <th scope="col">Orders</th>
+          <th scope="col">Gross Sales</th>
+        </tr>
+      </thead>
+      <tbody>
+        {analytics.salesByMonth.map((row) => (
+          <tr>
+            <td>{row.label}</td>
+            <td>{formatNumber(row.orderCount)}</td>
+            <td>{formatCurrency(row.grossSales)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="admin-panel" aria-labelledby="orders-by-status-title">
+  <div class="admin-panel__header">
+    <h2 id="orders-by-status-title">Orders By Status</h2>
+    <p>Order counts across the operational workflow.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <caption>Orders by status</caption>
+      <thead>
+        <tr>
+          <th scope="col">Status</th>
+          <th scope="col">Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {analytics.ordersByStatus.map((row) => (
+          <tr>
+            <td>{row.label}</td>
+            <td>{formatNumber(row.count)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="admin-panel" aria-labelledby="payments-by-status-title">
+  <div class="admin-panel__header">
+    <h2 id="payments-by-status-title">Payments By Status</h2>
+    <p>Order counts by balance and payment state.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <caption>Payments by status</caption>
+      <thead>
+        <tr>
+          <th scope="col">Status</th>
+          <th scope="col">Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {analytics.paymentsByStatus.map((row) => (
+          <tr>
+            <td>{row.label}</td>
+            <td>{formatNumber(row.count)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="admin-panel" aria-labelledby="top-products-title">
+  <div class="admin-panel__header">
+    <h2 id="top-products-title">Top Products</h2>
+    <p>Products ranked by gross sales.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <caption>Top products</caption>
+      <thead>
+        <tr>
+          <th scope="col">Product</th>
+          <th scope="col">Quantity</th>
+          <th scope="col">Gross Sales</th>
+        </tr>
+      </thead>
+      <tbody>
+        {analytics.topProducts.map((row) => (
+          <tr>
+            <td>{row.label}</td>
+            <td>{formatNumber(row.quantitySold)}</td>
+            <td>{formatCurrency(row.grossSales)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="admin-panel" aria-labelledby="sales-by-category-title">
+  <div class="admin-panel__header">
+    <h2 id="sales-by-category-title">Sales By Product Category</h2>
+    <p>Gross sales and sold quantity grouped by category.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <caption>Sales by product category</caption>
+      <thead>
+        <tr>
+          <th scope="col">Category</th>
+          <th scope="col">Quantity</th>
+          <th scope="col">Gross Sales</th>
+        </tr>
+      </thead>
+      <tbody>
+        {analytics.salesByCategory.map((row) => (
+          <tr>
+            <td>{row.label}</td>
+            <td>{formatNumber(row.quantitySold)}</td>
+            <td>{formatCurrency(row.grossSales)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="admin-panel" aria-labelledby="sales-by-agent-title">
+  <div class="admin-panel__header">
+    <h2 id="sales-by-agent-title">Sales By Agent</h2>
+    <p>Agent-linked sales, paid amounts, and commission totals.</p>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <caption>Sales by agent</caption>
+      <thead>
+        <tr>
+          <th scope="col">Agent</th>
+          <th scope="col">Orders</th>
+          <th scope="col">Gross Sales</th>
+          <th scope="col">Paid</th>
+          <th scope="col">Earned Commission</th>
+          <th scope="col">Expected Commission</th>
+        </tr>
+      </thead>
+      <tbody>
+        {analytics.salesByAgent.map((row) => (
+          <tr>
+            <td>{row.label}</td>
+            <td>{formatNumber(row.orderCount)}</td>
+            <td>{formatCurrency(row.grossSales)}</td>
+            <td>{formatCurrency(row.paidAmount)}</td>
+            <td>{formatCurrency(row.earnedCommission)}</td>
+            <td>{formatCurrency(row.expectedCommission)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</section>

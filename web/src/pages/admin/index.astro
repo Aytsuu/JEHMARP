@@ -13,7 +13,11 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
-const data = await loadAdminDashboardData();
+const data = await loadAdminDashboardData({
+  orderLimit: 500,
+  contactInquiryLimit: 500,
+  resellerApplicationLimit: 500,
+});
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 

@@ -243,22 +243,22 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 10 - Analytics
 
-- [ ] Build admin sales by day/month metric.
-- [ ] Build total paid amount metric.
-- [ ] Build outstanding balance metric.
-- [ ] Build orders by status metric.
-- [ ] Build payments by status metric.
-- [ ] Build top products metric.
-- [ ] Build sales by product category metric.
-- [ ] Build sales by agent metric.
-- [ ] Build new reseller applications metric.
-- [ ] Build new contact inquiries metric.
-- [ ] Build agent monthly earnings metric.
-- [ ] Build agent commission earned today metric.
-- [ ] Build agent expected commission metric.
-- [ ] Build assigned customer count metric.
-- [ ] Add analytics query tests.
-- [ ] Add rollup jobs only after live queries become too expensive.
+- [x] Build admin sales by day/month metric.
+- [x] Build total paid amount metric.
+- [x] Build outstanding balance metric.
+- [x] Build orders by status metric.
+- [x] Build payments by status metric.
+- [x] Build top products metric.
+- [x] Build sales by product category metric.
+- [x] Build sales by agent metric.
+- [x] Build new reseller applications metric.
+- [x] Build new contact inquiries metric.
+- [x] Build agent monthly earnings metric.
+- [x] Build agent commission earned today metric.
+- [x] Build agent expected commission metric.
+- [x] Build assigned customer count metric.
+- [x] Add analytics query tests.
+- [x] Add rollup jobs only after live queries become too expensive.
 
 ## Phase 11 - Security And Abuse Hardening
 

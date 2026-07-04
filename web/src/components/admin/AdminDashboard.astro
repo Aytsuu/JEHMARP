@@ -1,4 +1,6 @@
 ---
+import AdminAnalytics from "@/components/admin/AdminAnalytics.astro";
+
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 
 type Props = {
@@ -35,6 +37,15 @@ const { data } = Astro.props;
     <a href="/admin/reseller-applications">Review applications</a>
   </article>
 </section>
+
+<section class="admin-panel" aria-labelledby="admin-dashboard-analytics-title">
+  <div class="admin-panel__header">
+    <h2 id="admin-dashboard-analytics-title">Analytics</h2>
+    <p>Review live sales, payment, lead, product, and agent commission metrics.</p>
+  </div>
+</section>
+
+<AdminAnalytics data={data} />
 
 <section class="admin-panel" aria-labelledby="admin-overview-operations-title">
   <div class="admin-panel__header">

@@ -148,6 +148,30 @@ describe("agent dashboard calculations", () => {
     });
   });
 
+  it("excludes cancelled orders from aggregate outstanding balance", () => {
+    const now = new Date("2026-07-03T10:00:00.000Z");
+    const data = {
+      agent: {
+        id: agentId,
+        user_id: "22222222-2222-2222-2222-222222222222",
+        display_name: "NMC Agent",
+        status: "active",
+      },
+      customers: [],
+      orders: [
+        createOrder(),
+        createOrder({
+          id: "7c140d7d-8cb6-465d-a5ef-9bd8ea796d51",
+          order_status: "cancelled",
+          payment_status: "unpaid",
+          payment: [],
+        }),
+      ],
+    } as Pick<AgentDashboardData, "agent" | "customers" | "orders">;
+
+    expect(buildAgentSummary(data, now).outstandingBalance).toBe(212.5);
+  });
+
   it("summarizes orders by payment status", () => {
     expect(buildAgentPaymentSummary([
       createOrder({ payment_status: "unpaid" }),

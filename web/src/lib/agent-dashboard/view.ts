@@ -87,7 +87,9 @@ export function buildAgentSummary(
     expectedCommission: roundCurrency(agentOrders
       .filter((order) => order.payment_status === "unpaid" || order.payment_status === "partial")
       .reduce((total, order) => total + Math.max(orderExpectedCommission(order) - orderEarnedCommission(order), 0), 0)),
-    outstandingBalance: roundCurrency(data.orders.reduce((total, order) => total + orderBalance(order), 0)),
+    outstandingBalance: roundCurrency(data.orders
+      .filter(isOutstandingBalanceOrder)
+      .reduce((total, order) => total + orderBalance(order), 0)),
   };
 }
 
@@ -114,4 +116,8 @@ function dayIdentifier(value: Date) {
 
 function roundCurrency(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function isOutstandingBalanceOrder(order: AgentOrder): boolean {
+  return order.order_status !== "cancelled";
 }

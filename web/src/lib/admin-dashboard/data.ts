@@ -250,7 +250,15 @@ export type AdminDashboardData = {
   };
 };
 
-export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
+export type AdminDashboardDataOptions = {
+  orderLimit?: number;
+  contactInquiryLimit?: number;
+  resellerApplicationLimit?: number;
+};
+
+export async function loadAdminDashboardData(
+  options: AdminDashboardDataOptions = {},
+): Promise<AdminDashboardData> {
   // Called only after the /admin route verifies the signed-in user has an active admin role.
   // Keep reseller_price protected from non-admin authenticated clients by reading through
   // the server-only service-role client instead of broadening product SELECT grants.
@@ -270,9 +278,9 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     loadProducts(supabase),
     loadAgents(supabase),
     loadCustomers(supabase),
-    loadOrders(supabase),
-    loadContactInquiries(supabase),
-    loadResellerApplications(supabase),
+    loadOrders(supabase, options.orderLimit ?? 50),
+    loadContactInquiries(supabase, options.contactInquiryLimit ?? 50),
+    loadResellerApplications(supabase, options.resellerApplicationLimit ?? 50),
   ]);
 
   return {
@@ -369,12 +377,12 @@ async function loadCustomers(supabase: SupabaseAdminClient) {
   return (data ?? []) as AdminCustomer[];
 }
 
-async function loadOrders(supabase: SupabaseAdminClient) {
+async function loadOrders(supabase: SupabaseAdminClient, limit: number) {
   const { data, error } = await supabase
     .from("customer_order")
     .select(adminOrderSelect)
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(limit);
 
   if (error) throw new Error("Unable to load admin orders.");
 
@@ -400,28 +408,28 @@ function normalizeRelationArray<T>(value: T[] | T | null | undefined): T[] {
   return value ? [value] : [];
 }
 
-async function loadContactInquiries(supabase: SupabaseAdminClient) {
+async function loadContactInquiries(supabase: SupabaseAdminClient, limit: number) {
   const { data, error } = await supabase
     .from("contact_inquiry")
     .select(
       "id, name, email, phone_number, message, inquiry_status, internal_notes, created_at, updated_at",
     )
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(limit);
 
   if (error) throw new Error("Unable to load admin contact inquiries.");
 
   return (data ?? []) as AdminContactInquiry[];
 }
 
-async function loadResellerApplications(supabase: SupabaseAdminClient) {
+async function loadResellerApplications(supabase: SupabaseAdminClient, limit: number) {
   const { data, error } = await supabase
     .from("reseller_application")
     .select(
       "id, name, email, contact_number, planned_transaction_type, expected_quantity_per_week, application_status, email_delivery_status, price_list_sent_at, email_error, created_at, updated_at",
     )
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(limit);
 
   if (error) throw new Error("Unable to load admin reseller applications.");
 
