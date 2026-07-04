@@ -29,6 +29,11 @@ const { data } = Astro.props;
     <p>{data.summary.activeProducts}</p>
     <a href="/admin/products">Manage products</a>
   </article>
+  <article class="admin-summary-card">
+    <h2>Reseller Applications</h2>
+    <p>{data.summary.newResellerApplications}</p>
+    <a href="/admin/reseller-applications">Review applications</a>
+  </article>
 </section>
 
 <section class="admin-panel" aria-labelledby="admin-overview-operations-title">

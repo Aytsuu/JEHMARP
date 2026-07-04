@@ -31,11 +31,15 @@ describe("dashboard routes", () => {
       { label: "Orders", href: "/admin/orders" },
       { label: "Invoices", href: "/admin/invoices" },
       { label: "Inquiries", href: "/admin/inquiries" },
+      { label: "Reseller Applications", href: "/admin/reseller-applications" },
+      { label: "Activity", href: "/admin/activity" },
       { label: "Content", href: "/admin/content" },
     ]);
   });
 
-  it("does not expose a separate reseller admin surface", () => {
+  it("uses a dedicated reseller application admin surface", () => {
+    expect(adminDashboardRoutes.map((item) => item.href)).toContain("/admin/reseller-applications");
+    expect(adminDashboardRoutes.map((item) => item.label)).toContain("Reseller Applications");
     expect(adminDashboardRoutes.map((item) => item.href)).not.toContain("/admin/resellers");
     expect(adminDashboardRoutes.map((item) => item.label)).not.toContain("Resellers");
   });

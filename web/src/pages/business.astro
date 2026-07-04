@@ -1,13 +1,146 @@
 ---
 import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
+import { getPublicEnv } from "@/lib/env";
+import {
+  getResellerApplicationFeedback,
+  plannedTransactionTypeLabels,
+} from "@/lib/public-website/reseller-applications";
+
+const { turnstileSiteKey } = getPublicEnv();
+const feedback = getResellerApplicationFeedback(Astro.url);
+const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
 ---
 
-<Layout title="Business - JEHMARP">
-  <PageShell title="Business route foundation">
-    <p>
-      Reseller forms, Turnstile, rate limiting, and email sending are
-      intentionally deferred.
-    </p>
+<Layout
+  title="Business - JEHMARP"
+  description="Apply to become a JEHMARP reseller and receive the current reseller price list."
+>
+  <PageShell title="Business">
+    {
+      feedback?.status === "submitted" && (
+        <section class="message-block" aria-labelledby="reseller-confirmation">
+          <h2 id="reseller-confirmation">Application submitted</h2>
+          <p>Your reseller application was submitted for review.</p>
+          {feedback.reference && <p>Reference: {feedback.reference}</p>}
+        </section>
+      )
+    }
+
+    {
+      feedback?.status === "error" && (
+        <section class="message-block" aria-labelledby="reseller-error">
+          <h2 id="reseller-error">Application was not submitted</h2>
+          <p>{feedback.message}</p>
+        </section>
+      )
+    }
+
+    <section class="content-section" aria-labelledby="business-program-title">
+      <h1 id="business-program-title">Reseller Program</h1>
+      <p>
+        JEHMARP supports retailers, market sellers, restaurants, and online
+        merchants that need dependable meat supply with clear product pricing.
+      </p>
+      <div class="mission-grid">
+        <article>
+          <h2>Product access</h2>
+          <p>Receive the active product list with retail and reseller pricing.</p>
+        </article>
+        <article>
+          <h2>Review process</h2>
+          <p>Applications are checked by the admin team before follow-up.</p>
+        </article>
+        <article>
+          <h2>Order planning</h2>
+          <p>Share your weekly volume so the team can prepare the right supply discussion.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="form-section" aria-labelledby="reseller-application-title">
+      <h2 id="reseller-application-title">Reseller application</h2>
+      <form class="form-grid" method="post" action="/api/reseller-applications">
+        <fieldset class="fieldset-block">
+          <legend>Business details</legend>
+          <div class="form-grid form-grid--two-column">
+            <div class="field-row">
+              <label for="name">Name</label>
+              <input id="name" name="name" required autocomplete="name" maxlength="120" />
+            </div>
+            <div class="field-row">
+              <label for="email">Email</label>
+              <input id="email" name="email" type="email" required autocomplete="email" maxlength="254" />
+            </div>
+            <div class="field-row">
+              <label for="contactNumber">Contact number</label>
+              <input id="contactNumber" name="contactNumber" required autocomplete="tel" maxlength="50" />
+            </div>
+            <div class="field-row">
+              <label for="plannedTransactionType">Transaction type</label>
+              <select id="plannedTransactionType" name="plannedTransactionType" required>
+                <option value="">Select type</option>
+                {
+                  plannedTransactionOptions.map(([value, label]) => (
+                    <option value={value}>{label}</option>
+                  ))
+                }
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <label for="address">Business address</label>
+            <textarea
+              id="address"
+              name="address"
+              required
+              autocomplete="street-address"
+              maxlength="500"></textarea>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset-block">
+          <legend>Supply needs</legend>
+          <div class="field-row">
+            <label for="expectedQuantityPerWeek">Expected quantity per week</label>
+            <input
+              id="expectedQuantityPerWeek"
+              name="expectedQuantityPerWeek"
+              required
+              maxlength="120"
+              placeholder="Example: 40 kg chicken, 20 kg pork"
+            />
+          </div>
+          <div class="field-row">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" maxlength="1000"></textarea>
+          </div>
+        </fieldset>
+
+        <div class="fieldset-block">
+          {
+            turnstileSiteKey ? (
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+            ) : (
+              <p class="error-message">Reseller verification is not configured.</p>
+            )
+          }
+        </div>
+
+        <div class="button-row">
+          <button type="submit" disabled={!turnstileSiteKey}>Submit application</button>
+        </div>
+      </form>
+    </section>
+
+    {
+      turnstileSiteKey && (
+        <script
+          is:inline
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          async
+          defer></script>
+      )
+    }
   </PageShell>
 </Layout>

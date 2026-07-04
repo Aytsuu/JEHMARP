@@ -1,0 +1,72 @@
+---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+
+type Props = {
+  data: AdminDashboardData;
+};
+
+const { data } = Astro.props;
+---
+
+<section class="admin-panel" aria-labelledby="admin-reseller-applications-title">
+  <div class="admin-panel__header">
+    <h2 id="admin-reseller-applications-title">Reseller Applications</h2>
+    <p>Review reseller application submissions and price-list email delivery status.</p>
+  </div>
+
+  {
+    data.resellerApplications.length > 0 ? (
+      <div class="table-wrap">
+        <table>
+          <caption>Reseller applications</caption>
+          <thead>
+            <tr>
+              <th scope="col">Applicant</th>
+              <th scope="col">Contact</th>
+              <th scope="col">Business Type</th>
+              <th scope="col">Expected Quantity</th>
+              <th scope="col">Application Status</th>
+              <th scope="col">Price List Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.resellerApplications.map((application) => (
+              <tr>
+                <td>
+                  {application.name}
+                  <br />
+                  <span>{application.created_at}</span>
+                </td>
+                <td>
+                  {application.email}
+                  <br />
+                  <span>{application.contact_number}</span>
+                </td>
+                <td>{application.planned_transaction_type}</td>
+                <td>{application.expected_quantity_per_week}</td>
+                <td>{application.application_status}</td>
+                <td>
+                  {application.email_delivery_status}
+                  {application.price_list_sent_at && (
+                    <>
+                      <br />
+                      <span>Sent {application.price_list_sent_at}</span>
+                    </>
+                  )}
+                  {application.email_error && (
+                    <>
+                      <br />
+                      <span>{application.email_error}</span>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p class="empty-state">No reseller applications have been submitted yet.</p>
+    )
+  }
+</section>

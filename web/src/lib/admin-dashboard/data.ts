@@ -217,6 +217,21 @@ export type AdminContactInquiry = {
   updated_at: string;
 };
 
+export type AdminResellerApplication = {
+  id: string;
+  name: string;
+  email: string;
+  contact_number: string;
+  planned_transaction_type: string;
+  expected_quantity_per_week: string;
+  application_status: "submitted" | "contacted" | "qualified" | "closed" | "rejected" | "spam";
+  email_delivery_status: "pending" | "sent" | "failed";
+  price_list_sent_at: string | null;
+  email_error: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type AdminDashboardData = {
   pages: AdminPage[];
   pageSections: AdminPageSection[];
@@ -225,11 +240,13 @@ export type AdminDashboardData = {
   customers: AdminCustomer[];
   orders: AdminOrder[];
   contactInquiries: AdminContactInquiry[];
+  resellerApplications: AdminResellerApplication[];
   summary: {
     submittedOrders: number;
     openInquiries: number;
     customers: number;
     activeProducts: number;
+    newResellerApplications: number;
   };
 };
 
@@ -246,6 +263,7 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     customers,
     orders,
     contactInquiries,
+    resellerApplications,
   ] = await Promise.all([
     loadPages(supabase),
     loadPageSections(supabase),
@@ -254,6 +272,7 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     loadCustomers(supabase),
     loadOrders(supabase),
     loadContactInquiries(supabase),
+    loadResellerApplications(supabase),
   ]);
 
   return {
@@ -264,11 +283,15 @@ export async function loadAdminDashboardData(): Promise<AdminDashboardData> {
     customers,
     orders,
     contactInquiries,
+    resellerApplications,
     summary: {
       submittedOrders: orders.filter((order) => order.order_status === "submitted").length,
       openInquiries: contactInquiries.filter((inquiry) => inquiry.inquiry_status !== "closed").length,
       customers: customers.length,
       activeProducts: products.filter((product) => product.is_active).length,
+      newResellerApplications: resellerApplications.filter(
+        (application) => application.application_status === "submitted",
+      ).length,
     },
   };
 }
@@ -389,4 +412,18 @@ async function loadContactInquiries(supabase: SupabaseAdminClient) {
   if (error) throw new Error("Unable to load admin contact inquiries.");
 
   return (data ?? []) as AdminContactInquiry[];
+}
+
+async function loadResellerApplications(supabase: SupabaseAdminClient) {
+  const { data, error } = await supabase
+    .from("reseller_application")
+    .select(
+      "id, name, email, contact_number, planned_transaction_type, expected_quantity_per_week, application_status, email_delivery_status, price_list_sent_at, email_error, created_at, updated_at",
+    )
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw new Error("Unable to load admin reseller applications.");
+
+  return (data ?? []) as AdminResellerApplication[];
 }

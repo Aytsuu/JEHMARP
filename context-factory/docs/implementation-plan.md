@@ -212,22 +212,22 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 8 - Reseller Application And Email
 
-- [ ] Build Business Page content.
-- [ ] Build reseller application form.
-- [ ] Add server-side validation.
-- [ ] Add CAPTCHA or Turnstile.
-- [ ] Add rate limiting by IP and email.
-- [ ] Add duplicate submission handling.
-- [ ] Implement reseller application Edge Function.
-- [ ] Insert `reseller_application`.
-- [ ] Generate reseller price list from active products.
-- [ ] Include product name, category, unit label, default price, and reseller price.
-- [ ] Send reseller price list through selected email provider.
-- [ ] Record `email_delivery_status`.
-- [ ] Record `price_list_sent_at`.
-- [ ] Record `email_error` on failure.
-- [ ] Notify admin or expose new application in dashboard.
-- [ ] Add email workflow tests with provider mocked.
+- [x] Build Business Page content.
+- [x] Build reseller application form.
+- [x] Add server-side validation.
+- [x] Add CAPTCHA or Turnstile.
+- [x] Add rate limiting by IP and email.
+- [x] Add duplicate submission handling.
+- [x] Implement reseller application Edge Function.
+- [x] Insert `reseller_application`.
+- [x] Generate reseller price list from active products.
+- [x] Include product name, category, unit label, default price, and reseller price.
+- [x] Send reseller price list through selected email provider.
+- [x] Record `email_delivery_status`.
+- [x] Record `price_list_sent_at`.
+- [x] Record `email_error` on failure.
+- [x] Notify admin or expose new application in dashboard.
+- [x] Add email workflow tests with provider mocked.
 
 ## Phase 9 - Contact Inquiry
 

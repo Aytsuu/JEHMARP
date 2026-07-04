@@ -1,0 +1,28 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminResellerApplications from "@/components/admin/AdminResellerApplications.astro";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const data = await loadAdminDashboardData();
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title="Admin Reseller Applications - JEHMARP"
+  description="Admin reseller application management."
+  heading="Reseller Applications"
+  intro="Review reseller applications and price-list email delivery status."
+  feedback={feedback}
+>
+  <AdminResellerApplications data={data} />
+</AdminPageFrame>

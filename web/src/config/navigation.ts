@@ -24,6 +24,8 @@ export const adminDashboardRoutes = [
   { label: "Orders", href: "/admin/orders" },
   { label: "Invoices", href: "/admin/invoices" },
   { label: "Inquiries", href: "/admin/inquiries" },
+  { label: "Reseller Applications", href: "/admin/reseller-applications" },
+  { label: "Activity", href: "/admin/activity" },
   { label: "Content", href: "/admin/content" },
 ] as const satisfies readonly NavigationItem[];
 

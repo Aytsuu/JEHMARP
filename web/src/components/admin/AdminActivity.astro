@@ -1,0 +1,49 @@
+---
+import { buildAdminActivityItems } from "@/lib/admin-dashboard/activity";
+
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+
+type Props = {
+  data: AdminDashboardData;
+};
+
+const { data } = Astro.props;
+const activityItems = buildAdminActivityItems(data);
+---
+
+<section class="admin-panel" aria-labelledby="admin-activity-title">
+  <div class="admin-panel__header">
+    <h2 id="admin-activity-title">Admin Activity</h2>
+    <p>Review recent operational activity across orders, customers, products, invoices, and content.</p>
+  </div>
+
+  {
+    activityItems.length > 0 ? (
+      <div class="table-wrap">
+        <table>
+          <caption>Recent admin activity</caption>
+          <thead>
+            <tr>
+              <th scope="col">Activity</th>
+              <th scope="col">Details</th>
+              <th scope="col">Category</th>
+              <th scope="col">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activityItems.map((item) => (
+              <tr>
+                <td>{item.title}</td>
+                <td>{item.detail}</td>
+                <td>{item.category}</td>
+                <td>{item.occurredAt}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p class="empty-state">No admin activity is available yet.</p>
+    )
+  }
+</section>

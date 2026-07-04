@@ -1,0 +1,28 @@
+---
+import AdminActivity from "@/components/admin/AdminActivity.astro";
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const data = await loadAdminDashboardData();
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title="Admin Activity - JEHMARP"
+  description="Admin activity feed for operational changes."
+  heading="Activity"
+  intro="Review recent order, customer, product, invoice, and content activity."
+  feedback={feedback}
+>
+  <AdminActivity data={data} />
+</AdminPageFrame>
