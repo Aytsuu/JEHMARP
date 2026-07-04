@@ -262,16 +262,16 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 11 - Security And Abuse Hardening
 
-- [ ] Verify no service role key is exposed to browser code.
-- [ ] Verify public clients cannot read `reseller_price`.
-- [ ] Verify public clients cannot read orders, payments, invoices, customer records, inquiries, or reseller applications.
-- [ ] Verify agents cannot read other agents' records.
-- [ ] Verify admin checks are enforced by RLS or server-side logic.
-- [ ] Verify public forms have validation and rate limits.
-- [ ] Verify reseller email workflow cannot be called without validation.
-- [ ] Verify order/payment/invoice changes are audited through history/update tables.
-- [ ] Run Supabase advisors.
-- [ ] Fix all critical/high security findings.
+- [x] Verify no service role key is exposed to browser code.
+- [x] Verify public clients cannot read `reseller_price`.
+- [x] Verify public clients cannot read orders, payments, invoices, customer records, inquiries, or reseller applications.
+- [x] Verify agents cannot read other agents' records.
+- [x] Verify admin checks are enforced by RLS or server-side logic.
+- [x] Verify public forms have validation and rate limits.
+- [x] Verify reseller email workflow cannot be called without validation.
+- [x] Verify order/payment/invoice changes are audited through history/update tables.
+- [x] Run Supabase advisors.
+- [x] Fix all critical/high security findings.
 
 ## Phase 12 - Final Verification
 

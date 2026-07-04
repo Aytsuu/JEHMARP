@@ -18,19 +18,27 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   }
 
   try {
-    const orderId = await submitGuestOrder(parsed.data);
+    const orderId = await submitGuestOrder(parsed.data, {
+      clientIp: getClientIp(request.headers),
+    });
     const params = new URLSearchParams({
       order: "submitted",
       reference: orderId,
     });
 
     return redirect(`/shop?${params.toString()}`, 303);
-  } catch {
+  } catch (error) {
     const params = new URLSearchParams({
       order: "error",
-      message: "The order could not be submitted. Please try again.",
+      message: error instanceof Error ? error.message : "The order could not be submitted. Please try again.",
     });
 
     return redirect(`/shop?${params.toString()}`, 303);
   }
 };
+
+function getClientIp(headers: Headers): string | null {
+  const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+
+  return headers.get("cf-connecting-ip") ?? forwardedFor ?? headers.get("x-real-ip");
+}

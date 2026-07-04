@@ -1,6 +1,7 @@
 do $$
 declare
   missing_count integer;
+  restricted_table text;
 begin
   select count(*)
   into missing_count
@@ -62,20 +63,36 @@ begin
     raise exception 'authenticated must not be able to read product.reseller_price directly';
   end if;
 
-  if has_table_privilege('anon', 'public.customer_order', 'select') then
-    raise exception 'anon must not be able to read customer_order';
-  end if;
+  foreach restricted_table in array array[
+    'customer',
+    'customer_order',
+    'customer_order_item',
+    'payment',
+    'invoice',
+    'customer_order_status_history',
+    'contact_inquiry',
+    'reseller_application'
+  ] loop
+    if has_table_privilege('anon', format('public.%I', restricted_table), 'select') then
+      raise exception 'anon must not be able to read %', restricted_table;
+    end if;
+  end loop;
 
-  if not has_column_privilege('anon', 'public.contact_inquiry', 'message', 'insert') then
-    raise exception 'Expected anon insert grant for contact_inquiry.message';
-  end if;
+  foreach restricted_table in array array[
+    'customer_order',
+    'customer_order_item',
+    'payment',
+    'invoice',
+    'contact_inquiry',
+    'reseller_application'
+  ] loop
+    if has_table_privilege('anon', format('public.%I', restricted_table), 'insert') then
+      raise exception '% must use a trusted server workflow, not direct anon insert', restricted_table;
+    end if;
+  end loop;
 
-  if has_table_privilege('anon', 'public.reseller_application', 'insert') then
-    raise exception 'reseller_application must use the trusted server workflow, not direct anon insert';
-  end if;
-
-  if has_table_privilege('anon', 'public.customer_order', 'insert') then
-    raise exception 'guest order creation must use the trusted server workflow, not direct anon insert';
+  if has_column_privilege('anon', 'public.contact_inquiry', 'message', 'insert') then
+    raise exception 'contact_inquiry must use the trusted server workflow, not direct anon column inserts';
   end if;
 
   if not exists (
@@ -106,5 +123,45 @@ begin
       and policyname = 'Agents can read own commission metrics'
   ) then
     raise exception 'Missing agent commission metrics policy';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgname = 'record_payment_insert'
+      and tgrelid = 'public.payment'::regclass
+      and not tgisinternal
+  ) then
+    raise exception 'Missing payment insert audit trigger';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgname = 'block_payment_mutation'
+      and tgrelid = 'public.payment'::regclass
+      and not tgisinternal
+  ) then
+    raise exception 'Missing payment mutation block trigger';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgname = 'record_order_status_history'
+      and tgrelid = 'public.customer_order'::regclass
+      and not tgisinternal
+  ) then
+    raise exception 'Missing order status history trigger';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_trigger
+    where tgname = 'record_invoice_status_update'
+      and tgrelid = 'public.invoice'::regclass
+      and not tgisinternal
+  ) then
+    raise exception 'Missing invoice status audit trigger';
   end if;
 end $$;

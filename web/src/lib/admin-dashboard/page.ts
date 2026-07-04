@@ -5,6 +5,9 @@ import {
   getDashboardRoleForSignedInUser,
   getSignedInUser,
 } from "@/lib/auth";
+import { getServerEnv } from "@/lib/env";
+import { isTrustedFormOrigin } from "@/lib/security/form-origin";
+import { enforceFixedWindowRateLimit } from "@/lib/security/rate-limit";
 
 type AdminRouteContext = Pick<APIContext, "cookies" | "request" | "redirect" | "url">;
 
@@ -39,6 +42,36 @@ export async function requireAdminRoute(
   }
 
   if (context.request.method === "POST") {
+    if (!isTrustedFormOrigin(context.request.headers, context.url)) {
+      return {
+        ready: false,
+        response: redirectWithActionError(context, "Invalid request origin."),
+      };
+    }
+
+    try {
+      const env = getServerEnv();
+
+      await enforceFixedWindowRateLimit({
+        redisUrl: env.upstashRedisRestUrl,
+        redisToken: env.upstashRedisRestToken,
+        keyPrefix: "admin-action:user-minute",
+        identifier: user.id,
+        limit: 60,
+        windowSeconds: 60,
+        exceededMessage: "Too many dashboard actions. Please try again later.",
+        unavailableMessage: "Dashboard action rate limiting is not configured.",
+      });
+    } catch (error) {
+      return {
+        ready: false,
+        response: redirectWithActionError(
+          context,
+          error instanceof Error ? error.message : "Dashboard action was blocked.",
+        ),
+      };
+    }
+
     return {
       ready: false,
       response: await handleAdminDashboardAction(context, user.id, context.url.pathname),
@@ -48,4 +81,8 @@ export async function requireAdminRoute(
   return {
     ready: true,
   };
+}
+
+function redirectWithActionError(context: AdminRouteContext, message: string): Response {
+  return context.redirect(`${context.url.pathname}?error=${encodeURIComponent(message)}`, 303);
 }

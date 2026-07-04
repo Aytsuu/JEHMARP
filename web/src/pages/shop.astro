@@ -6,12 +6,14 @@ import {
   listPublicProducts,
   parseShopFilters,
 } from "@/lib/public-website/shop";
+import { getPublicEnv } from "@/lib/env";
 
 const filters = parseShopFilters(Astro.url);
 const { products, pagination } = await listPublicProducts(Astro, filters);
 const orderStatus = Astro.url.searchParams.get("order");
 const orderReference = Astro.url.searchParams.get("reference");
 const orderMessage = Astro.url.searchParams.get("message");
+const { turnstileSiteKey } = getPublicEnv();
 ---
 
 <Layout
@@ -276,12 +278,34 @@ const orderMessage = Astro.url.searchParams.get("message");
           }
         </fieldset>
 
+        <div class="fieldset-block">
+          {
+            turnstileSiteKey ? (
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+            ) : (
+              <p class="error-message">
+                Guest order verification is not configured.
+              </p>
+            )
+          }
+        </div>
+
         <div class="button-row">
-          <button type="submit" disabled={products.length === 0}
+          <button type="submit" disabled={products.length === 0 || !turnstileSiteKey}
             >Submit guest order</button
           >
         </div>
       </form>
     </section>
+
+    {
+      turnstileSiteKey && (
+        <script
+          is:inline
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          async
+          defer></script>
+      )
+    }
   </PageShell>
 </Layout>
