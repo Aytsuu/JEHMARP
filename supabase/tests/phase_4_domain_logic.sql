@@ -390,6 +390,95 @@ begin
     raise exception 'Expected reseller order total 160, got %', numeric_result;
   end if;
 
+  insert into public.customer_order (
+    customer_id,
+    source,
+    order_status
+  )
+  values (
+    test_customer_id,
+    'admin_manual',
+    'approved'
+  )
+  returning id into reseller_order_id;
+
+  insert into public.customer_order_item (
+    order_id,
+    product_id,
+    partial_quantity,
+    final_quantity
+  )
+  values (
+    reseller_order_id,
+    test_product_id,
+    1,
+    1
+  );
+
+  update public.customer_order
+  set order_status = 'cancelled'
+  where id = reseller_order_id;
+
+  select payment_status
+  into text_result
+  from public.customer_order
+  where id = reseller_order_id;
+
+  if text_result <> 'void' then
+    raise exception 'Expected unpaid cancelled order payment status void, got %', text_result;
+  end if;
+
+  insert into public.customer_order (
+    customer_id,
+    source,
+    order_status
+  )
+  values (
+    test_customer_id,
+    'admin_manual',
+    'approved'
+  )
+  returning id into reseller_order_id;
+
+  insert into public.customer_order_item (
+    order_id,
+    product_id,
+    partial_quantity,
+    final_quantity
+  )
+  values (
+    reseller_order_id,
+    test_product_id,
+    1,
+    1
+  );
+
+  insert into public.payment (
+    order_id,
+    amount,
+    payment_method,
+    reference_number
+  )
+  values (
+    reseller_order_id,
+    25,
+    'cash',
+    'phase-4-cancelled-refund'
+  );
+
+  update public.customer_order
+  set order_status = 'cancelled'
+  where id = reseller_order_id;
+
+  select payment_status
+  into text_result
+  from public.customer_order
+  where id = reseller_order_id;
+
+  if text_result <> 'refunded' then
+    raise exception 'Expected paid cancelled order payment status refunded, got %', text_result;
+  end if;
+
   update public.customer_order
   set order_status = 'submitted'
   where id = test_order_id;

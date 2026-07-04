@@ -4,6 +4,7 @@ import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
 import {
   formatCurrency,
   formatDate,
+  formatPaymentStatus,
   fullName,
   orderBalance,
   orderPaymentTotal,
@@ -48,6 +49,7 @@ const { data } = Astro.props;
         <thead>
           <tr>
             <th scope="col">Order</th>
+            <th scope="col">Payment Status</th>
             <th scope="col">Invoice Total</th>
             <th scope="col">Paid</th>
             <th scope="col">Balance</th>
@@ -57,6 +59,7 @@ const { data } = Astro.props;
           {data.orders.map((order) => (
             <tr>
               <td>{fullName(order.customer)}<br />{formatDate(order.created_at)}</td>
+              <td>{formatPaymentStatus(order.payment_status)}</td>
               <td>
                 {formatCurrency(orderTotal(order, "final_quantity"))}
                 {order.invoice.length > 0 && (

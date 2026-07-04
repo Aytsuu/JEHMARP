@@ -15,6 +15,21 @@ export function formatDate(value: string | null) {
   return value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(new Date(value)) : "Not set";
 }
 
+export function formatPaymentStatus(status: AgentOrder["payment_status"]) {
+  switch (status) {
+    case "unpaid":
+      return "Unpaid";
+    case "partial":
+      return "Partial";
+    case "paid":
+      return "Paid";
+    case "refunded":
+      return "Refunded";
+    case "void":
+      return "Void";
+  }
+}
+
 export function orderTotal(order: AgentOrder, quantityKey: "partial_quantity" | "final_quantity") {
   const subtotal = order.customer_order_item.reduce((total, item) => {
     return total + item[quantityKey] * item.unit_price;

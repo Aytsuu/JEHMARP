@@ -4,9 +4,11 @@ import {
   buildAgentPaymentSummary,
   buildAgentSummary,
   formatCurrency,
+  formatPaymentStatus,
   orderBalance,
   orderEarnedCommission,
   orderExpectedCommission,
+  orderPaymentTotal,
   orderTotal,
 } from "./view";
 import type { AgentDashboardData, AgentOrder } from "./data";
@@ -152,13 +154,33 @@ describe("agent dashboard calculations", () => {
       createOrder({ payment_status: "partial" }),
       createOrder({ payment_status: "partial" }),
       createOrder({ payment_status: "paid" }),
+      createOrder({ payment_status: "refunded" }),
+      createOrder({ payment_status: "void" }),
     ])).toEqual({
       unpaid: 1,
       partial: 2,
       paid: 1,
-      refunded: 0,
-      void: 0,
+      refunded: 1,
+      void: 1,
     });
+  });
+
+  it("formats payment statuses for balance tracking tables", () => {
+    expect(formatPaymentStatus("unpaid")).toBe("Unpaid");
+    expect(formatPaymentStatus("partial")).toBe("Partial");
+    expect(formatPaymentStatus("paid")).toBe("Paid");
+    expect(formatPaymentStatus("refunded")).toBe("Refunded");
+    expect(formatPaymentStatus("void")).toBe("Void");
+  });
+
+  it("keeps zero-payment orders useful for balance tracking", () => {
+    const unpaidOrder = createOrder({
+      payment_status: "unpaid",
+      payment: [],
+    });
+
+    expect(orderPaymentTotal(unpaidOrder)).toBe(0);
+    expect(orderBalance(unpaidOrder)).toBe(400);
   });
 
   it("formats Philippine peso values consistently", () => {
