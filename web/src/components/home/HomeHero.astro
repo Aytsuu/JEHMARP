@@ -11,7 +11,7 @@ function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-const heading = stringValue(section.content.heading) ?? "NMC Premium";
+const heading = stringValue(section.content.heading) ?? "JEHMARP";
 const summary = stringValue(section.content.summary);
 const supportingText = stringValue(section.content.supportingText);
 const primaryActionHref = stringValue(section.content.primaryActionHref);

@@ -1,6 +1,6 @@
-# NMC Web
+# JEHMARP Web
 
-Astro + React foundation for the NMC public, admin, and agent surfaces.
+Astro + React foundation for the JEHMARP public, admin, and agent surfaces.
 
 ## Project Structure
 
