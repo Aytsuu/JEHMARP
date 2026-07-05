@@ -32,3 +32,47 @@ import { authRoutes, publicRoutes } from "@/config/navigation";
     </ul>
   </nav>
 </header>
+
+<script>
+  function initSmartNavbar() {
+    const navbar = document.querySelector<HTMLElement>(".site-nav");
+    if (!navbar) return;
+
+    let lastScrollTop = 0;
+    let navbarHeight = navbar.getBoundingClientRect().height;
+
+    window.addEventListener("resize", () => {
+      navbarHeight = navbar.getBoundingClientRect().height;
+    });
+
+    window.addEventListener("scroll", () => {
+      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+      // If at the initial top most, always show the navbar
+      if (scrollTop <= 0) {
+        navbar.classList.remove("site-nav--hidden");
+        lastScrollTop = scrollTop;
+        return;
+      }
+
+      // Hide when scrolling down past the navbar height
+      if (scrollTop > lastScrollTop && scrollTop > navbarHeight) {
+        navbar.classList.add("site-nav--hidden");
+      } 
+      // Show when scrolling up
+      else if (scrollTop < lastScrollTop) {
+        navbar.classList.remove("site-nav--hidden");
+      }
+
+      lastScrollTop = scrollTop;
+    }, { passive: true });
+  }
+
+  // Initialize on load and on astro page transitions
+  document.addEventListener("DOMContentLoaded", initSmartNavbar);
+  document.addEventListener("astro:after-swap", initSmartNavbar);
+  
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initSmartNavbar();
+  }
+</script>

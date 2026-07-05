@@ -17,6 +17,8 @@ const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
   description="Apply to become a JEHMARP reseller and receive the current reseller price list."
 >
   <PageShell title="Business">
+    <h2 class="page-title-brand">BUSINESS</h2>
+
     {
       feedback?.status === "submitted" && (
         <section class="message-block" aria-labelledby="reseller-confirmation">
@@ -36,102 +38,114 @@ const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
       )
     }
 
-    <section aria-labelledby="business-program-title" style="margin-bottom: 3rem;">
-      <h2 id="business-program-title" class="about-section__title" style="margin-bottom: 1.5rem;">Reseller Program</h2>
-      <p style="font-size: 1.2rem; line-height: 1.65; color: #4b5563; margin-bottom: 2.5rem; max-width: 48rem;">
-        JEHMARP supports retailers, market sellers, restaurants, and online
-        merchants that need dependable meat supply with clear product pricing.
-      </p>
-      <div class="mission-grid">
-        <article class="mission-card">
-          <h3 class="mission-card__heading">Product access</h3>
-          <p class="mission-card__text">Receive the active product list with retail and reseller pricing.</p>
-        </article>
-        <article class="mission-card">
-          <h3 class="mission-card__heading">Review process</h3>
-          <p class="mission-card__text">Applications are checked by the admin team before follow-up.</p>
-        </article>
-        <article class="mission-card">
-          <h3 class="mission-card__heading">Order planning</h3>
-          <p class="mission-card__text">Share your weekly volume so the team can prepare the right supply discussion.</p>
-        </article>
+    <div class="business-layout">
+      {/* Left Column: Reseller Info */}
+      <div class="business-info">
+        <section aria-labelledby="what-it-means-heading" class="business-info__section">
+          <h3 id="what-it-means-heading" class="business-subtitle">What it means to be a Reseller</h3>
+          <p class="business-text">
+            JEHMARP supports retailers, market sellers, restaurants, and online
+            merchants that need dependable meat supply with clear product pricing. As a verified reseller, you get access to preferred wholesale pricing, bulk packaging, and scheduled fresh deliveries to support your daily operations.
+          </p>
+        </section>
+
+        <section aria-labelledby="how-to-be-heading" class="business-info__section">
+          <h3 id="how-to-be-heading" class="business-subtitle">How to be a Reseller</h3>
+          <ol class="reseller-steps">
+            <li>
+              <strong>Submit Application</strong>
+              <p>Fill out the business details and expected weekly volume in the form on the right.</p>
+            </li>
+            <li>
+              <strong>Verification & Review</strong>
+              <p>Our administration team checks applications to align on volume and logistics.</p>
+            </li>
+            <li>
+              <strong>Wholesale Ordering</strong>
+              <p>Once verified, you will receive the active price list and start submitting orders.</p>
+            </li>
+          </ol>
+        </section>
       </div>
-    </section>
 
-    <section class="form-section" aria-labelledby="reseller-application-title">
-      <h2 id="reseller-application-title">Reseller application</h2>
-      <form class="form-grid" method="post" action="/api/reseller-applications">
-        <fieldset class="fieldset-block">
-          <legend>Business details</legend>
-          <div class="form-grid form-grid--two-column">
-            <div class="field-row">
-              <label for="name">Name</label>
-              <input id="name" name="name" required autocomplete="name" maxlength="120" />
-            </div>
-            <div class="field-row">
-              <label for="email">Email</label>
-              <input id="email" name="email" type="email" required autocomplete="email" maxlength="254" />
-            </div>
-            <div class="field-row">
-              <label for="contactNumber">Contact number</label>
-              <input id="contactNumber" name="contactNumber" required autocomplete="tel" maxlength="50" />
-            </div>
-            <div class="field-row">
-              <label for="plannedTransactionType">Transaction type</label>
-              <select id="plannedTransactionType" name="plannedTransactionType" required>
-                <option value="">Select type</option>
-                {
-                  plannedTransactionOptions.map(([value, label]) => (
-                    <option value={value}>{label}</option>
-                  ))
-                }
-              </select>
-            </div>
-          </div>
-          <div class="field-row">
-            <label for="address">Business address</label>
-            <textarea
-              id="address"
-              name="address"
-              required
-              autocomplete="street-address"
-              maxlength="500"></textarea>
-          </div>
-        </fieldset>
+      {/* Right Column: Reseller Form */}
+      <div class="business-form">
+        <section class="form-section" aria-labelledby="reseller-application-title" style="margin-top: 0;">
+          <h3 id="reseller-application-title" class="business-subtitle" style="margin-bottom: 1.5rem;">Reseller Application</h3>
+          <form class="form-grid" method="post" action="/api/reseller-applications">
+            <fieldset class="fieldset-block">
+              <legend>Business details</legend>
+              <div class="form-grid form-grid--two-column">
+                <div class="field-row">
+                  <label for="name">Name</label>
+                  <input id="name" name="name" required autocomplete="name" maxlength="120" />
+                </div>
+                <div class="field-row">
+                  <label for="email">Email</label>
+                  <input id="email" name="email" type="email" required autocomplete="email" maxlength="254" />
+                </div>
+                <div class="field-row">
+                  <label for="contactNumber">Contact number</label>
+                  <input id="contactNumber" name="contactNumber" required autocomplete="tel" maxlength="50" />
+                </div>
+                <div class="field-row">
+                  <label for="plannedTransactionType">Transaction type</label>
+                  <select id="plannedTransactionType" name="plannedTransactionType" required>
+                    <option value="">Select type</option>
+                    {
+                      plannedTransactionOptions.map(([value, label]) => (
+                        <option value={value}>{label}</option>
+                      ))
+                    }
+                  </select>
+                </div>
+              </div>
+              <div class="field-row">
+                <label for="address">Business address</label>
+                <textarea
+                  id="address"
+                  name="address"
+                  required
+                  autocomplete="street-address"
+                  maxlength="500"></textarea>
+              </div>
+            </fieldset>
 
-        <fieldset class="fieldset-block">
-          <legend>Supply needs</legend>
-          <div class="field-row">
-            <label for="expectedQuantityPerWeek">Expected quantity per week</label>
-            <input
-              id="expectedQuantityPerWeek"
-              name="expectedQuantityPerWeek"
-              required
-              maxlength="120"
-              placeholder="Example: 40 kg chicken, 20 kg pork"
-            />
-          </div>
-          <div class="field-row">
-            <label for="message">Message</label>
-            <textarea id="message" name="message" maxlength="1000"></textarea>
-          </div>
-        </fieldset>
+            <fieldset class="fieldset-block">
+              <legend>Supply needs</legend>
+              <div class="field-row">
+                <label for="expectedQuantityPerWeek">Expected quantity per week</label>
+                <input
+                  id="expectedQuantityPerWeek"
+                  name="expectedQuantityPerWeek"
+                  required
+                  maxlength="120"
+                  placeholder="Example: 40 kg chicken, 20 kg pork"
+                />
+              </div>
+              <div class="field-row">
+                <label for="message">Message</label>
+                <textarea id="message" name="message" maxlength="1000"></textarea>
+              </div>
+            </fieldset>
 
-        <div class="fieldset-block">
-          {
-            turnstileSiteKey ? (
-              <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
-            ) : (
-              <p class="error-message">Reseller verification is not configured.</p>
-            )
-          }
-        </div>
+            <div class="fieldset-block">
+              {
+                turnstileSiteKey ? (
+                  <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+                ) : (
+                  <p class="error-message">Reseller verification is not configured.</p>
+                )
+              }
+            </div>
 
-        <div class="button-row">
-          <button type="submit" disabled={!turnstileSiteKey}>Submit application</button>
-        </div>
-      </form>
-    </section>
+            <div class="button-row">
+              <button type="submit" disabled={!turnstileSiteKey}>Submit application</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
 
     {
       turnstileSiteKey && (
