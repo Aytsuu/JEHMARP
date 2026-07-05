@@ -18,7 +18,9 @@ const missionVisionCoreValues = sections.find(
   (section) => section.type === "mission_vision_core_values",
 );
 const taglines = sections.find((section) => section.type === "taglines");
-const shopInfoSource = sections.find((section) => section.type === "images_gallery");
+const shopInfoSource = sections.find(
+  (section) => section.type === "images_gallery",
+);
 
 const coreValues = asStringArray(missionVisionCoreValues?.content.coreValues);
 const taglineItems = asStringArray(taglines?.content.items);
@@ -45,10 +47,31 @@ const featuredItems: FeaturedItem[] = [
   },
 ];
 const storefrontBenefits = [
-  "Fresh, not frozen meat prepared daily.",
-  "Cuts trimmed and packed on-site by the team.",
-  "Reliable quality for home cooking, bulk orders, and everyday meals.",
-  "Direct ordering flow with pickup or delivery coordination.",
+  {
+    title: "Direct from Local Farmers",
+    desc: "We partner with trusted local farmers to bring you the best quality meat.",
+    class: "why-buy-card--0",
+  },
+  {
+    title: "Guaranteed Freshness",
+    desc: "Freshly delivered and carefully handled to ensure top-notch freshness every day.",
+    class: "why-buy-card--1",
+  },
+  {
+    title: "Affordable & Fair Pricing",
+    desc: "We offer quality meat at prices that are fair and budget-friendly for every family.",
+    class: "why-buy-card--2",
+  },
+  {
+    title: "Trusted Family Experience",
+    desc: "A family-run business built on honesty, dedication, and care for our customers.",
+    class: "why-buy-card--3",
+  },
+  {
+    title: "Community-Centered Business",
+    desc: "We give back and support the community that has supported us all these years.",
+    class: "why-buy-card--4",
+  },
 ];
 const orderingSteps = [
   "Choose your cuts and preferred quantities.",
@@ -59,29 +82,38 @@ const storeDetails = [
   { label: "Store hours", value: "Open daily, 7:00 AM to 7:00 PM" },
   { label: "Phone", value: "+63 917 000 0000" },
   { label: "Location", value: "Main public market area, easy pickup access" },
-  { label: "Ordering", value: "Message ahead for bulk, party, or custom-cut requests" },
+  {
+    label: "Ordering",
+    value: "Message ahead for bulk, party, or custom-cut requests",
+  },
 ];
 const faqItems = [
   {
     question: "Is the meat fresh or frozen?",
-    answer: "Fresh cuts are prepared daily and packed on-site for the day’s orders.",
+    answer:
+      "Fresh cuts are prepared daily and packed on-site for the day’s orders.",
   },
   {
     question: "Do you accept custom cuts?",
-    answer: "Yes. You can request preferred thickness, portioning, and preparation when ordering.",
+    answer:
+      "Yes. You can request preferred thickness, portioning, and preparation when ordering.",
   },
   {
     question: "Can I order in bulk?",
-    answer: "Yes. Family packs, party orders, and business quantities can be arranged ahead of time.",
+    answer:
+      "Yes. Family packs, party orders, and business quantities can be arranged ahead of time.",
   },
   {
     question: "Do you offer pickup and delivery?",
-    answer: "Pickup is supported directly, and delivery can be coordinated based on your area.",
+    answer:
+      "Pickup is supported directly, and delivery can be coordinated based on your area.",
   },
 ];
 
 function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : undefined;
 }
 
 function asStringArray(value: unknown): string[] {
@@ -89,14 +121,18 @@ function asStringArray(value: unknown): string[] {
     return [];
   }
 
-  return value.flatMap((item) => (typeof item === "string" && item.trim().length > 0 ? [item.trim()] : []));
+  return value.flatMap((item) =>
+    typeof item === "string" && item.trim().length > 0 ? [item.trim()] : [],
+  );
 }
 
 function getProductImage(name: string): string {
   const normalized = name.toLowerCase();
   if (normalized.includes("pork belly")) return "/images/pork_belly.png";
-  if (normalized.includes("chicken breast")) return "/images/chicken_breast.png";
-  if (normalized.includes("short ribs") || normalized.includes("beef")) return "/images/beef_short_ribs.png";
+  if (normalized.includes("chicken breast"))
+    return "/images/chicken_breast.png";
+  if (normalized.includes("short ribs") || normalized.includes("beef"))
+    return "/images/beef_short_ribs.png";
   if (normalized.includes("ground pork")) return "/images/ground_pork.png";
   return "/images/meat_cluster.svg";
 }
@@ -130,12 +166,26 @@ function formatTagline(tagline: string): string {
         <section class="about-section" aria-labelledby="home-about">
           <div class="about-section__grid">
             <div class="about-section__image-container">
-              <img src="/images/meat_cluster.svg" alt="Pork, chicken, and egg cluster" class="about-section__image" />
+              <img
+                src="/images/about_photo.png"
+                alt="JEHMARP fresh local cuts and shop photo"
+                class="about-section__image"
+              />
             </div>
             <div class="about-section__content">
-              <h2 id="home-about" class="about-section__title">ABOUT THE MEATSHOP</h2>
-              {stringValue(about.content.summary) && <p class="about-section__summary">{stringValue(about.content.summary)}</p>}
-              {stringValue(about.content.body) && <p class="about-section__body">{stringValue(about.content.body)}</p>}
+              <h2 id="home-about" class="about-section__title">
+                THE MEATSHOP
+              </h2>
+              {stringValue(about.content.summary) && (
+                <p class="about-section__summary">
+                  {stringValue(about.content.summary)}
+                </p>
+              )}
+              {stringValue(about.content.body) && (
+                <p class="about-section__body">
+                  {stringValue(about.content.body)}
+                </p>
+              )}
             </div>
           </div>
         </section>
@@ -147,38 +197,44 @@ function formatTagline(tagline: string): string {
     missionVisionCoreValues && (
       <div class="mission-section-outer">
         <div class="home-container">
-          <section class="mission-section" aria-label="Mission, Vision, and Core Values">
+          <section
+            class="mission-section"
+            aria-label="Mission, Vision, and Core Values"
+          >
             <div class="mission-section__grid">
               <article class="mission-card mission-card--mission">
                 <h3 class="mission-card__heading">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-target"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
                   Mission
                 </h3>
-                <p class="mission-card__text">{stringValue(missionVisionCoreValues.content.mission) ?? "Mission content is not available yet."}</p>
+                <p class="mission-card__text">
+                  {stringValue(missionVisionCoreValues.content.mission) ??
+                    "Mission content is not available yet."}
+                </p>
               </article>
               <article class="mission-card mission-card--vision">
                 <h3 class="mission-card__heading">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                   Vision
                 </h3>
-                <p class="mission-card__text">{stringValue(missionVisionCoreValues.content.vision) ?? "Vision content is not available yet."}</p>
+                <p class="mission-card__text">
+                  {stringValue(missionVisionCoreValues.content.vision) ??
+                    "Vision content is not available yet."}
+                </p>
               </article>
               <article class="mission-card mission-card--values">
                 <h3 class="mission-card__heading">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-award"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
                   Core Values
                 </h3>
-                {
-                  coreValues.length > 0 ? (
-                    <ul class="mission-card__list">
-                      {coreValues.map((value) => (
-                        <li class="mission-card__list-item">{value}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p class="mission-card__text">Core values have not been added yet.</p>
-                  )
-                }
+                {coreValues.length > 0 ? (
+                  <ul class="mission-card__list">
+                    {coreValues.map((value) => (
+                      <li class="mission-card__list-item">{value}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p class="mission-card__text">
+                    Core values have not been added yet.
+                  </p>
+                )}
               </article>
             </div>
           </section>
@@ -192,180 +248,262 @@ function formatTagline(tagline: string): string {
       <div class="tagline-section">
         <div class="home-container">
           <div class="tagline-container">
-            <h3 class="tagline-eyebrow">NOT JUST ANY MEAT.</h3>
             <div class="tagline-display-stack">
-              {
-                taglineItems.length > 0 ? (
-                  taglineItems.map((tagline) => (
-                    <p class="tagline-headline">
-                      <span set:html={formatTagline(tagline)} />
-                    </p>
-                  ))
-                ) : (
-                  <p class="tagline-headline">Taglines have not been added yet.</p>
-                )
-              }
+              {taglineItems.length > 0 ? (
+                taglineItems.map((tagline) => (
+                  <p class="tagline-headline">
+                    <span set:html={formatTagline(tagline)} />
+                  </p>
+                ))
+              ) : (
+                <p class="tagline-headline">
+                  Taglines have not been added yet.
+                </p>
+              )}
             </div>
-            <a href="/our-story" class="tagline-button">Our Story</a>
+            <a href="/our-story" class="tagline-button">
+              Our Story
+            </a>
           </div>
         </div>
       </div>
     )
   }
 
-  {shopInfoSource && (
-    <>
-      <div class="why-buy-section">
-        <div class="home-container">
-          <section aria-labelledby="home-why-buy">
-            <h2 id="home-why-buy" class="text-center text-3xl font-extrabold tracking-tight uppercase text-black">Why buy from JEHMARP</h2>
-            <div class="why-buy-section__grid">
-              {storefrontBenefits.map((benefit, index) => {
-                return (
-                  <div class="why-buy-card">
-                    <div class="why-buy-card__icon-container">
-                      {index === 0 && (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                      )}
-                      {index === 1 && (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>
-                      )}
-                      {index === 2 && (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                      )}
-                      {index === 3 && (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                      )}
+  {
+    shopInfoSource && (
+      <>
+        <div class="why-buy-section">
+          <div class="home-container">
+            <section aria-labelledby="home-why-buy">
+              <h2
+                id="home-why-buy"
+                class="why-buy-section__title"
+              >
+                Why Choose JEHMARP
+              </h2>
+              <div class="why-buy-section__grid">
+                {storefrontBenefits.map((benefit) => {
+                  return (
+                    <div class={`why-buy-card ${benefit.class}`}>
+                      <div class="why-buy-card__content">
+                        <h3 class="why-buy-card__title">{benefit.title}</h3>
+                        <p class="why-buy-card__desc">{benefit.desc}</p>
+                      </div>
                     </div>
-                    <p class="why-buy-card__text">{benefit}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <div class="ordering-works-section">
-        <div class="home-container">
-          <section aria-labelledby="home-ordering-process">
-            <h2 id="home-ordering-process" class="text-center text-3xl font-extrabold tracking-tight uppercase text-black">How ordering works</h2>
-            <div class="ordering-stepper">
-              {orderingSteps.map((step, index) => (
-                <div class="stepper-step">
-                  <div class="stepper-step__number">0{index + 1}</div>
-                  <p class="stepper-step__text">{step}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <div class="featured-products-section">
-        <div class="home-container">
-          <section aria-labelledby="home-featured-products">
-            <div class="featured-products__header">
-              <h2 id="home-featured-products" class="featured-products__title">Featured products</h2>
-              <a href="/shop" class="featured-products__link">
-                Browse all products
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-              </a>
-            </div>
-            <div class="products-grid">
-              {featuredItems.map((item) => (
-                <article class="product-card">
-                  <div class="product-card__image-container">
-                    <img src={getProductImage(item.name)} alt={item.name} class="product-card__image" />
-                  </div>
-                  <div class="product-card__content">
-                    <h3 class="product-card__title">{item.name}</h3>
-                    <p class="product-card__description">{item.description}</p>
-                    <div class="product-card__rating">
-                      <span>★★★★★</span>
-                      <span class="product-card__rating-text">5.0</span>
-                    </div>
-                    <p class="product-card__price">{item.price}</p>
-                    <a href="/shop" class="product-card__button">Shop now</a>
-                  </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <div class="store-details-section">
-        <div class="home-container">
-          <section aria-labelledby="home-store-details">
-            <h2 id="home-store-details" class="text-center text-3xl font-extrabold tracking-tight uppercase text-black">Store details</h2>
-            <div class="store-details__grid">
-              {storeDetails.map((detail, index) => (
-                <div class="detail-card">
-                  <div class="detail-card__icon">
-                    {index === 0 && (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                    )}
-                    {index === 1 && (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-                    )}
-                    {index === 2 && (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                    )}
-                    {index === 3 && (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                    )}
-                  </div>
-                  <h3 class="detail-card__label">{detail.label}</h3>
-                  <p class="detail-card__value">{detail.value}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-
-      <div class="faq-section">
-        <div class="home-container">
-          <section aria-labelledby="home-faq">
-            <div class="faq-section__grid">
-              <div class="faq-section__intro">
-                <h2 id="home-faq" class="faq-section__title">Frequently asked questions</h2>
-                <p class="faq-section__desc">Find quick answers to common questions about our fresh meat cuts, ordering process, and pickup/delivery options.</p>
+                  );
+                })}
               </div>
-              <div class="faq-accordion">
-                {faqItems.map((item) => (
-                  <article class="faq-item">
-                    <button class="faq-item__trigger" type="button">
-                      {item.question}
-                      <span class="faq-item__icon">+</span>
-                    </button>
-                    <div class="faq-item__content">
-                      <p>{item.answer}</p>
+            </section>
+          </div>
+        </div>
+
+        <div class="featured-products-section">
+          <div class="home-container">
+            <section aria-labelledby="home-featured-products">
+              <div class="featured-products__header">
+                <h2
+                  id="home-featured-products"
+                  class="featured-products__title"
+                >
+                  Featured products
+                </h2>
+                <a href="/shop" class="featured-products__link">
+                  Browse all products
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <>
+                      <line x1="5" y1="12" x2="19" y2="12" />
+                      <polyline points="12 5 19 12 12 19" />
+                    </>
+                  </svg>
+                </a>
+              </div>
+              <div class="products-grid">
+                {featuredItems.map((item) => (
+                  <article class="product-card">
+                    <div class="product-card__image-container">
+                      <img
+                        src={getProductImage(item.name)}
+                        alt={item.name}
+                        class="product-card__image"
+                      />
+                    </div>
+                    <div class="product-card__content">
+                      <h3 class="product-card__title">{item.name}</h3>
+                      <p class="product-card__description">
+                        {item.description}
+                      </p>
                     </div>
                   </article>
                 ))}
               </div>
-            </div>
-          </section>
+            </section>
+          </div>
         </div>
-      </div>
-    </>
-  )}
+
+        <div class="ordering-works-section">
+          <div class="home-container">
+            <section aria-labelledby="home-ordering-process">
+              <h2
+                id="home-ordering-process"
+                class="ordering-section__title"
+              >
+                How ordering works
+              </h2>
+              <div class="ordering-stepper">
+                {orderingSteps.map((step, index) => (
+                  <div class="stepper-step">
+                    <div class="stepper-step__number">0{index + 1}</div>
+                    <p class="stepper-step__text">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="store-details-section">
+          <div class="home-container">
+            <section aria-labelledby="home-store-details">
+              <h2
+                id="home-store-details"
+                class="store-details__title"
+              >
+                Store details
+              </h2>
+              <div class="store-details__grid">
+                {storeDetails.map((detail, index) => (
+                  <div class="detail-card">
+                    <div class="detail-card__icon">
+                      {index === 0 && (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                      )}
+                      {index === 1 && (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                        </svg>
+                      )}
+                      {index === 2 && (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                          <circle cx="12" cy="10" r="3" />
+                        </svg>
+                      )}
+                      {index === 3 && (
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                        </svg>
+                      )}
+                    </div>
+                    <h3 class="detail-card__label">{detail.label}</h3>
+                    <p class="detail-card__value">{detail.value}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div class="faq-section">
+          <div class="home-container">
+            <section aria-labelledby="home-faq">
+              <div class="faq-section__grid">
+                <div class="faq-section__intro">
+                  <h2 id="home-faq" class="faq-section__title">
+                    FREQUENTLY ASKED QUESTIONS
+                  </h2>
+                  <p class="faq-section__desc">
+                    Find quick answers to common questions about our fresh meat
+                    cuts, ordering process, and pickup/delivery options.
+                  </p>
+                </div>
+                <div class="faq-accordion">
+                  {faqItems.map((item) => (
+                    <article class="faq-item">
+                      <button class="faq-item__trigger" type="button">
+                        {item.question}
+                        <span class="faq-item__icon">+</span>
+                      </button>
+                      <div class="faq-item__content">
+                        <p>{item.answer}</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </>
+    )
+  }
 </div>
 
 <script>
   // Dynamic FAQ Accordion toggle behavior
-  const faqItems = document.querySelectorAll('.faq-item');
-  faqItems.forEach(item => {
-    const trigger = item.querySelector('.faq-item__trigger');
-    trigger?.addEventListener('click', () => {
-      const isActive = item.classList.contains('faq-item--active');
+  const faqItems = document.querySelectorAll(".faq-item");
+  faqItems.forEach((item) => {
+    const trigger = item.querySelector(".faq-item__trigger");
+    trigger?.addEventListener("click", () => {
+      const isActive = item.classList.contains("faq-item--active");
       // Collapse all FAQ items first
-      faqItems.forEach(i => i.classList.remove('faq-item--active'));
+      faqItems.forEach((i) => i.classList.remove("faq-item--active"));
       if (!isActive) {
         // Expand clicked FAQ item
-        item.classList.add('faq-item--active');
+        item.classList.add("faq-item--active");
       }
     });
   });

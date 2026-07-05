@@ -18,11 +18,14 @@ const summary = stringValue(section.content.summary);
 const supportingText = stringValue(section.content.supportingText);
 const primaryActionHref = stringValue(section.content.primaryActionHref);
 const primaryActionLabel = stringValue(section.content.primaryActionLabel);
-const secondaryActionHref = stringValue(section.content.secondaryActionHref);
-const secondaryActionLabel = stringValue(section.content.secondaryActionLabel);
 ---
 
 <section class="home-hero" aria-labelledby="home-hero-heading">
+  <div class="home-hero__slides">
+    <div class="home-hero__slide home-hero__slide--active" style="background-image: url('/images/hero_carousel_1.jpg');" data-slide-index="0"></div>
+    <div class="home-hero__slide" style="background-image: url('/images/hero_carousel_2.jpg');" data-slide-index="1"></div>
+    <div class="home-hero__slide" style="background-image: url('/images/hero_carousel_3.jpg');" data-slide-index="2"></div>
+  </div>
   <div class="home-hero__overlay"></div>
   <div class="home-hero__content">
     <h1 id="home-hero-heading" class="home-hero__title">{heading}</h1>
@@ -36,23 +39,89 @@ const secondaryActionLabel = stringValue(section.content.secondaryActionLabel);
     {
       primaryActionHref && primaryActionLabel && (
         <div class="home-hero__actions">
-          {primaryActionHref && primaryActionLabel && (
-            <a
-              href={primaryActionHref}
-              class="home-hero__button home-hero__button--primary"
-            >
-              {primaryActionLabel}
-            </a>
-          )}
+          <a
+            href={primaryActionHref}
+            class="home-hero__button home-hero__button--primary"
+          >
+            {primaryActionLabel}
+          </a>
         </div>
       )
     }
   </div>
 
-  <div class="home-hero__indicators" aria-hidden="true">
-    <span class="home-hero__indicator-dot"></span>
-    <span class="home-hero__indicator-dot home-hero__indicator-dot--active"
-    ></span>
-    <span class="home-hero__indicator-dot"></span>
+  <div class="home-hero__indicators" aria-label="Hero carousel navigation">
+    <button class="home-hero__indicator-dot home-hero__indicator-dot--active" aria-label="Go to slide 1" aria-current="true" data-indicator-index="0"></button>
+    <button class="home-hero__indicator-dot" aria-label="Go to slide 2" data-indicator-index="1"></button>
+    <button class="home-hero__indicator-dot" aria-label="Go to slide 3" data-indicator-index="2"></button>
   </div>
 </section>
+
+<script>
+  function initHeroCarousel() {
+    const slides = document.querySelectorAll<HTMLElement>(".home-hero__slide");
+    const dots = document.querySelectorAll<HTMLButtonElement>(".home-hero__indicator-dot");
+    if (slides.length === 0 || dots.length === 0) return;
+
+    let currentSlide = 0;
+    const intervalTime = 5000;
+    let timerId: number | undefined;
+
+    function showSlide(index: number) {
+      slides.forEach((slide, i) => {
+        if (i === index) {
+          slide.classList.add("home-hero__slide--active");
+        } else {
+          slide.classList.remove("home-hero__slide--active");
+        }
+      });
+
+      dots.forEach((dot, i) => {
+        if (i === index) {
+          dot.classList.add("home-hero__indicator-dot--active");
+          dot.setAttribute("aria-current", "true");
+        } else {
+          dot.classList.remove("home-hero__indicator-dot--active");
+          dot.removeAttribute("aria-current");
+        }
+      });
+
+      currentSlide = index;
+    }
+
+    function startAutoPlay() {
+      stopAutoPlay();
+      timerId = window.setInterval(() => {
+        const nextIndex = (currentSlide + 1) % slides.length;
+        showSlide(nextIndex);
+      }, intervalTime);
+    }
+
+    function stopAutoPlay() {
+      if (timerId !== undefined) {
+        clearInterval(timerId);
+        timerId = undefined;
+      }
+    }
+
+    dots.forEach((dot, i) => {
+      dot.addEventListener("click", () => {
+        showSlide(i);
+        startAutoPlay();
+      });
+    });
+
+    // Start
+    showSlide(0);
+    startAutoPlay();
+  }
+
+  // Initialize on load and on astro page transitions
+  document.addEventListener("DOMContentLoaded", initHeroCarousel);
+  document.addEventListener("astro:after-swap", initHeroCarousel);
+  
+  // Also run immediately if script executes after DOMContentLoaded
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initHeroCarousel();
+  }
+</script>
