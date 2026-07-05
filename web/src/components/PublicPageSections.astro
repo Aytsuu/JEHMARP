@@ -1,5 +1,8 @@
 ---
-import { getSectionEntries, getSectionHeading } from "@/lib/public-website/content";
+import {
+  getSectionEntries,
+  getSectionHeading,
+} from "@/lib/public-website/content";
 import type { PublicPageSectionRecord } from "@/lib/public-website/content";
 
 type Props = {
@@ -13,7 +16,10 @@ const { sections } = Astro.props;
   sections.length > 0 ? (
     <div class="content-stack">
       {sections.map((section) => (
-        <section class="content-section" aria-labelledby={`section-${section.id}`}>
+        <section
+          class="content-section"
+          aria-labelledby={`section-${section.id}`}
+        >
           <h2 id={`section-${section.id}`}>{getSectionHeading(section)}</h2>
           {getSectionEntries(section).length > 0 ? (
             <dl class="detail-list">

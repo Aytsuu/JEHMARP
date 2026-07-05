@@ -33,52 +33,56 @@ const feedback = getContactInquiryFeedback(Astro.url);
       )
     }
 
-    <PublicPageSections sections={content.sections} />
+    <div class="contact-grid">
+      <div class="contact-info">
+        <PublicPageSections sections={content.sections} />
+      </div>
 
-    <section class="form-section" aria-labelledby="contact-inquiry-title">
-      <h2 id="contact-inquiry-title">Contact inquiry</h2>
-      <form class="form-grid" method="post" action="/api/contact-inquiries">
-        <fieldset class="fieldset-block">
-          <legend>Contact details</legend>
-          <div class="form-grid form-grid--two-column">
-            <div class="field-row">
-              <label for="name">Name</label>
-              <input id="name" name="name" required autocomplete="name" maxlength="120" />
+      <section class="form-section" aria-labelledby="contact-inquiry-title">
+        <h2 id="contact-inquiry-title">Contact inquiry</h2>
+        <form class="form-grid" method="post" action="/api/contact-inquiries">
+          <fieldset class="fieldset-block">
+            <legend>Contact details</legend>
+            <div class="form-grid form-grid--two-column">
+              <div class="field-row">
+                <label for="name">Name</label>
+                <input id="name" name="name" required autocomplete="name" maxlength="120" />
+              </div>
+              <div class="field-row">
+                <label for="email">Email</label>
+                <input id="email" name="email" type="email" autocomplete="email" maxlength="254" />
+              </div>
+              <div class="field-row">
+                <label for="phoneNumber">Phone number</label>
+                <input id="phoneNumber" name="phoneNumber" autocomplete="tel" maxlength="50" />
+              </div>
             </div>
+          </fieldset>
+
+          <fieldset class="fieldset-block">
+            <legend>Message</legend>
             <div class="field-row">
-              <label for="email">Email</label>
-              <input id="email" name="email" type="email" autocomplete="email" maxlength="254" />
+              <label for="message">How can we help?</label>
+              <textarea id="message" name="message" required maxlength="2000"></textarea>
             </div>
-            <div class="field-row">
-              <label for="phoneNumber">Phone number</label>
-              <input id="phoneNumber" name="phoneNumber" autocomplete="tel" maxlength="50" />
-            </div>
+          </fieldset>
+
+          <div class="fieldset-block">
+            {
+              turnstileSiteKey ? (
+                <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+              ) : (
+                <p class="error-message">Contact verification is not configured.</p>
+              )
+            }
           </div>
-        </fieldset>
 
-        <fieldset class="fieldset-block">
-          <legend>Message</legend>
-          <div class="field-row">
-            <label for="message">How can we help?</label>
-            <textarea id="message" name="message" required maxlength="2000"></textarea>
+          <div class="button-row">
+            <button type="submit" disabled={!turnstileSiteKey}>Send inquiry</button>
           </div>
-        </fieldset>
-
-        <div class="fieldset-block">
-          {
-            turnstileSiteKey ? (
-              <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
-            ) : (
-              <p class="error-message">Contact verification is not configured.</p>
-            )
-          }
-        </div>
-
-        <div class="button-row">
-          <button type="submit" disabled={!turnstileSiteKey}>Send inquiry</button>
-        </div>
-      </form>
-    </section>
+        </form>
+      </section>
+    </div>
 
     {
       turnstileSiteKey && (

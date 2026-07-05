@@ -16,8 +16,6 @@ function stringValue(value: unknown): string | undefined {
 const heading = stringValue(section.content.heading) ?? "JEHMARP";
 const summary = stringValue(section.content.summary);
 const supportingText = stringValue(section.content.supportingText);
-const primaryActionHref = stringValue(section.content.primaryActionHref);
-const primaryActionLabel = stringValue(section.content.primaryActionLabel);
 ---
 
 <section class="home-hero" aria-labelledby="home-hero-heading">
@@ -36,18 +34,14 @@ const primaryActionLabel = stringValue(section.content.primaryActionLabel);
       )
     }
 
-    {
-      primaryActionHref && primaryActionLabel && (
-        <div class="home-hero__actions">
-          <a
-            href={primaryActionHref}
-            class="home-hero__button home-hero__button--primary"
-          >
-            {primaryActionLabel}
-          </a>
-        </div>
-      )
-    }
+    <div class="home-hero__actions">
+      <a
+        href="/shop"
+        class="home-hero__button home-hero__button--primary"
+      >
+        Browse shop
+      </a>
+    </div>
   </div>
 
   <div class="home-hero__indicators" aria-label="Hero carousel navigation">

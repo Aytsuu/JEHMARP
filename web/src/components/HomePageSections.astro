@@ -8,7 +8,6 @@ type Props = {
 type FeaturedItem = {
   name: string;
   description: string;
-  price: string;
 };
 
 const { sections } = Astro.props;
@@ -26,50 +25,46 @@ const coreValues = asStringArray(missionVisionCoreValues?.content.coreValues);
 const taglineItems = asStringArray(taglines?.content.items);
 const featuredItems: FeaturedItem[] = [
   {
-    name: "Pork belly strips",
-    description: "Rich marbling, clean cut, ideal for grilling or braising.",
-    price: "From PHP 320/kg",
+    name: "Pork Belly",
+    description: "Fresh, carefully handled pork belly prepared for everyday frying, braising, and grilling.",
   },
   {
-    name: "Chicken breast fillet",
-    description: "Lean, fresh, and trimmed for quick family meals.",
-    price: "From PHP 245/kg",
+    name: "Chicken Breast",
+    description: "Lean chicken breast cuts prepared daily for practical family meals and bulk cooking.",
   },
   {
-    name: "Beef short ribs",
-    description: "Meaty ribs prepared for slow cooking and soup stock.",
-    price: "From PHP 540/kg",
+    name: "Ground Pork",
+    description: "Freshly ground pork ready for lumpia, patties, meatballs, and other home favorites.",
   },
   {
-    name: "Ground pork",
-    description: "Freshly ground on-site for lumpia, meatballs, and patties.",
-    price: "From PHP 295/kg",
+    name: "Porkchop",
+    description: "Clean porkchop cuts for grilling, frying, and budget-friendly family meals.",
   },
 ];
 const storefrontBenefits = [
   {
     title: "Direct from Local Farmers",
-    desc: "We partner with trusted local farmers to bring you the best quality meat.",
+    desc: "Partnering with trusted local farmers ensures the delivery of the best quality meat while supporting local agriculture.",
     class: "why-buy-card--0",
   },
   {
     title: "Guaranteed Freshness",
-    desc: "Freshly delivered and carefully handled to ensure top-notch freshness every day.",
+    desc: "Every product is freshly delivered and carefully handled daily to meet strict standards of top-notch freshness.",
     class: "why-buy-card--1",
   },
   {
     title: "Affordable & Fair Pricing",
-    desc: "We offer quality meat at prices that are fair and budget-friendly for every family.",
+    desc: "Premium quality meat is offered at fair, budget-friendly prices accessible to every family.",
     class: "why-buy-card--2",
   },
   {
     title: "Trusted Family Experience",
-    desc: "A family-run business built on honesty, dedication, and care for our customers.",
+    desc: "A multi-generational, family-run business built on a foundation of honesty, dedication, and genuine care for its customers.",
     class: "why-buy-card--3",
   },
   {
     title: "Community-Centered Business",
-    desc: "We give back and support the community that has supported us all these years.",
+    desc: "Dedicated to giving back, supporting community livelihoods, and uplifting the local neighborhood that has supported the business throughout the years.",
     class: "why-buy-card--4",
   },
 ];
@@ -79,12 +74,12 @@ const orderingSteps = [
   "Receive fresh meat packed and ready for cooking.",
 ];
 const storeDetails = [
-  { label: "Store hours", value: "Open daily, 7:00 AM to 7:00 PM" },
-  { label: "Phone", value: "+63 917 000 0000" },
-  { label: "Location", value: "Main public market area, easy pickup access" },
+  { label: "Store hours", value: "Open Daily (3:00AM - 8:00PM)" },
+  { label: "Phone", value: "09322159289 / 09177770118" },
+  { label: "Location", value: "Compostela Public Market / Consolacion Public Market" },
   {
-    label: "Ordering",
-    value: "Message ahead for bulk, party, or custom-cut requests",
+    label: "Email",
+    value: "jehmarp2020@gmail.com",
   },
 ];
 const faqItems = [

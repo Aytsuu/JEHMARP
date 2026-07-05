@@ -17,15 +17,14 @@ const errorMessage = getLoginErrorMessage(Astro.url.searchParams.get("error"));
   description="Single authentication entry point for admin and agent access."
 >
   <PageShell title="Login">
-    {
-      errorMessage && (
-        <section class="message-block">
-          <p>{errorMessage}</p>
-        </section>
-      )
-    }
-
-    <form class="form-section form-grid" method="post" action="/api/login">
+    <form class="form-section form-grid form-section--login" method="post" action="/api/login">
+      {
+        errorMessage && (
+          <div class="error-message" style="color: var(--color-brand-red); font-weight: 700; font-size: 0.95rem; margin-bottom: 1rem; border-left: 3px solid var(--color-brand-red); padding-left: 0.75rem;">
+            {errorMessage}
+          </div>
+        )
+      }
       <div class="field-row">
         <label for="email">Email</label>
         <input
@@ -46,7 +45,7 @@ const errorMessage = getLoginErrorMessage(Astro.url.searchParams.get("error"));
           autocomplete="current-password"
         />
       </div>
-      <button type="submit">Sign in</button>
+      <button type="submit" style="margin-top: 1rem; width: 100%;">Sign in</button>
     </form>
   </PageShell>
 </Layout>

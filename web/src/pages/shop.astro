@@ -14,6 +14,17 @@ const orderStatus = Astro.url.searchParams.get("order");
 const orderReference = Astro.url.searchParams.get("reference");
 const orderMessage = Astro.url.searchParams.get("message");
 const { turnstileSiteKey } = getPublicEnv();
+
+function getProductImage(name: string): string {
+  const normalized = name.toLowerCase();
+  if (normalized.includes("pork belly")) return "/images/pork_belly.png";
+  if (normalized.includes("chicken breast"))
+    return "/images/chicken_breast.png";
+  if (normalized.includes("short ribs") || normalized.includes("beef"))
+    return "/images/beef_short_ribs.png";
+  if (normalized.includes("ground pork")) return "/images/ground_pork.png";
+  return "/images/meat_cluster.svg";
+}
 ---
 
 <Layout
@@ -21,6 +32,7 @@ const { turnstileSiteKey } = getPublicEnv();
   description="Browse active JEHMARP products and submit a guest order."
 >
   <PageShell title="Shop">
+    <h2 class="page-title-brand">SHOP</h2>
     {
       orderStatus === "submitted" && (
         <section class="message-block" aria-labelledby="order-confirmation">
@@ -79,26 +91,36 @@ const { turnstileSiteKey } = getPublicEnv();
         </div>
 
         <div class="field-row">
-          <label for="minPrice">Minimum price</label>
+          <label for="minPrice"
+            >Minimum price (PHP <span id="minPriceVal"
+              >{filters.minPrice ?? 0}</span
+            >)</label
+          >
           <input
             id="minPrice"
             name="minPrice"
-            type="number"
+            type="range"
             min="0"
-            step="0.01"
-            value={filters.minPrice}
+            max="1000"
+            step="5"
+            value={filters.minPrice ?? 0}
           />
         </div>
 
         <div class="field-row">
-          <label for="maxPrice">Maximum price</label>
+          <label for="maxPrice"
+            >Maximum price (PHP <span id="maxPriceVal"
+              >{filters.maxPrice ?? 1000}</span
+            >)</label
+          >
           <input
             id="maxPrice"
             name="maxPrice"
-            type="number"
+            type="range"
             min="0"
-            step="0.01"
-            value={filters.maxPrice}
+            max="1000"
+            step="5"
+            value={filters.maxPrice ?? 1000}
           />
         </div>
 
@@ -125,13 +147,12 @@ const { turnstileSiteKey } = getPublicEnv();
 
         <div class="button-row">
           <button type="submit">Apply filters</button>
-          <a href="/shop">Reset filters</a>
+          <a href="/shop" class="btn-secondary">Reset filters</a>
         </div>
       </form>
     </section>
 
-    <section class="content-section" aria-labelledby="product-list">
-      <h2 id="product-list">Products</h2>
+    <section class="shop-products-section" aria-labelledby="product-list">
       <p>
         Showing page {pagination.currentPage} of {pagination.totalPages}. {
           pagination.count
@@ -143,22 +164,41 @@ const { turnstileSiteKey } = getPublicEnv();
           <ul class="product-grid gallery-list">
             {products.map((product) => (
               <li>
-                <article class="product-listing">
-                  <h3>{product.name}</h3>
-                  <p>
-                    {product.description ??
-                      "No description has been published for this product."}
-                  </p>
-                  <dl class="detail-list">
-                    <dt>Category</dt>
-                    <dd>{product.category}</dd>
-                    <dt>Unit</dt>
-                    <dd>{product.unit_label}</dd>
-                    <dt>Price</dt>
-                    <dd>{Number(product.default_price).toFixed(2)}</dd>
-                    <dt>Stock status</dt>
-                    <dd>{product.stock_status}</dd>
-                  </dl>
+                <article class="product-card">
+                  <div class="product-card__image-container">
+                    <img
+                      src={getProductImage(product.name)}
+                      alt={product.name}
+                      class="product-card__image"
+                    />
+                  </div>
+                  <div class="product-card__content">
+                    <h3 class="product-card__title">{product.name}</h3>
+                    <p class="product-card__description">
+                      {product.description ??
+                        "No description has been published for this product."}
+                    </p>
+                    <dl class="detail-list" style="margin-top: 1rem;">
+                      <dt>Category</dt>
+                      <dd>{product.category}</dd>
+                      <dt>Unit</dt>
+                      <dd>{product.unit_label}</dd>
+                      <dt>Price</dt>
+                      <dd>PHP {Number(product.default_price).toFixed(2)}</dd>
+                      <dt>Stock status</dt>
+                      <dd>
+                        {product.stock_status === "in_stock" && (
+                          <span class="badge badge--success">In stock</span>
+                        )}
+                        {product.stock_status === "limited" && (
+                          <span class="badge badge--warning">Limited</span>
+                        )}
+                        {product.stock_status === "out_of_stock" && (
+                          <span class="badge badge--danger">Out of stock</span>
+                        )}
+                      </dd>
+                    </dl>
+                  </div>
                 </article>
               </li>
             ))}
@@ -281,7 +321,7 @@ const { turnstileSiteKey } = getPublicEnv();
         <div class="fieldset-block">
           {
             turnstileSiteKey ? (
-              <div class="cf-turnstile" data-sitekey={turnstileSiteKey}></div>
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey} />
             ) : (
               <p class="error-message">
                 Guest order verification is not configured.
@@ -291,8 +331,10 @@ const { turnstileSiteKey } = getPublicEnv();
         </div>
 
         <div class="button-row">
-          <button type="submit" disabled={products.length === 0 || !turnstileSiteKey}
-            >Submit guest order</button
+          <button
+            type="submit"
+            disabled={products.length === 0 || !turnstileSiteKey}
+            >Submit order</button
           >
         </div>
       </form>
@@ -304,8 +346,52 @@ const { turnstileSiteKey } = getPublicEnv();
           is:inline
           src="https://challenges.cloudflare.com/turnstile/v0/api.js"
           async
-          defer></script>
+          defer
+        />
       )
     }
   </PageShell>
 </Layout>
+
+<script>
+  function initPriceSliders() {
+    const minInput = document.getElementById(
+      "minPrice",
+    ) as HTMLInputElement | null;
+    const maxInput = document.getElementById(
+      "maxPrice",
+    ) as HTMLInputElement | null;
+    const minVal = document.getElementById("minPriceVal");
+    const maxVal = document.getElementById("maxPriceVal");
+
+    if (minInput && minVal) {
+      minInput.addEventListener("input", () => {
+        minVal.textContent = minInput.value;
+        if (maxInput && Number(maxInput.value) < Number(minInput.value)) {
+          maxInput.value = minInput.value;
+          if (maxVal) maxVal.textContent = minInput.value;
+        }
+      });
+    }
+
+    if (maxInput && maxVal) {
+      maxInput.addEventListener("input", () => {
+        maxVal.textContent = maxInput.value;
+        if (minInput && Number(minInput.value) > Number(maxInput.value)) {
+          minInput.value = maxInput.value;
+          if (minVal) minVal.textContent = maxInput.value;
+        }
+      });
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", initPriceSliders);
+  document.addEventListener("astro:after-swap", initPriceSliders);
+
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    initPriceSliders();
+  }
+</script>
