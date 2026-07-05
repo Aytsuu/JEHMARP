@@ -1,4 +1,4 @@
-# NMC
+# JEHMARP
 
 ## Remote Supabase Test Accounts
 
@@ -13,6 +13,28 @@ credentials before production use and do not reuse them outside test data.
 The admin account is mapped through `public.admin_role`. The agent account is
 mapped through `public.agent_profile`.
 
+## Required Environment Variables
+
+For the Astro application in `web/`, configure these values in local `.env` files
+and in the deployment platform:
+
+```text
+PUBLIC_SUPABASE_URL=
+PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
+PUBLIC_TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+RESEND_API_KEY=
+RESELLER_PRICE_LIST_FROM=
+RESELLER_ADMIN_EMAIL=
+```
+
+`RESEND_API_KEY`, `RESELLER_PRICE_LIST_FROM`, and `RESELLER_ADMIN_EMAIL` are required
+for the reseller application email workflow. The remaining variables are required
+for the current public form and dashboard protections.
+
 ## Vercel Deployment
 
 Deploy the Astro app from the `web/` directory, not the repository root.
@@ -26,12 +48,12 @@ Recommended Vercel project settings:
 | Install Command | `npm install` |
 | Build Command | `npm run build` |
 
-Required environment variables:
+Recommended deployment checklist:
 
-```text
-PUBLIC_SUPABASE_URL=
-PUBLIC_SUPABASE_PUBLISHABLE_KEY=
-SUPABASE_SECRET_KEY=
-```
+1. Set the Vercel root directory to `web`.
+2. Configure all required environment variables before the first production deploy.
+3. Apply Supabase migrations to the linked project before deploying the app.
+4. Verify that Turnstile, Upstash Redis, and Resend credentials are production values.
+5. Run `npm run test`, `npm run check`, `npm run lint`, and `npm run build` from `web/`.
 
 The project uses `@astrojs/vercel` for server-rendered Astro routes on Vercel.

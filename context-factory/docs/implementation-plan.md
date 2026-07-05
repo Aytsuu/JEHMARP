@@ -275,20 +275,20 @@ Source: `context-factory/docs/draft-idea-refinement.md`
 
 ## Phase 12 - Final Verification
 
-- [ ] Run unit tests.
-- [ ] Run integration tests.
-- [ ] Run RLS policy tests.
-- [ ] Run build.
-- [ ] Run lint.
-- [ ] Test guest browsing flow.
-- [ ] Test guest order flow.
-- [ ] Test reseller application email flow.
-- [ ] Test admin content/product/order/payment/invoice flow.
-- [ ] Test agent order and commission flow.
-- [ ] Test analytics dashboard queries.
+- [x] Run unit tests.
+- [x] Run integration tests.
+- [x] Run RLS policy tests.
+- [x] Run build.
+- [x] Run lint.
+- [x] Test guest browsing flow.
+- [x] Test guest order flow.
+- [x] Test reseller application email flow.
+- [x] Test admin content/product/order/payment/invoice flow.
+- [x] Test agent order and commission flow.
+- [x] Test analytics dashboard queries.
 - [ ] Verify mobile layouts.
-- [ ] Verify empty states.
-- [ ] Verify error states.
+- [x] Verify empty states.
+- [x] Verify error states.
 - [ ] Verify loading states.
-- [ ] Document required environment variables.
-- [ ] Document deployment steps.
+- [x] Document required environment variables.
+- [x] Document deployment steps.
