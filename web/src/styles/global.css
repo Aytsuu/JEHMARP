@@ -583,20 +583,6 @@
     box-shadow: 0 6px 20px rgba(102, 24, 24, 0.4);
   }
 
-  .home-hero__button--secondary {
-    background-color: transparent;
-    color: #ffffff;
-    border: 2px solid #ffffff;
-    backdrop-filter: blur(4px);
-  }
-
-  .home-hero__button--secondary:hover {
-    background-color: #ffffff;
-    color: #000000;
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(255, 255, 255, 0.2);
-  }
-
   .home-hero__indicators {
     position: absolute;
     bottom: 2rem;
@@ -808,7 +794,8 @@
   }
 
   .tagline-container {
-    background-color: #eff1ef; /* light gray-green */
+    background-color: #eff1ef;
+    /* light gray-green */
     border-radius: 1rem;
     padding: 6rem 2rem;
     text-align: center;

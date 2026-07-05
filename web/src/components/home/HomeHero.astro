@@ -8,7 +8,9 @@ type Props = {
 const { section } = Astro.props;
 
 function stringValue(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
+  return typeof value === "string" && value.trim().length > 0
+    ? value.trim()
+    : undefined;
 }
 
 const heading = stringValue(section.content.heading) ?? "JEHMARP";
@@ -25,27 +27,32 @@ const secondaryActionLabel = stringValue(section.content.secondaryActionLabel);
   <div class="home-hero__content">
     <h1 id="home-hero-heading" class="home-hero__title">{heading}</h1>
     {summary && <p class="home-hero__summary">{summary}</p>}
-    {supportingText && <p class="home-hero__supporting-text">{supportingText}</p>}
-    
-    {((primaryActionHref && primaryActionLabel) || (secondaryActionHref && secondaryActionLabel)) && (
-      <div class="home-hero__actions">
-        {primaryActionHref && primaryActionLabel && (
-          <a href={primaryActionHref} class="home-hero__button home-hero__button--primary">
-            {primaryActionLabel}
-          </a>
-        )}
-        {secondaryActionHref && secondaryActionLabel && (
-          <a href={secondaryActionHref} class="home-hero__button home-hero__button--secondary">
-            {secondaryActionLabel}
-          </a>
-        )}
-      </div>
-    )}
+    {
+      supportingText && (
+        <p class="home-hero__supporting-text">{supportingText}</p>
+      )
+    }
+
+    {
+      primaryActionHref && primaryActionLabel && (
+        <div class="home-hero__actions">
+          {primaryActionHref && primaryActionLabel && (
+            <a
+              href={primaryActionHref}
+              class="home-hero__button home-hero__button--primary"
+            >
+              {primaryActionLabel}
+            </a>
+          )}
+        </div>
+      )
+    }
   </div>
 
   <div class="home-hero__indicators" aria-hidden="true">
     <span class="home-hero__indicator-dot"></span>
-    <span class="home-hero__indicator-dot home-hero__indicator-dot--active"></span>
+    <span class="home-hero__indicator-dot home-hero__indicator-dot--active"
+    ></span>
     <span class="home-hero__indicator-dot"></span>
   </div>
 </section>
