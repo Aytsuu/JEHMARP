@@ -2359,9 +2359,9 @@
   }
 
   .table-filters input[data-search-input] {
-    border-radius: 9999px;
-    padding-left: 1.25rem;
-    padding-right: 1.25rem;
+    border-radius: 0.375rem;
+    padding-left: 0.85rem;
+    padding-right: 0.85rem;
   }
 
   .table-filters select {
