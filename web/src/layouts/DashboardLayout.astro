@@ -56,5 +56,128 @@ const { title, description, navLabel, navItems } = Astro.props;
         <slot />
       </main>
     </div>
+
+    <!-- Drawer Sheet Component -->
+    <div class="drawer-sheet" id="drawer-sheet" aria-hidden="true">
+      <div class="drawer-sheet__backdrop" data-close-drawer></div>
+      <div class="drawer-sheet__content">
+        <header class="drawer-sheet__header">
+          <h3 class="drawer-sheet__title">Manage</h3>
+          <button type="button" class="drawer-sheet__close" data-close-drawer aria-label="Close panel">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </header>
+        <div class="drawer-sheet__body" data-drawer-body></div>
+      </div>
+    </div>
+
+    <script>
+      function initDrawerSheets() {
+        const drawer = document.querySelector<HTMLElement>("#drawer-sheet");
+        const drawerBody = drawer?.querySelector<HTMLElement>("[data-drawer-body]");
+        const closeButtons = drawer?.querySelectorAll("[data-close-drawer]");
+        const openButtons = document.querySelectorAll("[data-open-sheet]");
+
+        if (!drawer || !drawerBody) return;
+
+        let currentFormParent: HTMLElement | null = null;
+        let currentForm: HTMLFormElement | null = null;
+
+        function closeDrawer() {
+          if (!drawer || !drawerBody) return;
+          drawer.classList.remove("drawer-sheet--open");
+          drawer.setAttribute("aria-hidden", "true");
+
+          // Move the form back to its placeholder
+          if (currentForm && currentFormParent) {
+            currentFormParent.appendChild(currentForm);
+          }
+          currentForm = null;
+          currentFormParent = null;
+        }
+
+        // Handle Edit/Manage row buttons
+        openButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            // Close any open drawer first
+            if (currentForm) {
+              closeDrawer();
+            }
+
+            const parentTd = btn.closest("td");
+            if (!parentTd) return;
+
+            const holder = parentTd.querySelector<HTMLElement>(".hidden-form-holder");
+            const form = holder?.querySelector<HTMLFormElement>("form");
+            if (!holder || !form) return;
+
+            currentFormParent = holder;
+            currentForm = form;
+
+            // Move the form element to the drawer content
+            drawerBody.appendChild(form);
+
+            // Dynamically set title based on the row context
+            const row = btn.closest("tr");
+            const rowTitle = row?.querySelector("strong")?.textContent || row?.querySelector("td")?.textContent || "Manage";
+            const drawerTitle = drawer.querySelector(".drawer-sheet__title");
+            if (drawerTitle) {
+              drawerTitle.textContent = `Manage: ${rowTitle.trim().split("\n")[0]}`;
+            }
+
+            drawer.classList.add("drawer-sheet--open");
+            drawer.setAttribute("aria-hidden", "false");
+          });
+        });
+
+        // Handle Create form panel buttons
+        const openCreateButtons = document.querySelectorAll("[data-open-create-sheet]");
+        openCreateButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            // Close any open drawer first
+            if (currentForm) {
+              closeDrawer();
+            }
+
+            const parentPanel = btn.closest(".admin-panel");
+            const holder = parentPanel?.querySelector<HTMLElement>(".hidden-create-form-holder");
+            const form = holder?.querySelector<HTMLFormElement>("form");
+            if (!holder || !form) return;
+
+            currentFormParent = holder;
+            currentForm = form;
+
+            // Move the form element to the drawer content
+            drawerBody.appendChild(form);
+
+            // Set drawer title to the button label
+            const drawerTitle = drawer.querySelector(".drawer-sheet__title");
+            if (drawerTitle) {
+              drawerTitle.textContent = btn.textContent?.trim() || "Create";
+            }
+
+            drawer.classList.add("drawer-sheet--open");
+            drawer.setAttribute("aria-hidden", "false");
+          });
+        });
+
+        closeButtons?.forEach((btn) => {
+          btn.addEventListener("click", closeDrawer);
+        });
+
+        // Close on escape key
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && drawer.classList.contains("drawer-sheet--open")) {
+            closeDrawer();
+          }
+        });
+      }
+
+      document.addEventListener("DOMContentLoaded", initDrawerSheets);
+      document.addEventListener("astro:after-swap", initDrawerSheets);
+      if (document.readyState === "complete" || document.readyState === "interactive") {
+        initDrawerSheets();
+      }
+    </script>
   </body>
 </html>

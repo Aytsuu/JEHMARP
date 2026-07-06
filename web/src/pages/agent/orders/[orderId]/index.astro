@@ -1,0 +1,125 @@
+---
+import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
+import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
+import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
+import { requireAgentRoute } from "@/lib/agent-dashboard/page";
+import {
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderTotal,
+  orderPaymentTotal,
+  orderBalance,
+  orderExpectedCommission,
+  orderEarnedCommission,
+} from "@/lib/agent-dashboard/view";
+
+export const prerender = false;
+
+const agentRoute = await requireAgentRoute(Astro);
+
+if (!agentRoute.ready) {
+  return agentRoute.response;
+}
+
+const { orderId } = Astro.params;
+const data = await loadAgentDashboardData(Astro, agentRoute.userId);
+const order = data.orders.find((o) => o.id === orderId);
+
+if (!order) {
+  return Astro.redirect("/agent/orders", 302);
+}
+
+const feedback = formatAgentActionFeedback(Astro.url);
+---
+
+<AgentPageFrame
+  title={`Order Details #${order.id.slice(0, 8)} - JEHMARP`}
+  description="Agent order detail view, commissions, and PDFs."
+  heading="Order Details"
+  intro={`Review order items, details, commissions, and generate invoices/slips for Order #${order.id.slice(0, 8)}.`}
+  feedback={feedback}
+>
+  <div style="margin-bottom: 2rem;">
+    <a href="/agent/orders" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      Back to Orders
+    </a>
+  </div>
+
+  <div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem; align-items: start;">
+    <!-- Left Column: Items and PDF links -->
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+      <div class="content-section">
+        <h3>Order Items</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Commission</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.customer_order_item.map((item) => (
+                <tr>
+                  <td>{item.product?.name ?? "Missing product"}</td>
+                  <td>
+                    Slip {item.partial_quantity}<br />
+                    Invoice {item.final_quantity}<br />
+                    {formatCurrency(item.unit_price)} {item.price_type}
+                  </td>
+                  <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h3>PDF Downloads</h3>
+        <p>
+          <OrderPdfLinks
+            orderId={order.id}
+            basePath="/agent/orders"
+            showSalesInvoice={order.invoice.length > 0}
+          />
+        </p>
+      </div>
+    </div>
+
+    <!-- Right Column: Metadata / Summary -->
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+      <div class="content-section">
+        <h3>Order Summary</h3>
+        <dl class="detail-list">
+          <dt>Customer</dt>
+          <dd>{order.customer ? fullName(order.customer) : "Guest"}<br/>{order.customer?.phone_number ?? "N/A"}</dd>
+          <dt>Source</dt>
+          <dd>{order.source}</dd>
+          <dt>Order status</dt>
+          <dd>{order.order_status}</dd>
+          <dt>Payment status</dt>
+          <dd>{order.payment_status}</dd>
+          <dt>Order total</dt>
+          <dd>{formatCurrency(orderTotal(order, "partial_quantity"))}</dd>
+          <dt>Invoice total</dt>
+          <dd>{formatCurrency(orderTotal(order, "final_quantity"))}</dd>
+          <dt>Paid</dt>
+          <dd>{formatCurrency(orderPaymentTotal(order))}</dd>
+          <dt>Balance</dt>
+          <dd>{formatCurrency(orderBalance(order))}</dd>
+          <dt>Expected commission</dt>
+          <dd>{formatCurrency(orderExpectedCommission(order))}</dd>
+          <dt>Earned commission</dt>
+          <dd>{formatCurrency(orderEarnedCommission(order))}</dd>
+          <dt>Approved at</dt>
+          <dd>{formatDate(order.approved_at)}</dd>
+        </dl>
+      </div>
+    </div>
+  </div>
+</AgentPageFrame>

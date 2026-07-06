@@ -65,32 +65,35 @@ const sectionsByPage = data.pages.map((page) => ({
                       </details>
                     </td>
                     <td>
-                      <form method="post" class="admin-table-form">
-                        <input type="hidden" name="action" value="save-page-section" />
-                        <input type="hidden" name="sectionId" value={section.id} />
-                        <input type="hidden" name="pageId" value={page.id} />
-                        <label>
-                          <span>Type</span>
-                          <input name="type" value={section.type} required />
-                        </label>
-                        <label>
-                          <span>Order</span>
-                          <input name="sortOrder" type="number" min="0" step="1" value={section.sort_order} required />
-                        </label>
-                        <label>
-                          <span>Status</span>
-                          <select name="status" required>
-                            {pageStatuses.map((status) => (
-                              <option value={status} selected={selected(section.status, status)}>{status}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label>
-                          <span>Content JSON</span>
-                          <textarea name="content" required set:html={escapeTextareaValue(jsonTextareaValue(section.content))}></textarea>
-                        </label>
-                        <button type="submit">Save section</button>
-                      </form>
+                      <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+                      <div class="hidden-form-holder" style="display: none;">
+                        <form method="post" class="admin-table-form">
+                          <input type="hidden" name="action" value="save-page-section" />
+                          <input type="hidden" name="sectionId" value={section.id} />
+                          <input type="hidden" name="pageId" value={page.id} />
+                          <label>
+                            <span>Type</span>
+                            <input name="type" value={section.type} required />
+                          </label>
+                          <label>
+                            <span>Order</span>
+                            <input name="sortOrder" type="number" min="0" step="1" value={section.sort_order} required />
+                          </label>
+                          <label>
+                            <span>Status</span>
+                            <select name="status" required>
+                              {pageStatuses.map((status) => (
+                                <option value={status} selected={selected(section.status, status)}>{status}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Content JSON</span>
+                            <textarea name="content" required set:html={escapeTextareaValue(jsonTextareaValue(section.content))}></textarea>
+                          </label>
+                          <button type="submit">Save section</button>
+                        </form>
+                      </div>
                     </td>
                   </tr>
                 ))}

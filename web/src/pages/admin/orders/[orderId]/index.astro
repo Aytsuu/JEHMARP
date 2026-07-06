@@ -1,0 +1,217 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
+import {
+  formatAdminActionFeedback,
+  getCommissionStatuses,
+} from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { getAllowedNextOrderStatuses } from "@/lib/admin-dashboard/actions";
+import {
+  canManageOrderCommissions,
+  escapeTextareaValue,
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderTotal,
+  orderPaymentTotal,
+  orderBalance,
+  selected,
+} from "@/lib/admin-dashboard/view";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const { orderId } = Astro.params;
+const data = await loadAdminDashboardData();
+const order = data.orders.find((o) => o.id === orderId);
+
+if (!order) {
+  return Astro.redirect("/admin/orders", 302);
+}
+
+const commissionStatuses = getCommissionStatuses();
+const allowedStatuses = getAllowedNextOrderStatuses(order.order_status);
+const canManageCommissions = canManageOrderCommissions(order);
+const invoice = order.invoice[0];
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title={`Order Details #${order.id.slice(0, 8)} - JEHMARP`}
+  description="Admin order detail, status updates, invoices, and payments."
+  heading="Order Details"
+  intro={`Review order items, log customer payments, manage commissions, and generate invoices for Order #${order.id.slice(0, 8)}.`}
+  feedback={feedback}
+>
+  <div style="margin-bottom: 2rem;">
+    <a href="/admin/orders" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      Back to Orders
+    </a>
+  </div>
+
+  <div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem; align-items: start;">
+    <!-- Left Column: Items, Payments and Invoice PDF links -->
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+      <div class="content-section">
+        <h3>Order Items</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Quantities</th>
+                {canManageCommissions && <th scope="col">Commission</th>}
+                {canManageCommissions && <th scope="col">Manage commission</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {order.customer_order_item.map((item) => (
+                <tr>
+                  <td>{item.product?.name ?? "Missing product"}</td>
+                  <td>
+                    Slip {item.partial_quantity}<br />
+                    Invoice {item.final_quantity}<br />
+                    {formatCurrency(item.unit_price)} {item.price_type}
+                  </td>
+                  {canManageCommissions && (
+                    <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
+                  )}
+                  {canManageCommissions && (
+                    <td>
+                      <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+                      <div class="hidden-form-holder" style="display: none;">
+                        <form method="post" class="admin-table-form">
+                          <input type="hidden" name="action" value="update-commission" />
+                          <input type="hidden" name="orderItemId" value={item.id} />
+                          <label><span>Amount</span><input name="amount" type="number" min="0" step="0.01" value={item.agent_commission_amount} required /></label>
+                          <label>
+                            <span>Status</span>
+                            <select name="status" required>
+                              {commissionStatuses.map((status) => (
+                                <option value={status} selected={selected(item.agent_commission_status, status)}>{status}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <label><span>Notes</span><textarea name="notes" set:html={escapeTextareaValue(item.agent_commission_notes)}></textarea></label>
+                          <button type="submit">Save commission</button>
+                        </form>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h3>Payment History</h3>
+        {order.payment.length === 0 ? <p class="empty-state">No payments recorded.</p> : (
+          <ul class="compact-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem;">
+            {order.payment.map((payment) => (
+              <li style="padding: 0.75rem 1rem; background-color: var(--color-brand-cream); border-radius: 0.5rem; display: flex; justify-content: space-between;">
+                <span>{payment.payment_method} on {formatDate(payment.payment_date)}</span>
+                <strong>{formatCurrency(payment.amount)}</strong>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+
+    <!-- Right Column: Metadata, Actions, Status Update -->
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+      <div class="content-section">
+        <h3>Order Information</h3>
+        <dl class="detail-list" style="margin-bottom: 1.5rem;">
+          <dt>Customer</dt>
+          <dd>{order.customer ? fullName(order.customer) : "Guest"}<br/>{order.customer?.phone_number ?? "N/A"}</dd>
+          <dt>Source</dt>
+          <dd>{order.source}</dd>
+          <dt>Order status</dt>
+          <dd>{order.order_status}</dd>
+          <dt>Payment status</dt>
+          <dd>{order.payment_status}</dd>
+          <dt>Order total</dt>
+          <dd>{formatCurrency(orderTotal(order, "partial_quantity"))}</dd>
+          <dt>Invoice total</dt>
+          <dd>{formatCurrency(orderTotal(order, "final_quantity"))}</dd>
+          <dt>Paid</dt>
+          <dd>{formatCurrency(orderPaymentTotal(order))}</dd>
+          <dt>Balance</dt>
+          <dd>{formatCurrency(orderBalance(order))}</dd>
+          <dt>Assigned agent</dt>
+          <dd>{order.agent?.display_name ?? "None"}</dd>
+          <dt>Approved at</dt>
+          <dd>{formatDate(order.approved_at)}</dd>
+        </dl>
+
+        <p style="margin-top: 1.5rem;">
+          <OrderPdfLinks
+            orderId={order.id}
+            basePath="/admin/orders"
+            showSalesInvoice={Boolean(invoice)}
+          />
+        </p>
+      </div>
+
+      <div class="content-section" style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <form method="post" class="admin-form" style="margin: 0;">
+          <input type="hidden" name="action" value="update-order-status" />
+          <input type="hidden" name="orderId" value={order.id} />
+          <h4>Update Order Status</h4>
+          <label class="field-row">
+            <span>Next status</span>
+            <select name="orderStatus" required>
+              <option value={order.order_status}>{order.order_status}</option>
+              {allowedStatuses.map((status) => <option value={status}>{status}</option>)}
+            </select>
+          </label>
+          <button type="submit" disabled={allowedStatuses.length === 0} style="width: 100%;">Update status</button>
+        </form>
+
+        <form method="post" class="admin-form" style="margin: 0;">
+          <input type="hidden" name="action" value="record-payment" />
+          <input type="hidden" name="orderId" value={order.id} />
+          <h4>Record payment</h4>
+          <label class="field-row"><span>Amount</span><input name="amount" type="number" min="0.01" step="0.01" required /></label>
+          <label class="field-row"><span>Method</span><input name="paymentMethod" required placeholder="cash, bank transfer" /></label>
+          <label class="field-row"><span>Payment date</span><input name="paymentDate" type="date" value={new Date().toISOString().slice(0, 10)} required /></label>
+          <label class="field-row"><span>Reference</span><input name="referenceNumber" /></label>
+          <label class="field-row"><span>Notes</span><textarea name="notes"></textarea></label>
+          <button type="submit" style="width: 100%;">Record payment</button>
+        </form>
+
+        {invoice ? (
+          <section class="admin-form" aria-labelledby={`order-invoice-${order.id}`} style="margin: 0;">
+            <h4 id={`order-invoice-${order.id}`}>Invoice {invoice.invoice_number}</h4>
+            <p>
+              <OrderPdfLinks
+                orderId={order.id}
+                basePath="/admin/orders"
+                showOrderSlip={false}
+                showSalesInvoice
+              />
+            </p>
+          </section>
+        ) : (
+          <form method="post" class="admin-form" style="margin: 0;">
+            <input type="hidden" name="action" value="save-invoice" />
+            <input type="hidden" name="orderId" value={order.id} />
+            <h4>Create invoice</h4>
+            <button type="submit" style="width: 100%;">Create invoice</button>
+          </form>
+        )}
+      </div>
+    </div>
+  </div>
+</AdminPageFrame>

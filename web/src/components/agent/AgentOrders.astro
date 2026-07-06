@@ -1,14 +1,9 @@
 ---
-import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
 import {
   formatCurrency,
   formatDate,
   fullName,
-  orderBalance,
-  orderEarnedCommission,
-  orderExpectedCommission,
-  orderPaymentTotal,
   orderTotal,
 } from "@/lib/agent-dashboard/view";
 
@@ -25,66 +20,95 @@ const hasAssignedCustomers = data.customers.length > 0;
   <div class="admin-panel__header">
     <h2 id="agent-orders-title">Submit Order</h2>
     <p>Create an order for a customer. New submissions start in admin review.</p>
-  </div>
+    <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;" disabled={!canSubmitOrder}>Submit Order</button>
+    <div class="hidden-create-form-holder" style="display: none;">
+      <form method="post" class="admin-form" aria-labelledby="agent-order-form-title" data-agent-order-form data-can-submit-order={String(canSubmitOrder)}>
+        <input type="hidden" name="action" value="create-agent-order" />
+        <h3 id="agent-order-form-title">New agent order</h3>
 
-  {!canSubmitOrder && (
-    <p class="empty-state">
-      Active products are required before submitting an agent order.
-    </p>
-  )}
+        <div class="admin-form-grid">
+          <label class="field-row" data-existing-customer-field>
+            <span>Customer</span>
+            <select name="customerId" disabled={!canSubmitOrder || !hasAssignedCustomers}>
+              <option value="">Select customer</option>
+              {data.customers.map((customer) => (
+                <option
+                  value={customer.id}
+                  data-customer-first-name={customer.first_name}
+                  data-customer-last-name={customer.last_name}
+                  data-customer-phone-number={customer.phone_number}
+                  data-customer-email={customer.email ?? ""}
+                  data-customer-address={customer.address}
+                >
+                  {fullName(customer)} - {customer.phone_number}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-  <form method="post" class="admin-form" aria-labelledby="agent-order-form-title" data-agent-order-form data-can-submit-order={String(canSubmitOrder)}>
-    <input type="hidden" name="action" value="create-agent-order" />
-    <h3 id="agent-order-form-title">New agent order</h3>
+        <fieldset class="fieldset-block" data-customer-details-fields disabled={!canSubmitOrder}>
+          <legend>Customer details</legend>
+          <div class="admin-form-grid">
+            <label class="field-row"><span>First name</span><input name="firstName" required data-customer-first-name /></label>
+            <label class="field-row"><span>Last name</span><input name="lastName" required data-customer-last-name /></label>
+            <label class="field-row"><span>Phone number</span><input name="phoneNumber" required data-customer-phone-number /></label>
+            <label class="field-row"><span>Email</span><input name="email" type="email" data-customer-email /></label>
+          </div>
+          <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
+        </fieldset>
 
-    <div class="admin-form-grid">
-      <label class="field-row" data-existing-customer-field>
-        <span>Customer</span>
-        <select name="customerId" disabled={!canSubmitOrder || !hasAssignedCustomers}>
-          <option value="">Select customer</option>
-          {data.customers.map((customer) => (
-            <option
-              value={customer.id}
-              data-customer-first-name={customer.first_name}
-              data-customer-last-name={customer.last_name}
-              data-customer-phone-number={customer.phone_number}
-              data-customer-email={customer.email ?? ""}
-              data-customer-address={customer.address}
-            >
-              {fullName(customer)} - {customer.phone_number}
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+        <div class="table-wrap">
+          <table>
+            <caption>Order items</caption>
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Details</th>
+                <th scope="col">Manage</th>
+              </tr>
+            </thead>
+            <tbody data-agent-order-items>
+              <tr data-agent-order-item-row>
+                <td>
+                  <label class="field-row">
+                    <span>Product <span data-row-number>1</span></span>
+                    <select name="productId" required disabled={!canSubmitOrder}>
+                      <option value="">Select product</option>
+                      {data.products.map((product) => (
+                        <option value={product.id}>
+                          {product.name} - {formatCurrency(product.default_price)} per {product.unit_label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </td>
+                <td>
+                  <label class="field-row">
+                    <span>Quantity <span data-row-number>1</span></span>
+                    <input name="quantity" type="number" min="0.001" step="0.001" required disabled={!canSubmitOrder} />
+                  </label>
+                </td>
+                <td>
+                  <label class="field-row">
+                    <span>Details <span data-row-number>1</span></span>
+                    <textarea name="addDetails" placeholder="Cut, packing, or delivery notes" disabled={!canSubmitOrder}></textarea>
+                  </label>
+                </td>
+                <td>
+                  <span class="empty-state">Required</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-    <fieldset class="fieldset-block" data-customer-details-fields disabled={!canSubmitOrder}>
-      <legend>Customer details</legend>
-      <div class="admin-form-grid">
-        <label class="field-row"><span>First name</span><input name="firstName" required data-customer-first-name /></label>
-        <label class="field-row"><span>Last name</span><input name="lastName" required data-customer-last-name /></label>
-        <label class="field-row"><span>Phone number</span><input name="phoneNumber" required data-customer-phone-number /></label>
-        <label class="field-row"><span>Email</span><input name="email" type="email" data-customer-email /></label>
-      </div>
-      <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
-    </fieldset>
-
-    <div class="table-wrap">
-      <table>
-        <caption>Order items</caption>
-        <thead>
-          <tr>
-            <th scope="col">Product</th>
-            <th scope="col">Quantity</th>
-            <th scope="col">Details</th>
-            <th scope="col">Manage</th>
-          </tr>
-        </thead>
-        <tbody data-agent-order-items>
+        <template data-agent-order-item-template>
           <tr data-agent-order-item-row>
             <td>
               <label class="field-row">
-                <span>Product <span data-row-number>1</span></span>
+                <span>Product <span data-row-number></span></span>
                 <select name="productId" required disabled={!canSubmitOrder}>
                   <option value="">Select product</option>
                   {data.products.map((product) => (
@@ -97,60 +121,27 @@ const hasAssignedCustomers = data.customers.length > 0;
             </td>
             <td>
               <label class="field-row">
-                <span>Quantity <span data-row-number>1</span></span>
+                <span>Quantity <span data-row-number></span></span>
                 <input name="quantity" type="number" min="0.001" step="0.001" required disabled={!canSubmitOrder} />
               </label>
             </td>
             <td>
               <label class="field-row">
-                <span>Details <span data-row-number>1</span></span>
+                <span>Details <span data-row-number></span></span>
                 <textarea name="addDetails" placeholder="Cut, packing, or delivery notes" disabled={!canSubmitOrder}></textarea>
               </label>
             </td>
             <td>
-              <span class="empty-state">Required</span>
+              <button type="button" data-remove-agent-order-item>Remove</button>
             </td>
           </tr>
-        </tbody>
-      </table>
+        </template>
+
+        <button type="button" data-add-agent-order-item disabled={!canSubmitOrder}>Add item</button>
+        <button type="submit" disabled={!canSubmitOrder}>Submit for review</button>
+      </form>
     </div>
-
-    <template data-agent-order-item-template>
-      <tr data-agent-order-item-row>
-        <td>
-          <label class="field-row">
-            <span>Product <span data-row-number></span></span>
-            <select name="productId" required disabled={!canSubmitOrder}>
-              <option value="">Select product</option>
-              {data.products.map((product) => (
-                <option value={product.id}>
-                  {product.name} - {formatCurrency(product.default_price)} per {product.unit_label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </td>
-        <td>
-          <label class="field-row">
-            <span>Quantity <span data-row-number></span></span>
-            <input name="quantity" type="number" min="0.001" step="0.001" required disabled={!canSubmitOrder} />
-          </label>
-        </td>
-        <td>
-          <label class="field-row">
-            <span>Details <span data-row-number></span></span>
-            <textarea name="addDetails" placeholder="Cut, packing, or delivery notes" disabled={!canSubmitOrder}></textarea>
-          </label>
-        </td>
-        <td>
-          <button type="button" data-remove-agent-order-item>Remove</button>
-        </td>
-      </tr>
-    </template>
-
-    <button type="button" data-add-agent-order-item disabled={!canSubmitOrder}>Add item</button>
-    <button type="submit" disabled={!canSubmitOrder}>Submit for review</button>
-  </form>
+  </div>
 </section>
 
 <section class="admin-panel" aria-labelledby="agent-order-list-title">
@@ -162,63 +153,45 @@ const hasAssignedCustomers = data.customers.length > 0;
   {data.orders.length === 0 ? (
     <p class="empty-state">No accessible orders yet.</p>
   ) : (
-    <div class="admin-card-list">
-      {data.orders.map((order) => (
-        <article class="admin-card" aria-labelledby={`agent-order-${order.id}`}>
-          <div class="admin-card__header">
-            <h3 id={`agent-order-${order.id}`}>Order for {fullName(order.customer)}</h3>
-            <p>{order.source} - {order.order_status} - payment {order.payment_status} - {formatDate(order.created_at)}</p>
-            <p>
-              <OrderPdfLinks
-                orderId={order.id}
-                basePath="/agent/orders"
-                showSalesInvoice={order.invoice.length > 0}
-              />
-            </p>
-          </div>
+    <div class="table-wrap">
+      <table>
+        <caption>Orders</caption>
+        <thead>
+          <tr>
+            <th scope="col">Customer</th>
+            <th scope="col">Date</th>
+            <th scope="col">Source</th>
+            <th scope="col">Order Status</th>
+            <th scope="col">Payment Status</th>
+            <th scope="col">Order Total</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.orders.map((order) => {
+            const invoice = order.invoice.length > 0;
+            const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
 
-          <dl class="detail-list">
-            <dt>Order total</dt>
-            <dd>{formatCurrency(orderTotal(order, "partial_quantity"))}</dd>
-            <dt>Invoice total</dt>
-            <dd>{formatCurrency(orderTotal(order, "final_quantity"))}</dd>
-            <dt>Paid</dt>
-            <dd>{formatCurrency(orderPaymentTotal(order))}</dd>
-            <dt>Balance</dt>
-            <dd>{formatCurrency(orderBalance(order))}</dd>
-            <dt>Expected commission</dt>
-            <dd>{formatCurrency(orderExpectedCommission(order))}</dd>
-            <dt>Earned commission</dt>
-            <dd>{formatCurrency(orderEarnedCommission(order))}</dd>
-          </dl>
-
-          <div class="table-wrap">
-            <table>
-              <caption>Order items</caption>
-              <thead>
-                <tr>
-                  <th scope="col">Product</th>
-                  <th scope="col">Quantity</th>
-                  <th scope="col">Commission</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.customer_order_item.map((item) => (
-                  <tr>
-                    <td>{item.product?.name ?? "Missing product"}</td>
-                    <td>
-                      Slip {item.partial_quantity}<br />
-                      Invoice {item.final_quantity}<br />
-                      {formatCurrency(item.unit_price)} {item.price_type}
-                    </td>
-                    <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </article>
-      ))}
+            return (
+              <tr>
+                <td>
+                  <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
+                  <br />
+                  <span>{order.customer?.phone_number ?? "N/A"}</span>
+                </td>
+                <td>{formatDate(order.created_at)}</td>
+                <td>{order.source}</td>
+                <td>{order.order_status}</td>
+                <td>{order.payment_status}</td>
+                <td>{formatCurrency(total)}</td>
+                <td>
+                  <a href={`/agent/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   )}
 </section>

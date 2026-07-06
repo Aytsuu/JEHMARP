@@ -18,38 +18,29 @@ const agentStatuses = ["active", "inactive", "suspended"] as const;
   <div class="admin-panel__header">
     <h2 id="admin-agents-title">Agent Management</h2>
     <p>Create agent auth accounts and manage agent profile status.</p>
-  </div>
-  <form method="post" class="admin-form" aria-label="Create agent">
-    <input type="hidden" name="action" value="create-agent" />
-    <h3>Create Agent Account</h3>
-    <div class="admin-form-grid">
-      <label class="field-row"
-        ><span>Email</span><input name="email" type="email" required /></label
-      >
-      <label class="field-row"
-        ><span>Temporary password</span><input
-          name="password"
-          type="password"
-          minlength="8"
-          required
-        /></label
-      >
-      <label class="field-row"
-        ><span>Display name</span><input name="displayName" required /></label
-      >
-      <label class="field-row">
-        <span>Status</span>
-        <select name="status" required>
-          {
-            agentStatuses.map((status) => (
-              <option value={status}>{status}</option>
-            ))
-          }
-        </select>
-      </label>
+    <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;">Create Agent</button>
+    <div class="hidden-create-form-holder" style="display: none;">
+      <form method="post" class="admin-form" aria-label="Create agent">
+        <input type="hidden" name="action" value="create-agent" />
+        <div class="admin-form-grid">
+          <label class="field-row"><span>Email</span><input name="email" type="email" required /></label>
+          <label class="field-row"><span>Temporary password</span><input name="password" type="password" minlength="8" required /></label>
+          <label class="field-row"><span>Display name</span><input name="displayName" required /></label>
+          <label class="field-row">
+            <span>Status</span>
+            <select name="status" required>
+              {
+                agentStatuses.map((status) => (
+                  <option value={status}>{status}</option>
+                ))
+              }
+            </select>
+          </label>
+        </div>
+        <button type="submit">Create agent</button>
+      </form>
     </div>
-    <button type="submit">Create agent</button>
-  </form>
+  </div>
 
   <div class="table-wrap">
     <table>
@@ -72,34 +63,35 @@ const agentStatuses = ["active", "inactive", "suspended"] as const;
               </td>
               <td>{agent.status}</td>
               <td>
-                <form method="post" class="admin-table-form">
-                  <input type="hidden" name="action" value="update-agent" />
-                  <input type="hidden" name="agentId" value={agent.id} />
-                  <label>
-                    <>
+                <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+                <div class="hidden-form-holder" style="display: none;">
+                  <form method="post" class="admin-table-form">
+                    <input type="hidden" name="action" value="update-agent" />
+                    <input type="hidden" name="agentId" value={agent.id} />
+                    <label>
                       <span>Display name</span>
                       <input
                         name="displayName"
                         value={agent.display_name}
                         required
                       />
-                    </>
-                  </label>
-                  <label>
-                    <span>Status</span>
-                    <select name="status" required>
-                      {agentStatuses.map((status) => (
-                        <option
-                          value={status}
-                          selected={selected(agent.status, status)}
-                        >
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <button type="submit">Update agent</button>
-                </form>
+                    </label>
+                    <label>
+                      <span>Status</span>
+                      <select name="status" required>
+                        {agentStatuses.map((status) => (
+                          <option
+                            value={status}
+                            selected={selected(agent.status, status)}
+                          >
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <button type="submit">Update agent</button>
+                  </form>
+                </div>
               </td>
             </tr>
           ))

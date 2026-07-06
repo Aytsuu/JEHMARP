@@ -20,38 +20,40 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
   <div class="admin-panel__header">
     <h2 id="admin-products-title">Product Management</h2>
     <p>Create products, edit public/reseller pricing, stock status, and deactivate products instead of deleting them.</p>
-  </div>
-  <form method="post" class="admin-form" aria-label="Create product">
-    <input type="hidden" name="action" value="save-product" />
-    <h3>Create Product</h3>
-    <div class="admin-form-grid">
-      <label class="field-row"><span>Name</span><input name="name" required /></label>
-      <label class="field-row">
-        <span>Unit label</span>
-        <select name="unitLabel" required>
-          {productUnitLabels.map((unitLabel) => <option value={unitLabel}>{unitLabel}</option>)}
-        </select>
-      </label>
-      <label class="field-row">
-        <span>Category</span>
-        <select name="category" required>
-          {productCategories.map((category) => <option value={category}>{category}</option>)}
-        </select>
-      </label>
-      <label class="field-row"><span>Default price</span><input name="defaultPrice" type="number" min="0" step="0.01" required /></label>
-      <label class="field-row"><span>Reseller price</span><input name="resellerPrice" type="number" min="0" step="0.01" required /></label>
-      <label class="field-row">
-        <span>Stock status</span>
-        <select name="stockStatus" required>
-          {stockStatuses.map((status) => <option value={status}>{status}</option>)}
-        </select>
-      </label>
+    <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;">Create Product</button>
+    <div class="hidden-create-form-holder" style="display: none;">
+      <form method="post" class="admin-form" aria-label="Create product">
+        <input type="hidden" name="action" value="save-product" />
+        <div class="admin-form-grid">
+          <label class="field-row"><span>Name</span><input name="name" required /></label>
+          <label class="field-row">
+            <span>Unit label</span>
+            <select name="unitLabel" required>
+              {productUnitLabels.map((unitLabel) => <option value={unitLabel}>{unitLabel}</option>)}
+            </select>
+          </label>
+          <label class="field-row">
+            <span>Category</span>
+            <select name="category" required>
+              {productCategories.map((category) => <option value={category}>{category}</option>)}
+            </select>
+          </label>
+          <label class="field-row"><span>Default price</span><input name="defaultPrice" type="number" min="0" step="0.01" required /></label>
+          <label class="field-row"><span>Reseller price</span><input name="resellerPrice" type="number" min="0" step="0.01" required /></label>
+          <label class="field-row">
+            <span>Stock status</span>
+            <select name="stockStatus" required>
+              {stockStatuses.map((status) => <option value={status}>{status}</option>)}
+            </select>
+          </label>
+        </div>
+        <label class="field-row"><span>Description</span><textarea name="description"></textarea></label>
+        <label class="field-row"><span>Image path</span><input name="imagePath" /></label>
+        <label class="checkbox-row"><input type="checkbox" name="isActive" checked /> Active</label>
+        <button type="submit">Save product</button>
+      </form>
     </div>
-    <label class="field-row"><span>Description</span><textarea name="description"></textarea></label>
-    <label class="field-row"><span>Image path</span><input name="imagePath" /></label>
-    <label class="checkbox-row"><input type="checkbox" name="isActive" checked /> Active</label>
-    <button type="submit">Save product</button>
-  </form>
+  </div>
 
   <div class="table-wrap">
     <table>
@@ -78,48 +80,51 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
             </td>
             <td>{product.stock_status} - {product.is_active ? "active" : "inactive"}</td>
             <td>
-              <form method="post" class="admin-table-form">
-                <input type="hidden" name="action" value="save-product" />
-                <input type="hidden" name="productId" value={product.id} />
-                <label><span>Name</span><input name="name" value={product.name} required /></label>
-                <label>
-                  <span>Category</span>
-                  <select name="category" required>
-                    {productCategories.map((category) => (
-                      <option value={category} selected={selected(product.category, category)}>{category}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Unit</span>
-                  <select name="unitLabel" required>
-                    {productUnitLabels.map((unitLabel) => (
-                      <option value={unitLabel} selected={selected(product.unit_label, unitLabel)}>{unitLabel}</option>
-                    ))}
-                  </select>
-                </label>
-                <label><span>Retail price</span><input name="defaultPrice" type="number" min="0" step="0.01" value={product.default_price} required /></label>
-                <label><span>Reseller price</span><input name="resellerPrice" type="number" min="0" step="0.01" value={product.reseller_price} required /></label>
-                <label>
-                  <span>Stock</span>
-                  <select name="stockStatus" required>
-                    {stockStatuses.map((status) => (
-                      <option value={status} selected={selected(product.stock_status, status)}>{status}</option>
-                    ))}
-                  </select>
-                </label>
-                <label><span>Description</span><textarea name="description" set:html={escapeTextareaValue(product.description)}></textarea></label>
-                <label><span>Image path</span><input name="imagePath" value={product.image_path ?? ""} /></label>
-                <label class="checkbox-row"><input type="checkbox" name="isActive" checked={product.is_active} /> Active</label>
-                <div class="button-row">
-                  <button type="submit">Update product</button>
-                </div>
-              </form>
-              {product.is_active && (
+              <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+              <div class="hidden-form-holder" style="display: none;">
                 <form method="post" class="admin-table-form">
+                  <input type="hidden" name="action" value="save-product" />
+                  <input type="hidden" name="productId" value={product.id} />
+                  <label><span>Name</span><input name="name" value={product.name} required /></label>
+                  <label>
+                    <span>Category</span>
+                    <select name="category" required>
+                      {productCategories.map((category) => (
+                        <option value={category} selected={selected(product.category, category)}>{category}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    <span>Unit</span>
+                    <select name="unitLabel" required>
+                      {productUnitLabels.map((unitLabel) => (
+                        <option value={unitLabel} selected={selected(product.unit_label, unitLabel)}>{unitLabel}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label><span>Retail price</span><input name="defaultPrice" type="number" min="0" step="0.01" value={product.default_price} required /></label>
+                  <label><span>Reseller price</span><input name="resellerPrice" type="number" min="0" step="0.01" value={product.reseller_price} required /></label>
+                  <label>
+                    <span>Stock</span>
+                    <select name="stockStatus" required>
+                      {stockStatuses.map((status) => (
+                        <option value={status} selected={selected(product.stock_status, status)}>{status}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label><span>Description</span><textarea name="description" set:html={escapeTextareaValue(product.description)}></textarea></label>
+                  <label><span>Image path</span><input name="imagePath" value={product.image_path ?? ""} /></label>
+                  <label class="checkbox-row"><input type="checkbox" name="isActive" checked={product.is_active} /> Active</label>
+                  <div class="button-row">
+                    <button type="submit">Update product</button>
+                  </div>
+                </form>
+              </div>
+              {product.is_active && (
+                <form method="post" class="admin-table-form" style="margin-top: 0.5rem; display: inline-block;">
                   <input type="hidden" name="action" value="deactivate-product" />
                   <input type="hidden" name="productId" value={product.id} />
-                  <button type="submit">Deactivate product</button>
+                  <button type="submit" class="btn-table-manage" style="background-color: var(--color-brand-muted-black);">Deactivate</button>
                 </form>
               )}
             </td>

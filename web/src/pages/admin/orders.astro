@@ -3,7 +3,6 @@ import AdminOrderManagement from "@/components/admin/AdminOrderManagement.astro"
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
-  getCommissionStatuses,
 } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
@@ -29,6 +28,5 @@ const feedback = formatAdminActionFeedback(Astro.url);
 >
   <AdminOrderManagement
     data={data}
-    commissionStatuses={getCommissionStatuses()}
   />
 </AdminPageFrame>

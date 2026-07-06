@@ -31,20 +31,23 @@ const { data, inquiryStatuses } = Astro.props;
             <td>{inquiry.name}<br />{inquiry.email ?? inquiry.phone_number ?? "No contact"}<br />{inquiry.inquiry_status}</td>
             <td>{inquiry.message}</td>
             <td>
-              <form method="post" class="admin-table-form">
-                <input type="hidden" name="action" value="update-inquiry" />
-                <input type="hidden" name="inquiryId" value={inquiry.id} />
-                <label>
-                  <span>Status</span>
-                  <select name="inquiryStatus" required>
-                    {inquiryStatuses.map((status) => (
-                      <option value={status} selected={selected(inquiry.inquiry_status, status)}>{status}</option>
-                    ))}
-                  </select>
-                </label>
-                <label><span>Internal notes</span><textarea name="internalNotes" set:html={escapeTextareaValue(inquiry.internal_notes)}></textarea></label>
-                <button type="submit">Update inquiry</button>
-              </form>
+              <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+              <div class="hidden-form-holder" style="display: none;">
+                <form method="post" class="admin-table-form">
+                  <input type="hidden" name="action" value="update-inquiry" />
+                  <input type="hidden" name="inquiryId" value={inquiry.id} />
+                  <label>
+                    <span>Status</span>
+                    <select name="inquiryStatus" required>
+                      {inquiryStatuses.map((status) => (
+                        <option value={status} selected={selected(inquiry.inquiry_status, status)}>{status}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label><span>Internal notes</span><textarea name="internalNotes" set:html={escapeTextareaValue(inquiry.internal_notes)}></textarea></label>
+                  <button type="submit">Update inquiry</button>
+                </form>
+              </div>
             </td>
           </tr>
         ))}

@@ -41,31 +41,34 @@ const { data } = Astro.props;
             </td>
             <td>{data.agents.find((agent) => agent.id === customer.assigned_agent_id)?.display_name ?? "None"}</td>
             <td>
-              <form method="post" class="admin-table-form">
-                <input type="hidden" name="action" value="save-customer" />
-                <input type="hidden" name="customerId" value={customer.id} />
-                <label><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
-                <label><span>Last name</span><input name="lastName" value={customer.last_name} required /></label>
-                <label><span>Phone</span><input name="phoneNumber" value={customer.phone_number} required /></label>
-                <label><span>Email</span><input name="email" type="email" value={customer.email ?? ""} /></label>
-                <label class="checkbox-row">
-                  <input name="isReseller" type="checkbox" checked={customer.is_reseller} />
-                  <span>Reseller customer</span>
-                </label>
-                <label>
-                  <span>Agent</span>
-                  <select name="assignedAgentId">
-                    <option value="">None</option>
-                    {data.agents.map((agent) => (
-                      <option value={agent.id} selected={selected(customer.assigned_agent_id, agent.id)}>
-                        {agent.display_name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label><span>Address</span><textarea name="address" required set:html={escapeTextareaValue(customer.address)}></textarea></label>
-                <button type="submit">Update customer</button>
-              </form>
+              <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+              <div class="hidden-form-holder" style="display: none;">
+                <form method="post" class="admin-table-form">
+                  <input type="hidden" name="action" value="save-customer" />
+                  <input type="hidden" name="customerId" value={customer.id} />
+                  <label><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
+                  <label><span>Last name</span><input name="lastName" value={customer.last_name} required /></label>
+                  <label><span>Phone</span><input name="phoneNumber" value={customer.phone_number} required /></label>
+                  <label><span>Email</span><input name="email" type="email" value={customer.email ?? ""} /></label>
+                  <label class="checkbox-row">
+                    <input name="isReseller" type="checkbox" checked={customer.is_reseller} />
+                    <span>Reseller customer</span>
+                  </label>
+                  <label>
+                    <span>Agent</span>
+                    <select name="assignedAgentId">
+                      <option value="">None</option>
+                      {data.agents.map((agent) => (
+                        <option value={agent.id} selected={selected(customer.assigned_agent_id, agent.id)}>
+                          {agent.display_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label><span>Address</span><textarea name="address" required set:html={escapeTextareaValue(customer.address)}></textarea></label>
+                  <button type="submit">Update customer</button>
+                </form>
+              </div>
             </td>
           </tr>
         ))}
