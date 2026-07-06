@@ -1,0 +1,134 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { fullName } from "@/lib/admin-dashboard/view";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const { agentId } = Astro.params;
+const data = await loadAdminDashboardData();
+const agent = data.agents.find((a) => a.id === agentId);
+
+if (!agent) {
+  return Astro.redirect("/admin/agents", 302);
+}
+
+// Find customers assigned to this agent
+const assignedCustomers = data.customers.filter((c) => c.assigned_agent_id === agent.id);
+
+// Check if a customer has pending orders (status is not closed, rejected, cancelled)
+function hasPendingOrders(customerId: string): boolean {
+  return data.orders.some(
+    (order) =>
+      order.customer_id === customerId &&
+      !["closed", "rejected", "cancelled"].includes(order.order_status)
+  );
+}
+
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title={`Agent Details - ${agent.display_name} - JEHMARP`}
+  description="Admin agent profile details and assigned customer list."
+  heading={`Agent Record: ${agent.display_name}`}
+  intro={`Review detailed profile settings and customer assignments for Agent ${agent.display_name}.`}
+  feedback={feedback}
+>
+  <div style="margin-bottom: 2rem;">
+    <a href="/admin/agents" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      Back to Agents
+    </a>
+  </div>
+
+  <div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem; align-items: start; margin-bottom: 2rem;">
+    <!-- Left Column: Profile Card -->
+    <div class="content-section">
+      <h3>Agent Profile</h3>
+      <dl class="detail-list">
+        <dt>Display name</dt>
+        <dd>{agent.display_name}</dd>
+        <dt>User / auth ID</dt>
+        <dd>{agent.user_id}</dd>
+        <dt>Status</dt>
+        <dd>{agent.status}</dd>
+      </dl>
+    </div>
+
+    <!-- Right Column: Quick Stats -->
+    <div class="content-section">
+      <h3>Assigned Summary</h3>
+      <dl class="detail-list">
+        <dt>Assigned customers</dt>
+        <dd>{assignedCustomers.length}</dd>
+        <dt>Active tracing</dt>
+        <dd>
+          {assignedCustomers.filter((c) => hasPendingOrders(c.id)).length} customer(s) with pending orders
+        </dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Assigned Customers Section -->
+  <div class="content-section">
+    <h3>Assigned Customers ({assignedCustomers.length})</h3>
+    {assignedCustomers.length === 0 ? (
+      <p class="empty-state">No customers assigned to this agent yet.</p>
+    ) : (
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Customer</th>
+              <th scope="col">Contact</th>
+              <th scope="col">Address</th>
+              <th scope="col">Status Indicators</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {assignedCustomers.map((customer) => {
+              const pending = hasPendingOrders(customer.id);
+              return (
+                <tr>
+                  <td>
+                    <strong>{fullName(customer)}</strong>
+                    {customer.is_reseller && <span style="font-size: 0.75rem; color: var(--color-brand-muted-black); margin-left: 0.25rem;">(reseller)</span>}
+                  </td>
+                  <td>
+                    {customer.phone_number}<br />
+                    {customer.email ?? "No email"}
+                  </td>
+                  <td>{customer.address}</td>
+                  <td>
+                    {pending ? (
+                      <span style="background-color: var(--color-brand-red); color: white; padding: 0.25rem 0.65rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 700; display: inline-block;">
+                        PENDING ORDERS
+                      </span>
+                    ) : (
+                      <span style="color: var(--color-brand-muted-black); font-size: 0.875rem;">
+                        No pending orders
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    <a href={`/admin/customers/${customer.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">Profile</a>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</AdminPageFrame>

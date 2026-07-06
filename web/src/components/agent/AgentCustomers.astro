@@ -26,6 +26,7 @@ const { data } = Astro.props;
             <th scope="col">Customer</th>
             <th scope="col">Contact</th>
             <th scope="col">Address</th>
+            <th scope="col">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -34,6 +35,9 @@ const { data } = Astro.props;
               <td>{fullName(customer)}{customer.is_reseller ? " - reseller" : ""}</td>
               <td>{customer.phone_number}<br />{customer.email ?? "No email"}</td>
               <td>{customer.address}</td>
+              <td>
+                <a href={`/agent/customers/${customer.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+              </td>
             </tr>
           ))}
         </tbody>

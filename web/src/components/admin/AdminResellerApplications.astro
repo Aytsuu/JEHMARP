@@ -1,11 +1,13 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import { selected } from "@/lib/admin-dashboard/view";
 
 type Props = {
   data: AdminDashboardData;
+  applicationStatuses: readonly string[];
 };
 
-const { data } = Astro.props;
+const { data, applicationStatuses } = Astro.props;
 ---
 
 <section class="admin-panel" aria-labelledby="admin-reseller-applications-title">
@@ -27,6 +29,7 @@ const { data } = Astro.props;
               <th scope="col">Expected Quantity</th>
               <th scope="col">Application Status</th>
               <th scope="col">Price List Email</th>
+              <th scope="col">Manage</th>
             </tr>
           </thead>
           <tbody>
@@ -59,6 +62,25 @@ const { data } = Astro.props;
                       <span>{application.email_error}</span>
                     </>
                   )}
+                </td>
+                <td>
+                  <form method="post" class="admin-table-form">
+                    <input type="hidden" name="action" value="update-reseller-application" />
+                    <input type="hidden" name="applicationId" value={application.id} />
+                    <label>
+                      <span>Status</span>
+                      <select name="applicationStatus" required>
+                        {applicationStatuses.map((status) => (
+                          <option value={status} selected={selected(application.application_status, status)}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div class="button-row">
+                      <button type="submit">Save</button>
+                    </div>
+                  </form>
                 </td>
               </tr>
             ))}

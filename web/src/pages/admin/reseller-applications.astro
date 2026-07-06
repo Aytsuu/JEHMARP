@@ -1,7 +1,10 @@
 ---
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import AdminResellerApplications from "@/components/admin/AdminResellerApplications.astro";
-import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import {
+  formatAdminActionFeedback,
+  getResellerApplicationStatuses,
+} from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
@@ -24,5 +27,8 @@ const feedback = formatAdminActionFeedback(Astro.url);
   intro="Review reseller applications and price-list email delivery status."
   feedback={feedback}
 >
-  <AdminResellerApplications data={data} />
+  <AdminResellerApplications
+    data={data}
+    applicationStatuses={getResellerApplicationStatuses()}
+  />
 </AdminPageFrame>

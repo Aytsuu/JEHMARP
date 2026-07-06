@@ -143,6 +143,9 @@ describe("parseAdminActionFormData", () => {
 
   it("parses product saves with normalized numeric and optional fields", () => {
     const formData = new FormData();
+    const imageFile = new File(["image-bytes"], "pork.png", {
+      type: "image/png",
+    });
     formData.set("action", "save-product");
     formData.set("name", "  Pork Belly  ");
     formData.set("category", "pork");
@@ -151,7 +154,7 @@ describe("parseAdminActionFormData", () => {
     formData.set("resellerPrice", "220");
     formData.set("stockStatus", "limited");
     formData.set("description", "  ");
-    formData.set("imagePath", "/images/pork.png");
+    formData.set("imageFile", imageFile);
     formData.set("isActive", "on");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
@@ -162,7 +165,7 @@ describe("parseAdminActionFormData", () => {
           category: "pork",
           default_price: 250.5,
           description: null,
-          image_path: "/images/pork.png",
+          image_file: imageFile,
           is_active: true,
           name: "Pork Belly",
           reseller_price: 220,
@@ -170,6 +173,22 @@ describe("parseAdminActionFormData", () => {
           unit_label: "kg",
         },
       },
+    });
+  });
+
+  it("requires a product image when creating a product", () => {
+    const formData = new FormData();
+    formData.set("action", "save-product");
+    formData.set("name", "Pork Belly");
+    formData.set("category", "pork");
+    formData.set("unitLabel", "kg");
+    formData.set("defaultPrice", "250.50");
+    formData.set("resellerPrice", "220");
+    formData.set("stockStatus", "limited");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Product image is required."],
     });
   });
 
@@ -316,6 +335,25 @@ describe("parseAdminActionFormData", () => {
           status: "issued",
           issued_at: expect.any(String),
           due_at: null,
+          updated_at: expect.any(String),
+        },
+      },
+    });
+  });
+
+  it("parses reseller application status updates", () => {
+    const formData = new FormData();
+    formData.set("action", "update-reseller-application");
+    formData.set("applicationId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
+    formData.set("applicationStatus", "contacted");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "update-reseller-application",
+        applicationId: "45e73d23-f25f-4de7-ae3a-ebcf34e995f1",
+        payload: {
+          application_status: "contacted",
           updated_at: expect.any(String),
         },
       },

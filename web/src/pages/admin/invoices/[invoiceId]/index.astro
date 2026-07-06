@@ -1,0 +1,167 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import {
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderBalance,
+  orderPaymentTotal,
+  orderTotal,
+} from "@/lib/admin-dashboard/view";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const { invoiceId } = Astro.params;
+const data = await loadAdminDashboardData();
+const order = data.orders.find((o) => o.invoice.some((inv) => inv.id === invoiceId));
+
+if (!order) {
+  return Astro.redirect("/admin/invoices", 302);
+}
+
+const invoice = order.invoice.find((inv) => inv.id === invoiceId);
+if (!invoice) {
+  return Astro.redirect("/admin/invoices", 302);
+}
+
+const invoiceTotal = orderTotal(order, "final_quantity");
+const paidTotal = orderPaymentTotal(order);
+const balance = orderBalance(order);
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title={`Invoice Details ${invoice.invoice_number} - JEHMARP`}
+  description="Admin invoice details, items list, payments, and PDF generation."
+  heading={`Invoice Details: ${invoice.invoice_number}`}
+  intro={`Review detailed invoice line items, record payments, and download pdf copies for Invoice ${invoice.invoice_number}.`}
+  feedback={feedback}
+>
+  <div style="margin-bottom: 2rem;">
+    <a href="/admin/invoices" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      Back to Invoices
+    </a>
+  </div>
+
+  <div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem; align-items: start;">
+    <!-- Left Column: Invoice Line Items and PDF Link -->
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+      <div class="content-section">
+        <h3>Invoice Line Items</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Unit price</th>
+                <th scope="col">Line total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {order.customer_order_item.map((item) => (
+                <tr>
+                  <td>{item.product?.name ?? "Missing product"}</td>
+                  <td>{item.final_quantity}</td>
+                  <td>{formatCurrency(item.unit_price)} {item.price_type}</td>
+                  <td>{formatCurrency(item.final_quantity * item.unit_price)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="content-section">
+        <h3>Payments</h3>
+        {order.payment.length === 0 ? (
+          <p class="empty-state">No payments recorded.</p>
+        ) : (
+          <ul class="compact-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem;">
+            {order.payment.map((payment) => (
+              <li style="padding: 0.75rem 1rem; background-color: var(--color-brand-cream); border-radius: 0.5rem; display: flex; justify-content: space-between;">
+                <span>
+                  {payment.payment_method} on {formatDate(payment.payment_date)}
+                  {payment.reference_number ? ` (Ref: ${payment.reference_number})` : ""}
+                </span>
+                <strong>{formatCurrency(payment.amount)}</strong>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+
+    <!-- Right Column: Summary, Record Payment, PDF Trigger -->
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+      <div class="content-section">
+        <h3>Invoice Summary</h3>
+        <dl class="detail-list" style="margin-bottom: 1.5rem;">
+          <dt>Customer</dt>
+          <dd>{order.customer ? fullName(order.customer) : "Guest"}<br/>{order.customer?.phone_number ?? "N/A"}</dd>
+          <dt>Order Status</dt>
+          <dd>{order.order_status}</dd>
+          <dt>Payment Status</dt>
+          <dd>{order.payment_status}</dd>
+          <dt>Invoice Total</dt>
+          <dd>{formatCurrency(invoiceTotal)}</dd>
+          <dt>Paid</dt>
+          <dd>{formatCurrency(paidTotal)}</dd>
+          <dt>Balance</dt>
+          <dd>{formatCurrency(balance)}</dd>
+          <dt>Created Date</dt>
+          <dd>{formatDate(invoice.created_at)}</dd>
+        </dl>
+
+        <p style="margin-top: 1.5rem;">
+          <OrderPdfLinks
+            orderId={order.id}
+            basePath="/admin/orders"
+            showOrderSlip={false}
+            showSalesInvoice
+          />
+        </p>
+      </div>
+
+      <div class="content-section">
+        <form method="post" class="admin-form" style="margin: 0;">
+          <input type="hidden" name="action" value="record-payment" />
+          <input type="hidden" name="orderId" value={order.id} />
+          <h4>Record Payment</h4>
+          <label class="field-row">
+            <span>Amount</span>
+            <input name="amount" type="number" min="0.01" step="0.01" max={balance > 0 ? balance : undefined} required />
+          </label>
+          <label class="field-row">
+            <span>Method</span>
+            <input name="paymentMethod" required placeholder="cash, bank transfer" />
+          </label>
+          <label class="field-row">
+            <span>Payment date</span>
+            <input name="paymentDate" type="date" value={new Date().toISOString().slice(0, 10)} required />
+          </label>
+          <label class="field-row">
+            <span>Reference</span>
+            <input name="referenceNumber" />
+          </label>
+          <label class="field-row">
+            <span>Notes</span>
+            <textarea name="notes"></textarea>
+          </label>
+          <button type="submit" disabled={balance <= 0} style="width: 100%;">Record payment</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</AdminPageFrame>

@@ -224,7 +224,7 @@ export type AdminResellerApplication = {
   contact_number: string;
   planned_transaction_type: string;
   expected_quantity_per_week: string;
-  application_status: "submitted" | "contacted" | "qualified" | "closed" | "rejected" | "spam";
+  application_status: "submitted" | "contacted" | "closed";
   email_delivery_status: "pending" | "sent" | "failed";
   price_list_sent_at: string | null;
   email_error: string | null;

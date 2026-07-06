@@ -63,6 +63,7 @@ const agentStatuses = ["active", "inactive", "suspended"] as const;
               </td>
               <td>{agent.status}</td>
               <td>
+                <a href={`/admin/agents/${agent.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block; margin-right: 0.5rem;">View</a>
                 <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
                 <div class="hidden-form-holder" style="display: none;">
                   <form method="post" class="admin-table-form">

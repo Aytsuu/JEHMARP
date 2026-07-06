@@ -193,7 +193,7 @@ create table public.reseller_application (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint reseller_application_status_check check (
-    application_status in ('submitted', 'contacted', 'qualified', 'closed', 'rejected', 'spam')
+    application_status in ('submitted', 'contacted', 'closed')
   ),
   constraint reseller_application_email_delivery_status_check check (email_delivery_status in ('pending', 'sent', 'failed'))
 );

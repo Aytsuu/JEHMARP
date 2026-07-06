@@ -1,0 +1,162 @@
+---
+import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
+import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
+import { requireAgentRoute } from "@/lib/agent-dashboard/page";
+import {
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderTotal,
+} from "@/lib/agent-dashboard/view";
+
+export const prerender = false;
+
+const agentRoute = await requireAgentRoute(Astro);
+
+if (!agentRoute.ready) {
+  return agentRoute.response;
+}
+
+const { customerId } = Astro.params;
+const data = await loadAgentDashboardData(Astro, agentRoute.userId);
+const customer = data.customers.find((c) => c.id === customerId);
+
+if (!customer) {
+  return Astro.redirect("/agent/customers", 302);
+}
+
+const customerOrders = data.orders.filter((order) => order.customer_id === customerId);
+const pendingOrders = customerOrders.filter((order) => !["closed", "rejected", "cancelled"].includes(order.order_status));
+const historicalOrders = customerOrders.filter((order) => ["closed", "rejected", "cancelled"].includes(order.order_status));
+const feedback = formatAgentActionFeedback(Astro.url);
+---
+
+<AgentPageFrame
+  title={`Customer Details - ${fullName(customer)} - JEHMARP`}
+  description="Agent customer detail record, pending orders, and historical summary."
+  heading={`Customer Record: ${fullName(customer)}`}
+  intro={`Review detailed profile contact details, reseller attributes, pending workflow orders, and order history.`}
+  feedback={feedback}
+>
+  <div style="margin-bottom: 2rem;">
+    <a href="/agent/customers" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+      Back to Customers
+    </a>
+  </div>
+
+  <div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem; align-items: start; margin-bottom: 2rem;">
+    <!-- Left Column: Customer Details -->
+    <div class="content-section">
+      <h3>Customer Profile</h3>
+      <dl class="detail-list">
+        <dt>Name</dt>
+        <dd>{fullName(customer)}</dd>
+        <dt>Phone number</dt>
+        <dd>{customer.phone_number}</dd>
+        <dt>Email</dt>
+        <dd>{customer.email ?? "No email"}</dd>
+        <dt>Type</dt>
+        <dd>{customer.is_reseller ? "Reseller Customer" : "Retail Customer"}</dd>
+        <dt>Billing Address</dt>
+        <dd style="white-space: pre-line;">{customer.address}</dd>
+      </dl>
+    </div>
+
+    <!-- Right Column: Order Summary Totals -->
+    <div class="content-section">
+      <h3>Orders Summary</h3>
+      <dl class="detail-list">
+        <dt>Total orders</dt>
+        <dd>{customerOrders.length}</dd>
+        <dt>Pending orders</dt>
+        <dd>{pendingOrders.length}</dd>
+        <dt>Historical orders</dt>
+        <dd>{historicalOrders.length}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <!-- Pending Orders -->
+  <div class="content-section" style="margin-bottom: 2rem;">
+    <h3>Pending Orders ({pendingOrders.length})</h3>
+    {pendingOrders.length === 0 ? (
+      <p class="empty-state">No pending orders found for this customer.</p>
+    ) : (
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Order Date</th>
+              <th scope="col">Source</th>
+              <th scope="col">Order Status</th>
+              <th scope="col">Payment Status</th>
+              <th scope="col">Total</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pendingOrders.map((order) => {
+              const invoice = order.invoice.length > 0;
+              const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+              return (
+                <tr>
+                  <td>{formatDate(order.created_at)}</td>
+                  <td>{order.source}</td>
+                  <td>{order.order_status}</td>
+                  <td>{order.payment_status}</td>
+                  <td>{formatCurrency(total)}</td>
+                  <td>
+                    <a href={`/agent/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+
+  <!-- Historical Orders -->
+  <div class="content-section">
+    <h3>Historical & Closed Orders ({historicalOrders.length})</h3>
+    {historicalOrders.length === 0 ? (
+      <p class="empty-state">No historical or closed orders found for this customer.</p>
+    ) : (
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Order Date</th>
+              <th scope="col">Source</th>
+              <th scope="col">Order Status</th>
+              <th scope="col">Payment Status</th>
+              <th scope="col">Total</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {historicalOrders.map((order) => {
+              const invoice = order.invoice.length > 0;
+              const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+              return (
+                <tr>
+                  <td>{formatDate(order.created_at)}</td>
+                  <td>{order.source}</td>
+                  <td>{order.order_status}</td>
+                  <td>{order.payment_status}</td>
+                  <td>{formatCurrency(total)}</td>
+                  <td>
+                    <a href={`/agent/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+</AgentPageFrame>

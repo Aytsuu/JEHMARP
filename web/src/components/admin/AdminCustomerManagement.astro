@@ -41,6 +41,7 @@ const { data } = Astro.props;
             </td>
             <td>{data.agents.find((agent) => agent.id === customer.assigned_agent_id)?.display_name ?? "None"}</td>
             <td>
+              <a href={`/admin/customers/${customer.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block; margin-right: 0.5rem;">View</a>
               <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
               <div class="hidden-form-holder" style="display: none;">
                 <form method="post" class="admin-table-form">

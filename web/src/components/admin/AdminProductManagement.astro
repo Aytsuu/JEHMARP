@@ -22,7 +22,7 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
     <p>Create products, edit public/reseller pricing, stock status, and deactivate products instead of deleting them.</p>
     <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;">Create Product</button>
     <div class="hidden-create-form-holder" style="display: none;">
-      <form method="post" class="admin-form" aria-label="Create product">
+      <form method="post" enctype="multipart/form-data" class="admin-form" aria-label="Create product">
         <input type="hidden" name="action" value="save-product" />
         <div class="admin-form-grid">
           <label class="field-row"><span>Name</span><input name="name" required /></label>
@@ -48,7 +48,7 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
           </label>
         </div>
         <label class="field-row"><span>Description</span><textarea name="description"></textarea></label>
-        <label class="field-row"><span>Image path</span><input name="imagePath" /></label>
+        <label class="field-row"><span>Product image</span><input name="imageFile" type="file" accept="image/*" required /></label>
         <label class="checkbox-row"><input type="checkbox" name="isActive" checked /> Active</label>
         <button type="submit">Save product</button>
       </form>
@@ -82,7 +82,7 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
             <td>
               <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
               <div class="hidden-form-holder" style="display: none;">
-                <form method="post" class="admin-table-form">
+                <form method="post" enctype="multipart/form-data" class="admin-table-form">
                   <input type="hidden" name="action" value="save-product" />
                   <input type="hidden" name="productId" value={product.id} />
                   <label><span>Name</span><input name="name" value={product.name} required /></label>
@@ -113,7 +113,8 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
                     </select>
                   </label>
                   <label><span>Description</span><textarea name="description" set:html={escapeTextareaValue(product.description)}></textarea></label>
-                  <label><span>Image path</span><input name="imagePath" value={product.image_path ?? ""} /></label>
+                  <label><span>Replace image</span><input name="imageFile" type="file" accept="image/*" /></label>
+                  {product.image_path && <p>Current image stored.</p>}
                   <label class="checkbox-row"><input type="checkbox" name="isActive" checked={product.is_active} /> Active</label>
                   <div class="button-row">
                     <button type="submit">Update product</button>

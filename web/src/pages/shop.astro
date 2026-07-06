@@ -7,6 +7,7 @@ import {
   parseShopFilters,
 } from "@/lib/public-website/shop";
 import { getPublicEnv } from "@/lib/env";
+import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 const filters = parseShopFilters(Astro.url);
 const { products, pagination } = await listPublicProducts(Astro, filters);
@@ -24,6 +25,10 @@ function getProductImage(name: string): string {
     return "/images/beef_short_ribs.png";
   if (normalized.includes("ground pork")) return "/images/ground_pork.png";
   return "/images/meat_cluster.svg";
+}
+
+function getResolvedProductImage(imagePath: string | null, name: string) {
+  return resolvePublicStorageUrl(imagePath) ?? getProductImage(name);
 }
 ---
 
@@ -172,7 +177,7 @@ function getProductImage(name: string): string {
                 <article class="product-card">
                   <div class="product-card__image-container">
                     <img
-                      src={getProductImage(product.name)}
+                      src={getResolvedProductImage(product.image_path, product.name)}
                       alt={product.name}
                       class="product-card__image"
                     />

@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { PRODUCT_IMAGE_BUCKET, isManagedStoragePath } from "@/lib/supabase/storage";
 
 const uuidSchema = z.uuid();
 const pageStatuses = ["draft", "published", "archived"] as const;
@@ -21,6 +22,7 @@ const orderStatuses = [
 ] as const;
 const commissionStatuses = ["unset", "set", "cancelled", "paid"] as const;
 const inquiryStatuses = ["new", "reviewing", "responded", "closed", "spam"] as const;
+const resellerApplicationStatuses = ["submitted", "contacted", "closed"] as const;
 
 export type PageStatus = (typeof pageStatuses)[number];
 export type ProductCategory = (typeof productCategories)[number];
@@ -30,9 +32,14 @@ export type OrderStatus = (typeof orderStatuses)[number];
 export type CommissionStatus = (typeof commissionStatuses)[number];
 export type InvoiceStatus = "draft" | "issued" | "partially_paid" | "paid";
 export type InquiryStatus = (typeof inquiryStatuses)[number];
+export type ResellerApplicationStatus = (typeof resellerApplicationStatuses)[number];
 
 type AdminDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect">;
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
+type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
+type ProductImageFile = File & { size: number; type: string; name: string };
+
+const maxProductImageBytes = 5 * 1024 * 1024;
 
 type CustomerFormPayload = {
   first_name: string;
@@ -82,7 +89,7 @@ export type AdminAction =
         default_price: number;
         reseller_price: number;
         stock_status: StockStatus;
-        image_path: string | null;
+        image_file: ProductImageFile | null;
         is_active: boolean;
         updated_at?: string;
       };
@@ -194,6 +201,14 @@ export type AdminAction =
         internal_notes: string | null;
         updated_at: string;
       };
+    }
+  | {
+      type: "update-reseller-application";
+      applicationId: string;
+      payload: {
+        application_status: ResellerApplicationStatus;
+        updated_at: string;
+      };
     };
 
 export function parseAdminActionFormData(
@@ -243,10 +258,7 @@ export async function executeAdminAction(
       await executeTableUpdate(supabase, "page_section", action.sectionId, action.payload);
       return;
     case "save-product":
-      await executeTableUpsert(supabase, "product", action.productId, {
-        ...action.payload,
-        updated_at: new Date().toISOString(),
-      });
+      await executeProductSave(action);
       return;
     case "deactivate-product": {
       const { error } = await supabase.rpc("deactivate_product", {
@@ -281,6 +293,9 @@ export async function executeAdminAction(
       return;
     case "update-inquiry":
       await executeTableUpdate(supabase, "contact_inquiry", action.inquiryId, action.payload);
+      return;
+    case "update-reseller-application":
+      await executeTableUpdate(supabase, "reseller_application", action.applicationId, action.payload);
       return;
   }
 }
@@ -339,6 +354,10 @@ export function getInquiryStatuses() {
   return [...inquiryStatuses];
 }
 
+export function getResellerApplicationStatuses() {
+  return [...resellerApplicationStatuses];
+}
+
 function parseAdminActionFormDataOrThrow(
   formData: FormData,
   adminUserId: string,
@@ -373,7 +392,13 @@ function parseAdminActionFormDataOrThrow(
           default_price: nonNegativeNumber(formData, "defaultPrice"),
           reseller_price: nonNegativeNumber(formData, "resellerPrice"),
           stock_status: enumValue(formData, "stockStatus", stockStatuses),
-          image_path: optionalString(formData, "imagePath"),
+          image_file: requiredProductImage(
+            formData,
+            "imageFile",
+            {
+              required: !optionalUuid(formData, "productId"),
+            },
+          ),
           is_active: formData.get("isActive") === "on",
         },
       });
@@ -510,6 +535,15 @@ function parseAdminActionFormDataOrThrow(
           updated_at: new Date().toISOString(),
         },
       });
+    case "update-reseller-application":
+      return success({
+        type: "update-reseller-application",
+        applicationId: uuidSchema.parse(requiredString(formData, "applicationId")),
+        payload: {
+          application_status: enumValue(formData, "applicationStatus", resellerApplicationStatuses),
+          updated_at: new Date().toISOString(),
+        },
+      });
     default:
       throw new Error("Unknown admin action.");
   }
@@ -541,6 +575,54 @@ async function executeAgentCreate(
   if (profileError) {
     await adminClient.auth.admin.deleteUser(data.user.id);
     throw new Error("Unable to create agent profile.");
+  }
+}
+
+async function executeProductSave(action: Extract<AdminAction, { type: "save-product" }>) {
+  const adminClient = createSupabaseAdminClient();
+  const existingProduct = action.productId
+    ? await loadExistingProduct(adminClient, action.productId)
+    : null;
+  const existingImagePath = existingProduct?.image_path ?? null;
+  let uploadedImagePath: string | null = null;
+
+  try {
+    if (action.payload.image_file) {
+      uploadedImagePath = await uploadProductImage(
+        adminClient,
+        action.payload.image_file,
+        action.payload.name,
+      );
+    }
+
+    const payload = {
+      name: action.payload.name,
+      category: action.payload.category,
+      description: action.payload.description,
+      unit_label: action.payload.unit_label,
+      default_price: action.payload.default_price,
+      reseller_price: action.payload.reseller_price,
+      stock_status: action.payload.stock_status,
+      image_path: uploadedImagePath ?? existingImagePath,
+      is_active: action.payload.is_active,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (!payload.image_path) {
+      throw new Error("Product image is required.");
+    }
+
+    await executeTableUpsert(adminClient, "product", action.productId, payload);
+
+    if (uploadedImagePath && existingImagePath && existingImagePath !== uploadedImagePath) {
+      await removeProductImage(adminClient, existingImagePath);
+    }
+  } catch (error) {
+    if (uploadedImagePath) {
+      await removeProductImage(adminClient, uploadedImagePath);
+    }
+
+    throw error;
   }
 }
 
@@ -618,6 +700,30 @@ async function resolveOrderCustomer(
   };
 }
 
+async function loadExistingProduct(
+  supabase: SupabaseAdminClient,
+  productId: string,
+) {
+  const { data, error } = await supabase
+    .from("product")
+    .select("id, image_path")
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to load existing product.");
+  }
+
+  if (!data) {
+    throw new Error("Product was not found.");
+  }
+
+  return {
+    id: String(data.id),
+    image_path: typeof data.image_path === "string" ? data.image_path : null,
+  };
+}
+
 async function findExistingCustomerIdByPhone(
   supabase: SupabaseServerClient,
   phoneNumber: string,
@@ -689,6 +795,40 @@ async function executeTableUpdate(
 ) {
   const { error } = await supabase.from(table).update(payload).eq("id", id);
   if (error) throw new Error(`Unable to update ${table.replaceAll("_", " ")}.`);
+}
+
+async function uploadProductImage(
+  supabase: SupabaseAdminClient,
+  file: ProductImageFile,
+  productName: string,
+) {
+  const extension = inferFileExtension(file);
+  const fileNameBase = slugifyFileSegment(productName) || "product";
+  const objectPath = `products/${fileNameBase}-${crypto.randomUUID()}.${extension}`;
+  const { data, error } = await supabase.storage
+    .from(PRODUCT_IMAGE_BUCKET)
+    .upload(objectPath, file, {
+      cacheControl: "31536000",
+      contentType: file.type || undefined,
+      upsert: false,
+    });
+
+  if (error || !data?.path) {
+    throw new Error("Unable to upload product image.");
+  }
+
+  return data.path;
+}
+
+async function removeProductImage(
+  supabase: SupabaseAdminClient,
+  imagePath: string,
+) {
+  if (!isManagedStoragePath(imagePath, PRODUCT_IMAGE_BUCKET)) {
+    return;
+  }
+
+  await supabase.storage.from(PRODUCT_IMAGE_BUCKET).remove([imagePath]);
 }
 
 function success(action: AdminAction): ParseSuccess {
@@ -856,6 +996,32 @@ function normalizeFormDataEntry(value: FormDataEntryValue | undefined) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function requiredProductImage(
+  formData: FormData,
+  key: string,
+  options: { required: boolean },
+) {
+  const value = formData.get(key);
+
+  if (!(value instanceof File) || value.size === 0) {
+    if (options.required) {
+      throw new Error("Product image is required.");
+    }
+
+    return null;
+  }
+
+  if (!value.type.startsWith("image/")) {
+    throw new Error("Product image must be a supported image file.");
+  }
+
+  if (value.size > maxProductImageBytes) {
+    throw new Error("Product image must be 5 MB or smaller.");
+  }
+
+  return value as ProductImageFile;
+}
+
 function parseSectionContent(value: string): Record<string, unknown> {
   try {
     const parsed: unknown = JSON.parse(value);
@@ -904,6 +1070,8 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Invoice saved.";
     case "update-inquiry":
       return "Inquiry updated.";
+    case "update-reseller-application":
+      return "Reseller application updated.";
   }
 }
 
@@ -918,4 +1086,35 @@ function toSentenceLabel(value: string) {
     .trim()
     .toLowerCase()
     .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function slugifyFileSegment(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+function inferFileExtension(file: ProductImageFile) {
+  const nameExtension = file.name.split(".").pop()?.toLowerCase();
+
+  if (nameExtension && /^[a-z0-9]+$/.test(nameExtension)) {
+    return nameExtension;
+  }
+
+  switch (file.type) {
+    case "image/jpeg":
+      return "jpg";
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/gif":
+      return "gif";
+    case "image/svg+xml":
+      return "svg";
+    default:
+      return "bin";
+  }
 }

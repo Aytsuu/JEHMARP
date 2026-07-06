@@ -1,5 +1,4 @@
 ---
-import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 import {
   formatCurrency,
@@ -27,125 +26,49 @@ const invoiceOrders = data.orders.filter((order) => order.invoice.length > 0);
   {invoiceOrders.length === 0 ? (
     <p class="empty-state">No invoices have been created from orders yet.</p>
   ) : (
-    <div class="admin-card-list">
-      {invoiceOrders.map((order) => {
-        const invoice = order.invoice[0];
-        const invoiceTotal = orderTotal(order, "final_quantity");
-        const paidTotal = orderPaymentTotal(order);
-        const balance = orderBalance(order);
+    <div class="table-wrap">
+      <table>
+        <caption>Invoices</caption>
+        <thead>
+          <tr>
+            <th scope="col">Invoice Number</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Date</th>
+            <th scope="col">Invoice Total</th>
+            <th scope="col">Paid</th>
+            <th scope="col">Balance</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoiceOrders.map((order) => {
+            const invoice = order.invoice[0];
+            const invoiceTotal = orderTotal(order, "final_quantity");
+            const paidTotal = orderPaymentTotal(order);
+            const balance = orderBalance(order);
 
-        return (
-          <article class="admin-card" aria-labelledby={`invoice-order-${order.id}`}>
-            <div class="admin-card__header">
-              <h3 id={`invoice-order-${order.id}`}>
-                {invoice.invoice_number} - {fullName(order.customer)}
-              </h3>
-              <p>
-                Order {order.order_status} - payment {order.payment_status} - created {formatDate(order.created_at)}
-              </p>
-            </div>
-
-            <dl class="detail-list">
-              <dt>Invoice total</dt>
-              <dd>{formatCurrency(invoiceTotal)}</dd>
-              <dt>Paid</dt>
-              <dd>{formatCurrency(paidTotal)}</dd>
-              <dt>Balance</dt>
-              <dd>{formatCurrency(balance)}</dd>
-              <dt>Invoice</dt>
-              <dd>
-                <OrderPdfLinks
-                  orderId={order.id}
-                  basePath="/admin/orders"
-                  showOrderSlip={false}
-                  showSalesInvoice
-                />
-              </dd>
-            </dl>
-
-            <div class="table-wrap">
-              <table>
-                <caption>Invoice line items</caption>
-                <thead>
-                  <tr>
-                    <th scope="col">Product</th>
-                    <th scope="col">Quantity</th>
-                    <th scope="col">Unit price</th>
-                    <th scope="col">Line total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {order.customer_order_item.map((item) => (
-                    <tr>
-                      <td>{item.product?.name ?? "Missing product"}</td>
-                      <td>{item.final_quantity}</td>
-                      <td>{formatCurrency(item.unit_price)} {item.price_type}</td>
-                      <td>{formatCurrency(item.final_quantity * item.unit_price)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div class="admin-two-column">
-              <section class="admin-form" aria-labelledby={`invoice-actions-${order.id}`}>
-                <h4 id={`invoice-actions-${order.id}`}>Invoice {invoice.invoice_number}</h4>
-                <p>
-                  <OrderPdfLinks
-                    orderId={order.id}
-                    basePath="/admin/orders"
-                    showOrderSlip={false}
-                    showSalesInvoice
-                  />
-                </p>
-              </section>
-
-              <form method="post" class="admin-form">
-                <input type="hidden" name="action" value="record-payment" />
-                <input type="hidden" name="orderId" value={order.id} />
-                <h4>Record payment</h4>
-                <label class="field-row">
-                  <span>Amount</span>
-                  <input name="amount" type="number" min="0.01" step="0.01" max={balance > 0 ? balance : undefined} required />
-                </label>
-                <label class="field-row">
-                  <span>Method</span>
-                  <input name="paymentMethod" required placeholder="cash, bank transfer" />
-                </label>
-                <label class="field-row">
-                  <span>Payment date</span>
-                  <input name="paymentDate" type="date" value={new Date().toISOString().slice(0, 10)} required />
-                </label>
-                <label class="field-row">
-                  <span>Reference</span>
-                  <input name="referenceNumber" />
-                </label>
-                <label class="field-row">
-                  <span>Notes</span>
-                  <textarea name="notes"></textarea>
-                </label>
-                <button type="submit" disabled={balance <= 0}>Record payment</button>
-              </form>
-            </div>
-
-            <section aria-labelledby={`invoice-payments-${order.id}`}>
-              <h4 id={`invoice-payments-${order.id}`}>Payments</h4>
-              {order.payment.length === 0 ? (
-                <p class="empty-state">No payments recorded.</p>
-              ) : (
-                <ul class="compact-list">
-                  {order.payment.map((payment) => (
-                    <li>
-                      {formatCurrency(payment.amount)} by {payment.payment_method} on {formatDate(payment.payment_date)}
-                      {payment.reference_number ? ` - ${payment.reference_number}` : ""}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          </article>
-        );
-      })}
+            return (
+              <tr>
+                <td>
+                  <strong>{invoice.invoice_number}</strong>
+                </td>
+                <td>
+                  <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
+                  <br />
+                  <span>{order.customer?.phone_number ?? "N/A"}</span>
+                </td>
+                <td>{formatDate(invoice.created_at)}</td>
+                <td>{formatCurrency(invoiceTotal)}</td>
+                <td>{formatCurrency(paidTotal)}</td>
+                <td>{formatCurrency(balance)}</td>
+                <td>
+                  <a href={`/admin/invoices/${invoice.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   )}
 </section>
