@@ -2,6 +2,7 @@
 import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
 import { getLoginErrorMessage, getSignedInUser } from "@/lib/auth";
+import { getPublicEnv } from "@/lib/env";
 
 const user = await getSignedInUser(Astro);
 
@@ -10,6 +11,7 @@ if (user) {
 }
 
 const errorMessage = getLoginErrorMessage(Astro.url.searchParams.get("error"));
+const { turnstileSiteKey } = getPublicEnv();
 ---
 
 <Layout
@@ -17,35 +19,76 @@ const errorMessage = getLoginErrorMessage(Astro.url.searchParams.get("error"));
   description="Single authentication entry point for admin and agent access."
 >
   <PageShell title="Login">
-    <form class="form-section form-grid form-section--login" method="post" action="/api/login">
+    <div class="form-section form-section--login">
+      <h2 class="business-subtitle" style="margin-bottom: 0.75rem;">
+        LOGIN TO DASHBOARD
+      </h2>
+      <p class="business-text" style="margin-bottom: 2rem; margin-top: 0;">
+        Only authorized administrative and partner accounts can sign in to
+        access the dashboard.
+      </p>
+
       {
         errorMessage && (
-          <div class="error-message" style="color: var(--color-brand-red); font-weight: 700; font-size: 0.95rem; margin-bottom: 1rem; border-left: 3px solid var(--color-brand-red); padding-left: 0.75rem;">
+          <div
+            class="error-message"
+            style="color: var(--color-brand-red); font-weight: 700; font-size: 0.95rem; margin-bottom: 1.5rem; border-left: 3px solid var(--color-brand-red); padding-left: 0.75rem;"
+          >
             {errorMessage}
           </div>
         )
       }
-      <div class="field-row">
-        <label for="email">Email</label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          required
-          autocomplete="email"
+
+      <form class="form-grid" method="post" action="/api/login">
+        <div class="field-row">
+          <label for="email">Email</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            required
+            autocomplete="email"
+          />
+        </div>
+        <div class="field-row">
+          <label for="password">Password</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+
+        <div class="turnstile-container">
+          {
+            turnstileSiteKey ? (
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey} />
+            ) : (
+              <p class="error-message">Verification is not configured.</p>
+            )
+          }
+        </div>
+
+        <div
+          class="button-row"
+          style="margin-top: 1rem; justify-content: flex-start;"
+        >
+          <button type="submit" disabled={!turnstileSiteKey}>Sign in</button>
+        </div>
+      </form>
+    </div>
+
+    {
+      turnstileSiteKey && (
+        <script
+          is:inline
+          src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+          async
+          defer
         />
-      </div>
-      <div class="field-row">
-        <label for="password">Password</label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autocomplete="current-password"
-        />
-      </div>
-      <button type="submit" style="margin-top: 1rem; width: 100%;">Sign in</button>
-    </form>
+      )
+    }
   </PageShell>
 </Layout>

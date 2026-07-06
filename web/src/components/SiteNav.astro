@@ -1,5 +1,13 @@
 ---
 import { authRoutes, publicRoutes } from "@/config/navigation";
+
+const pathname = Astro.url.pathname;
+const isActive = (href: string) => {
+  if (href === "/") {
+    return pathname === "/";
+  }
+  return pathname.startsWith(href);
+};
 ---
 
 <header class="site-nav">
@@ -18,16 +26,30 @@ import { authRoutes, publicRoutes } from "@/config/navigation";
       {
         publicRoutes.map((item) => (
           <li>
-            <a href={item.href}>{item.label}</a>
+            <a
+              href={item.href}
+              class={isActive(item.href) ? "site-nav__link--active" : ""}
+            >
+              {item.label}
+            </a>
           </li>
         ))
       }
       {
-        authRoutes.map((item) => (
-          <li>
-            <a href={item.href}>{item.label}</a>
-          </li>
-        ))
+        authRoutes.map((item) => {
+          const isLogin = item.href === "/login";
+          const buttonClass = isLogin
+            ? `site-nav__link--button ${isActive(item.href) ? "site-nav__link--active" : ""}`
+            : (isActive(item.href) ? "site-nav__link--active" : "");
+
+          return (
+            <li>
+              <a href={item.href} class={buttonClass}>
+                {item.label}
+              </a>
+            </li>
+          );
+        })
       }
     </ul>
   </nav>

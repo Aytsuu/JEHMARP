@@ -6,6 +6,7 @@
   --color-brand-yellow: #f5de59;
   --color-brand-cream: #fffad9;
   --color-brand-gold: #ecb55d;
+  --color-brand-muted-black: #4b5563;
   --font-sans: 'DM Sans', Arial, Helvetica, sans-serif;
 }
 
@@ -149,11 +150,47 @@
   }
 
   .site-nav__list {
-    @apply m-0 flex list-none flex-wrap gap-x-4 gap-y-3 p-0;
+    @apply m-0 flex list-none flex-wrap gap-x-6 gap-y-3 p-0 items-center;
   }
 
   .site-nav__list a {
     @apply no-underline;
+    color: var(--color-brand-muted-black);
+    /* Muted black */
+    font-weight: 500;
+    font-size: 1rem;
+    transition: color 0.2s ease;
+  }
+
+  .site-nav__list a:hover {
+    color: var(--color-brand-red);
+  }
+
+  .site-nav__list a.site-nav__link--active {
+    color: var(--color-brand-red);
+    font-weight: 600;
+  }
+
+  /* Gold button container styling for login button */
+  .site-nav__list a.site-nav__link--button {
+    background-color: var(--color-brand-gold);
+    /* Gold background */
+    color: #000000 !important;
+    padding: 0.5rem 1.5rem !important;
+    border-radius: 9999px;
+    font-weight: 500;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    display: inline-block;
+  }
+
+  .site-nav__list a.site-nav__link--button:hover {
+    background-color: #dfa74d;
+    color: #000000 !important;
+  }
+
+  .site-nav__list a.site-nav__link--button.site-nav__link--active {
+    background-color: var(--color-brand-red) !important;
+    color: #ffffff !important;
   }
 
   .page-shell {
@@ -325,6 +362,12 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 0 0.75rem;
+  }
+
+  .turnstile-container {
+    margin: 1rem 0;
+    display: flex;
+    justify-content: flex-start;
   }
 
   .site-footer {
@@ -905,7 +948,7 @@
     text-transform: uppercase;
     font-weight: 700;
     letter-spacing: 0.15em;
-    color: #4b5563;
+    color: var(--color-brand-muted-black);
     margin: 0;
   }
 
@@ -1188,7 +1231,7 @@
   .product-card__description {
     font-size: 1.08rem;
     line-height: 1.5;
-    color: #4b5563;
+    color: var(--color-brand-muted-black);
     margin: 0;
     flex-grow: 1;
   }
@@ -1312,7 +1355,7 @@
   .faq-section__desc {
     font-size: 1.2rem;
     line-height: 1.6;
-    color: #4b5563;
+    color: var(--color-brand-muted-black);
     margin: 0;
   }
 
@@ -1361,7 +1404,7 @@
   .faq-item__content p {
     font-size: 1.15rem;
     line-height: 1.6;
-    color: #4b5563;
+    color: var(--color-brand-muted-black);
     margin: 0;
     padding-bottom: 1.5rem;
   }
@@ -1526,20 +1569,14 @@
     }
   }
 
-  /* Centered and padded login card */
+  /* Uncentered, flat, borderless login form container */
   .form-section--login {
-    max-width: 32rem;
-    margin: 3rem auto;
-  }
-
-  /* Contact page split columns */
-  @media (min-width: 56rem) {
-    .contact-grid {
-      display: grid;
-      grid-template-columns: 1fr 1.2fr;
-      gap: 3.5rem;
-      align-items: start;
-    }
+    max-width: 42rem;
+    margin: 2rem 0 4rem;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
   }
 
   /* Secondary outline buttons */
@@ -1700,6 +1737,13 @@
   /* Shop product list section */
   .shop-products-section {
     margin: 3.5rem 0;
+  }
+
+  .shop-products-section > p {
+    margin-top: 0;
+    margin-bottom: 2.25rem;
+    font-size: 1.1rem;
+    color: var(--color-brand-muted-black);
   }
 
   /* Shop 4-column product grid with extra spacing */
@@ -1889,7 +1933,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #4b5563; /* Dark gray for active arrow */
+    color: var(--color-brand-muted-black);
+    /* Dark gray for active arrow */
     text-decoration: none;
     cursor: pointer;
     transition: color 0.2s ease;
@@ -1900,7 +1945,8 @@
   }
 
   .shop-pagination .pagination-arrow--disabled {
-    color: #cccccc; /* Light gray for disabled arrow */
+    color: #cccccc;
+    /* Light gray for disabled arrow */
     cursor: not-allowed;
   }
 
@@ -1914,7 +1960,8 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: #cccccc; /* Light gray for inactive dots */
+    background-color: #cccccc;
+    /* Light gray for inactive dots */
     cursor: pointer;
     display: inline-block;
     transition: background-color 0.2s ease, width 0.2s ease, border-radius 0.2s ease;
@@ -1926,10 +1973,13 @@
   }
 
   .shop-pagination .pagination-indicator--active {
-    width: 32px; /* Active pill width */
+    width: 32px;
+    /* Active pill width */
     height: 10px;
-    border-radius: 9999px; /* Capsule/pill shape */
-    background-color: #1a1a1a; /* Dark background */
+    border-radius: 9999px;
+    /* Capsule/pill shape */
+    background-color: #1a1a1a;
+    /* Dark background */
     cursor: default;
   }
 
@@ -1949,30 +1999,50 @@
   @media (min-width: 64rem) {
     .business-layout {
       display: grid;
-      grid-template-columns: 1.15fr 0.85fr; /* Left column slightly wider than right form */
+      grid-template-columns: 1.15fr 0.85fr;
+      /* Left column slightly wider than right form */
       gap: 4rem;
       align-items: start;
     }
   }
 
   .business-subtitle {
-    font-size: 1.35rem;
-    font-weight: 700;
+    font-size: 2.25rem;
+    font-weight: 800;
     color: var(--color-brand-red);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     margin-top: 0;
-    margin-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
   }
 
   .business-info__section {
     margin-bottom: 3rem;
   }
 
+  /* Override nested content-sections under business-info to make them flat and borderless */
+  .business-info .content-section {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    margin-bottom: 3rem !important;
+  }
+
+  .business-info .content-section h2 {
+    font-size: 2.25rem !important;
+    font-weight: 800 !important;
+    color: var(--color-brand-red) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    margin-top: 0 !important;
+    margin-bottom: 1.5rem !important;
+  }
+
   .business-text {
     font-size: 1.1rem;
     line-height: 1.7;
-    color: #4b5563;
+    color: var(--color-brand-muted-black);
   }
 
   .reseller-steps {
@@ -2012,8 +2082,43 @@
   .reseller-steps li p {
     font-size: 1.05rem;
     line-height: 1.6;
-    color: #4b5563;
+    color: var(--color-brand-muted-black);
     margin: 0;
+  }
+
+  /* Contact page specific detail list overrides */
+  .contact-details-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .contact-details-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .contact-details-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-brand-red);
+    margin-top: 0.25rem;
+    flex-shrink: 0;
+  }
+
+  .contact-details-value {
+    font-size: 1.1rem;
+    line-height: 1.6;
+    color: var(--color-brand-muted-black);
+  }
+
+  .contact-ordering-summary {
+    border-top: 1px solid rgba(102, 24, 24, 0.08);
+    padding-top: 2rem;
+    margin-top: 2.5rem;
   }
 
 }
