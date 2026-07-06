@@ -489,7 +489,7 @@
   .admin-header h1 {
     font-size: 1.75rem !important;
     font-weight: 800 !important;
-    color: var(--color-brand-red) !important;
+    color: #000000 !important;
     letter-spacing: -0.025em;
     margin: 0;
   }
@@ -2386,7 +2386,8 @@
     margin: 0;
   }
 
-  th, td {
+  th,
+  td {
     border-top: none !important;
     border-left: none !important;
     border-right: none !important;
