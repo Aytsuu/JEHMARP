@@ -33,6 +33,7 @@ describe("dashboard routes", () => {
       { label: "Inquiries", href: "/admin/inquiries" },
       { label: "Reseller Applications", href: "/admin/reseller-applications" },
       { label: "Activity", href: "/admin/activity" },
+      { label: "Notifications", href: "/admin/notifications" },
       { label: "Content", href: "/admin/content" },
     ]);
   });
@@ -51,6 +52,7 @@ describe("dashboard routes", () => {
       { label: "Customers", href: "/agent/customers" },
       { label: "Orders", href: "/agent/orders" },
       { label: "Payments", href: "/agent/payments" },
+      { label: "Notifications", href: "/agent/notifications" },
     ]);
   });
 

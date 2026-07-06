@@ -14,28 +14,54 @@ const activityItems = buildAdminActivityItems(data);
 <section class="admin-panel" aria-labelledby="admin-activity-title">
   {
     activityItems.length > 0 ? (
-      <div class="table-wrap">
-        <table>
-          <caption>Recent admin activity</caption>
-          <thead>
-            <tr>
-              <th scope="col">Activity</th>
-              <th scope="col">Details</th>
-              <th scope="col">Category</th>
-              <th scope="col">Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {activityItems.map((item) => (
+      <div data-interactive-table>
+        <div class="table-filters">
+          <div style="flex: 1; min-width: 15rem;">
+            <input type="text" placeholder="Search activity..." data-search-input style="width: 100%;" />
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span style="font-size: 0.9rem; color: var(--color-brand-muted-black);">Show</span>
+              <select data-limit-select>
+                <option value="10">10</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
               <tr>
-                <td>{item.title}</td>
-                <td>{item.detail}</td>
-                <td>{item.category}</td>
-                <td>{item.occurredAt}</td>
+                <th scope="col">Activity</th>
+                <th scope="col">Details</th>
+                <th scope="col">Category</th>
+                <th scope="col">Time</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {activityItems.map((item) => (
+                <tr data-status={item.category}>
+                  <td>{item.title}</td>
+                  <td>{item.detail}</td>
+                  <td>{item.category}</td>
+                  <td>{item.occurredAt}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-pagination">
+          <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
+          <div style="display: flex; gap: 0.25rem; align-items: center;">
+            <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
+            <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+            <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+          </div>
+        </div>
       </div>
     ) : (
       <p class="empty-state">No admin activity is available yet.</p>

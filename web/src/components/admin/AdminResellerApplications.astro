@@ -16,66 +16,68 @@ const { data, applicationStatuses } = Astro.props;
 >
   {
     data.resellerApplications.length > 0 ? (
-      <div class="table-wrap">
-        <table>
-          <caption>Reseller applications</caption>
-          <thead>
-            <tr>
-              <th scope="col">Applicant</th>
-              <th scope="col">Contact</th>
-              <th scope="col">Business Type</th>
-              <th scope="col">Expected Quantity</th>
-              <th scope="col">Application Status</th>
-              <th scope="col">Price List Email</th>
-              <th scope="col">Manage</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.resellerApplications.map((application) => (
+      <div data-interactive-table>
+        <div class="table-filters">
+          <div style="flex: 1; min-width: 15rem;">
+            <input type="text" placeholder="Search applications..." data-search-input style="width: 100%;" />
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span style="font-size: 0.9rem; color: var(--color-brand-muted-black);">Show</span>
+              <select data-limit-select>
+                <option value="10">10</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
               <tr>
-                <td>
-                  {application.name}
-                  <br />
-                  <span>{application.created_at}</span>
-                </td>
-                <td>
-                  {application.email}
-                  <br />
-                  <span>{application.contact_number}</span>
-                </td>
-                <td>{application.planned_transaction_type}</td>
-                <td>{application.expected_quantity_per_week}</td>
-                <td>{application.application_status}</td>
-                <td>
-                  {application.email_delivery_status}
-                  {application.price_list_sent_at && (
-                    <>
-                      <br />
-                      <span>Sent {application.price_list_sent_at}</span>
-                    </>
-                  )}
-                  {application.email_error && (
-                    <>
-                      <br />
-                      <span>{application.email_error}</span>
-                    </>
-                  )}
-                </td>
-                <td>
-                  <form method="post" class="admin-table-form">
-                    <input
-                      type="hidden"
-                      name="action"
-                      value="update-reseller-application"
-                    />
-                    <input
-                      type="hidden"
-                      name="applicationId"
-                      value={application.id}
-                    />
-                    <label>
-                      <span>Status</span>
-                      <select name="applicationStatus" required>
+                <th scope="col">Applicant</th>
+                <th scope="col">Contact</th>
+                <th scope="col">Business Type</th>
+                <th scope="col">Expected Quantity</th>
+                <th scope="col">Application Status</th>
+                <th scope="col">Price List Email</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.resellerApplications.map((application) => (
+                <tr data-status={application.application_status}>
+                  <td>
+                    {application.name}
+                    <br />
+                    <span>{application.created_at}</span>
+                  </td>
+                  <td>
+                    {application.email}
+                    <br />
+                    <span>{application.contact_number}</span>
+                  </td>
+                  <td>{application.planned_transaction_type}</td>
+                  <td>{application.expected_quantity_per_week}</td>
+                  <td>
+                    <form method="post" class="admin-table-form" style="margin: 0; display: inline-block;">
+                      <input
+                        type="hidden"
+                        name="action"
+                        value="update-reseller-application"
+                      />
+                      <input
+                        type="hidden"
+                        name="applicationId"
+                        value={application.id}
+                      />
+                      <select
+                        name="applicationStatus"
+                        onchange="this.form.submit()"
+                        required
+                        style="padding: 0.25rem 0.5rem; font-size: 0.9rem; border-radius: 0.375rem; border: 1px solid #d1d5db; background-color: #ffffff;"
+                      >
                         {applicationStatuses.map((status) => (
                           <option
                             value={status}
@@ -88,16 +90,37 @@ const { data, applicationStatuses } = Astro.props;
                           </option>
                         ))}
                       </select>
-                    </label>
-                    <div class="button-row">
-                      <button type="submit">Save</button>
-                    </div>
-                  </form>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </form>
+                  </td>
+                  <td>
+                    {application.email_delivery_status}
+                    {application.price_list_sent_at && (
+                      <>
+                        <br />
+                        <span>Sent {application.price_list_sent_at}</span>
+                      </>
+                    )}
+                    {application.email_error && (
+                      <>
+                        <br />
+                        <span>{application.email_error}</span>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-pagination">
+          <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
+          <div style="display: flex; gap: 0.25rem; align-items: center;">
+            <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
+            <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+            <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+          </div>
+        </div>
       </div>
     ) : (
       <p class="empty-state">

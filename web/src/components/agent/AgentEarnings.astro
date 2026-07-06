@@ -40,32 +40,58 @@ const agentOrders = data.orders.filter(
         No agent-submitted or assigned commission orders yet.
       </p>
     ) : (
-      <div class="table-wrap">
-        <table>
-          <caption>Commission detail</caption>
-          <thead>
-            <tr>
-              <th scope="col">Order</th>
-              <th scope="col">Payment Status</th>
-              <th scope="col">Expected</th>
-              <th scope="col">Earned</th>
-            </tr>
-          </thead>
-          <tbody>
-            {agentOrders.map((order) => (
+      <div data-interactive-table>
+        <div class="table-filters">
+          <div style="flex: 1; min-width: 15rem;">
+            <input type="text" placeholder="Search commissions..." data-search-input style="width: 100%;" />
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span style="font-size: 0.9rem; color: var(--color-brand-muted-black);">Show</span>
+              <select data-limit-select>
+                <option value="10">10</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
               <tr>
-                <td>
-                  {fullName(order.customer)}
-                  <br />
-                  {formatDate(order.created_at)}
-                </td>
-                <td>{order.payment_status}</td>
-                <td>{formatCurrency(orderExpectedCommission(order))}</td>
-                <td>{formatCurrency(orderEarnedCommission(order))}</td>
+                <th scope="col">Order</th>
+                <th scope="col">Payment Status</th>
+                <th scope="col">Expected</th>
+                <th scope="col">Earned</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {agentOrders.map((order) => (
+                <tr data-status={order.payment_status}>
+                  <td>
+                    {fullName(order.customer)}
+                    <br />
+                    {formatDate(order.created_at)}
+                  </td>
+                  <td>{order.payment_status}</td>
+                  <td>{formatCurrency(orderExpectedCommission(order))}</td>
+                  <td>{formatCurrency(orderEarnedCommission(order))}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-pagination">
+          <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
+          <div style="display: flex; gap: 0.25rem; align-items: center;">
+            <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
+            <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+            <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+          </div>
+        </div>
       </div>
     )
   }

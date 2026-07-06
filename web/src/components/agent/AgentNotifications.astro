@@ -1,0 +1,189 @@
+---
+import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import { fullName, formatDate, formatCurrency } from "@/lib/agent-dashboard/view";
+
+type Props = {
+  data: AgentDashboardData;
+};
+
+const { data } = Astro.props;
+
+const notifications = [];
+
+// 1. Pending orders submitted by this agent
+data.orders.forEach((order) => {
+  if (order.order_status === "submitted") {
+    notifications.push({
+      id: `agent-order-pending-${order.id}`,
+      type: "Order Status",
+      title: "Order submitted for review",
+      message: `Order #${order.id.slice(0, 8)} for customer ${order.customer ? fullName(order.customer) : "Guest"} is pending admin approval.`,
+      date: order.created_at,
+      link: `/agent/orders/${order.id}`,
+      severity: "warning",
+    });
+  } else if (order.order_status === "approved" && order.payment_status === "unpaid") {
+    notifications.push({
+      id: `agent-order-unpaid-${order.id}`,
+      type: "Payment Alert",
+      title: "Order approved, payment pending",
+      message: `Order #${order.id.slice(0, 8)} for customer ${order.customer ? fullName(order.customer) : "Guest"} is approved. Please follow up on payment.`,
+      date: order.created_at,
+      link: `/agent/orders/${order.id}`,
+      severity: "info",
+    });
+  }
+});
+
+// 2. Earnings & Commission notifications
+if (data.summary.monthlyEarnings > 0) {
+  notifications.push({
+    id: "earnings-summary",
+    type: "Commission Alert",
+    title: "Monthly Earnings Summary",
+    message: `Your total monthly commission earnings stand at ${formatCurrency(data.summary.monthlyEarnings)}. Check Earnings tab for details.`,
+    date: new Date().toISOString(),
+    link: "/agent/earnings",
+    severity: "success",
+  });
+}
+
+// 3. Welcome / System Notification if list is empty
+if (notifications.length === 0) {
+  notifications.push({
+    id: "agent-welcome",
+    type: "System",
+    title: "Welcome to your Agent Portal",
+    message: "No current alerts. Go to Orders to submit a new sales workflow or Earnings to view commission summaries.",
+    date: new Date().toISOString(),
+    link: "/agent",
+    severity: "success",
+  });
+}
+---
+
+<section id="agent-notifications" class="admin-panel" aria-labelledby="agent-notifications-title" style="max-width: 48rem; margin: 0 auto;">
+  <div data-interactive-table>
+    <div class="table-filters" style="justify-content: flex-end; gap: 0.75rem;">
+      <button type="button" class="btn-table-manage" data-mark-all-read style="padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.9rem; font-weight: 600; letter-spacing: normal;">Mark All as Read</button>
+      <button type="button" class="btn-table-manage" data-clear-notifications style="padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.9rem; font-weight: 600; letter-spacing: normal; background-color: var(--color-brand-muted-black);">Clear Stored Read</button>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 1rem;" data-notifications-list>
+      {notifications.map((notif) => (
+        <article
+          class="admin-card notification-item"
+          data-notification-id={notif.id}
+          style="border-radius: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; transition: opacity 0.2s ease, transform 0.2s ease;"
+        >
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span
+                class={`notification-badge badge-${notif.severity}`}
+                style="padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;"
+              >
+                {notif.type}
+              </span>
+              <strong style="font-size: 1.05rem; color: var(--color-brand-red);">{notif.title}</strong>
+              <span class="unread-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-brand-red);"></span>
+            </div>
+            <span style="font-size: 0.85rem; color: var(--color-brand-muted-black); font-weight: 500;">{formatDate(notif.date)}</span>
+          </div>
+
+          <p style="margin: 0.25rem 0; font-size: 0.95rem; line-height: 1.5; color: var(--color-brand-muted-black);">{notif.message}</p>
+
+          <div style="display: flex; gap: 0.75rem; margin-top: 0.25rem; align-items: center;">
+            <a href={notif.link} class="btn-table-manage" style="text-decoration: none; padding: 0.35rem 0.75rem; font-size: 0.85rem;">View Details</a>
+            <button type="button" class="btn-table-manage" data-mark-read style="padding: 0.35rem 0.75rem; font-size: 0.85rem; background-color: transparent; border: 1px solid #d1d5db; color: var(--color-brand-muted-black);">Mark as read</button>
+          </div>
+        </article>
+      ))}
+    </div>
+  </div>
+</section>
+
+<style>
+  .badge-warning {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+  .badge-info {
+    background-color: #dbeafe;
+    color: #1e40af;
+  }
+  .badge-success {
+    background-color: #d1fae5;
+    color: #065f46;
+  }
+  .notification-item.read {
+    opacity: 0.65;
+  }
+  .notification-item.read .unread-dot {
+    display: none !important;
+  }
+</style>
+
+<script>
+  function initNotifications() {
+    const list = document.querySelector("[data-notifications-list]");
+    if (!list) return;
+
+    const items = Array.from(list.querySelectorAll<HTMLElement>(".notification-item"));
+    let readIds = JSON.parse(localStorage.getItem("agent-read-notifications") || "[]");
+
+    // Apply initial read state styling
+    items.forEach((item) => {
+      const id = item.dataset.notificationId;
+      if (id && readIds.includes(id)) {
+        item.classList.add("read");
+      }
+    });
+
+    // Set up click handlers on list
+    list.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const markReadBtn = target.closest("[data-mark-read]");
+      if (markReadBtn) {
+        const item = target.closest(".notification-item") as HTMLElement;
+        if (item) {
+          const id = item.dataset.notificationId;
+          if (id) {
+            if (!readIds.includes(id)) {
+              readIds.push(id);
+              localStorage.setItem("agent-read-notifications", JSON.stringify(readIds));
+            }
+            item.classList.add("read");
+          }
+        }
+      }
+    });
+
+    const markAllReadBtn = document.querySelector("[data-mark-all-read]");
+    if (markAllReadBtn) {
+      markAllReadBtn.addEventListener("click", () => {
+        items.forEach((item) => {
+          const id = item.dataset.notificationId;
+          if (id && !readIds.includes(id)) {
+            readIds.push(id);
+          }
+          item.classList.add("read");
+        });
+        localStorage.setItem("agent-read-notifications", JSON.stringify(readIds));
+      });
+    }
+
+    const clearBtn = document.querySelector("[data-clear-notifications]");
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        localStorage.removeItem("agent-read-notifications");
+        readIds = [];
+        items.forEach((item) => {
+          item.classList.remove("read");
+        });
+      });
+    }
+  }
+
+  initNotifications();
+  document.addEventListener("astro:after-swap", initNotifications);
+</script>

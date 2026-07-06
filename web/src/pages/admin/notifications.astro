@@ -1,0 +1,25 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminNotifications from "@/components/admin/AdminNotifications.astro";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const data = await loadAdminDashboardData();
+---
+
+<AdminPageFrame
+  title="Admin Notifications - JEHMARP"
+  description="System alerts and pending workflow indicators."
+  heading="Notifications Center"
+  intro="Review live actionable alerts regarding orders, inquiries, reseller signups, and database logs."
+>
+  <AdminNotifications data={data} />
+</AdminPageFrame>

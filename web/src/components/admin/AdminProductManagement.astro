@@ -17,40 +17,37 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
 ---
 
 <section id="admin-products" class="admin-panel" aria-labelledby="admin-products-title">
-  <div class="admin-panel__header">
-    <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;">Create Product</button>
-    <div class="hidden-create-form-holder" style="display: none;">
-      <form method="post" enctype="multipart/form-data" class="admin-form" aria-label="Create product">
-        <input type="hidden" name="action" value="save-product" />
-        <div class="admin-form-grid">
-          <label class="field-row"><span>Name</span><input name="name" required /></label>
-          <label class="field-row">
-            <span>Unit label</span>
-            <select name="unitLabel" required>
-              {productUnitLabels.map((unitLabel) => <option value={unitLabel}>{unitLabel}</option>)}
-            </select>
-          </label>
-          <label class="field-row">
-            <span>Category</span>
-            <select name="category" required>
-              {productCategories.map((category) => <option value={category}>{category}</option>)}
-            </select>
-          </label>
-          <label class="field-row"><span>Default price</span><input name="defaultPrice" type="number" min="0" step="0.01" required /></label>
-          <label class="field-row"><span>Reseller price</span><input name="resellerPrice" type="number" min="0" step="0.01" required /></label>
-          <label class="field-row">
-            <span>Stock status</span>
-            <select name="stockStatus" required>
-              {stockStatuses.map((status) => <option value={status}>{status}</option>)}
-            </select>
-          </label>
-        </div>
+  <div class="hidden-create-form-holder" style="display: none;">
+    <form method="post" enctype="multipart/form-data" class="admin-form" aria-label="Create product">
+      <input type="hidden" name="action" value="save-product" />
+      <div class="admin-form-grid">
+        <label class="field-row"><span>Name</span><input name="name" required /></label>
+        <label class="field-row">
+          <span>Unit label</span>
+          <select name="unitLabel" required>
+            {productUnitLabels.map((unitLabel) => <option value={unitLabel}>{unitLabel}</option>)}
+          </select>
+        </label>
+        <label class="field-row">
+          <span>Category</span>
+          <select name="category" required>
+            {productCategories.map((category) => <option value={category}>{category}</option>)}
+          </select>
+        </label>
+        <label class="field-row"><span>Default price</span><input name="defaultPrice" type="number" min="0" step="0.01" required /></label>
+        <label class="field-row"><span>Reseller price</span><input name="resellerPrice" type="number" min="0" step="0.01" required /></label>
+        <label class="field-row">
+          <span>Stock status</span>
+          <select name="stockStatus" required>
+            {stockStatuses.map((status) => <option value={status}>{status}</option>)}
+          </select>
+        </label>
         <label class="field-row"><span>Description</span><textarea name="description"></textarea></label>
         <label class="field-row"><span>Product image</span><input name="imageFile" type="file" accept="image/*" required /></label>
-        <label class="checkbox-row"><input type="checkbox" name="isActive" checked /> Active</label>
-        <button type="submit">Save product</button>
-      </form>
-    </div>
+      </div>
+      <label class="checkbox-row"><input type="checkbox" name="isActive" checked /> Active</label>
+      <button type="submit">Save product</button>
+    </form>
   </div>
 
   <div data-interactive-table>
@@ -58,19 +55,21 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
       <div style="flex: 1; min-width: 15rem;">
         <input type="text" placeholder="Search products..." data-search-input style="width: 100%;" />
       </div>
-      <div style="display: flex; align-items: center; gap: 0.5rem;">
-        <span>Show</span>
-        <select data-limit-select>
-          <option value="10">10</option>
-          <option value="50">50</option>
-          <option value="100">100</option>
-        </select>
+      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.35rem;">
+          <span style="font-size: 0.9rem; color: var(--color-brand-muted-black);">Show</span>
+          <select data-limit-select>
+            <option value="10">10</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+        <button type="button" class="btn-table-manage" data-open-create-sheet style="padding: 0.5rem 1rem; border-radius: 0.375rem; text-transform: none; font-size: 0.9rem; font-weight: 600; letter-spacing: normal;">Create Product</button>
       </div>
     </div>
 
     <div class="table-wrap">
       <table>
-        <caption>Products</caption>
         <thead>
           <tr>
             <th scope="col">Product</th>
@@ -169,9 +168,12 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
     </div>
 
     <div class="table-pagination">
-      <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Prev</button>
-      <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
-      <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Next</button>
+      <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
+      <div style="display: flex; gap: 0.25rem; align-items: center;">
+        <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
+        <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+        <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+      </div>
     </div>
   </div>
 </section>

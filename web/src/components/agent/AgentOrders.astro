@@ -17,12 +17,10 @@ const hasAssignedCustomers = data.customers.length > 0;
 ---
 
 <section class="admin-panel" aria-labelledby="agent-orders-title">
-  <div class="admin-panel__header">
-    <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;" disabled={!canSubmitOrder}>Submit Order</button>
-    <div class="hidden-create-form-holder" style="display: none;">
-      <form method="post" class="admin-form" aria-labelledby="agent-order-form-title" data-agent-order-form data-can-submit-order={String(canSubmitOrder)}>
-        <input type="hidden" name="action" value="create-agent-order" />
-        <h3 id="agent-order-form-title">New agent order</h3>
+  <div class="hidden-create-form-holder" style="display: none;">
+    <form method="post" class="admin-form" aria-labelledby="agent-order-form-title" data-agent-order-form data-can-submit-order={String(canSubmitOrder)}>
+      <input type="hidden" name="action" value="create-agent-order" />
+      <h3 id="agent-order-form-title">New agent order</h3>
 
         <div class="admin-form-grid">
           <label class="field-row" data-existing-customer-field>
@@ -139,14 +137,9 @@ const hasAssignedCustomers = data.customers.length > 0;
         <button type="submit" disabled={!canSubmitOrder}>Submit for review</button>
       </form>
     </div>
-  </div>
 </section>
 
 <section class="admin-panel" aria-labelledby="agent-order-list-title">
-  <div class="admin-panel__header">
-    <h2 id="agent-order-list-title">Customer Orders</h2>
-    <p>Orders submitted by this agent or tied to customer records.</p>
-  </div>
 
   {data.orders.length === 0 ? (
     <p class="empty-state">No accessible orders yet.</p>
@@ -156,19 +149,21 @@ const hasAssignedCustomers = data.customers.length > 0;
         <div style="flex: 1; min-width: 15rem;">
           <input type="text" placeholder="Search orders..." data-search-input style="width: 100%;" />
         </div>
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-          <span>Show</span>
-          <select data-limit-select>
-            <option value="10">10</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <div style="display: flex; align-items: center; gap: 0.35rem;">
+            <span style="font-size: 0.9rem; color: var(--color-brand-muted-black);">Show</span>
+            <select data-limit-select>
+              <option value="10">10</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <button type="button" class="btn-table-manage" data-open-create-sheet style="padding: 0.5rem 1rem; border-radius: 0.375rem; text-transform: none; font-size: 0.9rem; font-weight: 600; letter-spacing: normal;" disabled={!canSubmitOrder}>Submit Order</button>
         </div>
       </div>
 
       <div class="table-wrap">
         <table>
-          <caption>Orders</caption>
           <thead>
             <tr>
               <th scope="col">Customer</th>
@@ -208,9 +203,12 @@ const hasAssignedCustomers = data.customers.length > 0;
       </div>
 
       <div class="table-pagination">
-        <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Prev</button>
-        <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
-        <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Next</button>
+        <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
+        <div style="display: flex; gap: 0.25rem; align-items: center;">
+          <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
+          <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+          <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+        </div>
       </div>
     </div>
   )}
