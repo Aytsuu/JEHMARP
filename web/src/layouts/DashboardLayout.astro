@@ -173,10 +173,131 @@ const { title, description, navLabel, navItems } = Astro.props;
         });
       }
 
-      document.addEventListener("DOMContentLoaded", initDrawerSheets);
-      document.addEventListener("astro:after-swap", initDrawerSheets);
-      if (document.readyState === "complete" || document.readyState === "interactive") {
+      function initInteractiveTables() {
+        const interactiveTables = document.querySelectorAll("[data-interactive-table]");
+        interactiveTables.forEach((container) => {
+          const searchInput = container.querySelector<HTMLInputElement>("[data-search-input]");
+          const statusSelect = container.querySelector<HTMLSelectElement>("[data-status-select]");
+          const limitSelect = container.querySelector<HTMLSelectElement>("[data-limit-select]");
+          const prevBtn = container.querySelector<HTMLButtonElement>("[data-pagination-prev]");
+          const nextBtn = container.querySelector<HTMLButtonElement>("[data-pagination-next]");
+          const numbersContainer = container.querySelector<HTMLElement>("[data-pagination-numbers]");
+          const tbody = container.querySelector<HTMLTableSectionElement>("tbody");
+          if (!tbody) return;
+
+          const allRows = Array.from(tbody.querySelectorAll<HTMLTableRowElement>("tr")).filter(
+            (row) => !row.classList.contains("empty-row") && row.querySelector("td")
+          );
+          let filteredRows = [...allRows];
+          let currentPage = 1;
+          let limit = parseInt(limitSelect?.value || "10", 10);
+
+          function updateTable() {
+            const query = searchInput?.value.toLowerCase().trim() || "";
+            const statusQuery = statusSelect?.value || "";
+
+            // Filter rows
+            filteredRows = allRows.filter((row) => {
+              // Text Search filter (check text content of the row)
+              const textMatch = query === "" || row.textContent?.toLowerCase().includes(query);
+
+              // Status filter
+              const rowStatus = row.dataset.status || "";
+              const statusMatch = statusQuery === "" || rowStatus.toLowerCase() === statusQuery.toLowerCase();
+
+              return textMatch && statusMatch;
+            });
+
+            const totalRows = filteredRows.length;
+            const totalPages = Math.ceil(totalRows / limit) || 1;
+
+            if (currentPage > totalPages) {
+              currentPage = totalPages;
+            }
+
+            const start = (currentPage - 1) * limit;
+            const end = start + limit;
+
+            // Hide/Show rows
+            allRows.forEach((row) => {
+              row.style.display = "none";
+            });
+
+            filteredRows.slice(start, end).forEach((row) => {
+              row.style.display = "";
+            });
+
+            // Update pagination controls
+            if (prevBtn) prevBtn.disabled = currentPage === 1;
+            if (nextBtn) nextBtn.disabled = currentPage === totalPages;
+
+            // Generate numbered page buttons
+            if (numbersContainer) {
+              numbersContainer.innerHTML = "";
+              for (let i = 1; i <= totalPages; i++) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.textContent = String(i);
+                btn.className = i === currentPage ? "btn-table-manage" : "btn-secondary";
+                btn.style.padding = "0.25rem 0.65rem";
+                btn.style.minWidth = "2rem";
+                btn.style.border = "none";
+                btn.style.borderRadius = "0.25rem";
+                btn.style.cursor = "pointer";
+                btn.addEventListener("click", () => {
+                  currentPage = i;
+                  updateTable();
+                });
+                numbersContainer.appendChild(btn);
+              }
+            }
+          }
+
+          searchInput?.addEventListener("input", () => {
+            currentPage = 1;
+            updateTable();
+          });
+
+          statusSelect?.addEventListener("change", () => {
+            currentPage = 1;
+            updateTable();
+          });
+
+          limitSelect?.addEventListener("change", () => {
+            limit = parseInt(limitSelect.value, 10);
+            currentPage = 1;
+            updateTable();
+          });
+
+          prevBtn?.addEventListener("click", () => {
+            if (currentPage > 1) {
+              currentPage--;
+              updateTable();
+            }
+          });
+
+          nextBtn?.addEventListener("click", () => {
+            const totalPages = Math.ceil(filteredRows.length / limit) || 1;
+            if (currentPage < totalPages) {
+              currentPage++;
+              updateTable();
+            }
+          });
+
+          // Initial update
+          updateTable();
+        });
+      }
+
+      function initDashboardFeatures() {
         initDrawerSheets();
+        initInteractiveTables();
+      }
+
+      document.addEventListener("DOMContentLoaded", initDashboardFeatures);
+      document.addEventListener("astro:after-swap", initDashboardFeatures);
+      if (document.readyState === "complete" || document.readyState === "interactive") {
+        initDashboardFeatures();
       }
     </script>
   </body>

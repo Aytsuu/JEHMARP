@@ -16,8 +16,6 @@ const agentStatuses = ["active", "inactive", "suspended"] as const;
   aria-labelledby="admin-agents-title"
 >
   <div class="admin-panel__header">
-    <h2 id="admin-agents-title">Agent Management</h2>
-    <p>Create agent auth accounts and manage agent profile status.</p>
     <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;">Create Agent</button>
     <div class="hidden-create-form-holder" style="display: none;">
       <form method="post" class="admin-form" aria-label="Create agent">
@@ -42,62 +40,84 @@ const agentStatuses = ["active", "inactive", "suspended"] as const;
     </div>
   </div>
 
-  <div class="table-wrap">
-    <table>
-      <caption>Agents</caption>
-      <thead>
-        <tr>
-          <th scope="col">Agent</th>
-          <th scope="col">Status</th>
-          <th scope="col">Manage</th>
-        </tr>
-      </thead>
-      <tbody>
-        {
-          data.agents.map((agent) => (
-            <tr>
-              <td>
-                {agent.display_name}
-                <br />
-                <span>{agent.user_id}</span>
-              </td>
-              <td>{agent.status}</td>
-              <td>
-                <a href={`/admin/agents/${agent.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block; margin-right: 0.5rem;">View</a>
-                <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-                <div class="hidden-form-holder" style="display: none;">
-                  <form method="post" class="admin-table-form">
-                    <input type="hidden" name="action" value="update-agent" />
-                    <input type="hidden" name="agentId" value={agent.id} />
-                    <label>
-                      <span>Display name</span>
-                      <input
-                        name="displayName"
-                        value={agent.display_name}
-                        required
-                      />
-                    </label>
-                    <label>
-                      <span>Status</span>
-                      <select name="status" required>
-                        {agentStatuses.map((status) => (
-                          <option
-                            value={status}
-                            selected={selected(agent.status, status)}
-                          >
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button type="submit">Update agent</button>
-                  </form>
-                </div>
-              </td>
-            </tr>
-          ))
-        }
-      </tbody>
-    </table>
+  <div data-interactive-table>
+    <div class="table-filters">
+      <div style="flex: 1; min-width: 15rem;">
+        <input type="text" placeholder="Search agents..." data-search-input style="width: 100%;" />
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span>Show</span>
+        <select data-limit-select>
+          <option value="10">10</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <caption>Agents</caption>
+        <thead>
+          <tr>
+            <th scope="col">Agent</th>
+            <th scope="col">Status</th>
+            <th scope="col">Manage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            data.agents.map((agent) => (
+              <tr data-status={agent.status}>
+                <td>
+                  {agent.display_name}
+                  <br />
+                  <span>{agent.user_id}</span>
+                </td>
+                <td>{agent.status}</td>
+                <td>
+                  <a href={`/admin/agents/${agent.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block; margin-right: 0.5rem;">View</a>
+                  <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+                  <div class="hidden-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="update-agent" />
+                      <input type="hidden" name="agentId" value={agent.id} />
+                      <label>
+                        <span>Display name</span>
+                        <input
+                          name="displayName"
+                          value={agent.display_name}
+                          required
+                        />
+                      </label>
+                      <label>
+                        <span>Status</span>
+                        <select name="status" required>
+                          {agentStatuses.map((status) => (
+                            <option
+                              value={status}
+                              selected={selected(agent.status, status)}
+                            >
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button type="submit">Update agent</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-pagination">
+      <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Prev</button>
+      <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+      <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Next</button>
+    </div>
   </div>
 </section>

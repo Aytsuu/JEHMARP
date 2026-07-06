@@ -18,57 +18,74 @@ const invoiceOrders = data.orders.filter((order) => order.invoice.length > 0);
 ---
 
 <section id="admin-invoices" class="admin-panel" aria-labelledby="admin-invoices-title">
-  <div class="admin-panel__header">
-    <h2 id="admin-invoices-title">Invoice Management</h2>
-    <p>Review created invoices, open sales invoice PDFs, and record payments.</p>
-  </div>
-
   {invoiceOrders.length === 0 ? (
     <p class="empty-state">No invoices have been created from orders yet.</p>
   ) : (
-    <div class="table-wrap">
-      <table>
-        <caption>Invoices</caption>
-        <thead>
-          <tr>
-            <th scope="col">Invoice Number</th>
-            <th scope="col">Customer</th>
-            <th scope="col">Date</th>
-            <th scope="col">Invoice Total</th>
-            <th scope="col">Paid</th>
-            <th scope="col">Balance</th>
-            <th scope="col">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {invoiceOrders.map((order) => {
-            const invoice = order.invoice[0];
-            const invoiceTotal = orderTotal(order, "final_quantity");
-            const paidTotal = orderPaymentTotal(order);
-            const balance = orderBalance(order);
+    <div data-interactive-table>
+      <div class="table-filters">
+        <div style="flex: 1; min-width: 15rem;">
+          <input type="text" placeholder="Search invoices..." data-search-input style="width: 100%;" />
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span>Show</span>
+          <select data-limit-select>
+            <option value="10">10</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+      </div>
 
-            return (
-              <tr>
-                <td>
-                  <strong>{invoice.invoice_number}</strong>
-                </td>
-                <td>
-                  <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
-                  <br />
-                  <span>{order.customer?.phone_number ?? "N/A"}</span>
-                </td>
-                <td>{formatDate(invoice.created_at)}</td>
-                <td>{formatCurrency(invoiceTotal)}</td>
-                <td>{formatCurrency(paidTotal)}</td>
-                <td>{formatCurrency(balance)}</td>
-                <td>
-                  <a href={`/admin/invoices/${invoice.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <caption>Invoices</caption>
+          <thead>
+            <tr>
+              <th scope="col">Invoice Number</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Date</th>
+              <th scope="col">Invoice Total</th>
+              <th scope="col">Paid</th>
+              <th scope="col">Balance</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invoiceOrders.map((order) => {
+              const invoice = order.invoice[0];
+              const invoiceTotal = orderTotal(order, "final_quantity");
+              const paidTotal = orderPaymentTotal(order);
+              const balance = orderBalance(order);
+
+              return (
+                <tr data-status={order.payment_status}>
+                  <td>
+                    <strong>{invoice.invoice_number}</strong>
+                  </td>
+                  <td>
+                    <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
+                    <br />
+                    <span>{order.customer?.phone_number ?? "N/A"}</span>
+                  </td>
+                  <td>{formatDate(invoice.created_at)}</td>
+                  <td>{formatCurrency(invoiceTotal)}</td>
+                  <td>{formatCurrency(paidTotal)}</td>
+                  <td>{formatCurrency(balance)}</td>
+                  <td>
+                    <a href={`/admin/invoices/${invoice.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-pagination">
+        <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Prev</button>
+        <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+        <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Next</button>
+      </div>
     </div>
   )}
 </section>

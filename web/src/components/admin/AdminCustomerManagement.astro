@@ -14,66 +14,83 @@ const { data } = Astro.props;
 ---
 
 <section id="admin-customers" class="admin-panel" aria-labelledby="admin-customers-title">
-  <div class="admin-panel__header">
-    <h2 id="admin-customers-title">Customer Record Management</h2>
-    <p>Review customer records and update contact details, reseller status, or optional agent assignment.</p>
-  </div>
+  <div data-interactive-table>
+    <div class="table-filters">
+      <div style="flex: 1; min-width: 15rem;">
+        <input type="text" placeholder="Search customers..." data-search-input style="width: 100%;" />
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span>Show</span>
+        <select data-limit-select>
+          <option value="10">10</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
 
-  <div class="table-wrap">
-    <table>
-      <caption>Customer records</caption>
-      <thead>
-        <tr>
-          <th scope="col">Customer</th>
-          <th scope="col">Contact</th>
-          <th scope="col">Assigned agent</th>
-          <th scope="col">Manage</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.customers.map((customer) => (
+    <div class="table-wrap">
+      <table>
+        <caption>Customer records</caption>
+        <thead>
           <tr>
-            <td>{fullName(customer)}</td>
-            <td>
-              {customer.phone_number}<br />
-              {customer.email ?? "No email"}<br />
-              {customer.is_reseller ? "Reseller" : "Retail"}
-            </td>
-            <td>{data.agents.find((agent) => agent.id === customer.assigned_agent_id)?.display_name ?? "None"}</td>
-            <td>
-              <a href={`/admin/customers/${customer.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block; margin-right: 0.5rem;">View</a>
-              <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-              <div class="hidden-form-holder" style="display: none;">
-                <form method="post" class="admin-table-form">
-                  <input type="hidden" name="action" value="save-customer" />
-                  <input type="hidden" name="customerId" value={customer.id} />
-                  <label><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
-                  <label><span>Last name</span><input name="lastName" value={customer.last_name} required /></label>
-                  <label><span>Phone</span><input name="phoneNumber" value={customer.phone_number} required /></label>
-                  <label><span>Email</span><input name="email" type="email" value={customer.email ?? ""} /></label>
-                  <label class="checkbox-row">
-                    <input name="isReseller" type="checkbox" checked={customer.is_reseller} />
-                    <span>Reseller customer</span>
-                  </label>
-                  <label>
-                    <span>Agent</span>
-                    <select name="assignedAgentId">
-                      <option value="">None</option>
-                      {data.agents.map((agent) => (
-                        <option value={agent.id} selected={selected(customer.assigned_agent_id, agent.id)}>
-                          {agent.display_name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label><span>Address</span><textarea name="address" required set:html={escapeTextareaValue(customer.address)}></textarea></label>
-                  <button type="submit">Update customer</button>
-                </form>
-              </div>
-            </td>
+            <th scope="col">Customer</th>
+            <th scope="col">Contact</th>
+            <th scope="col">Assigned agent</th>
+            <th scope="col">Manage</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {data.customers.map((customer) => (
+            <tr>
+              <td>{fullName(customer)}</td>
+              <td>
+                {customer.phone_number}<br />
+                {customer.email ?? "No email"}<br />
+                {customer.is_reseller ? "Reseller" : "Retail"}
+              </td>
+              <td>{data.agents.find((agent) => agent.id === customer.assigned_agent_id)?.display_name ?? "None"}</td>
+              <td>
+                <a href={`/admin/customers/${customer.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block; margin-right: 0.5rem;">View</a>
+                <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+                <div class="hidden-form-holder" style="display: none;">
+                  <form method="post" class="admin-table-form">
+                    <input type="hidden" name="action" value="save-customer" />
+                    <input type="hidden" name="customerId" value={customer.id} />
+                    <label><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
+                    <label><span>Last name</span><input name="lastName" value={customer.last_name} required /></label>
+                    <label><span>Phone</span><input name="phoneNumber" value={customer.phone_number} required /></label>
+                    <label><span>Email</span><input name="email" type="email" value={customer.email ?? ""} /></label>
+                    <label class="checkbox-row">
+                      <input name="isReseller" type="checkbox" checked={customer.is_reseller} />
+                      <span>Reseller customer</span>
+                    </label>
+                    <label>
+                      <span>Agent</span>
+                      <select name="assignedAgentId">
+                        <option value="">None</option>
+                        {data.agents.map((agent) => (
+                          <option value={agent.id} selected={selected(customer.assigned_agent_id, agent.id)}>
+                            {agent.display_name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label><span>Address</span><textarea name="address" required set:html={escapeTextareaValue(customer.address)}></textarea></label>
+                    <button type="submit">Update customer</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-pagination">
+      <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Prev</button>
+      <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+      <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Next</button>
+    </div>
   </div>
 </section>

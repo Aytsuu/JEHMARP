@@ -10,12 +10,10 @@ type Props = {
 const { data, applicationStatuses } = Astro.props;
 ---
 
-<section class="admin-panel" aria-labelledby="admin-reseller-applications-title">
-  <div class="admin-panel__header">
-    <h2 id="admin-reseller-applications-title">Reseller Applications</h2>
-    <p>Review reseller application submissions and price-list email delivery status.</p>
-  </div>
-
+<section
+  class="admin-panel"
+  aria-labelledby="admin-reseller-applications-title"
+>
   {
     data.resellerApplications.length > 0 ? (
       <div class="table-wrap">
@@ -65,13 +63,27 @@ const { data, applicationStatuses } = Astro.props;
                 </td>
                 <td>
                   <form method="post" class="admin-table-form">
-                    <input type="hidden" name="action" value="update-reseller-application" />
-                    <input type="hidden" name="applicationId" value={application.id} />
+                    <input
+                      type="hidden"
+                      name="action"
+                      value="update-reseller-application"
+                    />
+                    <input
+                      type="hidden"
+                      name="applicationId"
+                      value={application.id}
+                    />
                     <label>
                       <span>Status</span>
                       <select name="applicationStatus" required>
                         {applicationStatuses.map((status) => (
-                          <option value={status} selected={selected(application.application_status, status)}>
+                          <option
+                            value={status}
+                            selected={selected(
+                              application.application_status,
+                              status,
+                            )}
+                          >
                             {status}
                           </option>
                         ))}
@@ -88,7 +100,9 @@ const { data, applicationStatuses } = Astro.props;
         </table>
       </div>
     ) : (
-      <p class="empty-state">No reseller applications have been submitted yet.</p>
+      <p class="empty-state">
+        No reseller applications have been submitted yet.
+      </p>
     )
   }
 </section>

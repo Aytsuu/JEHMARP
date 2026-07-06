@@ -18,8 +18,6 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
 
 <section id="admin-products" class="admin-panel" aria-labelledby="admin-products-title">
   <div class="admin-panel__header">
-    <h2 id="admin-products-title">Product Management</h2>
-    <p>Create products, edit public/reseller pricing, stock status, and deactivate products instead of deleting them.</p>
     <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;">Create Product</button>
     <div class="hidden-create-form-holder" style="display: none;">
       <form method="post" enctype="multipart/form-data" class="admin-form" aria-label="Create product">
@@ -55,83 +53,125 @@ const { data, productCategories, productUnitLabels, stockStatuses } = Astro.prop
     </div>
   </div>
 
-  <div class="table-wrap">
-    <table>
-      <caption>Products</caption>
-      <thead>
-        <tr>
-          <th scope="col">Product</th>
-          <th scope="col">Pricing</th>
-          <th scope="col">Status</th>
-          <th scope="col">Manage</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.products.map((product) => (
+  <div data-interactive-table>
+    <div class="table-filters">
+      <div style="flex: 1; min-width: 15rem;">
+        <input type="text" placeholder="Search products..." data-search-input style="width: 100%;" />
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span>Show</span>
+        <select data-limit-select>
+          <option value="10">10</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <caption>Products</caption>
+        <thead>
           <tr>
-            <td>
-              <strong>{product.name}</strong>
-              <span>{product.category} - {product.unit_label}</span>
-            </td>
-            <td>
-              Retail {formatCurrency(product.default_price)}
-              <br />
-              Reseller {formatCurrency(product.reseller_price)}
-            </td>
-            <td>{product.stock_status} - {product.is_active ? "active" : "inactive"}</td>
-            <td>
-              <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-              <div class="hidden-form-holder" style="display: none;">
-                <form method="post" enctype="multipart/form-data" class="admin-table-form">
-                  <input type="hidden" name="action" value="save-product" />
-                  <input type="hidden" name="productId" value={product.id} />
-                  <label><span>Name</span><input name="name" value={product.name} required /></label>
-                  <label>
-                    <span>Category</span>
-                    <select name="category" required>
-                      {productCategories.map((category) => (
-                        <option value={category} selected={selected(product.category, category)}>{category}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <span>Unit</span>
-                    <select name="unitLabel" required>
-                      {productUnitLabels.map((unitLabel) => (
-                        <option value={unitLabel} selected={selected(product.unit_label, unitLabel)}>{unitLabel}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label><span>Retail price</span><input name="defaultPrice" type="number" min="0" step="0.01" value={product.default_price} required /></label>
-                  <label><span>Reseller price</span><input name="resellerPrice" type="number" min="0" step="0.01" value={product.reseller_price} required /></label>
-                  <label>
-                    <span>Stock</span>
-                    <select name="stockStatus" required>
-                      {stockStatuses.map((status) => (
-                        <option value={status} selected={selected(product.stock_status, status)}>{status}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label><span>Description</span><textarea name="description" set:html={escapeTextareaValue(product.description)}></textarea></label>
-                  <label><span>Replace image</span><input name="imageFile" type="file" accept="image/*" /></label>
-                  {product.image_path && <p>Current image stored.</p>}
-                  <label class="checkbox-row"><input type="checkbox" name="isActive" checked={product.is_active} /> Active</label>
-                  <div class="button-row">
-                    <button type="submit">Update product</button>
-                  </div>
-                </form>
-              </div>
-              {product.is_active && (
-                <form method="post" class="admin-table-form" style="margin-top: 0.5rem; display: inline-block;">
-                  <input type="hidden" name="action" value="deactivate-product" />
-                  <input type="hidden" name="productId" value={product.id} />
-                  <button type="submit" class="btn-table-manage" style="background-color: var(--color-brand-muted-black);">Deactivate</button>
-                </form>
-              )}
-            </td>
+            <th scope="col">Product</th>
+            <th scope="col">Pricing</th>
+            <th scope="col">Status</th>
+            <th scope="col">Manage</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {data.products.map((product) => (
+            <tr data-status={product.is_active ? "active" : "inactive"}>
+              <td>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                  {product.image_path && (
+                    <img
+                      src={product.image_path}
+                      alt={product.name}
+                      style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;"
+                    />
+                  )}
+                  <div>
+                    <strong>{product.name}</strong>
+                    <br />
+                    <span>{product.category} - {product.unit_label}</span>
+                  </div>
+                </div>
+              </td>
+              <td>
+                Retail: {formatCurrency(product.default_price)}
+                <br />
+                Reseller: {formatCurrency(product.reseller_price)}
+              </td>
+              <td>
+                {product.is_active ? (
+                  <span class="status-badge status-active">Active</span>
+                ) : (
+                  <span class="status-badge status-inactive">Inactive</span>
+                )}
+                <br />
+                <span>Stock: {product.stock_status}</span>
+              </td>
+              <td>
+                <button type="button" class="btn-table-manage" data-open-sheet style="margin-right: 0.5rem;">Manage</button>
+                <div class="hidden-form-holder" style="display: none;">
+                  <form method="post" enctype="multipart/form-data" class="admin-table-form">
+                    <input type="hidden" name="action" value="save-product" />
+                    <input type="hidden" name="productId" value={product.id} />
+                    <label><span>Name</span><input name="name" value={product.name} required /></label>
+                    <label>
+                      <span>Unit label</span>
+                      <select name="unitLabel" required>
+                        {productUnitLabels.map((unitLabel) => (
+                          <option value={unitLabel} selected={selected(product.unit_label, unitLabel)}>{unitLabel}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Category</span>
+                      <select name="category" required>
+                        {productCategories.map((category) => (
+                          <option value={category} selected={selected(product.category, category)}>{category}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label><span>Default price</span><input name="defaultPrice" type="number" min="0" step="0.01" value={product.default_price} required /></label>
+                    <label><span>Reseller price</span><input name="resellerPrice" type="number" min="0" step="0.01" value={product.reseller_price} required /></label>
+                    <label>
+                      <span>Stock status</span>
+                      <select name="stockStatus" required>
+                        {stockStatuses.map((status) => (
+                          <option value={status} selected={selected(product.stock_status, status)}>{status}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label><span>Description</span><textarea name="description" set:html={escapeTextareaValue(product.description)}></textarea></label>
+                    <label><span>Replace image</span><input name="imageFile" type="file" accept="image/*" /></label>
+                    {product.image_path && <p>Current image stored.</p>}
+                    <label class="checkbox-row"><input type="checkbox" name="isActive" checked={product.is_active} /> Active</label>
+                    <div class="button-row">
+                      <button type="submit">Update product</button>
+                    </div>
+                  </form>
+                </div>
+                {product.is_active && (
+                  <form method="post" class="admin-table-form" style="display: inline-block;">
+                    <input type="hidden" name="action" value="deactivate-product" />
+                    <input type="hidden" name="productId" value={product.id} />
+                    <button type="submit" class="btn-table-manage" style="background-color: var(--color-brand-muted-black);">Deactivate</button>
+                  </form>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-pagination">
+      <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Prev</button>
+      <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+      <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Next</button>
+    </div>
   </div>
 </section>

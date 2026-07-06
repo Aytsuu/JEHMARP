@@ -11,47 +11,65 @@ const { data, inquiryStatuses } = Astro.props;
 ---
 
 <section id="admin-inquiries" class="admin-panel" aria-labelledby="admin-inquiries-title">
-  <div class="admin-panel__header">
-    <h2 id="admin-inquiries-title">Contact Inquiry Management</h2>
-    <p>Update inquiry status and internal notes.</p>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <caption>Contact inquiries</caption>
-      <thead>
-        <tr>
-          <th scope="col">Inquiry</th>
-          <th scope="col">Message</th>
-          <th scope="col">Manage</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.contactInquiries.map((inquiry) => (
+  <div data-interactive-table>
+    <div class="table-filters">
+      <div style="flex: 1; min-width: 15rem;">
+        <input type="text" placeholder="Search inquiries..." data-search-input style="width: 100%;" />
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span>Show</span>
+        <select data-limit-select>
+          <option value="10">10</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <caption>Contact inquiries</caption>
+        <thead>
           <tr>
-            <td>{inquiry.name}<br />{inquiry.email ?? inquiry.phone_number ?? "No contact"}<br />{inquiry.inquiry_status}</td>
-            <td>{inquiry.message}</td>
-            <td>
-              <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-              <div class="hidden-form-holder" style="display: none;">
-                <form method="post" class="admin-table-form">
-                  <input type="hidden" name="action" value="update-inquiry" />
-                  <input type="hidden" name="inquiryId" value={inquiry.id} />
-                  <label>
-                    <span>Status</span>
-                    <select name="inquiryStatus" required>
-                      {inquiryStatuses.map((status) => (
-                        <option value={status} selected={selected(inquiry.inquiry_status, status)}>{status}</option>
-                      ))}
-                    </select>
-                  </label>
-                  <label><span>Internal notes</span><textarea name="internalNotes" set:html={escapeTextareaValue(inquiry.internal_notes)}></textarea></label>
-                  <button type="submit">Update inquiry</button>
-                </form>
-              </div>
-            </td>
+            <th scope="col">Inquiry</th>
+            <th scope="col">Message</th>
+            <th scope="col">Manage</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {data.contactInquiries.map((inquiry) => (
+            <tr data-status={inquiry.inquiry_status}>
+              <td>{inquiry.name}<br />{inquiry.email ?? inquiry.phone_number ?? "No contact"}<br />{inquiry.inquiry_status}</td>
+              <td>{inquiry.message}</td>
+              <td>
+                <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+                <div class="hidden-form-holder" style="display: none;">
+                  <form method="post" class="admin-table-form">
+                    <input type="hidden" name="action" value="update-inquiry" />
+                    <input type="hidden" name="inquiryId" value={inquiry.id} />
+                    <label>
+                      <span>Status</span>
+                      <select name="inquiryStatus" required>
+                        {inquiryStatuses.map((status) => (
+                          <option value={status} selected={selected(inquiry.inquiry_status, status)}>{status}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label><span>Internal notes</span><textarea name="internalNotes" set:html={escapeTextareaValue(inquiry.internal_notes)}></textarea></label>
+                    <button type="submit">Update inquiry</button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-pagination">
+      <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Prev</button>
+      <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+      <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Next</button>
+    </div>
   </div>
 </section>

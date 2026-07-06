@@ -18,8 +18,6 @@ const hasAssignedCustomers = data.customers.length > 0;
 
 <section class="admin-panel" aria-labelledby="agent-orders-title">
   <div class="admin-panel__header">
-    <h2 id="agent-orders-title">Submit Order</h2>
-    <p>Create an order for a customer. New submissions start in admin review.</p>
     <button type="button" class="btn-table-manage" data-open-create-sheet style="margin-top: 1rem; padding: 0.65rem 1.25rem;" disabled={!canSubmitOrder}>Submit Order</button>
     <div class="hidden-create-form-holder" style="display: none;">
       <form method="post" class="admin-form" aria-labelledby="agent-order-form-title" data-agent-order-form data-can-submit-order={String(canSubmitOrder)}>
@@ -153,45 +151,67 @@ const hasAssignedCustomers = data.customers.length > 0;
   {data.orders.length === 0 ? (
     <p class="empty-state">No accessible orders yet.</p>
   ) : (
-    <div class="table-wrap">
-      <table>
-        <caption>Orders</caption>
-        <thead>
-          <tr>
-            <th scope="col">Customer</th>
-            <th scope="col">Date</th>
-            <th scope="col">Source</th>
-            <th scope="col">Order Status</th>
-            <th scope="col">Payment Status</th>
-            <th scope="col">Order Total</th>
-            <th scope="col">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.orders.map((order) => {
-            const invoice = order.invoice.length > 0;
-            const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+    <div data-interactive-table>
+      <div class="table-filters">
+        <div style="flex: 1; min-width: 15rem;">
+          <input type="text" placeholder="Search orders..." data-search-input style="width: 100%;" />
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span>Show</span>
+          <select data-limit-select>
+            <option value="10">10</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+      </div>
 
-            return (
-              <tr>
-                <td>
-                  <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
-                  <br />
-                  <span>{order.customer?.phone_number ?? "N/A"}</span>
-                </td>
-                <td>{formatDate(order.created_at)}</td>
-                <td>{order.source}</td>
-                <td>{order.order_status}</td>
-                <td>{order.payment_status}</td>
-                <td>{formatCurrency(total)}</td>
-                <td>
-                  <a href={`/agent/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <div class="table-wrap">
+        <table>
+          <caption>Orders</caption>
+          <thead>
+            <tr>
+              <th scope="col">Customer</th>
+              <th scope="col">Date</th>
+              <th scope="col">Source</th>
+              <th scope="col">Order Status</th>
+              <th scope="col">Payment Status</th>
+              <th scope="col">Order Total</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.orders.map((order) => {
+              const invoice = order.invoice.length > 0;
+              const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+
+              return (
+                <tr data-status={order.order_status}>
+                  <td>
+                    <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
+                    <br />
+                    <span>{order.customer?.phone_number ?? "N/A"}</span>
+                  </td>
+                  <td>{formatDate(order.created_at)}</td>
+                  <td>{order.source}</td>
+                  <td>{order.order_status}</td>
+                  <td>{order.payment_status}</td>
+                  <td>{formatCurrency(total)}</td>
+                  <td>
+                    <a href={`/agent/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-pagination">
+        <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Prev</button>
+        <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+        <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">Next</button>
+      </div>
     </div>
   )}
 </section>

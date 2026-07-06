@@ -19,11 +19,6 @@ const sectionsByPage = data.pages.map((page) => ({
 ---
 
 <section id="admin-content" class="admin-panel" aria-labelledby="admin-content-title">
-  <div class="admin-panel__header">
-    <h2 id="admin-content-title">Public Content Management</h2>
-    <p>Update existing content sections for the predefined public pages.</p>
-  </div>
-
   <div class="admin-card-list">
     {sectionsByPage.map(({ page, sections }) => (
       <article class="admin-card" aria-labelledby={`page-${page.id}`}>

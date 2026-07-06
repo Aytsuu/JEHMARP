@@ -12,11 +12,6 @@ const activityItems = buildAdminActivityItems(data);
 ---
 
 <section class="admin-panel" aria-labelledby="admin-activity-title">
-  <div class="admin-panel__header">
-    <h2 id="admin-activity-title">Admin Activity</h2>
-    <p>Review recent operational activity across orders, customers, products, invoices, inquiries, and content.</p>
-  </div>
-
   {
     activityItems.length > 0 ? (
       <div class="table-wrap">
