@@ -1,0 +1,36 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const feedback = formatAdminActionFeedback(Astro.url);
+const data = await loadAdminDashboardData();
+---
+
+<AdminPageFrame
+  title="Admin Settings - JEHMARP"
+  description="Manage administrative settings and platform configurations."
+  heading="Settings"
+  intro="Configure administrative rules, roles, pricing adjustments, and general system properties."
+  feedback={feedback}
+  dashboardData={data}
+>
+  <div class="admin-panel">
+    <div class="admin-card">
+      <h3 class="m-0 text-base font-bold text-gray-900 mb-2">Platform Settings</h3>
+      <p class="m-0 text-sm text-gray-500 mb-4">Configurations and preferences are managed here.</p>
+      <div style="padding: 3rem 2rem; border: 2px dashed #e5e7eb; border-radius: 0.5rem; text-align: center; color: #9ca3af; font-size: 0.875rem;">
+        Settings panel is under construction.
+      </div>
+    </div>
+  </div>
+</AdminPageFrame>

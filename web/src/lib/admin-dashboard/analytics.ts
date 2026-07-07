@@ -4,7 +4,7 @@ import {
   orderTotal,
 } from "./view";
 
-import type { AdminDashboardData, AdminOrder } from "./data";
+import type { AdminDashboardData, AdminOrder, AdminCustomer } from "./data";
 
 export type AnalyticsSummary = {
   totalPaidAmount: number;
@@ -53,6 +53,7 @@ export type AdminAnalytics = {
   topProducts: ProductSalesMetric[];
   salesByCategory: ProductSalesMetric[];
   salesByAgent: AgentSalesMetric[];
+  recentCustomers: AdminCustomer[];
 };
 
 const orderStatuses = [
@@ -111,6 +112,7 @@ export function buildAdminAnalytics(
     topProducts: buildProductSales(data).slice(0, 5),
     salesByCategory: buildCategorySales(data),
     salesByAgent: buildAgentSales(data),
+    recentCustomers: data.customers.slice(0, 5),
   };
 }
 

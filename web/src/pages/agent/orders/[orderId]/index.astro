@@ -40,6 +40,7 @@ const feedback = formatAgentActionFeedback(Astro.url);
   heading="Order Details"
   intro={`Review order items, details, commissions, and generate invoices/slips for Order #${order.id.slice(0, 8)}.`}
   feedback={feedback}
+  dashboardData={data}
 >
   <div style="margin-bottom: 2rem;">
     <a href="/agent/orders" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">

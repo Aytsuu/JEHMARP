@@ -1,4 +1,11 @@
 ---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  getAdminUnreadNotificationIds,
+  getUnreadAdminInquiryIds,
+  getUnreadAdminOrderIds,
+  getUnreadAdminResellerApplicationIds,
+} from "@/lib/admin-dashboard/notifications";
 import { adminDashboardRoutes } from "@/config/navigation";
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 
@@ -11,13 +18,20 @@ type Props = {
     status?: string;
     error?: string;
   };
+  dashboardData?: AdminDashboardData;
 };
 
-const { title, description, heading, intro, feedback } = Astro.props;
+const { title, description, heading, intro, feedback, dashboardData } = Astro.props;
 const headingId = `${heading
   .toLowerCase()
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-|-$/g, "")}-title`;
+const notificationIds = dashboardData ? getAdminUnreadNotificationIds(dashboardData) : [];
+const unreadOrderCount = dashboardData ? getUnreadAdminOrderIds(dashboardData).length : 0;
+const unreadInquiryCount = dashboardData ? getUnreadAdminInquiryIds(dashboardData).length : 0;
+const unreadResellerApplicationCount = dashboardData
+  ? getUnreadAdminResellerApplicationIds(dashboardData).length
+  : 0;
 ---
 
 <DashboardLayout
@@ -25,6 +39,21 @@ const headingId = `${heading
   description={description}
   navLabel="Admin operations"
   navItems={adminDashboardRoutes}
+  sidebarUnreadBadges={{
+    "/admin/orders": {
+      count: unreadOrderCount,
+    },
+    "/admin/inquiries": {
+      count: unreadInquiryCount,
+    },
+    "/admin/reseller-applications": {
+      count: unreadResellerApplicationCount,
+    },
+    "/admin/notifications": {
+      ids: notificationIds,
+      storageKey: "admin-read-notifications",
+    },
+  }}
 >
   <section class="admin-shell" aria-labelledby={headingId}>
     <header class="admin-header">

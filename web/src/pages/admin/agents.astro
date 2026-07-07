@@ -23,6 +23,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Agent Management"
   intro="Create agent auth accounts and manage agent profile status."
   feedback={feedback}
+  dashboardData={data}
 >
   <AdminAgentManagement data={data} />
 </AdminPageFrame>

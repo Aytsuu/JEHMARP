@@ -23,6 +23,7 @@ const feedback = formatAgentActionFeedback(Astro.url);
   heading="Agent Earnings"
   intro="Review monthly earnings, commission earned today, and expected commission by order."
   feedback={feedback}
+  dashboardData={data}
 >
   <AgentEarnings data={data} />
 </AgentPageFrame>

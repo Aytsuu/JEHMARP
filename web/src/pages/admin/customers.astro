@@ -23,6 +23,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Customer Record Management"
   intro="Review customer records and update contact details, reseller status, or optional agent assignment."
   feedback={feedback}
+  dashboardData={data}
 >
   <AdminCustomerManagement data={data} />
 </AdminPageFrame>

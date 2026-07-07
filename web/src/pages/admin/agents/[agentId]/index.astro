@@ -42,6 +42,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading={`Agent Record: ${agent.display_name}`}
   intro={`Review detailed profile settings and customer assignments for Agent ${agent.display_name}.`}
   feedback={feedback}
+  dashboardData={data}
 >
   <div style="margin-bottom: 2rem;">
     <a href="/admin/agents" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">

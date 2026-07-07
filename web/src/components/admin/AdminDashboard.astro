@@ -1,5 +1,6 @@
 ---
-import AdminAnalytics from "@/components/admin/AdminAnalytics.astro";
+import AdminCharts from "@/components/admin/AdminCharts";
+import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
 
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 
@@ -8,6 +9,7 @@ type Props = {
 };
 
 const { data } = Astro.props;
+const analytics = buildAdminAnalytics(data);
 ---
 
 <section class="admin-summary-grid" aria-label="Dashboard summary">
@@ -38,13 +40,6 @@ const { data } = Astro.props;
   </article>
 </section>
 
-<section class="admin-panel" aria-labelledby="admin-dashboard-analytics-title">
-  <div class="admin-panel__header">
-    <h2 id="admin-dashboard-analytics-title">Analytics</h2>
-    <p>
-      Review live sales, payment, lead, product, and agent commission metrics.
-    </p>
-  </div>
+<section aria-label="Analytics Visualization">
+  <AdminCharts client:only="react" analytics={analytics} />
 </section>
-
-<AdminAnalytics data={data} />

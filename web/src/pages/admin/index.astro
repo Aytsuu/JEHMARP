@@ -22,11 +22,12 @@ const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
 <AdminPageFrame
-  title="Admin Dashboard - JEHMARP"
-  description="Admin dashboard overview for operational workflows."
-  heading="Admin Dashboard"
+  title="Dashboard - JEHMARP"
+  description="Dashboard overview for operational workflows."
+  heading="Dashboard"
   intro="Review operational totals and choose a management area from the sidebar."
   feedback={feedback}
+  dashboardData={data}
 >
   <AdminDashboard data={data} />
 </AdminPageFrame>

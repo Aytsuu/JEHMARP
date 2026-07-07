@@ -23,6 +23,7 @@ const feedback = formatAgentActionFeedback(Astro.url);
   heading="Notifications Center"
   intro="Check status updates on submitted orders, commission payouts, and customer activity flags."
   feedback={feedback}
+  dashboardData={data}
 >
   <AgentNotifications data={data} />
 </AgentPageFrame>

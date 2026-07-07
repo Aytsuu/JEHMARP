@@ -23,6 +23,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Public Content Management"
   intro="Update JSON content, ordering, and publish status for existing predefined public page sections."
   feedback={feedback}
+  dashboardData={data}
 >
   <AdminContentManagement data={data} pageStatuses={getPageStatuses()} />
 </AdminPageFrame>

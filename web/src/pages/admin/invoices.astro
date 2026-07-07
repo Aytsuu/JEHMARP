@@ -25,6 +25,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Invoice Management"
   intro="Review invoices created from orders, open sales invoice PDFs, and record payments."
   feedback={feedback}
+  dashboardData={data}
 >
   <AdminInvoiceManagement data={data} />
 </AdminPageFrame>

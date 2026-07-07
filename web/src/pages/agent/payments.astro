@@ -23,6 +23,7 @@ const feedback = formatAgentActionFeedback(Astro.url);
   heading="Payment Status"
   intro="Review payment status counts and remaining balances for accessible orders."
   feedback={feedback}
+  dashboardData={data}
 >
   <AgentPayments data={data} />
 </AgentPageFrame>

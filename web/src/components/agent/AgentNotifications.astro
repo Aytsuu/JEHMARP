@@ -1,65 +1,14 @@
 ---
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
-import { fullName, formatDate, formatCurrency } from "@/lib/agent-dashboard/view";
+import { buildAgentNotifications } from "@/lib/agent-dashboard/notifications";
+import { formatDate } from "@/lib/agent-dashboard/view";
 
 type Props = {
   data: AgentDashboardData;
 };
 
 const { data } = Astro.props;
-
-const notifications = [];
-
-// 1. Pending orders submitted by this agent
-data.orders.forEach((order) => {
-  if (order.order_status === "submitted") {
-    notifications.push({
-      id: `agent-order-pending-${order.id}`,
-      type: "Order Status",
-      title: "Order submitted for review",
-      message: `Order #${order.id.slice(0, 8)} for customer ${order.customer ? fullName(order.customer) : "Guest"} is pending admin approval.`,
-      date: order.created_at,
-      link: `/agent/orders/${order.id}`,
-      severity: "warning",
-    });
-  } else if (order.order_status === "approved" && order.payment_status === "unpaid") {
-    notifications.push({
-      id: `agent-order-unpaid-${order.id}`,
-      type: "Payment Alert",
-      title: "Order approved, payment pending",
-      message: `Order #${order.id.slice(0, 8)} for customer ${order.customer ? fullName(order.customer) : "Guest"} is approved. Please follow up on payment.`,
-      date: order.created_at,
-      link: `/agent/orders/${order.id}`,
-      severity: "info",
-    });
-  }
-});
-
-// 2. Earnings & Commission notifications
-if (data.summary.monthlyEarnings > 0) {
-  notifications.push({
-    id: "earnings-summary",
-    type: "Commission Alert",
-    title: "Monthly Earnings Summary",
-    message: `Your total monthly commission earnings stand at ${formatCurrency(data.summary.monthlyEarnings)}. Check Earnings tab for details.`,
-    date: new Date().toISOString(),
-    link: "/agent/earnings",
-    severity: "success",
-  });
-}
-
-// 3. Welcome / System Notification if list is empty
-if (notifications.length === 0) {
-  notifications.push({
-    id: "agent-welcome",
-    type: "System",
-    title: "Welcome to your Agent Portal",
-    message: "No current alerts. Go to Orders to submit a new sales workflow or Earnings to view commission summaries.",
-    date: new Date().toISOString(),
-    link: "/agent",
-    severity: "success",
-  });
-}
+const notifications = buildAgentNotifications(data);
 ---
 
 <section id="agent-notifications" class="admin-panel" aria-labelledby="agent-notifications-title" style="max-width: 48rem; margin: 0 auto;">
@@ -142,10 +91,10 @@ if (notifications.length === 0) {
     // Set up click handlers on list
     list.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
-      const markReadBtn = target.closest("[data-mark-read]");
-      if (markReadBtn) {
-        const item = target.closest(".notification-item") as HTMLElement;
-        if (item) {
+        const markReadBtn = target.closest("[data-mark-read]");
+        if (markReadBtn) {
+          const item = target.closest(".notification-item") as HTMLElement;
+          if (item) {
           const id = item.dataset.notificationId;
           if (id) {
             if (!readIds.includes(id)) {
@@ -153,6 +102,9 @@ if (notifications.length === 0) {
               localStorage.setItem("agent-read-notifications", JSON.stringify(readIds));
             }
             item.classList.add("read");
+            (
+              window as Window & { updateSidebarUnreadBadges?: () => void }
+            ).updateSidebarUnreadBadges?.();
           }
         }
       }
@@ -169,6 +121,9 @@ if (notifications.length === 0) {
           item.classList.add("read");
         });
         localStorage.setItem("agent-read-notifications", JSON.stringify(readIds));
+        (
+          window as Window & { updateSidebarUnreadBadges?: () => void }
+        ).updateSidebarUnreadBadges?.();
       });
     }
 
@@ -180,6 +135,9 @@ if (notifications.length === 0) {
         items.forEach((item) => {
           item.classList.remove("read");
         });
+        (
+          window as Window & { updateSidebarUnreadBadges?: () => void }
+        ).updateSidebarUnreadBadges?.();
       });
     }
   }

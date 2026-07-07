@@ -23,6 +23,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Activity"
   intro="Review recent order, customer, product, invoice, and content activity."
   feedback={feedback}
+  dashboardData={data}
 >
   <AdminActivity data={data} />
 </AdminPageFrame>

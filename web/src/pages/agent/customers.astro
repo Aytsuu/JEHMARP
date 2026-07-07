@@ -23,6 +23,7 @@ const feedback = formatAgentActionFeedback(Astro.url);
   heading="Customers"
   intro="Review customer records for your agent profile."
   feedback={feedback}
+  dashboardData={data}
 >
   <AgentCustomers data={data} />
 </AgentPageFrame>

@@ -23,6 +23,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Contact Inquiry Management"
   intro="Review contact inquiries and update status or internal notes."
   feedback={feedback}
+  dashboardData={data}
 >
   <AdminInquiryManagement data={data} inquiryStatuses={getInquiryStatuses()} />
 </AdminPageFrame>

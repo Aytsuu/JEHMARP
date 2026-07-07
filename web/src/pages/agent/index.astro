@@ -18,11 +18,12 @@ const feedback = formatAgentActionFeedback(Astro.url);
 ---
 
 <AgentPageFrame
-  title="Agent Dashboard - JEHMARP"
-  description="Agent dashboard for customers, submitted orders, payments, and commission workflows."
-  heading="Agent Dashboard"
+  title="Dashboard - JEHMARP"
+  description="Dashboard for customers, submitted orders, payments, and commission workflows."
+  heading="Dashboard"
   intro="Review customer records, submit customer orders, and track commission and payment status."
   feedback={feedback}
+  dashboardData={data}
 >
   <AgentDashboard data={data} />
 </AgentPageFrame>

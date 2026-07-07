@@ -39,6 +39,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading={`Customer Record: ${fullName(customer)}`}
   intro={`Review detailed profile contact details, reseller attributes, pending workflow orders, and order history.`}
   feedback={feedback}
+  dashboardData={data}
 >
   <div style="margin-bottom: 2rem;">
     <a href="/admin/customers" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">

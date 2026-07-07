@@ -46,6 +46,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading={`Invoice Details: ${invoice.invoice_number}`}
   intro={`Review detailed invoice line items, record payments, and download pdf copies for Invoice ${invoice.invoice_number}.`}
   feedback={feedback}
+  dashboardData={data}
 >
   <div style="margin-bottom: 2rem;">
     <a href="/admin/invoices" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">

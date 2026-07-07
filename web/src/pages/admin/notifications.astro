@@ -20,6 +20,7 @@ const data = await loadAdminDashboardData();
   description="System alerts and pending workflow indicators."
   heading="Notifications Center"
   intro="Review live actionable alerts regarding orders, inquiries, reseller signups, and database logs."
+  dashboardData={data}
 >
   <AdminNotifications data={data} />
 </AdminPageFrame>
