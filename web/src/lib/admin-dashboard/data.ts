@@ -124,6 +124,8 @@ export type AdminAgent = {
   user_id: string;
   display_name: string;
   status: "active" | "inactive" | "suspended";
+  email: string | null;
+  contact: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -364,7 +366,7 @@ async function loadProducts(supabase: SupabaseAdminClient) {
 async function loadAgents(supabase: SupabaseAdminClient) {
   const { data, error } = await supabase
     .from("agent_profile")
-    .select("id, user_id, display_name, status, created_at, updated_at")
+    .select("id, user_id, display_name, status, email, contact, created_at, updated_at")
     .order("display_name", { ascending: true });
 
   if (error) throw new Error("Unable to load admin agents.");

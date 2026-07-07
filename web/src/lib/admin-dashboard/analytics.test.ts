@@ -98,6 +98,8 @@ function createAnalyticsData(): AdminDashboardData {
       user_id: "22222222-2222-2222-2222-222222222222",
       display_name: "JEHMARP Agent",
       status: "active",
+      email: null,
+      contact: null,
       created_at: "2026-07-01T00:00:00.000Z",
       updated_at: "2026-07-01T00:00:00.000Z",
     }],

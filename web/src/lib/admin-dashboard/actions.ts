@@ -118,6 +118,8 @@ export type AdminAction =
       payload: {
         display_name: string;
         status: "active" | "inactive" | "suspended";
+        email?: string | null;
+        contact?: string | null;
         updated_at: string;
       };
     }
@@ -520,6 +522,8 @@ function parseAdminActionFormDataOrThrow(
         payload: {
           display_name: requiredString(formData, "displayName"),
           status: enumValue(formData, "status", ["active", "inactive", "suspended"] as const),
+          email: optionalString(formData, "email"),
+          contact: optionalString(formData, "contact"),
           updated_at: new Date().toISOString(),
         },
       });

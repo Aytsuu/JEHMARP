@@ -1,6 +1,7 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
-import { selected } from "@/lib/admin-dashboard/view";
+import { selected, formatDate } from "@/lib/admin-dashboard/view";
+import { autoCapitalize } from "@/lib/formatters";
 
 type Props = {
   data: AdminDashboardData;
@@ -10,11 +11,7 @@ const { data } = Astro.props;
 const agentStatuses = ["active", "inactive", "suspended"] as const;
 ---
 
-<section
-  id="admin-agents"
-  class="admin-panel"
-  aria-labelledby="admin-agents-title"
->
+<section id="admin-agents" class="admin-panel" aria-labelledby="admin-agents-title">
   <div class="hidden-create-form-holder" style="display: none;">
     <form method="post" class="admin-form" aria-label="Create agent">
       <input type="hidden" name="action" value="create-agent" />
@@ -25,11 +22,9 @@ const agentStatuses = ["active", "inactive", "suspended"] as const;
         <label class="field-row">
           <span>Status</span>
           <select name="status" required>
-            {
-              agentStatuses.map((status) => (
-                <option value={status}>{status}</option>
-              ))
-            }
+            {agentStatuses.map((status) => (
+              <option value={status}>{autoCapitalize(status)}</option>
+            ))}
           </select>
         </label>
       </div>
@@ -56,59 +51,119 @@ const agentStatuses = ["active", "inactive", "suspended"] as const;
     </div>
 
     <div class="table-wrap">
-      <table>
+      <table style="table-layout: fixed; width: 100%;">
         <thead>
           <tr>
-            <th scope="col">Agent</th>
-            <th scope="col">Status</th>
-            <th scope="col">Manage</th>
+            <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Agent</th>
+            <th scope="col" style="width: 22%; padding: 1.1rem 0.75rem;">Email</th>
+            <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Contact</th>
+            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Status</th>
+            <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Date Created</th>
+            <th scope="col" style="width: 12%; padding: 1.1rem 0.75rem;">Action</th>
           </tr>
         </thead>
         <tbody>
-          {
-            data.agents.map((agent) => (
-              <tr data-status={agent.status}>
-                <td>
-                  {agent.display_name}
-                  <br />
-                  <span>{agent.user_id}</span>
-                </td>
-                <td>{agent.status}</td>
-                <td>
-                  <a href={`/admin/agents/${agent.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block; margin-right: 0.5rem;">View</a>
-                  <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-                  <div class="hidden-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
-                      <input type="hidden" name="action" value="update-agent" />
-                      <input type="hidden" name="agentId" value={agent.id} />
-                      <label>
-                        <span>Display name</span>
-                        <input
-                          name="displayName"
-                          value={agent.display_name}
-                          required
-                        />
-                      </label>
-                      <label>
-                        <span>Status</span>
-                        <select name="status" required>
-                          {agentStatuses.map((status) => (
-                            <option
-                              value={status}
-                              selected={selected(agent.status, status)}
-                            >
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <button type="submit">Update agent</button>
-                    </form>
-                  </div>
-                </td>
-              </tr>
-            ))
-          }
+          {data.agents.map((agent) => (
+            <tr data-status={agent.status}>
+              <!-- 1. Agent Name Column (Editable Popover) -->
+              <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <button type="button" class="table-cell-trigger" data-open-cell-popover data-popover-title={`Edit Display Name: ${agent.display_name}`} style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
+                    {agent.display_name}
+                  </span>
+                </button>
+                
+                <div class="hidden-popover-form-holder" style="display: none;">
+                  <form method="post" class="admin-table-form">
+                    <input type="hidden" name="action" value="update-agent" />
+                    <input type="hidden" name="agentId" value={agent.id} />
+                    <input type="hidden" name="status" value={agent.status} />
+                    <input type="hidden" name="email" value={agent.email ?? ""} />
+                    <input type="hidden" name="contact" value={agent.contact ?? ""} />
+                    <label>
+                      <span>Display name</span>
+                      <input name="displayName" value={agent.display_name} required />
+                    </label>
+                    <button type="submit">Save</button>
+                  </form>
+                </div>
+              </td>
+
+              <!-- 2. Email Column (Editable Popover) -->
+              <td style="width: 22%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <button type="button" class="table-cell-trigger" data-open-cell-popover data-popover-title={`Edit Email: ${agent.display_name}`} style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
+                    {agent.email ?? "No email"}
+                  </span>
+                </button>
+                
+                <div class="hidden-popover-form-holder" style="display: none;">
+                  <form method="post" class="admin-table-form">
+                    <input type="hidden" name="action" value="update-agent" />
+                    <input type="hidden" name="agentId" value={agent.id} />
+                    <input type="hidden" name="displayName" value={agent.display_name} />
+                    <input type="hidden" name="status" value={agent.status} />
+                    <input type="hidden" name="contact" value={agent.contact ?? ""} />
+                    <label>
+                      <span>Email</span>
+                      <input name="email" type="email" value={agent.email ?? ""} />
+                    </label>
+                    <button type="submit">Save</button>
+                  </form>
+                </div>
+              </td>
+
+              <!-- 3. Contact Column (Editable Popover) -->
+              <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <button type="button" class="table-cell-trigger" data-open-cell-popover data-popover-title={`Edit Contact: ${agent.display_name}`} style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
+                    {agent.contact ?? "No contact"}
+                  </span>
+                </button>
+                
+                <div class="hidden-popover-form-holder" style="display: none;">
+                  <form method="post" class="admin-table-form">
+                    <input type="hidden" name="action" value="update-agent" />
+                    <input type="hidden" name="agentId" value={agent.id} />
+                    <input type="hidden" name="displayName" value={agent.display_name} />
+                    <input type="hidden" name="status" value={agent.status} />
+                    <input type="hidden" name="email" value={agent.email ?? ""} />
+                    <label>
+                      <span>Contact</span>
+                      <input name="contact" value={agent.contact ?? ""} />
+                    </label>
+                    <button type="submit">Save</button>
+                  </form>
+                </div>
+              </td>
+
+              <!-- 4. Status Column (Dropdown Autoupdate on Change) -->
+              <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                <form method="post" style="margin: 0; width: 100%;">
+                  <input type="hidden" name="action" value="update-agent" />
+                  <input type="hidden" name="agentId" value={agent.id} />
+                  <input type="hidden" name="displayName" value={agent.display_name} />
+                  <input type="hidden" name="email" value={agent.email ?? ""} />
+                  <input type="hidden" name="contact" value={agent.contact ?? ""} />
+                  <select name="status" onchange="this.closest('form').submit()" style="padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background-color: white; cursor: pointer; width: 100%;">
+                    {agentStatuses.map((status) => (
+                      <option value={status} selected={selected(agent.status, status)}>{autoCapitalize(status)}</option>
+                    ))}
+                  </select>
+                </form>
+              </td>
+
+              <!-- 5. Date Created Column -->
+              <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                {formatDate(agent.created_at)}
+              </td>
+
+              <!-- 6. Action Column -->
+              <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                <a href={`/admin/agents/${agent.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
+              </td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
