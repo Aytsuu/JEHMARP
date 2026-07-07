@@ -1,9 +1,7 @@
 ---
 import AdminOrderManagement from "@/components/admin/AdminOrderManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import {
-  formatAdminActionFeedback,
-} from "@/lib/admin-dashboard/actions";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
@@ -22,12 +20,10 @@ const feedback = formatAdminActionFeedback(Astro.url);
 <AdminPageFrame
   title="Admin Orders - JEHMARP"
   description="Admin order review, payment, invoice, and commission management."
-  heading="Order Review And Workflow"
+  heading="Order Management"
   intro="Review submitted orders, approve or reject, update status, edit commissions, record payments, and manage invoices."
   feedback={feedback}
   dashboardData={data}
 >
-  <AdminOrderManagement
-    data={data}
-  />
+  <AdminOrderManagement data={data} />
 </AdminPageFrame>

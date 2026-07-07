@@ -6,6 +6,7 @@ import {
   fullName,
   orderTotal,
 } from "@/lib/agent-dashboard/view";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 
 type Props = {
   data: AgentDashboardData;
@@ -163,16 +164,16 @@ const hasAssignedCustomers = data.customers.length > 0;
       </div>
 
       <div class="table-wrap">
-        <table>
+        <table style="table-layout: fixed; width: 100%;">
           <thead>
             <tr>
-              <th scope="col">Customer</th>
-              <th scope="col">Date</th>
-              <th scope="col">Source</th>
-              <th scope="col">Order Status</th>
-              <th scope="col">Payment Status</th>
-              <th scope="col">Order Total</th>
-              <th scope="col">Action</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Customer</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Date</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Source</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Order Status</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Payment Status</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Order Total</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -182,18 +183,16 @@ const hasAssignedCustomers = data.customers.length > 0;
 
               return (
                 <tr data-status={order.order_status}>
-                  <td>
-                    <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
-                    <br />
-                    <span>{order.customer?.phone_number ?? "N/A"}</span>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {order.customer ? fullName(order.customer) : "Guest"}
                   </td>
-                  <td>{formatDate(order.created_at)}</td>
-                  <td>{order.source}</td>
-                  <td>{order.order_status}</td>
-                  <td>{order.payment_status}</td>
-                  <td>{formatCurrency(total)}</td>
-                  <td>
-                    <a href={`/agent/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(order.created_at)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatOrderSource(order.source)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.order_status)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.payment_status)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(total)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                    <a href={`/agent/orders/${order.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
                   </td>
                 </tr>
               );

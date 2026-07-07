@@ -19,6 +19,7 @@ import {
   orderBalance,
   selected,
 } from "@/lib/admin-dashboard/view";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 
 export const prerender = false;
 
@@ -50,169 +51,228 @@ const feedback = formatAdminActionFeedback(Astro.url);
   intro={`Review order items, log customer payments, manage commissions, and generate invoices for Order #${order.id.slice(0, 8)}.`}
   feedback={feedback}
   dashboardData={data}
+  backUrl="/admin/orders"
 >
-  <div style="margin-bottom: 2rem;">
-    <a href="/admin/orders" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-      Back to Orders
-    </a>
-  </div>
+  <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 100%;">
+    <!-- 1. Order Information -->
+    <div class="content-section">
+      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Order Information</h3>
+      
+      <div class="order-info-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Customer</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {order.customer ? fullName(order.customer) : "Guest"}
+          </div>
+        </div>
+        
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Source</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {formatOrderSource(order.source)}
+          </div>
+        </div>
 
-  <div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem; align-items: start;">
-    <!-- Left Column: Items, Payments and Invoice PDF links -->
-    <div style="display: flex; flex-direction: column; gap: 2rem;">
-      <div class="content-section">
-        <h3>Order Items</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Product</th>
-                <th scope="col">Quantities</th>
-                {canManageCommissions && <th scope="col">Commission</th>}
-                {canManageCommissions && <th scope="col">Manage commission</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {order.customer_order_item.map((item) => (
-                <tr>
-                  <td>{item.product?.name ?? "Missing product"}</td>
-                  <td>
-                    Slip {item.partial_quantity}<br />
-                    Invoice {item.final_quantity}<br />
-                    {formatCurrency(item.unit_price)} {item.price_type}
-                  </td>
-                  {canManageCommissions && (
-                    <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
-                  )}
-                  {canManageCommissions && (
-                    <td>
-                      <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-                      <div class="hidden-form-holder" style="display: none;">
-                        <form method="post" class="admin-table-form">
-                          <input type="hidden" name="action" value="update-commission" />
-                          <input type="hidden" name="orderItemId" value={item.id} />
-                          <label><span>Amount</span><input name="amount" type="number" min="0" step="0.01" value={item.agent_commission_amount} required /></label>
-                          <label>
-                            <span>Status</span>
-                            <select name="status" required>
-                              {commissionStatuses.map((status) => (
-                                <option value={status} selected={selected(item.agent_commission_status, status)}>{status}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <label><span>Notes</span><textarea name="notes" set:html={escapeTextareaValue(item.agent_commission_notes)}></textarea></label>
-                          <button type="submit">Save commission</button>
-                        </form>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Order Status</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500; display: flex; align-items: center;">
+            <form method="post" style="margin: 0; width: 100%;">
+              <input type="hidden" name="action" value="update-order-status" />
+              <input type="hidden" name="orderId" value={order.id} />
+              <select name="orderStatus" onchange="this.closest('form').submit()" style="border: none; padding: 0; background: transparent; font-weight: 500; font-size: 1rem; color: #111827; width: 100%; cursor: pointer;" disabled={allowedStatuses.length === 0}>
+                <option value={order.order_status}>{autoCapitalize(order.order_status)}</option>
+                {allowedStatuses.map((status) => (
+                  <option value={status}>{autoCapitalize(status)}</option>
+                ))}
+              </select>
+            </form>
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Payment Status</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {autoCapitalize(order.payment_status)}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Order Total</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {formatCurrency(orderTotal(order, "partial_quantity"))}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Invoice Total</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {formatCurrency(orderTotal(order, "final_quantity"))}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Paid</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {formatCurrency(orderPaymentTotal(order))}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Balance</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {formatCurrency(orderBalance(order))}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Assigned Agent</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {order.agent?.display_name ?? "None"}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Approved At</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {formatDate(order.approved_at)}
+          </div>
         </div>
       </div>
 
-      <div class="content-section">
-        <h3>Payment History</h3>
-        {order.payment.length === 0 ? <p class="empty-state">No payments recorded.</p> : (
-          <ul class="compact-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem;">
-            {order.payment.map((payment) => (
-              <li style="padding: 0.75rem 1rem; background-color: var(--color-brand-cream); border-radius: 0.5rem; display: flex; justify-content: space-between;">
-                <span>{payment.payment_method} on {formatDate(payment.payment_date)}</span>
-                <strong>{formatCurrency(payment.amount)}</strong>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-
-    <!-- Right Column: Metadata, Actions, Status Update -->
-    <div style="display: flex; flex-direction: column; gap: 2rem;">
-      <div class="content-section">
-        <h3>Order Information</h3>
-        <dl class="detail-list" style="margin-bottom: 1.5rem;">
-          <dt>Customer</dt>
-          <dd>{order.customer ? fullName(order.customer) : "Guest"}<br/>{order.customer?.phone_number ?? "N/A"}</dd>
-          <dt>Source</dt>
-          <dd>{order.source}</dd>
-          <dt>Order status</dt>
-          <dd>{order.order_status}</dd>
-          <dt>Payment status</dt>
-          <dd>{order.payment_status}</dd>
-          <dt>Order total</dt>
-          <dd>{formatCurrency(orderTotal(order, "partial_quantity"))}</dd>
-          <dt>Invoice total</dt>
-          <dd>{formatCurrency(orderTotal(order, "final_quantity"))}</dd>
-          <dt>Paid</dt>
-          <dd>{formatCurrency(orderPaymentTotal(order))}</dd>
-          <dt>Balance</dt>
-          <dd>{formatCurrency(orderBalance(order))}</dd>
-          <dt>Assigned agent</dt>
-          <dd>{order.agent?.display_name ?? "None"}</dd>
-          <dt>Approved at</dt>
-          <dd>{formatDate(order.approved_at)}</dd>
-        </dl>
-
-        <p style="margin-top: 1.5rem;">
-          <OrderPdfLinks
-            orderId={order.id}
-            basePath="/admin/orders"
-            showSalesInvoice={Boolean(invoice)}
-          />
-        </p>
-      </div>
-
-      <div class="content-section" style="display: flex; flex-direction: column; gap: 1.5rem;">
-        <form method="post" class="admin-form" style="margin: 0;">
-          <input type="hidden" name="action" value="update-order-status" />
-          <input type="hidden" name="orderId" value={order.id} />
-          <h4>Update Order Status</h4>
-          <label class="field-row">
-            <span>Next status</span>
-            <select name="orderStatus" required>
-              <option value={order.order_status}>{order.order_status}</option>
-              {allowedStatuses.map((status) => <option value={status}>{status}</option>)}
-            </select>
-          </label>
-          <button type="submit" disabled={allowedStatuses.length === 0} style="width: 100%;">Update status</button>
-        </form>
-
-        <form method="post" class="admin-form" style="margin: 0;">
-          <input type="hidden" name="action" value="record-payment" />
-          <input type="hidden" name="orderId" value={order.id} />
-          <h4>Record payment</h4>
-          <label class="field-row"><span>Amount</span><input name="amount" type="number" min="0.01" step="0.01" required /></label>
-          <label class="field-row"><span>Method</span><input name="paymentMethod" required placeholder="cash, bank transfer" /></label>
-          <label class="field-row"><span>Payment date</span><input name="paymentDate" type="date" value={new Date().toISOString().slice(0, 10)} required /></label>
-          <label class="field-row"><span>Reference</span><input name="referenceNumber" /></label>
-          <label class="field-row"><span>Notes</span><textarea name="notes"></textarea></label>
-          <button type="submit" style="width: 100%;">Record payment</button>
-        </form>
-
-        {invoice ? (
-          <section class="admin-form" aria-labelledby={`order-invoice-${order.id}`} style="margin: 0;">
-            <h4 id={`order-invoice-${order.id}`}>Invoice {invoice.invoice_number}</h4>
-            <p>
-              <OrderPdfLinks
-                orderId={order.id}
-                basePath="/admin/orders"
-                showOrderSlip={false}
-                showSalesInvoice
-              />
-            </p>
-          </section>
-        ) : (
-          <form method="post" class="admin-form" style="margin: 0;">
+      <div class="pdf-links-container" style="margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center; border-top: 1px solid #e5e7eb; padding-top: 1.25rem; flex-wrap: wrap;">
+        <OrderPdfLinks
+          orderId={order.id}
+          basePath="/admin/orders"
+          showSalesInvoice={Boolean(invoice)}
+        />
+        {!invoice && (
+          <form method="post" style="margin: 0;">
             <input type="hidden" name="action" value="save-invoice" />
             <input type="hidden" name="orderId" value={order.id} />
-            <h4>Create invoice</h4>
-            <button type="submit" style="width: 100%;">Create invoice</button>
+            <button type="submit" class="btn-secondary" style="padding: 0.5rem 1rem; border-radius: 0.375rem; text-transform: none; font-size: 0.85rem; font-weight: 600; letter-spacing: normal; cursor: pointer;">Create Sales Invoice</button>
           </form>
         )}
       </div>
     </div>
+
+    <!-- 2. Order Items -->
+    <div class="content-section">
+      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Order Items</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Product</th>
+              <th scope="col">Quantities</th>
+              {canManageCommissions && <th scope="col">Commission</th>}
+              {canManageCommissions && <th scope="col">Manage commission</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {order.customer_order_item.map((item) => (
+              <tr>
+                <td>{item.product?.name ?? "Missing product"}</td>
+                <td>
+                  Slip {item.partial_quantity}<br />
+                  Invoice {item.final_quantity}<br />
+                  {formatCurrency(item.unit_price)} {item.price_type}
+                </td>
+                {canManageCommissions && (
+                  <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
+                )}
+                {canManageCommissions && (
+                  <td>
+                    <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+                    <div class="hidden-form-holder" style="display: none;">
+                      <form method="post" class="admin-table-form">
+                        <input type="hidden" name="action" value="update-commission" />
+                        <input type="hidden" name="orderItemId" value={item.id} />
+                        <label><span>Amount</span><input name="amount" type="number" min="0" step="0.01" value={item.agent_commission_amount} required /></label>
+                        <label>
+                          <span>Status</span>
+                          <select name="status" required>
+                            {commissionStatuses.map((status) => (
+                              <option value={status} selected={selected(item.agent_commission_status, status)}>{status}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label><span>Notes</span><textarea name="notes" set:html={escapeTextareaValue(item.agent_commission_notes)}></textarea></label>
+                        <button type="submit">Save commission</button>
+                      </form>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 3. Payment History -->
+    <div class="content-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <h3 style="margin: 0;">Payment History</h3>
+        
+        <div class="admin-panel" style="border: none; padding: 0; margin: 0; box-shadow: none; display: inline-block;">
+          <button type="button" class="btn-table-manage" data-open-create-sheet style="text-transform: none; font-size: 0.9rem; font-weight: 600; letter-spacing: normal;">Record Payment</button>
+          
+          <div class="hidden-create-form-holder" style="display: none;">
+            <form method="post" class="admin-form" style="margin: 0;">
+              <input type="hidden" name="action" value="record-payment" />
+              <input type="hidden" name="orderId" value={order.id} />
+              <label class="field-row"><span>Amount</span><input name="amount" type="number" min="0.01" step="0.01" required /></label>
+              <label class="field-row"><span>Method</span><input name="paymentMethod" required placeholder="cash, bank transfer" /></label>
+              <label class="field-row"><span>Payment date</span><input name="paymentDate" type="date" value={new Date().toISOString().slice(0, 10)} required /></label>
+              <label class="field-row"><span>Reference</span><input name="referenceNumber" /></label>
+              <label class="field-row"><span>Notes</span><textarea name="notes"></textarea></label>
+              <button type="submit" style="width: 100%;">Record payment</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {order.payment.length === 0 ? (
+        <p class="empty-state">No payments recorded.</p>
+      ) : (
+        <ul class="compact-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; margin: 0;">
+          {order.payment.map((payment) => (
+            <li style="padding: 0.75rem 1rem; background-color: var(--color-brand-cream); border-radius: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+              <span>{payment.payment_method} on {formatDate(payment.payment_date)}</span>
+              <strong>{formatCurrency(payment.amount)}</strong>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   </div>
 </AdminPageFrame>
+
+<style>
+  /* Remove shadows on cards, add matching gray border and border-radius */
+  .content-section {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 0.75rem !important;
+  }
+  
+  /* PDF Links aesthetics */
+  .pdf-links-container a {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.5rem 1rem;
+    border: 1px solid rgba(102, 24, 24, 0.15);
+    border-radius: 0.375rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    color: var(--color-brand-muted-black);
+    background-color: #ffffff;
+    transition: all 0.2s ease;
+  }
+  .pdf-links-container a:hover {
+    background-color: #f3f4f6;
+    border-color: var(--color-brand-muted-black);
+    color: #111827;
+  }
+</style>

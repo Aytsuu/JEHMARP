@@ -6,6 +6,7 @@ import {
   fullName,
   orderTotal,
 } from "@/lib/admin-dashboard/view";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 
 type Props = {
   data: AdminDashboardData;
@@ -196,17 +197,17 @@ const customerOptions = data.customers.map((customer) => ({
       </div>
 
       <div class="table-wrap">
-        <table>
+        <table style="table-layout: fixed; width: 100%;">
           <thead>
             <tr>
-              <th scope="col">Customer</th>
-              <th scope="col">Date</th>
-              <th scope="col">Source</th>
-              <th scope="col">Order Status</th>
-              <th scope="col">Payment Status</th>
-              <th scope="col">Order Total</th>
-              <th scope="col">Action</th>
-              <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
+              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Customer</th>
+              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Date</th>
+              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Source</th>
+              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Order Status</th>
+              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Payment Status</th>
+              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Order Total</th>
+              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Action</th>
+              <th scope="col" class="unread-record-heading" style="width: 2%; padding: 1.1rem 0.75rem;"><span class="sr-only">Unread</span></th>
             </tr>
           </thead>
           <tbody>
@@ -220,25 +221,23 @@ const customerOptions = data.customers.map((customer) => ({
 
               return (
                 <tr data-status={order.order_status}>
-                  <td>
-                    <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
-                    <br />
-                    <span>{order.customer?.phone_number ?? "N/A"}</span>
+                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {order.customer ? fullName(order.customer) : "Guest"}
                   </td>
-                  <td>{formatDate(order.created_at)}</td>
-                  <td>{order.source}</td>
-                  <td>{order.order_status}</td>
-                  <td>{order.payment_status}</td>
-                  <td>{formatCurrency(total)}</td>
-                  <td>
+                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(order.created_at)}</td>
+                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatOrderSource(order.source)}</td>
+                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.order_status)}</td>
+                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.payment_status)}</td>
+                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(total)}</td>
+                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                     <form method="post" style="margin: 0;">
                       <input type="hidden" name="action" value="mark-order-read" />
                       <input type="hidden" name="orderId" value={order.id} />
                       <input type="hidden" name="returnTo" value={`/admin/orders/${order.id}`} />
-                      <button type="submit" class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</button>
+                      <button type="submit" class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</button>
                     </form>
                   </td>
-                  <td class="unread-record-cell">
+                  <td class="unread-record-cell" style="width: 2%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                     {isUnread && <span class="record-unread-dot" aria-label="Unread"></span>}
                   </td>
                 </tr>
