@@ -8,7 +8,10 @@ import {
   formatDate,
   fullName,
   orderTotal,
+  selected,
+  escapeTextareaValue,
 } from "@/lib/admin-dashboard/view";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 
 export const prerender = false;
 
@@ -40,127 +43,208 @@ const feedback = formatAdminActionFeedback(Astro.url);
   intro={`Review detailed profile contact details, reseller attributes, pending workflow orders, and order history.`}
   feedback={feedback}
   dashboardData={data}
+  backUrl="/admin/customers"
 >
-  <div style="margin-bottom: 2rem;">
-    <a href="/admin/customers" class="btn-secondary" style="text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem;">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-      Back to Customers
-    </a>
-  </div>
-
-  <div class="admin-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); gap: 2rem; align-items: start; margin-bottom: 2rem;">
-    <!-- Left Column: Customer Details -->
+  <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 100%;">
+    <!-- 1. Customer Profile -->
     <div class="content-section">
-      <h3>Customer Profile</h3>
-      <dl class="detail-list">
-        <dt>Name</dt>
-        <dd>{fullName(customer)}</dd>
-        <dt>Phone number</dt>
-        <dd>{customer.phone_number}</dd>
-        <dt>Email</dt>
-        <dd>{customer.email ?? "No email"}</dd>
-        <dt>Type</dt>
-        <dd>{customer.is_reseller ? "Reseller Customer" : "Retail Customer"}</dd>
-        <dt>Assigned Agent</dt>
-        <dd>{assignedAgent ? assignedAgent.display_name : "None"}</dd>
-        <dt>Billing Address</dt>
-        <dd style="white-space: pre-line;">{customer.address}</dd>
-      </dl>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+        <h3 style="margin: 0;">Customer Profile</h3>
+        
+        <div class="admin-panel" style="border: none; padding: 0; margin: 0; box-shadow: none; display: inline-block;">
+          <button type="button" class="btn-table-manage" data-open-create-sheet style="text-transform: none; font-size: 0.9rem; font-weight: 600; letter-spacing: normal;">Edit Profile</button>
+          
+          <div class="hidden-create-form-holder" style="display: none;">
+            <form method="post" class="admin-form" style="margin: 0;">
+              <input type="hidden" name="action" value="save-customer" />
+              <input type="hidden" name="customerId" value={customer.id} />
+              <label class="field-row"><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
+              <label class="field-row"><span>Last name</span><input name="lastName" value={customer.last_name} required /></label>
+              <label class="field-row"><span>Phone</span><input name="phoneNumber" value={customer.phone_number} required /></label>
+              <label class="field-row"><span>Email</span><input name="email" type="email" value={customer.email ?? ""} /></label>
+              <label class="checkbox-row" style="margin-bottom: 1rem;">
+                <input name="isReseller" type="checkbox" checked={customer.is_reseller} />
+                <span>Reseller customer</span>
+              </label>
+              <label class="field-row">
+                <span>Agent</span>
+                <select name="assignedAgentId">
+                  <option value="">None</option>
+                  {data.agents.map((agent) => (
+                    <option value={agent.id} selected={selected(customer.assigned_agent_id, agent.id)}>
+                      {agent.display_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label class="field-row"><span>Address</span><textarea name="address" required set:html={escapeTextareaValue(customer.address)}></textarea></label>
+              <button type="submit" style="width: 100%;">Update customer</button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div class="customer-info-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Name</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {fullName(customer)}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Phone number</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {customer.phone_number}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Email</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {customer.email ?? "No email"}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Type</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {customer.is_reseller ? "Reseller Customer" : "Retail Customer"}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Assigned Agent</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {assignedAgent ? assignedAgent.display_name : "None"}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem; grid-column: 1 / -1;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Billing Address</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500; white-space: pre-line;">
+            {customer.address}
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Right Column: Order Summary Totals -->
+    <!-- 2. Orders Summary -->
     <div class="content-section">
-      <h3>Orders Summary</h3>
-      <dl class="detail-list">
-        <dt>Total orders</dt>
-        <dd>{customerOrders.length}</dd>
-        <dt>Pending orders</dt>
-        <dd>{pendingOrders.length}</dd>
-        <dt>Historical orders</dt>
-        <dd>{historicalOrders.length}</dd>
-      </dl>
+      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Orders Summary</h3>
+      <div class="orders-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Total orders</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {customerOrders.length}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Pending orders</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {pendingOrders.length}
+          </div>
+        </div>
+
+        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
+          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Historical orders</span>
+          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+            {historicalOrders.length}
+          </div>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <!-- Pending Orders -->
-  <div class="content-section" style="margin-bottom: 2rem;">
-    <h3>Pending Orders ({pendingOrders.length})</h3>
-    {pendingOrders.length === 0 ? (
-      <p class="empty-state">No pending orders found for this customer.</p>
-    ) : (
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Order Date</th>
-              <th scope="col">Source</th>
-              <th scope="col">Order Status</th>
-              <th scope="col">Payment Status</th>
-              <th scope="col">Total</th>
-              <th scope="col">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pendingOrders.map((order) => {
-              const invoice = order.invoice[0];
-              const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
-              return (
-                <tr>
-                  <td>{formatDate(order.created_at)}</td>
-                  <td>{order.source}</td>
-                  <td>{order.order_status}</td>
-                  <td>{order.payment_status}</td>
-                  <td>{formatCurrency(total)}</td>
-                  <td>
-                    <a href={`/admin/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </div>
+    <!-- 3. Pending Orders -->
+    <div class="content-section">
+      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Pending Orders ({pendingOrders.length})</h3>
+      {pendingOrders.length === 0 ? (
+        <p class="empty-state">No pending orders found for this customer.</p>
+      ) : (
+        <div class="table-wrap">
+          <table style="table-layout: fixed; width: 100%;">
+            <thead>
+              <tr>
+                <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Date</th>
+                <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Source</th>
+                <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Status</th>
+                <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Payment Status</th>
+                <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Total</th>
+                <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pendingOrders.map((order) => {
+                const invoice = order.invoice[0];
+                const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+                return (
+                  <tr>
+                    <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(order.created_at)}</td>
+                    <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatOrderSource(order.source)}</td>
+                    <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.order_status)}</td>
+                    <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.payment_status)}</td>
+                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(total)}</td>
+                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                      <a href={`/admin/orders/${order.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
 
-  <!-- Historical Orders -->
-  <div class="content-section">
-    <h3>Historical & Closed Orders ({historicalOrders.length})</h3>
-    {historicalOrders.length === 0 ? (
-      <p class="empty-state">No historical or closed orders found for this customer.</p>
-    ) : (
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col">Order Date</th>
-              <th scope="col">Source</th>
-              <th scope="col">Order Status</th>
-              <th scope="col">Payment Status</th>
-              <th scope="col">Total</th>
-              <th scope="col">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {historicalOrders.map((order) => {
-              const invoice = order.invoice[0];
-              const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
-              return (
-                <tr>
-                  <td>{formatDate(order.created_at)}</td>
-                  <td>{order.source}</td>
-                  <td>{order.order_status}</td>
-                  <td>{order.payment_status}</td>
-                  <td>{formatCurrency(total)}</td>
-                  <td>
-                    <a href={`/admin/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    )}
+    <!-- 4. Historical Orders -->
+    <div class="content-section">
+      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Historical & Closed Orders ({historicalOrders.length})</h3>
+      {historicalOrders.length === 0 ? (
+        <p class="empty-state">No historical or closed orders found for this customer.</p>
+      ) : (
+        <div class="table-wrap">
+          <table style="table-layout: fixed; width: 100%;">
+            <thead>
+              <tr>
+                <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Date</th>
+                <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Source</th>
+                <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Status</th>
+                <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Payment Status</th>
+                <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Total</th>
+                <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {historicalOrders.map((order) => {
+                const invoice = order.invoice[0];
+                const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+                return (
+                  <tr>
+                    <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(order.created_at)}</td>
+                    <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatOrderSource(order.source)}</td>
+                    <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.order_status)}</td>
+                    <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.payment_status)}</td>
+                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(total)}</td>
+                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                      <a href={`/admin/orders/${order.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   </div>
 </AdminPageFrame>
+
+<style>
+  /* Remove shadows on cards, add matching gray border and border-radius */
+  .content-section {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 0.75rem !important;
+  }
+</style>

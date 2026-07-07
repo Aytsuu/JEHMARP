@@ -1,10 +1,6 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
-import {
-  escapeTextareaValue,
-  fullName,
-  selected,
-} from "@/lib/admin-dashboard/view";
+import { fullName } from "@/lib/admin-dashboard/view";
 
 type Props = {
   data: AdminDashboardData;
@@ -32,55 +28,37 @@ const { data } = Astro.props;
     </div>
 
     <div class="table-wrap">
-      <table>
+      <table style="table-layout: fixed; width: 100%;">
         <thead>
           <tr>
-            <th scope="col">Customer</th>
-            <th scope="col">Contact</th>
-            <th scope="col">Assigned agent</th>
-            <th scope="col">Manage</th>
+            <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Customer</th>
+            <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Email</th>
+            <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Contact</th>
+            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Type</th>
+            <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Assigned Agent</th>
+            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Action</th>
           </tr>
         </thead>
         <tbody>
           {data.customers.map((customer) => (
             <tr>
-              <td>{fullName(customer)}</td>
-              <td>
-                {customer.phone_number}<br />
-                {customer.email ?? "No email"}<br />
+              <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {fullName(customer)}
+              </td>
+              <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {customer.email ?? "No email"}
+              </td>
+              <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {customer.phone_number}
+              </td>
+              <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                 {customer.is_reseller ? "Reseller" : "Retail"}
               </td>
-              <td>{data.agents.find((agent) => agent.id === customer.assigned_agent_id)?.display_name ?? "None"}</td>
-              <td>
-                <a href={`/admin/customers/${customer.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block; margin-right: 0.5rem;">View</a>
-                <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-                <div class="hidden-form-holder" style="display: none;">
-                  <form method="post" class="admin-table-form">
-                    <input type="hidden" name="action" value="save-customer" />
-                    <input type="hidden" name="customerId" value={customer.id} />
-                    <label><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
-                    <label><span>Last name</span><input name="lastName" value={customer.last_name} required /></label>
-                    <label><span>Phone</span><input name="phoneNumber" value={customer.phone_number} required /></label>
-                    <label><span>Email</span><input name="email" type="email" value={customer.email ?? ""} /></label>
-                    <label class="checkbox-row">
-                      <input name="isReseller" type="checkbox" checked={customer.is_reseller} />
-                      <span>Reseller customer</span>
-                    </label>
-                    <label>
-                      <span>Agent</span>
-                      <select name="assignedAgentId">
-                        <option value="">None</option>
-                        {data.agents.map((agent) => (
-                          <option value={agent.id} selected={selected(customer.assigned_agent_id, agent.id)}>
-                            {agent.display_name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label><span>Address</span><textarea name="address" required set:html={escapeTextareaValue(customer.address)}></textarea></label>
-                    <button type="submit">Update customer</button>
-                  </form>
-                </div>
+              <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {data.agents.find((agent) => agent.id === customer.assigned_agent_id)?.display_name ?? "None"}
+              </td>
+              <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                <a href={`/admin/customers/${customer.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
               </td>
             </tr>
           ))}
