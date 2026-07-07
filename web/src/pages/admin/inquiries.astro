@@ -1,7 +1,11 @@
 ---
 import AdminInquiryManagement from "@/components/admin/AdminInquiryManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import { formatAdminActionFeedback, getInquiryStatuses } from "@/lib/admin-dashboard/actions";
+import {
+  formatAdminActionFeedback,
+  getInquiryStatuses,
+  markUnreadAdminInquiriesRead,
+} from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
@@ -12,6 +16,8 @@ const adminRoute = await requireAdminRoute(Astro);
 if (!adminRoute.ready) {
   return adminRoute.response;
 }
+
+await markUnreadAdminInquiriesRead(Astro, adminRoute.userId);
 
 const data = await loadAdminDashboardData();
 const feedback = formatAdminActionFeedback(Astro.url);

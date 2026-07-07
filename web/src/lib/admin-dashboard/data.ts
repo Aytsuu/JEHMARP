@@ -20,6 +20,8 @@ const adminOrderSelect = `
   order_status,
   payment_status,
   approved_at,
+  admin_read_at,
+  admin_read_by,
   created_at,
   updated_at,
   customer:customer_id (
@@ -195,6 +197,8 @@ export type AdminOrder = {
   order_status: OrderStatus;
   payment_status: "unpaid" | "partial" | "paid" | "refunded" | "void";
   approved_at: string | null;
+  admin_read_at?: string | null;
+  admin_read_by?: string | null;
   created_at: string;
   updated_at: string;
   customer: AdminOrderCustomer | null;
@@ -213,6 +217,8 @@ export type AdminContactInquiry = {
   message: string;
   inquiry_status: InquiryStatus;
   internal_notes: string | null;
+  admin_read_at?: string | null;
+  admin_read_by?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -228,6 +234,8 @@ export type AdminResellerApplication = {
   email_delivery_status: "pending" | "sent" | "failed";
   price_list_sent_at: string | null;
   email_error: string | null;
+  admin_read_at?: string | null;
+  admin_read_by?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -412,7 +420,7 @@ async function loadContactInquiries(supabase: SupabaseAdminClient, limit: number
   const { data, error } = await supabase
     .from("contact_inquiry")
     .select(
-      "id, name, email, phone_number, message, inquiry_status, internal_notes, created_at, updated_at",
+      "id, name, email, phone_number, message, inquiry_status, internal_notes, admin_read_at, admin_read_by, created_at, updated_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -426,7 +434,7 @@ async function loadResellerApplications(supabase: SupabaseAdminClient, limit: nu
   const { data, error } = await supabase
     .from("reseller_application")
     .select(
-      "id, name, email, contact_number, planned_transaction_type, expected_quantity_per_week, application_status, email_delivery_status, price_list_sent_at, email_error, created_at, updated_at",
+      "id, name, email, contact_number, planned_transaction_type, expected_quantity_per_week, application_status, email_delivery_status, price_list_sent_at, email_error, admin_read_at, admin_read_by, created_at, updated_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);

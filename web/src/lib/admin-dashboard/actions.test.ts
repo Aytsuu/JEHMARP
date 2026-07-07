@@ -354,9 +354,39 @@ describe("parseAdminActionFormData", () => {
         applicationId: "45e73d23-f25f-4de7-ae3a-ebcf34e995f1",
         payload: {
           application_status: "contacted",
+          admin_read_at: expect.any(String),
+          admin_read_by: adminUserId,
           updated_at: expect.any(String),
         },
       },
+    });
+  });
+
+  it("parses order read actions with safe admin return paths", () => {
+    const formData = new FormData();
+    formData.set("action", "mark-order-read");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("returnTo", "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "mark-order-read",
+        orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        returnTo: "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      },
+    });
+  });
+
+  it("rejects read-action return paths outside the admin dashboard", () => {
+    const formData = new FormData();
+    formData.set("action", "mark-order-read");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("returnTo", "https://example.test/admin/orders");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Return path is not supported."],
     });
   });
 

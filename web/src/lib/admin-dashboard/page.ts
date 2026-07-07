@@ -13,6 +13,7 @@ type AdminRouteContext = Pick<APIContext, "cookies" | "request" | "redirect" | "
 
 type AdminRouteReady = {
   ready: true;
+  userId: string;
 };
 
 type AdminRouteResponse = {
@@ -80,6 +81,7 @@ export async function requireAdminRoute(
 
   return {
     ready: true,
+    userId: user.id,
   };
 }
 

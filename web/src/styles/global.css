@@ -726,6 +726,18 @@
     @apply w-full overflow-x-auto;
   }
 
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
   table {
     @apply w-full border-collapse text-left;
   }
@@ -749,6 +761,44 @@
     @apply bg-gray-100;
     font-size: 1rem;
     font-weight: 600;
+  }
+
+  .unread-record-heading,
+  .unread-record-cell {
+    width: 3rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .unread-record-form {
+    display: inline-flex;
+    margin: 0;
+  }
+
+  .unread-record-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 9999px;
+    cursor: pointer;
+  }
+
+  .unread-record-button:hover:not(:disabled) {
+    background-color: rgba(236, 181, 93, 0.18);
+  }
+
+  .record-unread-dot {
+    display: inline-block;
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 9999px;
+    background-color: var(--color-brand-gold);
+    box-shadow: 0 0 0 3px rgba(236, 181, 93, 0.18);
   }
 
   td span {

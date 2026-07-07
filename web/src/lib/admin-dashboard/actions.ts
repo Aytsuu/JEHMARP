@@ -156,8 +156,15 @@ export type AdminAction =
         order_status: OrderStatus;
         approved_by?: string | null;
         approved_at?: string | null;
+        admin_read_at: string;
+        admin_read_by: string;
         updated_at: string;
       };
+    }
+  | {
+      type: "mark-order-read";
+      orderId: string;
+      returnTo?: string;
     }
   | {
       type: "update-commission";
@@ -199,16 +206,35 @@ export type AdminAction =
       payload: {
         inquiry_status: InquiryStatus;
         internal_notes: string | null;
+        admin_read_at: string;
+        admin_read_by: string;
         updated_at: string;
       };
+    }
+  | {
+      type: "mark-inquiry-read";
+      inquiryId: string;
     }
   | {
       type: "update-reseller-application";
       applicationId: string;
       payload: {
         application_status: ResellerApplicationStatus;
+        admin_read_at: string;
+        admin_read_by: string;
         updated_at: string;
       };
+    }
+  | {
+      type: "mark-reseller-application-read";
+      applicationId: string;
+    }
+  | {
+      type: "mark-admin-notification-read";
+      notificationId: string;
+    }
+  | {
+      type: "mark-all-admin-notifications-read";
     };
 
 export function parseAdminActionFormData(
@@ -240,18 +266,41 @@ export async function handleAdminDashboardAction(
   }
 
   try {
-    await executeAdminAction(createSupabaseServerClient(context), parsed.action);
+    await executeAdminAction(createSupabaseServerClient(context), parsed.action, adminUserId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Admin action failed.";
     return context.redirect(`${returnPath}?error=${encodeURIComponent(message)}`, 303);
   }
 
-  return context.redirect(`${returnPath}?status=${encodeURIComponent(getActionSuccessMessage(parsed.action))}`, 303);
+  return context.redirect(
+    withActionFeedback(
+      getActionRedirectPath(parsed.action, returnPath),
+      "status",
+      getActionSuccessMessage(parsed.action),
+    ),
+    303,
+  );
+}
+
+export async function markUnreadAdminInquiriesRead(
+  context: Pick<APIContext, "cookies" | "request">,
+  adminUserId: string,
+) {
+  const { error } = await createSupabaseServerClient(context)
+    .from("contact_inquiry")
+    .update(adminReadPayload(adminUserId))
+    .eq("inquiry_status", "new")
+    .is("admin_read_at", null);
+
+  if (error) {
+    throw new Error("Unable to mark inquiries as read.");
+  }
 }
 
 export async function executeAdminAction(
   supabase: SupabaseServerClient,
   action: AdminAction,
+  adminUserId = "00000000-0000-4000-8000-000000000000",
 ): Promise<void> {
   switch (action.type) {
     case "save-page-section":
@@ -282,20 +331,37 @@ export async function executeAdminAction(
     case "update-order-status":
       await executeTableUpdate(supabase, "customer_order", action.orderId, action.payload);
       return;
+    case "mark-order-read":
+      await markAdminRecordRead(supabase, "customer_order", action.orderId, adminReadPayload(adminUserId));
+      return;
     case "update-commission":
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
     case "record-payment":
       await executeTableInsert(supabase, "payment", action.payload);
+      await markAdminRecordRead(supabase, "customer_order", action.payload.order_id, adminReadPayload(action.payload.recorded_by));
       return;
     case "save-invoice":
       await executeTableUpsert(supabase, "invoice", action.invoiceId, action.payload);
+      await markAdminRecordRead(supabase, "customer_order", action.payload.order_id, adminReadPayload(adminUserId));
       return;
     case "update-inquiry":
       await executeTableUpdate(supabase, "contact_inquiry", action.inquiryId, action.payload);
       return;
+    case "mark-inquiry-read":
+      await markAdminRecordRead(supabase, "contact_inquiry", action.inquiryId, adminReadPayload(adminUserId));
+      return;
     case "update-reseller-application":
       await executeTableUpdate(supabase, "reseller_application", action.applicationId, action.payload);
+      return;
+    case "mark-reseller-application-read":
+      await markAdminRecordRead(supabase, "reseller_application", action.applicationId, adminReadPayload(adminUserId));
+      return;
+    case "mark-admin-notification-read":
+      await markAdminNotificationRead(supabase, action.notificationId, adminUserId);
+      return;
+    case "mark-all-admin-notifications-read":
+      await markAllAdminNotificationsRead(supabase, adminUserId);
       return;
   }
 }
@@ -474,10 +540,17 @@ function parseAdminActionFormDataOrThrow(
           order_status: nextStatus,
           approved_by: nextStatus === "approved" ? adminUserId : undefined,
           approved_at: nextStatus === "approved" ? new Date().toISOString() : undefined,
+          ...adminReadPayload(adminUserId),
           updated_at: new Date().toISOString(),
         },
       });
     }
+    case "mark-order-read":
+      return success({
+        type: "mark-order-read",
+        orderId: uuidSchema.parse(requiredString(formData, "orderId")),
+        returnTo: optionalAdminReturnPath(formData, "returnTo"),
+      });
     case "update-commission": {
       const status = enumValue(formData, "status", commissionStatuses);
       return success({
@@ -532,8 +605,14 @@ function parseAdminActionFormDataOrThrow(
         payload: {
           inquiry_status: enumValue(formData, "inquiryStatus", inquiryStatuses),
           internal_notes: optionalString(formData, "internalNotes"),
+          ...adminReadPayload(adminUserId),
           updated_at: new Date().toISOString(),
         },
+      });
+    case "mark-inquiry-read":
+      return success({
+        type: "mark-inquiry-read",
+        inquiryId: uuidSchema.parse(requiredString(formData, "inquiryId")),
       });
     case "update-reseller-application":
       return success({
@@ -541,8 +620,23 @@ function parseAdminActionFormDataOrThrow(
         applicationId: uuidSchema.parse(requiredString(formData, "applicationId")),
         payload: {
           application_status: enumValue(formData, "applicationStatus", resellerApplicationStatuses),
+          ...adminReadPayload(adminUserId),
           updated_at: new Date().toISOString(),
         },
+      });
+    case "mark-reseller-application-read":
+      return success({
+        type: "mark-reseller-application-read",
+        applicationId: uuidSchema.parse(requiredString(formData, "applicationId")),
+      });
+    case "mark-admin-notification-read":
+      return success({
+        type: "mark-admin-notification-read",
+        notificationId: requiredString(formData, "notificationId"),
+      });
+    case "mark-all-admin-notifications-read":
+      return success({
+        type: "mark-all-admin-notifications-read",
       });
     default:
       throw new Error("Unknown admin action.");
@@ -797,6 +891,101 @@ async function executeTableUpdate(
   if (error) throw new Error(`Unable to update ${table.replaceAll("_", " ")}.`);
 }
 
+type AdminReadableTable =
+  | "customer_order"
+  | "contact_inquiry"
+  | "reseller_application";
+
+function adminReadPayload(adminUserId: string) {
+  return {
+    admin_read_at: new Date().toISOString(),
+    admin_read_by: adminUserId,
+  };
+}
+
+async function markAdminRecordRead(
+  supabase: SupabaseServerClient,
+  table: AdminReadableTable,
+  id: string,
+  payload: ReturnType<typeof adminReadPayload>,
+) {
+  await executeTableUpdate(supabase, table, id, payload);
+}
+
+async function markAdminNotificationRead(
+  supabase: SupabaseServerClient,
+  notificationId: string,
+  adminUserId: string,
+) {
+  const target = adminNotificationTarget(notificationId);
+
+  await markAdminRecordRead(
+    supabase,
+    target.table,
+    target.id,
+    adminReadPayload(adminUserId),
+  );
+}
+
+async function markAllAdminNotificationsRead(
+  supabase: SupabaseServerClient,
+  adminUserId: string,
+) {
+  const payload = adminReadPayload(adminUserId);
+  const results = await Promise.all([
+    supabase
+      .from("customer_order")
+      .update(payload)
+      .eq("order_status", "submitted")
+      .neq("source", "admin_manual")
+      .is("admin_read_at", null),
+    supabase
+      .from("contact_inquiry")
+      .update(payload)
+      .eq("inquiry_status", "new")
+      .is("admin_read_at", null),
+    supabase
+      .from("reseller_application")
+      .update(payload)
+      .eq("application_status", "submitted")
+      .is("admin_read_at", null),
+  ]);
+
+  const failedResult = results.find((result) => result.error);
+
+  if (failedResult?.error) {
+    throw new Error("Unable to mark admin notifications as read.");
+  }
+}
+
+function adminNotificationTarget(notificationId: string): {
+  table: AdminReadableTable;
+  id: string;
+} {
+  if (notificationId.startsWith("reseller-app-")) {
+    return {
+      table: "reseller_application",
+      id: uuidSchema.parse(notificationId.slice("reseller-app-".length)),
+    };
+  }
+
+  if (notificationId.startsWith("order-pending-")) {
+    return {
+      table: "customer_order",
+      id: uuidSchema.parse(notificationId.slice("order-pending-".length)),
+    };
+  }
+
+  if (notificationId.startsWith("inquiry-new-")) {
+    return {
+      table: "contact_inquiry",
+      id: uuidSchema.parse(notificationId.slice("inquiry-new-".length)),
+    };
+  }
+
+  throw new Error("Notification cannot be marked as read.");
+}
+
 async function uploadProductImage(
   supabase: SupabaseAdminClient,
   file: ProductImageFile,
@@ -864,6 +1053,18 @@ function optionalUuid(formData: FormData, key: string) {
   const value = optionalString(formData, key);
 
   return value ? uuidSchema.parse(value) : undefined;
+}
+
+function optionalAdminReturnPath(formData: FormData, key: string) {
+  const value = optionalString(formData, key);
+
+  if (!value) return undefined;
+
+  if (!value.startsWith("/admin") || value.startsWith("//")) {
+    throw new Error("Return path is not supported.");
+  }
+
+  return value;
 }
 
 function requiredUuid(formData: FormData, key: string) {
@@ -1062,6 +1263,8 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Order created.";
     case "update-order-status":
       return "Order status updated.";
+    case "mark-order-read":
+      return "Order marked as read.";
     case "update-commission":
       return "Commission updated.";
     case "record-payment":
@@ -1070,9 +1273,31 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Invoice saved.";
     case "update-inquiry":
       return "Inquiry updated.";
+    case "mark-inquiry-read":
+      return "Inquiry marked as read.";
     case "update-reseller-application":
       return "Reseller application updated.";
+    case "mark-reseller-application-read":
+      return "Reseller application marked as read.";
+    case "mark-admin-notification-read":
+      return "Notification marked as read.";
+    case "mark-all-admin-notifications-read":
+      return "Notifications marked as read.";
   }
+}
+
+function getActionRedirectPath(action: AdminAction, fallbackPath: string) {
+  if (action.type === "mark-order-read" && action.returnTo) {
+    return action.returnTo;
+  }
+
+  return fallbackPath;
+}
+
+function withActionFeedback(path: string, key: "status" | "error", message: string) {
+  const separator = path.includes("?") ? "&" : "?";
+
+  return `${path}${separator}${key}=${encodeURIComponent(message)}`;
 }
 
 function normalizeQueryMessage(value: string | null) {

@@ -35,34 +35,52 @@ const { data, inquiryStatuses } = Astro.props;
             <th scope="col">Inquiry</th>
             <th scope="col">Message</th>
             <th scope="col">Manage</th>
+            <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
           </tr>
         </thead>
         <tbody>
-          {data.contactInquiries.map((inquiry) => (
-            <tr data-status={inquiry.inquiry_status}>
-              <td>{inquiry.name}<br />{inquiry.email ?? inquiry.phone_number ?? "No contact"}<br />{inquiry.inquiry_status}</td>
-              <td>{inquiry.message}</td>
-              <td>
-                <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-                <div class="hidden-form-holder" style="display: none;">
-                  <form method="post" class="admin-table-form">
-                    <input type="hidden" name="action" value="update-inquiry" />
-                    <input type="hidden" name="inquiryId" value={inquiry.id} />
-                    <label>
-                      <span>Status</span>
-                      <select name="inquiryStatus" required>
-                        {inquiryStatuses.map((status) => (
-                          <option value={status} selected={selected(inquiry.inquiry_status, status)}>{status}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label><span>Internal notes</span><textarea name="internalNotes" set:html={escapeTextareaValue(inquiry.internal_notes)}></textarea></label>
-                    <button type="submit">Update inquiry</button>
-                  </form>
-                </div>
-              </td>
-            </tr>
-          ))}
+          {data.contactInquiries.map((inquiry) => {
+            const isUnread =
+              !inquiry.admin_read_at && inquiry.inquiry_status === "new";
+
+            return (
+              <tr data-status={inquiry.inquiry_status}>
+                <td>{inquiry.name}<br />{inquiry.email ?? inquiry.phone_number ?? "No contact"}<br />{inquiry.inquiry_status}</td>
+                <td>{inquiry.message}</td>
+                <td>
+                  <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
+                  <div class="hidden-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="update-inquiry" />
+                      <input type="hidden" name="inquiryId" value={inquiry.id} />
+                      <label>
+                        <span>Status</span>
+                        <select name="inquiryStatus" required>
+                          {inquiryStatuses.map((status) => (
+                            <option value={status} selected={selected(inquiry.inquiry_status, status)}>{status}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label><span>Internal notes</span><textarea name="internalNotes" set:html={escapeTextareaValue(inquiry.internal_notes)}></textarea></label>
+                      <button type="submit">Update inquiry</button>
+                    </form>
+                  </div>
+                </td>
+                <td class="unread-record-cell">
+                  {isUnread && (
+                    <form method="post" class="unread-record-form">
+                      <input type="hidden" name="action" value="mark-inquiry-read" />
+                      <input type="hidden" name="inquiryId" value={inquiry.id} />
+                      <button type="submit" class="unread-record-button">
+                        <span class="record-unread-dot" aria-label="Unread"></span>
+                        <span class="sr-only">Mark inquiry as read</span>
+                      </button>
+                    </form>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

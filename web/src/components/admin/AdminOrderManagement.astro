@@ -206,12 +206,17 @@ const customerOptions = data.customers.map((customer) => ({
               <th scope="col">Payment Status</th>
               <th scope="col">Order Total</th>
               <th scope="col">Action</th>
+              <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
             </tr>
           </thead>
           <tbody>
             {data.orders.map((order) => {
               const invoice = order.invoice[0];
               const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+              const isUnread =
+                !order.admin_read_at &&
+                order.order_status === "submitted" &&
+                order.source !== "admin_manual";
 
               return (
                 <tr data-status={order.order_status}>
@@ -226,7 +231,15 @@ const customerOptions = data.customers.map((customer) => ({
                   <td>{order.payment_status}</td>
                   <td>{formatCurrency(total)}</td>
                   <td>
-                    <a href={`/admin/orders/${order.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                    <form method="post" style="margin: 0;">
+                      <input type="hidden" name="action" value="mark-order-read" />
+                      <input type="hidden" name="orderId" value={order.id} />
+                      <input type="hidden" name="returnTo" value={`/admin/orders/${order.id}`} />
+                      <button type="submit" class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</button>
+                    </form>
+                  </td>
+                  <td class="unread-record-cell">
+                    {isUnread && <span class="record-unread-dot" aria-label="Unread"></span>}
                   </td>
                 </tr>
               );

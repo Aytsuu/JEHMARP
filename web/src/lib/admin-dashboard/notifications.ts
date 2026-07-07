@@ -9,6 +9,7 @@ export type AdminNotification = {
   date: string;
   link: string;
   severity: "warning" | "info" | "success";
+  isUnread: boolean;
 };
 
 type AdminNotificationSource = Pick<
@@ -20,7 +21,11 @@ export function getUnreadAdminResellerApplicationIds(
   data: AdminNotificationSource,
 ): string[] {
   return data.resellerApplications
-    .filter((application) => application.application_status === "submitted")
+    .filter(
+      (application) =>
+        application.application_status === "submitted" &&
+        !application.admin_read_at,
+    )
     .map((application) => application.id);
 }
 
@@ -30,7 +35,9 @@ export function getUnreadAdminOrderIds(
   return data.orders
     .filter(
       (order) =>
-        order.order_status === "submitted" && order.source !== "admin_manual",
+        order.order_status === "submitted" &&
+        order.source !== "admin_manual" &&
+        !order.admin_read_at,
     )
     .map((order) => order.id);
 }
@@ -39,7 +46,10 @@ export function getUnreadAdminInquiryIds(
   data: AdminNotificationSource,
 ): string[] {
   return data.contactInquiries
-    .filter((inquiry) => inquiry.inquiry_status === "new")
+    .filter(
+      (inquiry) =>
+        inquiry.inquiry_status === "new" && !inquiry.admin_read_at,
+    )
     .map((inquiry) => inquiry.id);
 }
 
@@ -59,6 +69,7 @@ function buildAdminActionNotifications(
         date: application.created_at,
         link: "/admin/reseller-applications",
         severity: "warning",
+        isUnread: !application.admin_read_at,
       });
     });
 
@@ -76,6 +87,7 @@ function buildAdminActionNotifications(
         date: order.created_at,
         link: `/admin/orders/${order.id}`,
         severity: "warning",
+        isUnread: !order.admin_read_at,
       });
     });
 
@@ -90,10 +102,11 @@ function buildAdminActionNotifications(
         date: inquiry.created_at,
         link: "/admin/inquiries",
         severity: "info",
+        isUnread: !inquiry.admin_read_at,
       });
     });
 
-  return notifications;
+  return sortNotificationsByDateDesc(notifications);
 }
 
 export function buildAdminNotifications(
@@ -115,6 +128,7 @@ export function buildAdminNotifications(
       date: new Date().toISOString(),
       link: "/admin",
       severity: "success",
+      isUnread: false,
     },
   ];
 }
@@ -122,5 +136,13 @@ export function buildAdminNotifications(
 export function getAdminUnreadNotificationIds(
   data: AdminNotificationSource,
 ): string[] {
-  return buildAdminActionNotifications(data).map((notification) => notification.id);
+  return buildAdminActionNotifications(data)
+    .filter((notification) => notification.isUnread)
+    .map((notification) => notification.id);
+}
+
+function sortNotificationsByDateDesc(notifications: AdminNotification[]) {
+  return [...notifications].sort(
+    (left, right) => Date.parse(right.date) - Date.parse(left.date),
+  );
 }

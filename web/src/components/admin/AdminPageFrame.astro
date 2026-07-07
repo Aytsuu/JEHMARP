@@ -1,7 +1,6 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 import {
-  getAdminUnreadNotificationIds,
   getUnreadAdminInquiryIds,
   getUnreadAdminOrderIds,
   getUnreadAdminResellerApplicationIds,
@@ -26,12 +25,13 @@ const headingId = `${heading
   .toLowerCase()
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-|-$/g, "")}-title`;
-const notificationIds = dashboardData ? getAdminUnreadNotificationIds(dashboardData) : [];
 const unreadOrderCount = dashboardData ? getUnreadAdminOrderIds(dashboardData).length : 0;
 const unreadInquiryCount = dashboardData ? getUnreadAdminInquiryIds(dashboardData).length : 0;
 const unreadResellerApplicationCount = dashboardData
   ? getUnreadAdminResellerApplicationIds(dashboardData).length
   : 0;
+const unreadNotificationCount =
+  unreadOrderCount + unreadInquiryCount + unreadResellerApplicationCount;
 ---
 
 <DashboardLayout
@@ -50,8 +50,7 @@ const unreadResellerApplicationCount = dashboardData
       count: unreadResellerApplicationCount,
     },
     "/admin/notifications": {
-      ids: notificationIds,
-      storageKey: "admin-read-notifications",
+      count: unreadNotificationCount,
     },
   }}
 >
