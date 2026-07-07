@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   executeAdminAction,
+  formatAdminActionFeedback,
   getAllowedNextOrderStatuses,
   parseAdminActionFormData,
 } from "./actions";
@@ -639,5 +640,29 @@ describe("getAllowedNextOrderStatuses", () => {
     expect(getAllowedNextOrderStatuses("closed")).toEqual([]);
     expect(getAllowedNextOrderStatuses("cancelled")).toEqual([]);
     expect(getAllowedNextOrderStatuses("rejected")).toEqual([]);
+  });
+});
+
+describe("formatAdminActionFeedback", () => {
+  it("returns transient feedback with a clean reload URL", () => {
+    const url = new URL(
+      "https://jehmarp.example/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?status=Order%20marked%20as%20read.&page=2#error-anchor",
+    );
+
+    expect(formatAdminActionFeedback(url)).toEqual({
+      status: "Order marked as read.",
+      error: undefined,
+      cleanPath: "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?page=2#error-anchor",
+    });
+  });
+
+  it("does not provide a clean URL when no feedback is present", () => {
+    const url = new URL("https://jehmarp.example/admin/orders?page=2");
+
+    expect(formatAdminActionFeedback(url)).toEqual({
+      status: undefined,
+      error: undefined,
+      cleanPath: undefined,
+    });
   });
 });

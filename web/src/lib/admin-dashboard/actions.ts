@@ -38,6 +38,11 @@ type AdminDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect"
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 type ProductImageFile = File & { size: number; type: string; name: string };
+export type AdminActionFeedback = {
+  status?: string;
+  error?: string;
+  cleanPath?: string;
+};
 
 const maxProductImageBytes = 5 * 1024 * 1024;
 
@@ -407,10 +412,14 @@ export function getAllowedNextOrderStatuses(status: OrderStatus): OrderStatus[] 
   }
 }
 
-export function formatAdminActionFeedback(url: URL) {
+export function formatAdminActionFeedback(url: URL): AdminActionFeedback {
+  const status = normalizeQueryMessage(url.searchParams.get("status"));
+  const error = normalizeQueryMessage(url.searchParams.get("error"));
+
   return {
-    status: normalizeQueryMessage(url.searchParams.get("status")),
-    error: normalizeQueryMessage(url.searchParams.get("error")),
+    status,
+    error,
+    cleanPath: status || error ? getAdminActionFeedbackCleanPath(url) : undefined,
   };
 }
 
@@ -1342,6 +1351,15 @@ function withActionFeedback(path: string, key: "status" | "error", message: stri
   const separator = path.includes("?") ? "&" : "?";
 
   return `${path}${separator}${key}=${encodeURIComponent(message)}`;
+}
+
+function getAdminActionFeedbackCleanPath(url: URL) {
+  const cleanUrl = new URL(url.href);
+
+  cleanUrl.searchParams.delete("status");
+  cleanUrl.searchParams.delete("error");
+
+  return `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`;
 }
 
 function normalizeQueryMessage(value: string | null) {

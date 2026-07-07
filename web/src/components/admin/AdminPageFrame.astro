@@ -1,5 +1,6 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import type { AdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import {
   getUnreadAdminInquiryIds,
   getUnreadAdminOrderIds,
@@ -14,10 +15,7 @@ type Props = {
   heading: string;
   intro: string;
   backUrl?: string;
-  feedback?: {
-    status?: string;
-    error?: string;
-  };
+  feedback?: AdminActionFeedback;
   dashboardData?: AdminDashboardData;
 };
 
@@ -86,3 +84,13 @@ const unreadNotificationCount =
     <slot />
   </section>
 </DashboardLayout>
+
+{
+  feedback?.cleanPath && (
+    <script is:inline define:vars={{ adminFeedbackCleanPath: feedback.cleanPath }}>
+      if (typeof adminFeedbackCleanPath === "string" && window.history.replaceState) {
+        window.history.replaceState(window.history.state, "", adminFeedbackCleanPath);
+      }
+    </script>
+  )
+}
