@@ -1,6 +1,7 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
-import { escapeTextareaValue, selected } from "@/lib/admin-dashboard/view";
+import { selected } from "@/lib/admin-dashboard/view";
+import { autoCapitalize } from "@/lib/formatters";
 
 type Props = {
   data: AdminDashboardData;
@@ -11,87 +12,118 @@ const { data, inquiryStatuses } = Astro.props;
 ---
 
 <section id="admin-inquiries" class="admin-panel" aria-labelledby="admin-inquiries-title">
-  <div data-interactive-table>
-    <div class="table-filters">
-      <div style="flex: 1; min-width: 15rem;">
-        <input type="text" placeholder="Search inquiries..." data-search-input style="width: 100%;" />
-      </div>
-      <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-        <div style="display: flex; align-items: center; gap: 0.35rem;">
-          <span style="font-size: 0.9rem; color: var(--color-brand-muted-black);">Show</span>
-          <select data-limit-select>
-            <option value="10">10</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
+  {
+    data.contactInquiries.length > 0 ? (
+      <div data-interactive-table>
+        <div class="table-filters">
+          <div style="flex: 1; min-width: 15rem;">
+            <input type="text" placeholder="Search inquiries..." data-search-input style="width: 100%;" />
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span style="font-size: 0.9rem; color: var(--color-brand-muted-black);">Show</span>
+              <select data-limit-select>
+                <option value="10">10</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Inquiry</th>
-            <th scope="col">Message</th>
-            <th scope="col">Manage</th>
-            <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.contactInquiries.map((inquiry) => {
-            const isUnread =
-              !inquiry.admin_read_at && inquiry.inquiry_status === "new";
+        <div class="table-wrap">
+          <table style="table-layout: fixed; width: 100%;">
+            <thead>
+              <tr>
+                <th scope="col" style="width: 18%; padding: 1.1rem 0.75rem;">Name</th>
+                <th scope="col" style="width: 18%; padding: 1.1rem 0.75rem;">Email</th>
+                <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Contact</th>
+                <th scope="col" style="width: 32%; padding: 1.1rem 0.75rem;">Message</th>
+                <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.contactInquiries.map((inquiry) => {
+                const isUnread =
+                  !inquiry.admin_read_at && inquiry.inquiry_status === "new";
 
-            return (
-              <tr data-status={inquiry.inquiry_status}>
-                <td>{inquiry.name}<br />{inquiry.email ?? inquiry.phone_number ?? "No contact"}<br />{inquiry.inquiry_status}</td>
-                <td>{inquiry.message}</td>
-                <td>
-                  <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-                  <div class="hidden-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
-                      <input type="hidden" name="action" value="update-inquiry" />
-                      <input type="hidden" name="inquiryId" value={inquiry.id} />
-                      <label>
-                        <span>Status</span>
-                        <select name="inquiryStatus" required>
+                return (
+                  <tr data-status={inquiry.inquiry_status}>
+                    <!-- 1. Name Column (displays complete name and inline unread dot) -->
+                    <td style="width: 18%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; overflow: hidden;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">
+                          {inquiry.name}
+                        </span>
+                        {isUnread && (
+                          <form method="post" class="unread-record-form" style="margin: 0; display: inline-flex; align-items: center; flex-shrink: 0;">
+                            <input type="hidden" name="action" value="mark-inquiry-read" />
+                            <input type="hidden" name="inquiryId" value={inquiry.id} />
+                            <button type="submit" class="unread-record-button" style="border: none; background: transparent; padding: 0; cursor: pointer; display: inline-flex; align-items: center;">
+                              <span class="record-unread-dot" aria-label="Unread" style="width: 8px; height: 8px; background-color: var(--color-brand-red); border-radius: 50%; display: inline-block;"></span>
+                              <span class="sr-only">Mark inquiry as read</span>
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </td>
+
+                    <!-- 2. Email Column -->
+                    <td style="width: 18%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      {inquiry.email ?? "—"}
+                    </td>
+
+                    <!-- 3. Contact Column -->
+                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      {inquiry.phone_number ?? "—"}
+                    </td>
+
+                    <!-- 4. Message Column -->
+                    <td style="width: 32%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title={inquiry.message}>
+                      {inquiry.message}
+                    </td>
+
+                    <!-- 5. Status Column (Dropdown Autoupdate on Change) -->
+                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                      <form method="post" class="admin-table-form" style="margin: 0; width: 100%;">
+                        <input type="hidden" name="action" value="update-inquiry" />
+                        <input type="hidden" name="inquiryId" value={inquiry.id} />
+                        <input type="hidden" name="internalNotes" value={inquiry.internal_notes ?? ""} />
+                        <select
+                          name="inquiryStatus"
+                          onchange="this.form.submit()"
+                          required
+                          style="padding: 0.25rem 0.5rem; font-size: 0.9rem; border-radius: 0.375rem; border: 1px solid #d1d5db; background-color: #ffffff; cursor: pointer; width: 100%;"
+                        >
                           {inquiryStatuses.map((status) => (
-                            <option value={status} selected={selected(inquiry.inquiry_status, status)}>{status}</option>
+                            <option
+                              value={status}
+                              selected={selected(inquiry.inquiry_status, status)}
+                            >
+                              {autoCapitalize(status)}
+                            </option>
                           ))}
                         </select>
-                      </label>
-                      <label><span>Internal notes</span><textarea name="internalNotes" set:html={escapeTextareaValue(inquiry.internal_notes)}></textarea></label>
-                      <button type="submit">Update inquiry</button>
-                    </form>
-                  </div>
-                </td>
-                <td class="unread-record-cell">
-                  {isUnread && (
-                    <form method="post" class="unread-record-form">
-                      <input type="hidden" name="action" value="mark-inquiry-read" />
-                      <input type="hidden" name="inquiryId" value={inquiry.id} />
-                      <button type="submit" class="unread-record-button">
-                        <span class="record-unread-dot" aria-label="Unread"></span>
-                        <span class="sr-only">Mark inquiry as read</span>
-                      </button>
-                    </form>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                      </form>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
 
-    <div class="table-pagination">
-      <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
-      <div style="display: flex; gap: 0.25rem; align-items: center;">
-        <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
-        <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
-        <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+        <div class="table-pagination">
+          <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
+          <div style="display: flex; gap: 0.25rem; align-items: center;">
+            <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
+            <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
+            <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
+    ) : (
+      <p class="empty-state">No inquiries have been received yet.</p>
+    )
+  }
 </section>
