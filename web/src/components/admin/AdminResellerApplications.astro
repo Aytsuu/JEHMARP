@@ -1,6 +1,7 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 import { selected } from "@/lib/admin-dashboard/view";
+import { autoCapitalize } from "@/lib/formatters";
 
 type Props = {
   data: AdminDashboardData;
@@ -34,16 +35,15 @@ const { data, applicationStatuses } = Astro.props;
         </div>
 
         <div class="table-wrap">
-          <table>
+          <table style="table-layout: fixed; width: 100%;">
             <thead>
               <tr>
-                <th scope="col">Applicant</th>
-                <th scope="col">Contact</th>
-                <th scope="col">Business Type</th>
-                <th scope="col">Expected Quantity</th>
-                <th scope="col">Application Status</th>
-                <th scope="col">Price List Email</th>
-                <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
+                <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Applicant</th>
+                <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Email</th>
+                <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Contact</th>
+                <th scope="col" style="width: 15%; padding: 1.1rem 0.75rem;">Supply Needs</th>
+                <th scope="col" style="width: 15%; padding: 1.1rem 0.75rem;">Status</th>
+                <th scope="col" style="width: 10%; padding: 1.1rem 0.75rem;"><span class="sr-only">Email Status</span></th>
               </tr>
             </thead>
             <tbody>
@@ -54,20 +54,51 @@ const { data, applicationStatuses } = Astro.props;
 
                 return (
                   <tr data-status={application.application_status}>
-                    <td>
-                      {application.name}
-                      <br />
-                      <span>{application.created_at}</span>
+                    <!-- 1. Applicant Column (displays complete name and inline unread dot) -->
+                    <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; overflow: hidden;">
+                        <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">
+                          {application.name}
+                        </span>
+                        {isUnread && (
+                          <form method="post" class="unread-record-form" style="margin: 0; display: inline-flex; align-items: center; flex-shrink: 0;">
+                            <input
+                              type="hidden"
+                              name="action"
+                              value="mark-reseller-application-read"
+                            />
+                            <input
+                              type="hidden"
+                              name="applicationId"
+                              value={application.id}
+                            />
+                            <button type="submit" class="unread-record-button" style="border: none; background: transparent; padding: 0; cursor: pointer; display: inline-flex; align-items: center;">
+                              <span class="record-unread-dot" aria-label="Unread" style="width: 8px; height: 8px; background-color: var(--color-brand-red); border-radius: 50%; display: inline-block;"></span>
+                              <span class="sr-only">Mark reseller application as read</span>
+                            </button>
+                          </form>
+                        )}
+                      </div>
                     </td>
-                    <td>
+
+                    <!-- 2. Email Column -->
+                    <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                       {application.email}
-                      <br />
-                      <span>{application.contact_number}</span>
                     </td>
-                    <td>{application.planned_transaction_type}</td>
-                    <td>{application.expected_quantity_per_week}</td>
-                    <td>
-                      <form method="post" class="admin-table-form" style="margin: 0; display: inline-block;">
+
+                    <!-- 3. Contact Column -->
+                    <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      {application.contact_number}
+                    </td>
+
+                    <!-- 4. Supply Needs Column -->
+                    <td style="width: 15%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                      {application.expected_quantity_per_week}
+                    </td>
+
+                    <!-- 5. Status Column (Dropdown Autoupdate on Change) -->
+                    <td style="width: 15%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                      <form method="post" class="admin-table-form" style="margin: 0; width: 100%;">
                         <input
                           type="hidden"
                           name="action"
@@ -82,7 +113,7 @@ const { data, applicationStatuses } = Astro.props;
                           name="applicationStatus"
                           onchange="this.form.submit()"
                           required
-                          style="padding: 0.25rem 0.5rem; font-size: 0.9rem; border-radius: 0.375rem; border: 1px solid #d1d5db; background-color: #ffffff;"
+                          style="padding: 0.25rem 0.5rem; font-size: 0.9rem; border-radius: 0.375rem; border: 1px solid #d1d5db; background-color: #ffffff; cursor: pointer; width: 100%;"
                         >
                           {applicationStatuses.map((status) => (
                             <option
@@ -92,45 +123,27 @@ const { data, applicationStatuses } = Astro.props;
                                 status,
                               )}
                             >
-                              {status}
+                              {autoCapitalize(status)}
                             </option>
                           ))}
                         </select>
                       </form>
                     </td>
-                    <td>
-                      {application.email_delivery_status}
-                      {application.price_list_sent_at && (
-                        <>
-                          <br />
-                          <span>Sent {application.price_list_sent_at}</span>
-                        </>
-                      )}
-                      {application.email_error && (
-                        <>
-                          <br />
-                          <span>{application.email_error}</span>
-                        </>
-                      )}
-                    </td>
-                    <td class="unread-record-cell">
-                      {isUnread && (
-                        <form method="post" class="unread-record-form">
-                          <input
-                            type="hidden"
-                            name="action"
-                            value="mark-reseller-application-read"
-                          />
-                          <input
-                            type="hidden"
-                            name="applicationId"
-                            value={application.id}
-                          />
-                          <button type="submit" class="unread-record-button">
-                            <span class="record-unread-dot" aria-label="Unread"></span>
-                            <span class="sr-only">Mark reseller application as read</span>
-                          </button>
-                        </form>
+
+                    <!-- 6. Blank (right-most) Column: Email Delivery Status Tooltip Icon -->
+                    <td style="width: 10%; padding: 1.1rem 0.75rem; vertical-align: middle; text-align: center;">
+                      {application.email_delivery_status === "sent" ? (
+                        <div title="Price list sent to email" style="display: inline-flex; align-items: center; justify-content: center; color: #10b981; cursor: help;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-check"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="m16 19 2 2 4-4"/></svg>
+                        </div>
+                      ) : application.email_delivery_status === "failed" ? (
+                        <div title="Failed to send the price list to email" style="display: inline-flex; align-items: center; justify-content: center; color: #ef4444; cursor: help;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-warning"><path d="M22 10.5V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h12.5"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M20 14v4"/><path d="M20 22v.01"/></svg>
+                        </div>
+                      ) : (
+                        <div title="Sending price list email..." style="display: inline-flex; align-items: center; justify-content: center; color: #6b7280; cursor: help;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                        </div>
                       )}
                     </td>
                   </tr>
