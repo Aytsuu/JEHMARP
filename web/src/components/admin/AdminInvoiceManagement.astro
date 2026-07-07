@@ -39,16 +39,16 @@ const invoiceOrders = data.orders.filter((order) => order.invoice.length > 0);
       </div>
 
       <div class="table-wrap">
-        <table>
+        <table style="table-layout: fixed; width: 100%;">
           <thead>
             <tr>
-              <th scope="col">Invoice Number</th>
-              <th scope="col">Customer</th>
-              <th scope="col">Date</th>
-              <th scope="col">Invoice Total</th>
-              <th scope="col">Paid</th>
-              <th scope="col">Balance</th>
-              <th scope="col">Action</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Invoice Number</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Customer</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Date</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Invoice Total</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Paid</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Balance</th>
+              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -60,20 +60,18 @@ const invoiceOrders = data.orders.filter((order) => order.invoice.length > 0);
 
               return (
                 <tr data-status={order.payment_status}>
-                  <td>
-                    <strong>{invoice.invoice_number}</strong>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                    {invoice.invoice_number}
                   </td>
-                  <td>
-                    <strong>{order.customer ? fullName(order.customer) : "Guest"}</strong>
-                    <br />
-                    <span>{order.customer?.phone_number ?? "N/A"}</span>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {order.customer ? fullName(order.customer) : "Guest"}
                   </td>
-                  <td>{formatDate(invoice.created_at)}</td>
-                  <td>{formatCurrency(invoiceTotal)}</td>
-                  <td>{formatCurrency(paidTotal)}</td>
-                  <td>{formatCurrency(balance)}</td>
-                  <td>
-                    <a href={`/admin/invoices/${invoice.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(invoice.created_at)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(invoiceTotal)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(paidTotal)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(balance)}</td>
+                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                    <a href={`/admin/invoices/${invoice.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
                   </td>
                 </tr>
               );

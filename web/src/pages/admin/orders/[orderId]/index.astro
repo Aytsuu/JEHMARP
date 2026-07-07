@@ -162,44 +162,57 @@ const feedback = formatAdminActionFeedback(Astro.url);
         <table>
           <thead>
             <tr>
-              <th scope="col">Product</th>
-              <th scope="col">Quantities</th>
-              {canManageCommissions && <th scope="col">Commission</th>}
-              {canManageCommissions && <th scope="col">Manage commission</th>}
+              <th scope="col" style={`width: ${canManageCommissions ? "40%" : "60%"}; padding: 0.75rem;`}>Product</th>
+              <th scope="col" style={`width: ${canManageCommissions ? "30%" : "40%"}; padding: 0.75rem;`}>Quantity</th>
+              {canManageCommissions && <th scope="col" style="width: 30%; padding: 0.75rem;">Commission</th>}
             </tr>
           </thead>
           <tbody>
             {order.customer_order_item.map((item) => (
               <tr>
-                <td>{item.product?.name ?? "Missing product"}</td>
-                <td>
-                  Slip {item.partial_quantity}<br />
-                  Invoice {item.final_quantity}<br />
-                  {formatCurrency(item.unit_price)} {item.price_type}
+                <td style="vertical-align: middle;">
+                  {item.product?.name ?? "Missing product"}<br />
+                  <span style="font-size: 0.85rem; color: var(--color-brand-muted-black); font-weight: 500;">
+                    {formatCurrency(item.unit_price)} {item.price_type}
+                  </span>
+                </td>
+                <td style="vertical-align: middle;">
+                  <form method="post" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="hidden" name="action" value="update-order-item-quantity" />
+                    <input type="hidden" name="orderItemId" value={item.id} />
+                    <input
+                      type="number"
+                      name="quantity"
+                      value={item.partial_quantity}
+                      min="0.001"
+                      step="0.001"
+                      required
+                      style="width: 6rem; padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+                    />
+                    <button type="submit" class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block;">Save</button>
+                  </form>
                 </td>
                 {canManageCommissions && (
-                  <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
-                )}
-                {canManageCommissions && (
-                  <td>
-                    <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
-                    <div class="hidden-form-holder" style="display: none;">
-                      <form method="post" class="admin-table-form">
-                        <input type="hidden" name="action" value="update-commission" />
-                        <input type="hidden" name="orderItemId" value={item.id} />
-                        <label><span>Amount</span><input name="amount" type="number" min="0" step="0.01" value={item.agent_commission_amount} required /></label>
-                        <label>
-                          <span>Status</span>
-                          <select name="status" required>
-                            {commissionStatuses.map((status) => (
-                              <option value={status} selected={selected(item.agent_commission_status, status)}>{status}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label><span>Notes</span><textarea name="notes" set:html={escapeTextareaValue(item.agent_commission_notes)}></textarea></label>
-                        <button type="submit">Save commission</button>
-                      </form>
-                    </div>
+                  <td style="vertical-align: middle;">
+                    <form method="post" style="margin: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                      <input type="hidden" name="action" value="update-commission" />
+                      <input type="hidden" name="orderItemId" value={item.id} />
+                      <input
+                        type="number"
+                        name="amount"
+                        value={item.agent_commission_amount}
+                        min="0"
+                        step="0.01"
+                        required
+                        style="width: 5rem; padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
+                      />
+                      <select name="status" required style="padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background-color: white;">
+                        {commissionStatuses.map((status) => (
+                          <option value={status} selected={selected(item.agent_commission_status, status)}>{autoCapitalize(status)}</option>
+                        ))}
+                      </select>
+                      <button type="submit" class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block;">Save</button>
+                    </form>
                   </td>
                 )}
               </tr>

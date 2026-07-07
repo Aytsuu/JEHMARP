@@ -235,6 +235,20 @@ export type AdminAction =
     }
   | {
       type: "mark-all-admin-notifications-read";
+    }
+  | {
+      type: "update-invoice-item-quantity";
+      orderItemId: string;
+      payload: {
+        final_quantity: number;
+      };
+    }
+  | {
+      type: "update-order-item-quantity";
+      orderItemId: string;
+      payload: {
+        partial_quantity: number;
+      };
     };
 
 export function parseAdminActionFormData(
@@ -335,6 +349,12 @@ export async function executeAdminAction(
       await markAdminRecordRead(supabase, "customer_order", action.orderId, adminReadPayload(adminUserId));
       return;
     case "update-commission":
+      await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
+      return;
+    case "update-invoice-item-quantity":
+      await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
+      return;
+    case "update-order-item-quantity":
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
     case "record-payment":
@@ -573,6 +593,22 @@ function parseAdminActionFormDataOrThrow(
             },
       });
     }
+    case "update-invoice-item-quantity":
+      return success({
+        type: "update-invoice-item-quantity",
+        orderItemId: uuidSchema.parse(requiredString(formData, "orderItemId")),
+        payload: {
+          final_quantity: positiveNumber(formData, "quantity"),
+        },
+      });
+    case "update-order-item-quantity":
+      return success({
+        type: "update-order-item-quantity",
+        orderItemId: uuidSchema.parse(requiredString(formData, "orderItemId")),
+        payload: {
+          partial_quantity: positiveNumber(formData, "quantity"),
+        },
+      });
     case "record-payment":
       return success({
         type: "record-payment",
@@ -1267,6 +1303,10 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Order marked as read.";
     case "update-commission":
       return "Commission updated.";
+    case "update-invoice-item-quantity":
+      return "Quantity updated.";
+    case "update-order-item-quantity":
+      return "Quantity updated.";
     case "record-payment":
       return "Payment recorded.";
     case "save-invoice":

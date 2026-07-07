@@ -144,21 +144,24 @@ const feedback = formatAgentActionFeedback(Astro.url);
         <table>
           <thead>
             <tr>
-              <th scope="col">Product</th>
-              <th scope="col">Quantity</th>
-              <th scope="col">Commission</th>
+              <th scope="col" style="width: 40%; padding: 0.75rem;">Product</th>
+              <th scope="col" style="width: 30%; padding: 0.75rem;">Quantity</th>
+              <th scope="col" style="width: 30%; padding: 0.75rem;">Commission</th>
             </tr>
           </thead>
           <tbody>
             {order.customer_order_item.map((item) => (
               <tr>
-                <td>{item.product?.name ?? "Missing product"}</td>
-                <td>
-                  Slip {item.partial_quantity}<br />
-                  Invoice {item.final_quantity}<br />
-                  {formatCurrency(item.unit_price)} {item.price_type}
+                <td style="vertical-align: middle;">
+                  {item.product?.name ?? "Missing product"}<br />
+                  <span style="font-size: 0.85rem; color: var(--color-brand-muted-black); font-weight: 500;">
+                    {formatCurrency(item.unit_price)} {item.price_type}
+                  </span>
                 </td>
-                <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
+                <td style="vertical-align: middle;">
+                  {item.partial_quantity}
+                </td>
+                <td style="vertical-align: middle;">{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
               </tr>
             ))}
           </tbody>
