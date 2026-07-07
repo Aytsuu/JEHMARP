@@ -38,12 +38,13 @@ const { data, applicationStatuses } = Astro.props;
           <table style="table-layout: fixed; width: 100%;">
             <thead>
               <tr>
-                <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Applicant</th>
-                <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Email</th>
-                <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Contact</th>
-                <th scope="col" style="width: 15%; padding: 1.1rem 0.75rem;">Supply Needs</th>
-                <th scope="col" style="width: 15%; padding: 1.1rem 0.75rem;">Status</th>
-                <th scope="col" style="width: 10%; padding: 1.1rem 0.75rem;"><span class="sr-only">Email Status</span></th>
+                <th scope="col" style="width: 15%; padding: 1.1rem 0.75rem;">Applicant</th>
+                <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Email</th>
+                <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Contact</th>
+                <th scope="col" style="width: 12%; padding: 1.1rem 0.75rem;">Supply Needs</th>
+                <th scope="col" style="width: 21%; padding: 1.1rem 0.75rem;">Message</th>
+                <th scope="col" style="width: 12%; padding: 1.1rem 0.75rem;">Status</th>
+                <th scope="col" style="width: 8%; padding: 1.1rem 0.75rem;"><span class="sr-only">Email Status</span></th>
               </tr>
             </thead>
             <tbody>
@@ -54,8 +55,8 @@ const { data, applicationStatuses } = Astro.props;
 
                 return (
                   <tr data-status={application.application_status}>
-                    <!-- 1. Applicant Column (displays complete name and inline unread dot) -->
-                    <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <!-- 1. Applicant Column -->
+                    <td style="width: 15%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                       <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; overflow: hidden;">
                         <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">
                           {application.name}
@@ -82,22 +83,27 @@ const { data, applicationStatuses } = Astro.props;
                     </td>
 
                     <!-- 2. Email Column -->
-                    <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                       {application.email}
                     </td>
 
                     <!-- 3. Contact Column -->
-                    <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                       {application.contact_number}
                     </td>
 
                     <!-- 4. Supply Needs Column -->
-                    <td style="width: 15%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                    <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                       {application.expected_quantity_per_week}
                     </td>
 
-                    <!-- 5. Status Column (Dropdown Autoupdate on Change) -->
-                    <td style="width: 15%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                    <!-- 5. Message Column -->
+                    <td style="width: 21%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title={application.message ?? "No message"}>
+                      {application.message ?? "—"}
+                    </td>
+
+                    <!-- 6. Status Column -->
+                    <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                       <form method="post" class="admin-table-form" style="margin: 0; width: 100%;">
                         <input
                           type="hidden"
@@ -130,8 +136,8 @@ const { data, applicationStatuses } = Astro.props;
                       </form>
                     </td>
 
-                    <!-- 6. Blank (right-most) Column: Email Delivery Status Tooltip Icon -->
-                    <td style="width: 10%; padding: 1.1rem 0.75rem; vertical-align: middle; text-align: center;">
+                    <!-- 7. Blank (right-most) Column: Email Delivery Status Tooltip Icon -->
+                    <td style="width: 8%; padding: 1.1rem 0.75rem; vertical-align: middle; text-align: center;">
                       {application.email_delivery_status === "sent" ? (
                         <div title="Price list sent to email" style="display: inline-flex; align-items: center; justify-content: center; color: #10b981; cursor: help;">
                           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail-check"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="m16 19 2 2 4-4"/></svg>

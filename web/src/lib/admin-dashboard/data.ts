@@ -232,6 +232,7 @@ export type AdminResellerApplication = {
   contact_number: string;
   planned_transaction_type: string;
   expected_quantity_per_week: string;
+  message: string | null;
   application_status: "submitted" | "contacted" | "closed";
   email_delivery_status: "pending" | "sent" | "failed";
   price_list_sent_at: string | null;
@@ -436,7 +437,7 @@ async function loadResellerApplications(supabase: SupabaseAdminClient, limit: nu
   const { data, error } = await supabase
     .from("reseller_application")
     .select(
-      "id, name, email, contact_number, planned_transaction_type, expected_quantity_per_week, application_status, email_delivery_status, price_list_sent_at, email_error, admin_read_at, admin_read_by, created_at, updated_at",
+      "id, name, email, contact_number, planned_transaction_type, expected_quantity_per_week, message, application_status, email_delivery_status, price_list_sent_at, email_error, admin_read_at, admin_read_by, created_at, updated_at",
     )
     .order("created_at", { ascending: false })
     .limit(limit);

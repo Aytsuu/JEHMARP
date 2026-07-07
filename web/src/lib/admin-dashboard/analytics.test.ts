@@ -163,6 +163,7 @@ function createAnalyticsData(): AdminDashboardData {
       contact_number: "09170000000",
       planned_transaction_type: "retail_resale",
       expected_quantity_per_week: "50 kg",
+      message: null,
       application_status: "submitted",
       email_delivery_status: "sent",
       price_list_sent_at: "2026-07-04T08:30:00.000Z",

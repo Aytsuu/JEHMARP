@@ -137,6 +137,7 @@ function createAdminDashboardData(): AdminDashboardData {
       contact_number: "09171111111",
       planned_transaction_type: "retail_resale",
       expected_quantity_per_week: "40 kg",
+      message: null,
       application_status: "submitted",
       email_delivery_status: "sent",
       price_list_sent_at: "2026-07-04T14:00:00.000Z",
