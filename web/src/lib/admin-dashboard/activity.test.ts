@@ -66,6 +66,14 @@ function createAdminDashboardData(): AdminDashboardData {
       created_at: "2026-07-04T10:00:00.000Z",
       updated_at: "2026-07-04T10:00:00.000Z",
     }],
+    productPriceRange: {
+      min: 0,
+      max: 320,
+    },
+    orderTotalRange: {
+      min: 0,
+      max: 0,
+    },
     agents: [],
     customers: [{
       id: "customer-id",

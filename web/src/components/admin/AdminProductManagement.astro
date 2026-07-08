@@ -1,19 +1,39 @@
 ---
-import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import type { AdminProductManagementData } from "@/lib/admin-dashboard/data";
+import type { AdminProductFilters } from "@/lib/admin-dashboard/product-filters";
 import {
   escapeTextareaValue,
   formatCurrency,
 } from "@/lib/admin-dashboard/view";
 
 type Props = {
-  data: AdminDashboardData;
+  data: AdminProductManagementData;
   productCategories: readonly string[];
   productUnitLabels: readonly string[];
   stockStatuses: readonly string[];
+  activeFilters: AdminProductFilters;
+  filterQuery: string;
 };
 
-const { data, productCategories, productUnitLabels, stockStatuses } =
+const { data, productCategories, productUnitLabels, stockStatuses, activeFilters, filterQuery } =
   Astro.props;
+const hasActiveFilters = filterQuery.length > 0;
+const skeletonRows = Array.from({ length: 6 });
+const priceRangeMin = 0;
+const priceRangeMax = Math.max(
+  1,
+  Math.ceil(data.productPriceRange.max),
+  Math.ceil(activeFilters.maxPrice ?? 0),
+  Math.ceil(activeFilters.minPrice ?? 0),
+);
+const activeMinPrice = Math.min(
+  priceRangeMax,
+  Math.max(priceRangeMin, activeFilters.minPrice ?? priceRangeMin),
+);
+const activeMaxPrice = Math.min(
+  priceRangeMax,
+  Math.max(activeMinPrice, activeFilters.maxPrice ?? priceRangeMax),
+);
 
 function formatStockStatus(status: string): string {
   if (status === "in_stock") return "In Stock";
@@ -109,40 +129,124 @@ function formatStockStatus(status: string): string {
   </div>
 
   <div data-interactive-table>
-    <div class="table-filters">
-      <div style="flex: 1; min-width: 15rem;">
-        <input
-          type="text"
-          placeholder="Search products..."
-          data-search-input
-          style="width: 100%;"
-        />
-      </div>
-      <div
-        style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;"
+    <div class="table-filters product-management-toolbar">
+      <form
+        method="get"
+        action="/admin/products"
+        class="product-filter-form"
+        data-product-filter-form
+        data-current-filter-query={filterQuery}
+        aria-label="Filter products"
       >
-        <div style="display: flex; align-items: center; gap: 0.35rem;">
-          <span
-            style="font-size: 0.9rem; color: var(--color-brand-muted-black);"
-            >Show</span
-          >
+        <label class="product-filter-form__field product-filter-form__field--search">
+          <span>Search</span>
+          <input
+            name="search"
+            type="search"
+            value={activeFilters.search ?? ""}
+            placeholder="Search products..."
+            autocomplete="off"
+            data-product-search-input
+          />
+        </label>
+        <label class="product-filter-form__field">
+          <span>Status</span>
+          <select name="stockStatus">
+            <option value="">All statuses</option>
+            {stockStatuses.map((status) => (
+              <option value={status} selected={activeFilters.stockStatus === status}>
+                {formatStockStatus(status)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label class="product-filter-form__field">
+          <span>Category</span>
+          <select name="category">
+            <option value="">All categories</option>
+            {productCategories.map((category) => (
+              <option value={category} selected={activeFilters.category === category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </label>
+        <fieldset
+          class="product-filter-form__price-range"
+          data-price-range
+          data-price-min={priceRangeMin}
+          data-price-max={priceRangeMax}
+        >
+          <legend>Price range</legend>
+          <input
+            type="hidden"
+            name="minPrice"
+            value={activeFilters.minPrice ?? ""}
+            data-price-min-hidden
+          />
+          <input
+            type="hidden"
+            name="maxPrice"
+            value={activeFilters.maxPrice ?? ""}
+            data-price-max-hidden
+          />
+          <div class="product-filter-form__range-values" aria-live="polite">
+            <span data-price-min-label>{formatCurrency(activeMinPrice)}</span>
+            <span data-price-max-label>{formatCurrency(activeMaxPrice)}</span>
+          </div>
+          <div class="dual-range-slider">
+            <div class="dual-range-slider__track" aria-hidden="true">
+              <span class="dual-range-slider__fill" data-price-range-fill></span>
+            </div>
+            <input
+              type="range"
+              min={priceRangeMin}
+              max={priceRangeMax}
+              step="1"
+              value={activeMinPrice}
+              aria-label="Minimum product price"
+              data-price-min-range
+            />
+            <input
+              type="range"
+              min={priceRangeMin}
+              max={priceRangeMax}
+              step="1"
+              value={activeMaxPrice}
+              aria-label="Maximum product price"
+              data-price-max-range
+            />
+          </div>
+        </fieldset>
+        <a
+          href="/admin/products"
+          class="product-filter-form__reset"
+          data-product-filter-reset
+          hidden={!hasActiveFilters}
+        >
+          Clear
+        </a>
+      </form>
+      <div class="product-management-toolbar__actions">
+        <label class="product-management-toolbar__limit">
+          <span>Show</span>
           <select data-limit-select>
             <option value="10">10</option>
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
-        </div>
+        </label>
         <button
           type="button"
-          class="btn-table-manage"
+          class="btn-table-manage product-management-toolbar__create"
           data-open-create-sheet
-          style="padding: 0.5rem 1rem; border-radius: 0.375rem; text-transform: none; font-size: 0.9rem; font-weight: 600; letter-spacing: normal;"
           >Create Product</button
         >
       </div>
     </div>
 
-    <div class="table-wrap">
+    <div data-product-table-shell>
+      <div class="table-wrap">
       <table style="table-layout: fixed; width: 100%;">
         <thead>
           <tr>
@@ -157,7 +261,13 @@ function formatStockStatus(status: string): string {
         </thead>
         <tbody>
           {
-            data.products.map((product) => (
+            data.products.length === 0 ? (
+              <tr class="empty-row">
+                <td colspan="7" class="empty-state">
+                  No products match the selected filters.
+                </td>
+              </tr>
+            ) : data.products.map((product) => (
               <tr data-status={product.is_active ? "active" : "inactive"}>
                 {/* 1. Image Cell (Editable Popover) */}
                 <td style="width: 8%; vertical-align: middle;">
@@ -638,6 +748,7 @@ function formatStockStatus(status: string): string {
           }
         </tbody>
       </table>
+      </div>
     </div>
 
     <div class="table-pagination">
@@ -664,4 +775,281 @@ function formatStockStatus(status: string): string {
       </div>
     </div>
   </div>
+
+  <template data-product-filter-skeleton>
+    <div class="table-wrap" aria-busy="true" aria-live="polite">
+      <table class="product-table-skeleton" style="table-layout: fixed; width: 100%;">
+        <caption class="sr-only">Loading filtered products</caption>
+        <thead>
+          <tr>
+            <th scope="col" style="width: 8%;"></th>
+            <th scope="col" style="width: 24%;">Name</th>
+            <th scope="col" style="width: 24%;">Description</th>
+            <th scope="col" style="width: 17%;">Pricing</th>
+            <th scope="col" style="width: 12%;">Status</th>
+            <th scope="col" style="width: 15%;">Date Created</th>
+            <th scope="col" style="width: 10%;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {skeletonRows.map(() => (
+            <tr>
+              <td><span class="table-skeleton-block table-skeleton-block--image"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--wide"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </template>
 </section>
+
+<script>
+  function initAdminProductFilters() {
+    const form = document.querySelector<HTMLFormElement>("[data-product-filter-form]");
+    const tableShell = document.querySelector<HTMLElement>("[data-product-table-shell]");
+    const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-product-filter-skeleton]");
+    const resetLink = document.querySelector<HTMLAnchorElement>("[data-product-filter-reset]");
+
+    if (!form || !tableShell || !skeletonTemplate) return;
+    if (form.dataset.productFilterInitialized === "true") return;
+    form.dataset.productFilterInitialized = "true";
+    const activeForm = form;
+    const activeTableShell = tableShell;
+    const activeSkeletonTemplate = skeletonTemplate;
+
+    const cacheKey = "admin-products-filter-cache-v1";
+    const fragmentPath = "/admin/products-fragment";
+    const filterKeys = ["search", "category", "stockStatus", "minPrice", "maxPrice"] as const;
+    const autoSubmitFields = activeForm.querySelectorAll<HTMLSelectElement>("select");
+    const searchInput = activeForm.querySelector<HTMLInputElement>("[data-product-search-input]");
+    const priceRange = activeForm.querySelector<HTMLElement>("[data-price-range]");
+    const minRange = activeForm.querySelector<HTMLInputElement>("[data-price-min-range]");
+    const maxRange = activeForm.querySelector<HTMLInputElement>("[data-price-max-range]");
+    const minHidden = activeForm.querySelector<HTMLInputElement>("[data-price-min-hidden]");
+    const maxHidden = activeForm.querySelector<HTMLInputElement>("[data-price-max-hidden]");
+    const minLabel = activeForm.querySelector<HTMLElement>("[data-price-min-label]");
+    const maxLabel = activeForm.querySelector<HTMLElement>("[data-price-max-label]");
+    const rangeFill = activeForm.querySelector<HTMLElement>("[data-price-range-fill]");
+    const priceMin = Number(priceRange?.dataset.priceMin ?? "0");
+    const priceMax = Number(priceRange?.dataset.priceMax ?? "1");
+    let submitTimer: number | undefined;
+    let searchTimer: number | undefined;
+    let activeFetchController: AbortController | undefined;
+
+    function readCache(): string[] {
+      try {
+        const parsed = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
+        return Array.isArray(parsed)
+          ? parsed.filter((value): value is string => typeof value === "string")
+          : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function writeCache(values: string[]) {
+      sessionStorage.setItem(cacheKey, JSON.stringify([...new Set(values)]));
+    }
+
+    function normalizeParams(params: URLSearchParams) {
+      const normalized = new URLSearchParams();
+
+      filterKeys.forEach((key) => {
+        const value = params.get(key)?.trim();
+        if (value) normalized.set(key, value);
+      });
+
+      return normalized.toString();
+    }
+
+    function normalizeFormQuery() {
+      const params = new URLSearchParams();
+      const formData = new FormData(activeForm);
+
+      filterKeys.forEach((key) => {
+        const value = formData.get(key);
+        if (typeof value === "string" && value.trim()) {
+          params.set(key, value.trim());
+        }
+      });
+
+      return params.toString();
+    }
+
+    function buildUrl(path: string, targetQuery: string) {
+      return targetQuery ? `${path}?${targetQuery}` : path;
+    }
+
+    function formatPrice(value: number) {
+      return new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        maximumFractionDigits: 0,
+      }).format(value);
+    }
+
+    function syncPriceRange() {
+      if (!minRange || !maxRange || !minHidden || !maxHidden) return;
+
+      let minValue = Number(minRange.value);
+      let maxValue = Number(maxRange.value);
+
+      if (minValue > maxValue) {
+        if (document.activeElement === minRange) {
+          maxValue = minValue;
+          maxRange.value = String(maxValue);
+        } else {
+          minValue = maxValue;
+          minRange.value = String(minValue);
+        }
+      }
+
+      minHidden.value = minValue > priceMin ? String(minValue) : "";
+      maxHidden.value = maxValue < priceMax ? String(maxValue) : "";
+
+      if (minLabel) minLabel.textContent = formatPrice(minValue);
+      if (maxLabel) maxLabel.textContent = formatPrice(maxValue);
+
+      if (rangeFill) {
+        const span = Math.max(priceMax - priceMin, 1);
+        const left = ((minValue - priceMin) / span) * 100;
+        const right = 100 - ((maxValue - priceMin) / span) * 100;
+        rangeFill.style.left = `${left}%`;
+        rangeFill.style.right = `${right}%`;
+      }
+    }
+
+    function submitFilters() {
+      window.clearTimeout(submitTimer);
+      submitTimer = window.setTimeout(() => {
+        syncPriceRange();
+        void applyFilters(normalizeFormQuery());
+      }, 120);
+    }
+
+    function showSkeletonForQuery(targetQuery: string) {
+      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
+      const cachedQueries = readCache();
+
+      if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) {
+        return;
+      }
+
+      const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
+      if (!skeleton) return;
+
+      activeTableShell.replaceChildren(skeleton);
+    }
+
+    function replaceProductsFragment(fragmentHtml: string) {
+      const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html");
+      const nextTableShell = parsed.querySelector<HTMLElement>("[data-product-table-shell]");
+
+      if (!nextTableShell) {
+        throw new Error("Products fragment did not include a product table.");
+      }
+
+      activeTableShell.innerHTML = nextTableShell.innerHTML;
+      document.dispatchEvent(new Event("dashboard:interactive-table-updated"));
+    }
+
+    async function applyFilters(
+      targetQuery: string,
+      options: { updateHistory?: boolean } = {},
+    ) {
+      const updateHistory = options.updateHistory ?? true;
+      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
+
+      if (targetQuery === currentQuery && updateHistory) {
+        return;
+      }
+
+      showSkeletonForQuery(targetQuery);
+      activeFetchController?.abort();
+
+      const fetchController = new AbortController();
+      activeFetchController = fetchController;
+
+      try {
+        const response = await fetch(buildUrl(fragmentPath, targetQuery), {
+          headers: {
+            "X-Requested-With": "fetch",
+          },
+          signal: fetchController.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Product filters failed with ${response.status}.`);
+        }
+
+        const fragmentHtml = await response.text();
+        if (updateHistory) {
+          window.history.replaceState(
+            { productFilterQuery: targetQuery },
+            "",
+            buildUrl("/admin/products", targetQuery),
+          );
+        }
+
+        replaceProductsFragment(fragmentHtml);
+        activeForm.dataset.currentFilterQuery = targetQuery;
+        if (resetLink) resetLink.hidden = targetQuery.length === 0;
+        writeCache([...readCache(), targetQuery]);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
+        window.location.href = buildUrl("/admin/products", targetQuery);
+      } finally {
+        if (activeFetchController === fetchController) {
+          activeFetchController = undefined;
+        }
+      }
+    }
+
+    writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      syncPriceRange();
+      void applyFilters(normalizeFormQuery());
+    });
+
+    autoSubmitFields.forEach((field) => {
+      field.addEventListener("change", submitFilters);
+    });
+
+    searchInput?.addEventListener("input", () => {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(submitFilters, 450);
+    });
+
+    minRange?.addEventListener("input", syncPriceRange);
+    maxRange?.addEventListener("input", syncPriceRange);
+    minRange?.addEventListener("change", submitFilters);
+    maxRange?.addEventListener("change", submitFilters);
+    syncPriceRange();
+
+    resetLink?.addEventListener("click", (event) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      event.preventDefault();
+      void applyFilters("");
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initAdminProductFilters);
+  document.addEventListener("astro:after-swap", initAdminProductFilters);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initAdminProductFilters();
+  }
+</script>

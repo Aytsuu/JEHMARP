@@ -9,6 +9,10 @@ import {
 } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import {
+  parseAdminProductFilters,
+  serializeAdminProductFilters,
+} from "@/lib/admin-dashboard/product-filters";
 
 export const prerender = false;
 
@@ -18,7 +22,11 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
-const data = await loadAdminDashboardData();
+const productFilters = parseAdminProductFilters(Astro.url);
+const productFilterQuery = serializeAdminProductFilters(productFilters);
+const data = await loadAdminDashboardData({
+  productFilters,
+});
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
@@ -35,5 +43,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
     productCategories={getProductCategories()}
     productUnitLabels={getProductUnitLabels()}
     stockStatuses={getStockStatuses()}
+    activeFilters={productFilters}
+    filterQuery={productFilterQuery}
   />
 </AdminPageFrame>

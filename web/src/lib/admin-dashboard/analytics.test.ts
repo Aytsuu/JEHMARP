@@ -93,6 +93,14 @@ function createAnalyticsData(): AdminDashboardData {
       product("product-pork", "Pork Belly", "pork"),
       product("product-chicken", "Chicken Thigh", "chicken"),
     ],
+    productPriceRange: {
+      min: 0,
+      max: 100,
+    },
+    orderTotalRange: {
+      min: 0,
+      max: 320,
+    },
     agents: [{
       id: "agent-id",
       user_id: "22222222-2222-2222-2222-222222222222",

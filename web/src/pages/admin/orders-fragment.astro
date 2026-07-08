@@ -1,0 +1,27 @@
+---
+import AdminOrderManagement from "@/components/admin/AdminOrderManagement.astro";
+import { loadAdminOrderManagementData } from "@/lib/admin-dashboard/data";
+import {
+  parseAdminOrderFilters,
+  serializeAdminOrderFilters,
+} from "@/lib/admin-dashboard/order-filters";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const orderFilters = parseAdminOrderFilters(Astro.url);
+const orderFilterQuery = serializeAdminOrderFilters(orderFilters);
+const data = await loadAdminOrderManagementData(orderFilters);
+---
+
+<AdminOrderManagement
+  data={data}
+  activeFilters={orderFilters}
+  filterQuery={orderFilterQuery}
+/>

@@ -20,6 +20,9 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    gte: vi.fn(() => builder),
+    lte: vi.fn(() => builder),
+    or: vi.fn(() => builder),
     maybeSingle: vi.fn(() => Promise.resolve({
       data: response.data[0] ?? null,
       error: response.error,
@@ -30,6 +33,49 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
   };
 
   return builder;
+}
+
+function createMockOrder(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+    agent_id: null,
+    source: "guest_shop",
+    order_status: "submitted",
+    payment_status: "partial",
+    approved_at: null,
+    created_at: "2026-07-03T00:00:00.000Z",
+    updated_at: "2026-07-03T00:00:00.000Z",
+    customer: {
+      id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+      first_name: "Maria",
+      last_name: "Cruz",
+      phone_number: "09170000000",
+      email: "maria@example.test",
+      address: "Quezon City",
+      is_reseller: false,
+    },
+    agent: null,
+    customer_order_item: [
+      {
+        id: "a10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        product_id: "p10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        partial_quantity: 2,
+        final_quantity: 3,
+        unit_price: 600,
+        price_type: "retail",
+        add_details: null,
+        agent_commission_amount: 0,
+        agent_commission_status: "unset",
+        agent_commission_notes: null,
+        product: null,
+      },
+    ],
+    payment: [],
+    invoice: [],
+    customer_order_status_history: [],
+    ...overrides,
+  };
 }
 
 describe("loadAdminDashboardData", () => {
@@ -48,6 +94,136 @@ describe("loadAdminDashboardData", () => {
     expect(createSupabaseAdminClient).toHaveBeenCalledTimes(1);
     expect(from).toHaveBeenCalledWith("product");
     expect(result.products).toEqual([]);
+  });
+
+  it("applies admin product filters to the database query", async () => {
+    const productBuilder = createQueryBuilder();
+    const from = vi.fn((table: string) => (
+      table === "product" ? productBuilder : createQueryBuilder()
+    ));
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminDashboardData } = await import("./data");
+
+    await loadAdminDashboardData({
+      productFilters: {
+        search: "belly",
+        category: "pork",
+        stockStatus: "limited",
+        minPrice: 100,
+        maxPrice: 250,
+      },
+    });
+
+    expect(productBuilder.or).toHaveBeenCalledWith("name.ilike.%belly%,description.ilike.%belly%");
+    expect(productBuilder.eq).toHaveBeenCalledWith("category", "pork");
+    expect(productBuilder.eq).toHaveBeenCalledWith("stock_status", "limited");
+    expect(productBuilder.gte).toHaveBeenCalledWith("default_price", 100);
+    expect(productBuilder.lte).toHaveBeenCalledWith("default_price", 250);
+  });
+
+  it("loads product management data without loading the rest of the dashboard", async () => {
+    const productBuilder = createQueryBuilder();
+    const from = vi.fn(() => productBuilder);
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminProductManagementData } = await import("./data");
+
+    const result = await loadAdminProductManagementData({
+      search: "belly",
+    });
+
+    expect(createSupabaseAdminClient).toHaveBeenCalledTimes(1);
+    expect(from).toHaveBeenCalledTimes(2);
+    expect(from).toHaveBeenNthCalledWith(1, "product");
+    expect(from).toHaveBeenNthCalledWith(2, "product");
+    expect(productBuilder.or).toHaveBeenCalledWith("name.ilike.%belly%,description.ilike.%belly%");
+    expect(result).toEqual({
+      products: [],
+      productPriceRange: {
+        min: 0,
+        max: 0,
+      },
+    });
+  });
+
+  it("applies direct admin order filters to the database query", async () => {
+    const orderBuilder = createQueryBuilder();
+    const from = vi.fn((table: string) => (
+      table === "customer_order" ? orderBuilder : createQueryBuilder()
+    ));
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminDashboardData } = await import("./data");
+
+    await loadAdminDashboardData({
+      orderFilters: {
+        source: "guest_shop",
+        orderStatus: "submitted",
+        paymentStatus: "partial",
+      },
+    });
+
+    expect(orderBuilder.eq).toHaveBeenCalledWith("source", "guest_shop");
+    expect(orderBuilder.eq).toHaveBeenCalledWith("order_status", "submitted");
+    expect(orderBuilder.eq).toHaveBeenCalledWith("payment_status", "partial");
+  });
+
+  it("filters admin orders by search and total on the server", async () => {
+    const matchingOrder = createMockOrder();
+    const lowTotalOrder = createMockOrder({
+      id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      customer: {
+        id: "c10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        first_name: "Maria",
+        last_name: "Santos",
+        phone_number: "09171111111",
+        email: "santos@example.test",
+        address: "Makati",
+        is_reseller: false,
+      },
+      customer_order_item: [
+        {
+          id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+          product_id: "p10bb955-d8b1-4a26-a6e2-928fd33949e1",
+          partial_quantity: 1,
+          final_quantity: 1,
+          unit_price: 200,
+          price_type: "retail",
+          add_details: null,
+          agent_commission_amount: 0,
+          agent_commission_status: "unset",
+          agent_commission_notes: null,
+          product: null,
+        },
+      ],
+    });
+    const unrelatedOrder = createMockOrder({
+      id: "69d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      customer: {
+        id: "d10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        first_name: "Juan",
+        last_name: "Reyes",
+        phone_number: "09172222222",
+        email: "juan@example.test",
+        address: "Pasig",
+        is_reseller: false,
+      },
+    });
+    const orderBuilder = createQueryBuilder({
+      data: [matchingOrder, lowTotalOrder, unrelatedOrder],
+      error: null,
+    });
+    const from = vi.fn((table: string) => (
+      table === "customer_order" ? orderBuilder : createQueryBuilder()
+    ));
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminOrderManagementData } = await import("./data");
+
+    const result = await loadAdminOrderManagementData({
+      search: "maria",
+      minTotal: 1000,
+      maxTotal: 1500,
+    });
+
+    expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id]);
   });
 
   it("normalizes nullable order child relations to empty arrays", async () => {

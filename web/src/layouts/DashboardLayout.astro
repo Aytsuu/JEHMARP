@@ -650,10 +650,14 @@ const categories: CategoryGroup[] = isAdmin
       }
 
       function initInteractiveTables() {
-        const interactiveTables = document.querySelectorAll(
+        const interactiveTables = document.querySelectorAll<HTMLElement>(
           "[data-interactive-table]",
         );
         interactiveTables.forEach((container) => {
+          const tableGeneration = String(
+            Number(container.dataset.interactiveTableGeneration || "0") + 1,
+          );
+          container.dataset.interactiveTableGeneration = tableGeneration;
           const searchInput = container.querySelector<HTMLInputElement>(
             "[data-search-input]",
           );
@@ -686,7 +690,13 @@ const categories: CategoryGroup[] = isAdmin
           let currentPage = 1;
           let limit = parseInt(limitSelect?.value || "10", 10);
 
+          function isCurrentGeneration() {
+            return container.dataset.interactiveTableGeneration === tableGeneration;
+          }
+
           function updateTable() {
+            if (!isCurrentGeneration()) return;
+
             const query = searchInput?.value.toLowerCase().trim() || "";
             const statusQuery = statusSelect?.value || "";
 
@@ -757,22 +767,26 @@ const categories: CategoryGroup[] = isAdmin
           }
 
           searchInput?.addEventListener("input", () => {
+            if (!isCurrentGeneration()) return;
             currentPage = 1;
             updateTable();
           });
 
           statusSelect?.addEventListener("change", () => {
+            if (!isCurrentGeneration()) return;
             currentPage = 1;
             updateTable();
           });
 
           limitSelect?.addEventListener("change", () => {
+            if (!isCurrentGeneration()) return;
             limit = parseInt(limitSelect.value, 10);
             currentPage = 1;
             updateTable();
           });
 
           prevBtn?.addEventListener("click", () => {
+            if (!isCurrentGeneration()) return;
             if (currentPage > 1) {
               currentPage--;
               updateTable();
@@ -780,6 +794,7 @@ const categories: CategoryGroup[] = isAdmin
           });
 
           nextBtn?.addEventListener("click", () => {
+            if (!isCurrentGeneration()) return;
             const totalPages = Math.ceil(filteredRows.length / limit) || 1;
             if (currentPage < totalPages) {
               currentPage++;
@@ -801,6 +816,10 @@ const categories: CategoryGroup[] = isAdmin
 
       document.addEventListener("DOMContentLoaded", initDashboardFeatures);
       document.addEventListener("astro:after-swap", initDashboardFeatures);
+      document.addEventListener(
+        "dashboard:interactive-table-updated",
+        initInteractiveTables,
+      );
       if (
         document.readyState === "complete" ||
         document.readyState === "interactive"
