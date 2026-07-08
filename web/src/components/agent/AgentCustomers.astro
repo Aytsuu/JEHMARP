@@ -1,5 +1,6 @@
 ---
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import ViewButton from "@/components/ViewButton.astro";
 import { fullName } from "@/lib/agent-dashboard/view";
 
 type Props = {
@@ -47,7 +48,7 @@ const { data } = Astro.props;
                 <td>{customer.phone_number}<br />{customer.email ?? "No email"}</td>
                 <td>{customer.address}</td>
                 <td>
-                  <a href={`/agent/customers/${customer.id}`} class="btn-table-manage" style="text-decoration: none; display: inline-block;">View</a>
+                  <ViewButton href={`/agent/customers/${customer.id}`} />
                 </td>
               </tr>
             ))}

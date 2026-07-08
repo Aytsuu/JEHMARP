@@ -1,5 +1,6 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import ViewButton from "@/components/ViewButton.astro";
 import { selected, formatDate } from "@/lib/admin-dashboard/view";
 import { autoCapitalize } from "@/lib/formatters";
 
@@ -160,7 +161,7 @@ const agentStatuses = ["active", "inactive", "suspended"] as const;
 
               <!-- 6. Action Column -->
               <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                <a href={`/admin/agents/${agent.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
+                <ViewButton href={`/admin/agents/${agent.id}`} />
               </td>
             </tr>
           ))}

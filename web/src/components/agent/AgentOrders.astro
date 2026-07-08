@@ -1,5 +1,6 @@
 ---
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import ViewButton from "@/components/ViewButton.astro";
 import {
   formatCurrency,
   formatDate,
@@ -192,7 +193,7 @@ const hasAssignedCustomers = data.customers.length > 0;
                   <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.payment_status)}</td>
                   <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(total)}</td>
                   <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                    <a href={`/agent/orders/${order.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
+                    <ViewButton href={`/agent/orders/${order.id}`} />
                   </td>
                 </tr>
               );

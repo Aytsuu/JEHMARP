@@ -1,0 +1,35 @@
+---
+type Props = {
+  href?: string;
+  type?: "button" | "submit" | "reset";
+  class?: string;
+  [key: string]: any;
+};
+
+const { href, type = "button", class: className = "", ...rest } = Astro.props;
+const Tag = href ? "a" : "button";
+const buttonProps = href ? { href } : { type };
+---
+
+<Tag
+  {...buttonProps}
+  class={`group inline-flex items-center gap-2 py-1 rounded-lg border-none shadow-none transition-colors duration-200 ease-in-out cursor-pointer bg-transparent text-left p-0 text-inherit decoration-none ${className}`}
+  style="cursor: pointer; text-decoration: none;"
+  {...rest}
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="35"
+    height="35"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    class="text-black/40 group-hover:fill-brand-red group-hover:stroke-white transition-all duration-200 ease-in-out"
+  >
+    <circle cx="12" cy="12" r="10"></circle>
+    <path d="m10 8 4 4-4 4"></path>
+  </svg>
+</Tag>

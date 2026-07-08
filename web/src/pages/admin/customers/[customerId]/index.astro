@@ -1,5 +1,6 @@
 ---
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import ViewButton from "@/components/ViewButton.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
@@ -186,7 +187,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
                     <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.payment_status)}</td>
                     <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(total)}</td>
                     <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                      <a href={`/admin/orders/${order.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
+                      <ViewButton href={`/admin/orders/${order.id}`} />
                     </td>
                   </tr>
                 );
@@ -227,7 +228,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
                     <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.payment_status)}</td>
                     <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(total)}</td>
                     <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                      <a href={`/admin/orders/${order.id}`} class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block; text-decoration: none;">View</a>
+                      <ViewButton href={`/admin/orders/${order.id}`} />
                     </td>
                   </tr>
                 );
