@@ -6,6 +6,10 @@ import {
   getSignedInUser,
 } from "@/lib/auth";
 import { getServerEnv } from "@/lib/env";
+import {
+  getDashboardPageAvailability,
+  getPageStatusLabel,
+} from "@/lib/page-availability";
 import { isTrustedFormOrigin } from "@/lib/security/form-origin";
 import { enforceFixedWindowRateLimit } from "@/lib/security/rate-limit";
 
@@ -43,6 +47,18 @@ export async function requireAdminRoute(
   }
 
   if (context.request.method === "POST") {
+    const pageAvailability = getDashboardPageAvailability(context.url.pathname);
+
+    if (pageAvailability.status !== "ready") {
+      return {
+        ready: false,
+        response: redirectWithActionError(
+          context,
+          `${pageAvailability.label} is ${getPageStatusLabel(pageAvailability.status).toLowerCase()} and cannot accept updates right now.`,
+        ),
+      };
+    }
+
     if (!isTrustedFormOrigin(context.request.headers, context.url)) {
       return {
         ready: false,

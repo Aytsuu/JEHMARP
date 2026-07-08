@@ -1,5 +1,9 @@
 ---
 import type { NavigationItem } from "@/config/navigation";
+import {
+  getDashboardRouteStatuses,
+  getPageStatusLabel,
+} from "@/lib/page-availability";
 import "@/styles/global.css";
 
 type Props = {
@@ -21,6 +25,7 @@ type Props = {
 
 const { title, description, navLabel, sidebarUnreadBadges = {} } = Astro.props;
 const isAdmin = Astro.url.pathname.startsWith("/admin");
+const routeStatuses = getDashboardRouteStatuses();
 
 type GroupedNavItem = {
   label: string;
@@ -216,6 +221,15 @@ const categories: CategoryGroup[] = isAdmin
                           item.href !== "/agent" &&
                           Astro.url.pathname.startsWith(item.href));
                       const unreadBadge = sidebarUnreadBadges[item.href];
+                      const routeStatus = routeStatuses[item.href];
+                      const showRouteStatus =
+                        routeStatus && routeStatus.status !== "ready";
+                      const routeStatusLabel = routeStatus
+                        ? getPageStatusLabel(routeStatus.status)
+                        : "";
+                      const routeStatusIcon = routeStatus?.status === "maintenance"
+                        ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.66 5.66l-6.36 6.36a2 2 0 0 0 2.83 2.83l6.36-6.36a4 4 0 0 0 5.66-5.66l-2.12 2.12-2.83-2.83 2.12-2.12z"></path></svg>`
+                        : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>`;
                       return (
                         <li>
                           {item.isAction ? (
@@ -246,6 +260,16 @@ const categories: CategoryGroup[] = isAdmin
                                 />
                                 <span>{item.label}</span>
                               </span>
+                              {
+                                showRouteStatus && (
+                                  <span
+                                    class={`dashboard-sidebar__status dashboard-sidebar__status--${routeStatus.status}`}
+                                    aria-label={`${item.label} status: ${routeStatusLabel}`}
+                                    title={`${item.label}: ${routeStatusLabel}`}
+                                    set:html={routeStatusIcon}
+                                  />
+                                )
+                              }
                               {
                                 unreadBadge &&
                                   ("count" in unreadBadge

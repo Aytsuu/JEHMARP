@@ -1,8 +1,10 @@
 ---
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import PageAvailabilityNotice from "@/components/dashboard/PageAvailabilityNotice.astro";
 import { getAgentUnreadNotificationIds } from "@/lib/agent-dashboard/notifications";
 import { agentDashboardRoutes } from "@/config/navigation";
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { getDashboardPageAvailability } from "@/lib/page-availability";
 
 type Props = {
   title: string;
@@ -23,6 +25,8 @@ const headingId = `${heading
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-|-$/g, "")}-title`;
 const notificationIds = dashboardData ? getAgentUnreadNotificationIds(dashboardData) : [];
+const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
+const isPageReady = pageAvailability.status === "ready";
 ---
 
 <DashboardLayout
@@ -65,6 +69,6 @@ const notificationIds = dashboardData ? getAgentUnreadNotificationIds(dashboardD
       )
     }
 
-    <slot />
+    {isPageReady ? <slot /> : <PageAvailabilityNotice availability={pageAvailability} />}
   </section>
 </DashboardLayout>

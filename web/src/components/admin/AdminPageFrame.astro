@@ -1,6 +1,7 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 import type { AdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import PageAvailabilityNotice from "@/components/dashboard/PageAvailabilityNotice.astro";
 import {
   getUnreadAdminInquiryIds,
   getUnreadAdminOrderIds,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/admin-dashboard/notifications";
 import { adminDashboardRoutes } from "@/config/navigation";
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { getDashboardPageAvailability } from "@/lib/page-availability";
 
 type Props = {
   title: string;
@@ -31,6 +33,8 @@ const unreadResellerApplicationCount = dashboardData
   : 0;
 const unreadNotificationCount =
   unreadOrderCount + unreadInquiryCount + unreadResellerApplicationCount;
+const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
+const isPageReady = pageAvailability.status === "ready";
 ---
 
 <DashboardLayout
@@ -81,7 +85,7 @@ const unreadNotificationCount =
       )
     }
 
-    <slot />
+    {isPageReady ? <slot /> : <PageAvailabilityNotice availability={pageAvailability} />}
   </section>
 </DashboardLayout>
 

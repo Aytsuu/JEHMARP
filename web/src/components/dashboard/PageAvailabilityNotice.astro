@@ -1,0 +1,22 @@
+---
+import type { DashboardPageStatus } from "@/lib/page-availability";
+type Props = {
+  availability: DashboardPageStatus;
+};
+
+const { availability } = Astro.props;
+const isMaintenance = availability.status === "maintenance";
+const title = isMaintenance ? "Maintenance in progress" : "Coming soon";
+const message = isMaintenance
+  ? `${availability.label} is temporarily paused while updates are ongoing. The rest of the dashboard remains available.`
+  : `${availability.label} is still being prepared for production. This deployment can continue while the page stays restricted.`;
+const detail = isMaintenance
+  ? "Check back after the update window, or use another sidebar section for active work."
+  : "We are building this area carefully before opening it in production.";
+---
+
+<section class={`page-availability page-availability--${availability.status}`} aria-labelledby="page-availability-title">
+  <h2 id="page-availability-title">{title}</h2>
+  <p>{message}</p>
+  <p class="page-availability__detail">{detail}</p>
+</section>
