@@ -1,5 +1,5 @@
 ---
-import ViewButton from "@/components/ViewButton.astro";
+import TableActionMenu from "@/components/TableActionMenu.astro";
 import type { AdminInvoiceManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminInvoiceFilters } from "@/lib/admin-dashboard/invoice-filters";
 import { invoiceBalanceStatuses } from "@/lib/admin-dashboard/invoice-filters";
@@ -170,6 +170,8 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
               const invoiceTotal = orderTotal(order, "final_quantity");
               const paidTotal = orderPaymentTotal(order);
               const balance = orderBalance(order);
+              const salesInvoicePdfHref = `/admin/orders/${order.id}/sales-invoice.pdf`;
+              const orderDetailsHref = `/admin/orders/${order.id}`;
 
               return (
                 <tr data-status={order.payment_status}>
@@ -184,7 +186,11 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
                   <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(paidTotal)}</td>
                   <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(balance)}</td>
                   <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                    <ViewButton href={`/admin/invoices/${invoice.id}`} />
+                    <TableActionMenu
+                      menuLabel={`Open actions for ${invoice.invoice_number}`}
+                      pdfHref={salesInvoicePdfHref}
+                      detailsHref={orderDetailsHref}
+                    />
                   </td>
                 </tr>
               );

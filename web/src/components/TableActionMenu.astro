@@ -1,0 +1,284 @@
+---
+type Props = {
+  menuLabel: string;
+  pdfHref?: string;
+  detailsHref?: string;
+  detailsLabel?: string;
+};
+
+const {
+  menuLabel,
+  pdfHref,
+  detailsHref,
+  detailsLabel = "Order Details",
+} = Astro.props;
+---
+
+<div class="table-action-menu" data-table-action-menu>
+  <button
+    type="button"
+    class="table-action-menu__trigger"
+    aria-label={menuLabel}
+    aria-haspopup="menu"
+    aria-expanded="false"
+    data-table-action-menu-trigger
+  >
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.75"></circle>
+      <circle cx="12" cy="12" r="1.75"></circle>
+      <circle cx="19" cy="12" r="1.75"></circle>
+    </svg>
+  </button>
+  <div
+    class="table-action-menu__content"
+    role="menu"
+    aria-label={menuLabel}
+    hidden
+    data-table-action-menu-content
+  >
+    {pdfHref && (
+      <a href={pdfHref} class="table-action-menu__item" target="_blank" rel="noreferrer" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M15 3h6v6"></path>
+          <path d="M10 14 21 3"></path>
+          <path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"></path>
+        </svg>
+        <span>Open PDF</span>
+      </a>
+    )}
+    {detailsHref && (
+      <a href={detailsHref} class="table-action-menu__item" role="menuitem">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M9 6.75H19.5"></path>
+          <path d="M9 12H19.5"></path>
+          <path d="M9 17.25H19.5"></path>
+          <path d="M4.5 6.75h.01"></path>
+          <path d="M4.5 12h.01"></path>
+          <path d="M4.5 17.25h.01"></path>
+        </svg>
+        <span>{detailsLabel}</span>
+      </a>
+    )}
+  </div>
+</div>
+
+<script>
+  function initTableActionMenus() {
+    if (document.body.dataset.tableActionMenusInitialized === "true") return;
+    document.body.dataset.tableActionMenusInitialized = "true";
+
+    let activeMenu: HTMLElement | null = null;
+
+    const closeMenu = (menu: HTMLElement | null) => {
+      if (!menu) return;
+
+      const trigger = menu.querySelector<HTMLElement>("[data-table-action-menu-trigger]");
+      const content = menu.querySelector<HTMLElement>("[data-table-action-menu-content]");
+
+      if (content) {
+        content.hidden = true;
+        content.style.left = "";
+        content.style.top = "";
+      }
+
+      trigger?.setAttribute("aria-expanded", "false");
+
+      if (activeMenu === menu) {
+        activeMenu = null;
+      }
+    };
+
+    const positionMenu = (menu: HTMLElement) => {
+      const trigger = menu.querySelector<HTMLElement>("[data-table-action-menu-trigger]");
+      const content = menu.querySelector<HTMLElement>("[data-table-action-menu-content]");
+      if (!trigger || !content) return;
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const gutter = 12;
+
+      content.hidden = false;
+
+      const contentRect = content.getBoundingClientRect();
+      let left = triggerRect.right - contentRect.width;
+      let top = triggerRect.bottom + 8;
+
+      if (left < gutter) left = gutter;
+      if (left + contentRect.width > viewportWidth - gutter) {
+        left = viewportWidth - contentRect.width - gutter;
+      }
+
+      if (top + contentRect.height > viewportHeight - gutter) {
+        top = triggerRect.top - contentRect.height - 8;
+      }
+
+      if (top < gutter) top = gutter;
+
+      content.style.left = `${left}px`;
+      content.style.top = `${top}px`;
+    };
+
+    const openMenu = (menu: HTMLElement) => {
+      if (activeMenu && activeMenu !== menu) {
+        closeMenu(activeMenu);
+      }
+
+      const trigger = menu.querySelector<HTMLElement>("[data-table-action-menu-trigger]");
+      trigger?.setAttribute("aria-expanded", "true");
+      positionMenu(menu);
+      activeMenu = menu;
+    };
+
+    const toggleMenu = (menu: HTMLElement) => {
+      const content = menu.querySelector<HTMLElement>("[data-table-action-menu-content]");
+      if (!content || content.hidden) {
+        openMenu(menu);
+        return;
+      }
+
+      closeMenu(menu);
+    };
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const trigger = target.closest<HTMLElement>("[data-table-action-menu-trigger]");
+      if (trigger) {
+        const menu = trigger.closest<HTMLElement>("[data-table-action-menu]");
+        if (menu) {
+          toggleMenu(menu);
+        }
+        return;
+      }
+
+      const menuAction = target.closest<HTMLElement>(".table-action-menu__item");
+      if (menuAction) {
+        closeMenu(menuAction.closest<HTMLElement>("[data-table-action-menu]"));
+        return;
+      }
+
+      if (activeMenu && !target.closest("[data-table-action-menu-content]")) {
+        closeMenu(activeMenu);
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && activeMenu) {
+        closeMenu(activeMenu);
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (activeMenu) {
+        positionMenu(activeMenu);
+      }
+    });
+
+    window.addEventListener("scroll", () => {
+      if (activeMenu) {
+        closeMenu(activeMenu);
+      }
+    }, true);
+
+    document.addEventListener("astro:after-swap", () => {
+      closeMenu(activeMenu);
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initTableActionMenus);
+  document.addEventListener("astro:after-swap", initTableActionMenus);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initTableActionMenus();
+  }
+</script>
+
+<style>
+  .table-action-menu {
+    display: inline-block;
+  }
+
+  .table-action-menu__trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-brand-muted-black);
+    cursor: pointer;
+    line-height: 0;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .table-action-menu__trigger:hover,
+  .table-action-menu__trigger[aria-expanded="true"] {
+    background: rgba(17, 24, 39, 0.08);
+    color: var(--color-brand-red);
+  }
+
+  .table-action-menu__trigger:focus-visible {
+    outline: 2px solid var(--color-brand-red);
+    outline-offset: 2px;
+  }
+
+  .table-action-menu__trigger svg {
+    width: 1rem;
+    height: 1rem;
+    fill: currentColor;
+    stroke: none;
+    display: block;
+  }
+
+  .table-action-menu__content {
+    position: fixed;
+    z-index: 1000;
+    min-width: 12rem;
+    padding: 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.75rem;
+    background: #2e2e2e;
+    box-shadow: none;
+  }
+
+  .table-action-menu__item {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.65rem;
+    width: 100%;
+    border: none;
+    border-radius: 0.5rem;
+    background: transparent;
+    padding: 0.65rem 0.75rem;
+    color: #ffffff;
+    font: inherit;
+    text-decoration: none;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s ease, opacity 0.15s ease;
+  }
+
+  .table-action-menu__item:hover,
+  .table-action-menu__item:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    opacity: 0.82;
+    outline: none;
+  }
+
+  .table-action-menu__item svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+</style>

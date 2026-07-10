@@ -303,14 +303,10 @@ const timelineItems = [
             </footer>
             <div class="document-preview-floating-bar">
               <div class="panel-actions">
-                <a href={orderSlipPdfHref} class="document-action" download>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
-                  <span>Download</span>
+                <a href={orderSlipPdfHref} class="document-action" target="_blank" rel="noreferrer">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"></path></svg>
+                  <span>Open PDF</span>
                 </a>
-                <button type="button" class="document-action" data-print-url={orderSlipPdfHref}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v8H6z"></path></svg>
-                  <span>Print</span>
-                </button>
               </div>
             </div>
           </article>
@@ -328,14 +324,10 @@ const timelineItems = [
             </div>
             {hasSalesInvoice && (
               <div class="panel-actions">
-                <a href={salesInvoicePdfHref} class="document-action" download>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
-                  <span>Download</span>
+                <a href={salesInvoicePdfHref} class="document-action" target="_blank" rel="noreferrer">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"></path></svg>
+                  <span>Open PDF</span>
                 </a>
-                <button type="button" class="document-action" data-print-url={salesInvoicePdfHref}>
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v8H6z"></path></svg>
-                  <span>Print</span>
-                </button>
               </div>
             )}
           </div>
@@ -681,18 +673,6 @@ const timelineItems = [
     trigger.addEventListener("click", () => {
       const target = trigger.dataset.tabTarget;
       if (target) setActiveTab(target);
-    });
-  });
-
-  document.querySelectorAll("[data-print-url]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const url = button.getAttribute("data-print-url");
-      if (!url) return;
-      const printWindow = window.open(url, "_blank", "noopener,noreferrer");
-      if (!printWindow) return;
-      printWindow.addEventListener("load", () => {
-        printWindow.print();
-      }, { once: true });
     });
   });
 
