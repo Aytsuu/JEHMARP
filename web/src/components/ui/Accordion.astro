@@ -1,0 +1,42 @@
+---
+type Props = {
+  title?: string;
+  open?: boolean;
+  class?: string;
+};
+
+const {
+  title,
+  open = false,
+  class: className = "",
+} = Astro.props;
+---
+
+<details class:list={["ui-accordion", className]} open={open}>
+  <summary class="ui-accordion__summary">
+    <span class="ui-accordion__title">
+      {Astro.slots.has("title") ? <slot name="title" /> : title}
+    </span>
+    <span class="ui-accordion__summary-actions">
+      {Astro.slots.has("actions") && <slot name="actions" />}
+      <span class="ui-accordion__icon" aria-hidden="true">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </span>
+    </span>
+  </summary>
+  <div class="ui-accordion__content">
+    <slot />
+  </div>
+</details>

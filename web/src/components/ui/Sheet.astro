@@ -2,6 +2,7 @@
 type Props = {
   id?: string;
   header?: string;
+  description?: string;
   content?: string;
   footer?: string;
   width?: string;
@@ -10,6 +11,7 @@ type Props = {
 const {
   id = "drawer-sheet",
   header,
+  description,
   content,
   footer,
   width = "32rem",
@@ -35,7 +37,12 @@ const hasFooter = typeof footer === "string" || Astro.slots.has("footer");
           {Astro.slots.has("header") ? (
             <slot name="header" />
           ) : (
-            <h3 class="drawer-sheet__title" data-sheet-title>{header}</h3>
+            <>
+              <h3 class="drawer-sheet__title" data-sheet-title>{header}</h3>
+              {typeof description === "string" && description.length > 0 && (
+                <p class="drawer-sheet__description">{description}</p>
+              )}
+            </>
           )}
         </div>
         <button

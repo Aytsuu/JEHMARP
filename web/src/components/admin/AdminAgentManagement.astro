@@ -19,10 +19,16 @@ const skeletonRows = Array.from({ length: 6 });
 ---
 
 <section id="admin-agents" class="admin-panel" aria-labelledby="admin-agents-title">
-  <Sheet id="create-agent-sheet" header="Create Agent" width="34rem">
-    <form method="post" class="admin-form" aria-label="Create agent">
+  <Sheet id="create-agent-sheet" width="34rem">
+    <div slot="header" class="agent-create-sheet__header-copy">
+      <h3 class="drawer-sheet__title" data-sheet-title>Create Agent</h3>
+      <p class="agent-create-sheet__header-description">
+        Add the agent's login details, display name, and initial account status.
+      </p>
+    </div>
+    <form id="create-agent-form" method="post" class="admin-form agent-create-form" aria-label="Create agent">
       <input type="hidden" name="action" value="create-agent" />
-      <div class="admin-form-grid">
+      <div class="admin-form-grid agent-create-form__grid">
         <label class="field-row"><span>Email</span><input name="email" type="email" required /></label>
         <label class="field-row"><span>Temporary password</span><input name="password" type="password" minlength="8" required /></label>
         <label class="field-row"><span>Display name</span><input name="displayName" required /></label>
@@ -35,8 +41,10 @@ const skeletonRows = Array.from({ length: 6 });
           </select>
         </label>
       </div>
-      <button type="submit">Create agent</button>
     </form>
+    <div slot="footer" class="agent-create-sheet__footer">
+      <button type="submit" form="create-agent-form">Create agent</button>
+    </div>
   </Sheet>
 
   <div data-interactive-table>
@@ -180,7 +188,11 @@ const skeletonRows = Array.from({ length: 6 });
                     <input type="hidden" name="displayName" value={agent.display_name} />
                     <input type="hidden" name="email" value={agent.email ?? ""} />
                     <input type="hidden" name="contact" value={agent.contact ?? ""} />
-                    <select name="status" onchange="this.closest('form').submit()" style="padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background-color: white; cursor: pointer; width: 100%;">
+                    <select
+                      name="status"
+                      onchange="this.closest('form').submit()"
+                      style="padding: 0.25rem 0.5rem; font-size: 0.9rem; border-radius: 0.375rem; border: 1px solid #d1d5db; background-color: #ffffff; cursor: pointer; width: 100%;"
+                    >
                       {agentStatuses.map((status) => (
                         <option value={status} selected={selected(agent.status, status)}>{autoCapitalize(status)}</option>
                       ))}

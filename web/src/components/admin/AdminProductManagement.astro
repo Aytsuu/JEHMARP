@@ -49,15 +49,22 @@ function formatStockStatus(status: string): string {
   class="admin-panel"
   aria-labelledby="admin-products-title"
 >
-  <Sheet id="create-product-sheet" header="Create Product" width="36rem">
+  <Sheet
+    id="create-product-sheet"
+    header="Create Product"
+    description="Add a new product to the catalog."
+    width="36rem"
+  >
     <form
+      id="create-product-form"
       method="post"
       enctype="multipart/form-data"
-      class="admin-form"
+      class="admin-form product-create-form"
       aria-label="Create product"
     >
       <input type="hidden" name="action" value="save-product" />
-      <div class="admin-form-grid">
+      <input type="hidden" name="isActive" value="on" />
+      <div class="admin-form-grid product-create-form__grid">
         <label class="field-row"
           ><span>Name</span><input name="name" required /></label
         >
@@ -113,20 +120,49 @@ function formatStockStatus(status: string): string {
           ><span>Description</span><textarea name="description"
           ></textarea></label
         >
-        <label class="field-row"
-          ><span>Product image</span><input
-            name="imageFile"
-            type="file"
-            accept="image/*"
-            required
-          /></label
-        >
+        <div class="field-row product-image-field">
+          <span>Product image</span>
+          <div class="product-image-picker" data-product-image-picker>
+            <input
+              id="create-product-image-input"
+              class="product-image-picker__input"
+              name="imageFile"
+              type="file"
+              accept="image/*"
+              required
+              data-product-image-input
+            />
+            <label
+              for="create-product-image-input"
+              class="product-image-picker__surface"
+              data-product-image-surface
+            >
+              <img
+                class="product-image-picker__preview"
+                alt="Selected product preview"
+                hidden
+                data-product-image-preview
+              />
+              <span class="product-image-picker__placeholder" data-product-image-placeholder>
+                Select image
+              </span>
+            </label>
+            <button
+              type="button"
+              class="product-image-picker__remove"
+              aria-label="Remove selected image"
+              hidden
+              data-product-image-remove
+            >
+              Remove
+            </button>
+          </div>
+        </div>
       </div>
-      <label class="checkbox-row"
-        ><input type="checkbox" name="isActive" checked /> Active</label
-      >
-      <button type="submit">Save product</button>
     </form>
+    <div slot="footer" class="product-create-sheet__footer">
+      <button type="submit" form="create-product-form">Save product</button>
+    </div>
   </Sheet>
 
   <div data-interactive-table>
@@ -1053,5 +1089,70 @@ function formatStockStatus(status: string): string {
   document.addEventListener("astro:after-swap", initAdminProductFilters);
   if (document.readyState === "complete" || document.readyState === "interactive") {
     initAdminProductFilters();
+  }
+
+  function initCreateProductImagePicker() {
+    const picker = document.querySelector<HTMLElement>("[data-product-image-picker]");
+    if (!picker || picker.dataset.initialized === "true") return;
+
+    const input = picker.querySelector<HTMLInputElement>("[data-product-image-input]");
+    const preview = picker.querySelector<HTMLImageElement>("[data-product-image-preview]");
+    const placeholder = picker.querySelector<HTMLElement>("[data-product-image-placeholder]");
+    const removeButton = picker.querySelector<HTMLButtonElement>("[data-product-image-remove]");
+    if (!input || !preview || !placeholder || !removeButton) return;
+    picker.dataset.initialized = "true";
+
+    const activePicker = picker;
+    const activeInput = input;
+    const activePreview = preview;
+    const activePlaceholder = placeholder;
+    const activeRemoveButton = removeButton;
+    let previewUrl = "";
+
+    function clearPreview() {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = "";
+      }
+
+      activePreview.hidden = true;
+      activePreview.removeAttribute("src");
+      activePlaceholder.hidden = false;
+      activeRemoveButton.hidden = true;
+      activePicker.dataset.hasImage = "false";
+    }
+
+    function updatePreview() {
+      const file = activeInput.files?.[0];
+      if (!file) {
+        clearPreview();
+        return;
+      }
+
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+
+      previewUrl = URL.createObjectURL(file);
+      activePreview.src = previewUrl;
+      activePreview.hidden = false;
+      activePlaceholder.hidden = true;
+      activeRemoveButton.hidden = false;
+      activePicker.dataset.hasImage = "true";
+    }
+
+    activeInput.addEventListener("change", updatePreview);
+    activeRemoveButton.addEventListener("click", () => {
+      activeInput.value = "";
+      clearPreview();
+    });
+
+    clearPreview();
+  }
+
+  document.addEventListener("DOMContentLoaded", initCreateProductImagePicker);
+  document.addEventListener("astro:after-swap", initCreateProductImagePicker);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initCreateProductImagePicker();
   }
 </script>
