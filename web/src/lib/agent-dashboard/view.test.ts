@@ -21,7 +21,7 @@ function createOrder(overrides: Partial<AgentOrder> = {}): AgentOrder {
     customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
     agent_id: agentId,
     source: "agent_submitted",
-    order_status: "approved",
+    order_status: "processing",
     payment_status: "partial",
     approved_at: "2026-07-01T00:00:00.000Z",
     created_at: "2026-07-03T00:00:00.000Z",
@@ -148,7 +148,7 @@ describe("agent dashboard calculations", () => {
     });
   });
 
-  it("excludes cancelled orders from aggregate outstanding balance", () => {
+  it("keeps closed unpaid orders in aggregate outstanding balance", () => {
     const now = new Date("2026-07-03T10:00:00.000Z");
     const data = {
       agent: {
@@ -162,14 +162,14 @@ describe("agent dashboard calculations", () => {
         createOrder(),
         createOrder({
           id: "7c140d7d-8cb6-465d-a5ef-9bd8ea796d51",
-          order_status: "cancelled",
+          order_status: "closed",
           payment_status: "unpaid",
           payment: [],
         }),
       ],
     } as Pick<AgentDashboardData, "agent" | "customers" | "orders">;
 
-    expect(buildAgentSummary(data, now).outstandingBalance).toBe(212.5);
+    expect(buildAgentSummary(data, now).outstandingBalance).toBe(612.5);
   });
 
   it("summarizes orders by payment status", () => {
@@ -179,13 +179,11 @@ describe("agent dashboard calculations", () => {
       createOrder({ payment_status: "partial" }),
       createOrder({ payment_status: "paid" }),
       createOrder({ payment_status: "refunded" }),
-      createOrder({ payment_status: "void" }),
     ])).toEqual({
       unpaid: 1,
       partial: 2,
       paid: 1,
       refunded: 1,
-      void: 1,
     });
   });
 
@@ -194,7 +192,6 @@ describe("agent dashboard calculations", () => {
     expect(formatPaymentStatus("partial")).toBe("Partial");
     expect(formatPaymentStatus("paid")).toBe("Paid");
     expect(formatPaymentStatus("refunded")).toBe("Refunded");
-    expect(formatPaymentStatus("void")).toBe("Void");
   });
 
   it("keeps zero-payment orders useful for balance tracking", () => {

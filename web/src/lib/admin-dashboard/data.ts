@@ -26,6 +26,7 @@ const adminOrderSelect = `
   source,
   order_status,
   payment_status,
+  notes,
   approved_at,
   admin_read_at,
   admin_read_by,
@@ -42,7 +43,9 @@ const adminOrderSelect = `
   ),
   agent:agent_id (
     id,
-    display_name
+    display_name,
+    email,
+    contact
   ),
   customer_order_item (
     id,
@@ -204,14 +207,15 @@ export type AdminOrder = {
   agent_id: string | null;
   source: "guest_shop" | "agent_submitted" | "admin_manual";
   order_status: OrderStatus;
-  payment_status: "unpaid" | "partial" | "paid" | "refunded" | "void";
+  payment_status: "unpaid" | "partial" | "paid" | "refunded";
+  notes: string | null;
   approved_at: string | null;
   admin_read_at?: string | null;
   admin_read_by?: string | null;
   created_at: string;
   updated_at: string;
   customer: AdminOrderCustomer | null;
-  agent: Pick<AdminAgent, "id" | "display_name"> | null;
+  agent: Pick<AdminAgent, "id" | "display_name" | "email" | "contact"> | null;
   customer_order_item: AdminOrderItem[];
   payment: AdminPayment[];
   invoice: AdminInvoice[];
@@ -371,7 +375,7 @@ export async function loadAdminDashboardData(
     contactInquiries,
     resellerApplications,
     summary: {
-      submittedOrders: orders.filter((order) => order.order_status === "submitted").length,
+      submittedOrders: orders.filter((order) => order.order_status === "pending").length,
       openInquiries: contactInquiries.filter((inquiry) => inquiry.inquiry_status !== "closed").length,
       customers: customers.length,
       activeProducts: products.filter((product) => product.is_active).length,

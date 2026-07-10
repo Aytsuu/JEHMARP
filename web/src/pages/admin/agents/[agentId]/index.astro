@@ -26,12 +26,12 @@ if (!agent) {
 // Find customers assigned to this agent
 const assignedCustomers = data.customers.filter((c) => c.assigned_agent_id === agent.id);
 
-// Check if a customer has pending orders (status is not closed, rejected, cancelled)
+// Check if a customer has active orders (status is not closed)
 function hasPendingOrders(customerId: string): boolean {
   return data.orders.some(
     (order) =>
       order.customer_id === customerId &&
-      !["closed", "rejected", "cancelled"].includes(order.order_status)
+      order.order_status !== "closed"
   );
 }
 

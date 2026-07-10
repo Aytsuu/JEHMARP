@@ -1,23 +1,27 @@
 ---
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
 import {
   formatAdminActionFeedback,
-  getCommissionStatuses,
+  getAllowedNextOrderStatuses,
 } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
-import { requireAdminRoute } from "@/lib/admin-dashboard/page";
-import { getAllowedNextOrderStatuses } from "@/lib/admin-dashboard/actions";
 import {
-  canManageOrderCommissions,
+  loadAdminDashboardData,
+  loadAdminOrder,
+} from "@/lib/admin-dashboard/data";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import {
   formatCurrency,
   formatDate,
   fullName,
-  orderTotal,
-  orderPaymentTotal,
   orderBalance,
-  selected,
+  orderPaymentTotal,
+  orderTotal,
 } from "@/lib/admin-dashboard/view";
+import {
+  buildOrderSlipLayout,
+  buildSalesInvoiceLayout,
+  getDocumentColumnTemplate,
+} from "@/lib/order-documents/layout";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 
 export const prerender = false;
@@ -29,269 +33,1391 @@ if (!adminRoute.ready) {
 }
 
 const { orderId } = Astro.params;
-const data = await loadAdminDashboardData();
-const order = data.orders.find((o) => o.id === orderId);
+
+if (!orderId) {
+  return Astro.redirect("/admin/orders", 302);
+}
+
+const [dashboardData, order] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminOrder(orderId),
+]);
 
 if (!order) {
   return Astro.redirect("/admin/orders", 302);
 }
 
-const commissionStatuses = getCommissionStatuses();
-const allowedStatuses = getAllowedNextOrderStatuses(order.order_status);
-const canManageCommissions = canManageOrderCommissions(order);
-const invoice = order.invoice[0];
 const rawFeedback = formatAdminActionFeedback(Astro.url);
-const feedback =
-  rawFeedback.status === "Order marked as read."
-    ? {
-        ...rawFeedback,
-        status: undefined,
-      }
-    : rawFeedback;
+const feedback = rawFeedback.status === "Order marked as read."
+  ? { ...rawFeedback, status: undefined }
+  : rawFeedback;
+
+const invoice = order.invoice[0] ?? null;
+const hasSalesInvoice = Boolean(invoice);
+const canGenerateInvoice = order.order_status === "processing";
+const hasCommissionTab = order.source === "agent_submitted" && Boolean(order.agent_id);
+const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
+const orderSlipPdfHref = `/admin/orders/${order.id}/order-slip.pdf`;
+const salesInvoicePdfHref = `/admin/orders/${order.id}/sales-invoice.pdf`;
+const invoiceTotal = orderTotal(order, "final_quantity");
+const paidTotal = orderPaymentTotal(order);
+const balance = orderBalance(order);
+const totalCommission = order.customer_order_item.reduce((total, item) => {
+  return total + item.agent_commission_amount;
+}, 0);
+const orderSlipLayout = buildOrderSlipLayout(order);
+const salesInvoiceLayout = buildSalesInvoiceLayout(order);
+const orderSlipGridTemplate = getDocumentColumnTemplate(orderSlipLayout.columns);
+const salesInvoiceGridTemplate = getDocumentColumnTemplate(salesInvoiceLayout.columns);
+const nextStatuses = getAllowedNextOrderStatuses(order.order_status, order.payment_status);
+const availableStatuses = [order.order_status, ...nextStatuses].filter(
+  (value, index, values) => values.indexOf(value) === index,
+);
+const orderStatusOptionLabel = (status: typeof availableStatuses[number]) => {
+  if (order.order_status === "closed" && status === "processing") {
+    return "Open";
+  }
+
+  return autoCapitalize(status);
+};
+
+const timelineItems = [
+  ...order.payment.map((payment) => ({
+    id: `payment-${payment.id}`,
+    title: `Payment recorded via ${payment.payment_method}`,
+    timestamp: payment.created_at,
+    meta: `${formatCurrency(payment.amount)}${payment.reference_number ? ` • Ref ${payment.reference_number}` : ""}`,
+  })),
+  ...order.customer_order_status_history.map((entry) => ({
+    id: `status-${entry.id}`,
+    title: `Order moved to ${autoCapitalize(entry.to_status)}`,
+    timestamp: entry.changed_at,
+    meta: entry.notes ?? (entry.from_status ? `From ${autoCapitalize(entry.from_status)}` : "Status update"),
+  })),
+  ...(invoice
+    ? [{
+        id: `invoice-${invoice.id}`,
+        title: "Invoice created",
+        timestamp: invoice.created_at,
+        meta: invoice.invoice_number,
+      }]
+    : []),
+  {
+    id: `created-${order.id}`,
+    title: "Order created",
+    timestamp: order.created_at,
+    meta: formatOrderSource(order.source),
+  },
+].sort((left, right) => {
+  return new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime();
+});
 ---
 
 <AdminPageFrame
-  title={`Order Details #${order.id.slice(0, 8)} - JEHMARP`}
-  description="Admin order detail, status updates, invoices, and payments."
+  title={`${orderCode} - JEHMARP`}
+  description="Admin order details with order slip, sales invoice, commissions, payment records, and notes."
   heading="Order Details"
-  intro={`Review order items, log customer payments, manage commissions, and generate invoices for Order #${order.id.slice(0, 8)}.`}
+  intro={`Review ${orderCode} and manage invoice, commission, payment, and notes.`}
   feedback={feedback}
-  dashboardData={data}
-  backUrl="/admin/orders"
+  dashboardData={dashboardData}
 >
-  <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 100%;">
-    <!-- 1. Order Information -->
-    <div class="content-section">
-      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Order Information</h3>
-      
-      <div class="order-info-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Customer</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {order.customer ? fullName(order.customer) : "Guest"}
-          </div>
-        </div>
-        
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Source</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {formatOrderSource(order.source)}
-          </div>
-        </div>
+  <div class="order-detail-page">
+    <aside class="order-detail-sidebar">
+      <section class="order-detail-section order-summary-section">
+        <p class="order-detail-eyebrow">Order / Order Details</p>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Order Status</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500; display: flex; align-items: center;">
-            <form method="post" style="margin: 0; width: 100%;">
-              <input type="hidden" name="action" value="update-order-status" />
-              <input type="hidden" name="orderId" value={order.id} />
-              <select name="orderStatus" onchange="this.closest('form').submit()" style="border: none; padding: 0; background: transparent; font-weight: 500; font-size: 1rem; color: #111827; width: 100%; cursor: pointer;" disabled={allowedStatuses.length === 0}>
-                <option value={order.order_status}>{autoCapitalize(order.order_status)}</option>
-                {allowedStatuses.map((status) => (
-                  <option value={status}>{autoCapitalize(status)}</option>
-                ))}
-              </select>
-            </form>
-          </div>
-        </div>
+        <div class="order-title-row">
+          <a href="/admin/orders" class="icon-button" aria-label="Back to orders">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m15 18-6-6 6-6"></path>
+            </svg>
+          </a>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Payment Status</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {autoCapitalize(order.payment_status)}
+          <div class="order-title-copy">
+            <h1>{orderCode}</h1>
+            <p>{formatOrderSource(order.source)}</p>
           </div>
-        </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Order Total</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {formatCurrency(orderTotal(order, "partial_quantity"))}
-          </div>
-        </div>
-
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Invoice Total</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {formatCurrency(orderTotal(order, "final_quantity"))}
-          </div>
-        </div>
-
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Paid</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {formatCurrency(orderPaymentTotal(order))}
-          </div>
-        </div>
-
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Balance</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {formatCurrency(orderBalance(order))}
-          </div>
-        </div>
-
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Assigned Agent</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {order.agent?.display_name ?? "None"}
-          </div>
-        </div>
-
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Approved At</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {formatDate(order.approved_at)}
-          </div>
-        </div>
-      </div>
-
-      <div class="pdf-links-container" style="margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center; border-top: 1px solid #e5e7eb; padding-top: 1.25rem; flex-wrap: wrap;">
-        <OrderPdfLinks
-          orderId={order.id}
-          basePath="/admin/orders"
-          showSalesInvoice={Boolean(invoice)}
-        />
-        {!invoice && (
-          <form method="post" style="margin: 0;">
-            <input type="hidden" name="action" value="save-invoice" />
+          <form method="post" class="status-form">
+            <input type="hidden" name="action" value="update-order-status" />
             <input type="hidden" name="orderId" value={order.id} />
-            <button type="submit" class="btn-secondary" style="padding: 0.5rem 1rem; border-radius: 0.375rem; text-transform: none; font-size: 0.85rem; font-weight: 600; letter-spacing: normal; cursor: pointer;">Create Sales Invoice</button>
+            <label class="sr-only" for="order-status-select">Order status</label>
+            <select id="order-status-select" name="orderStatus" class="status-select">
+              {availableStatuses.map((status) => (
+                <option value={status} selected={status === order.order_status}>
+                  {orderStatusOptionLabel(status)}
+                </option>
+              ))}
+            </select>
+            <button type="submit" class="status-save-button">Save</button>
           </form>
-        )}
-      </div>
-    </div>
+        </div>
 
-    <!-- 2. Order Items -->
-    <div class="content-section">
-      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Order Items</h3>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th scope="col" style={`width: ${canManageCommissions ? "40%" : "60%"}; padding: 0.75rem;`}>Product</th>
-              <th scope="col" style={`width: ${canManageCommissions ? "30%" : "40%"}; padding: 0.75rem;`}>Quantity</th>
-              {canManageCommissions && <th scope="col" style="width: 30%; padding: 0.75rem;">Commission</th>}
-            </tr>
-          </thead>
-          <tbody>
-            {order.customer_order_item.map((item) => (
-              <tr>
-                <td style="vertical-align: middle;">
-                  {item.product?.name ?? "Missing product"}<br />
-                  <span style="font-size: 0.85rem; color: var(--color-brand-muted-black); font-weight: 500;">
-                    {formatCurrency(item.unit_price)} {item.price_type}
-                  </span>
-                </td>
-                <td style="vertical-align: middle;">
-                  <form method="post" style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
-                    <input type="hidden" name="action" value="update-order-item-quantity" />
-                    <input type="hidden" name="orderItemId" value={item.id} />
-                    <input
-                      type="number"
-                      name="quantity"
-                      value={item.partial_quantity}
-                      min="0.001"
-                      step="0.001"
-                      required
-                      style="width: 6rem; padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
-                    />
-                    <button type="submit" class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block;">Save</button>
-                  </form>
-                </td>
-                {canManageCommissions && (
-                  <td style="vertical-align: middle;">
-                    <form method="post" style="margin: 0; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                      <input type="hidden" name="action" value="update-commission" />
+        <div class="detail-stack">
+          <div class="detail-group">
+            <p class="detail-label">Customer</p>
+            <p class="detail-value">{order.customer ? fullName(order.customer) : "Unassigned customer"}</p>
+          </div>
+
+          <div class="detail-group">
+            <p class="detail-label">Address</p>
+            <p class="detail-value">{order.customer?.address ?? "No address on file"}</p>
+          </div>
+
+          <div class="detail-group">
+            <p class="detail-label">Contact Information</p>
+            <div class="detail-lines">
+              <p>{order.customer?.phone_number ?? "No contact number"}</p>
+              <p>{order.customer?.email ?? "No email address"}</p>
+            </div>
+          </div>
+
+          <div class="detail-group">
+            <p class="detail-label">Agent</p>
+            <p class="detail-value">{order.agent?.display_name ?? "No assigned agent"}</p>
+          </div>
+
+          <div class="detail-group">
+            <p class="detail-label">Contact Information</p>
+            <div class="detail-lines">
+              <p>{order.agent?.contact ?? "No contact number"}</p>
+              <p>{order.agent?.email ?? "No email address"}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="order-detail-section activity-section">
+        <div class="section-heading">
+          <span class="section-heading-line"></span>
+          <h2>Activity</h2>
+          <span class="section-heading-line"></span>
+        </div>
+
+        {timelineItems.length === 0 ? (
+          <p class="empty-copy">No activity recorded yet.</p>
+        ) : (
+          <ol class="activity-timeline">
+            {timelineItems.map((item) => (
+              <li>
+                <span class="activity-dot" aria-hidden="true"></span>
+                <div class="activity-copy">
+                  <p class="activity-title">{item.title}</p>
+                  <p class="activity-meta">{item.meta}</p>
+                  <time datetime={item.timestamp}>{formatDate(item.timestamp)}</time>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+    </aside>
+
+    <section class="order-detail-main">
+      <div class="order-tabs" role="tablist" aria-label="Order detail sections">
+        <button type="button" class="order-tab is-active" data-order-detail-tab-trigger data-tab-target="order-slip" role="tab" aria-selected="true">
+          Order Slip
+        </button>
+        <button type="button" class="order-tab" data-order-detail-tab-trigger data-tab-target="sales-invoice" role="tab" aria-selected="false">
+          Sales Invoice
+        </button>
+        {hasCommissionTab && (
+          <button type="button" class="order-tab" data-order-detail-tab-trigger data-tab-target="commission" role="tab" aria-selected="false">
+            Commission
+          </button>
+        )}
+        <button type="button" class="order-tab" data-order-detail-tab-trigger data-tab-target="payment-record" role="tab" aria-selected="false">
+          Payment Record
+        </button>
+        <button type="button" class="order-tab" data-order-detail-tab-trigger data-tab-target="notes" role="tab" aria-selected="false">
+          Notes
+        </button>
+      </div>
+
+      <div class="order-tab-panels">
+        <section class="order-tab-panel order-tab-panel--document is-active" data-order-detail-tab-panel="order-slip" role="tabpanel">
+          <article class="document-preview document-preview--pdf-like document-preview--rounded-sm">
+            <header class="pdf-preview-header">
+              <div class="pdf-preview-brand">
+                {orderSlipLayout.brandLines.map((line, index) => (
+                  <p class:list={["pdf-preview-brand-line", index === 0 && "pdf-preview-brand-line--strong"]}>{line}</p>
+                ))}
+              </div>
+              <div class="pdf-preview-logo">LOGO</div>
+              <h3 class="pdf-preview-title">{orderSlipLayout.title}</h3>
+            </header>
+
+            <div class="pdf-preview-fields pdf-preview-fields--two-column">
+              <div class="pdf-preview-field-line"><span>{orderSlipLayout.dateLabel}</span></div>
+              <div></div>
+              <div class="pdf-preview-field-line"><span>{orderSlipLayout.sellerLabel}</span></div>
+              <div class="pdf-preview-field-line"><span>{orderSlipLayout.orderedByLabel}</span></div>
+            </div>
+
+            <div class="pdf-preview-table" style={`--pdf-grid-template:${orderSlipGridTemplate};`}>
+              <div class="pdf-preview-table__head">
+                {orderSlipLayout.columns.map((column) => (
+                  <span class:list={[column.align && `is-${column.align}`]}>{column.label}</span>
+                ))}
+              </div>
+              {orderSlipLayout.rows.map((row) => (
+                <div class="pdf-preview-table__row">
+                  {row.cells.map((cell, cellIndex) => (
+                    <span class:list={[orderSlipLayout.columns[cellIndex]?.align && `is-${orderSlipLayout.columns[cellIndex]?.align}`]}>
+                      {cell || "\u00A0"}
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <div class="pdf-preview-total-row">
+              <span>{orderSlipLayout.totalLabel}</span>
+            </div>
+
+            <div class="pdf-preview-copy-block">
+              <h4>{orderSlipLayout.deliveryHeading}</h4>
+              {orderSlipLayout.deliveryLines.map((line) => <p>{line}</p>)}
+            </div>
+
+            <div class="pdf-preview-copy-block">
+              <h4>{orderSlipLayout.paymentHeading}</h4>
+              {orderSlipLayout.paymentLines.map((line) => <p>{line}</p>)}
+            </div>
+
+            <p class="pdf-preview-confirmation">{orderSlipLayout.confirmationText}</p>
+
+            <footer class="pdf-preview-signatures">
+              <div class="pdf-preview-signature-block">
+                <p class="pdf-preview-signature-heading">{orderSlipLayout.buyerSignatureLines[0]}</p>
+                <p>{orderSlipLayout.buyerSignatureLines[1]}</p>
+                <p>{orderSlipLayout.buyerSignatureLines[2]}</p>
+                <p>{orderSlipLayout.buyerSignatureLines[3]}</p>
+              </div>
+              <div class="pdf-preview-signature-block">
+                <p class="pdf-preview-signature-heading">{orderSlipLayout.sellerSignatureHeading}</p>
+                <p class="pdf-preview-signature-name">{orderSlipLayout.sellerSignatureLines[0]}</p>
+                <p>{orderSlipLayout.sellerSignatureLines[1]}</p>
+                <p>{orderSlipLayout.sellerSignatureLines[2]}</p>
+              </div>
+            </footer>
+            <div class="document-preview-floating-bar">
+              <div class="panel-actions">
+                <a href={orderSlipPdfHref} class="document-action" download>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+                  <span>Download</span>
+                </a>
+                <button type="button" class="document-action" data-print-url={orderSlipPdfHref}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v8H6z"></path></svg>
+                  <span>Print</span>
+                </button>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="order-tab-panel" data-order-detail-tab-panel="sales-invoice" role="tabpanel" hidden>
+          <div class="panel-header">
+            <div>
+              <h2>Sales Invoice</h2>
+              <p>{hasSalesInvoice
+                ? "Manage invoice quantities and export the invoice."
+                : canGenerateInvoice
+                  ? "No sales invoice has been created for this order yet."
+                  : "Move this order to processing before creating a sales invoice."}</p>
+            </div>
+            {hasSalesInvoice && (
+              <div class="panel-actions">
+                <a href={salesInvoicePdfHref} class="document-action" download>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+                  <span>Download</span>
+                </a>
+                <button type="button" class="document-action" data-print-url={salesInvoicePdfHref}>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V2h12v7"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 14h12v8H6z"></path></svg>
+                  <span>Print</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          {!hasSalesInvoice ? (
+            <div class="empty-document-state">
+              <form method="post">
+                <input type="hidden" name="action" value="save-invoice" />
+                <input type="hidden" name="orderId" value={order.id} />
+                <button type="submit" class="primary-panel-button" disabled={!canGenerateInvoice}>Create Sales Invoice</button>
+              </form>
+            </div>
+          ) : (
+            <article class="document-preview document-preview--pdf-like">
+              <header class="pdf-preview-header">
+                <div class="pdf-preview-brand">
+                  {salesInvoiceLayout.brandLines.map((line, index) => (
+                    <p class:list={["pdf-preview-brand-line", index === 0 && "pdf-preview-brand-line--strong"]}>{line}</p>
+                  ))}
+                </div>
+                <div class="pdf-preview-logo">LOGO</div>
+                <h3 class="pdf-preview-title">{salesInvoiceLayout.title}</h3>
+              </header>
+
+              <div class="pdf-preview-fields pdf-preview-fields--two-column">
+                <div class="pdf-preview-field-line"><span>{salesInvoiceLayout.dateLabel}</span></div>
+                <div class="pdf-preview-field-line"><span>{salesInvoiceLayout.invoiceNumberLabel}</span></div>
+                <div class="pdf-preview-field-line"><span>{salesInvoiceLayout.soldToLabel}</span></div>
+                <div class="pdf-preview-field-line"><span>{salesInvoiceLayout.addressLabel}</span></div>
+              </div>
+
+              <div class="pdf-preview-table" style={`--pdf-grid-template:${salesInvoiceGridTemplate};`}>
+                <div class="pdf-preview-table__head">
+                  {salesInvoiceLayout.columns.map((column) => (
+                    <span class:list={[column.align && `is-${column.align}`]}>{column.label}</span>
+                  ))}
+                </div>
+                {order.customer_order_item.map((item, index) => (
+                  <div class="pdf-preview-table__row pdf-preview-table__row--editable">
+                    <span>{salesInvoiceLayout.rows[index]?.cells[0] ?? "Missing product"}</span>
+                    <form method="post" class="pdf-preview-quantity-form">
+                      <input type="hidden" name="action" value="update-invoice-item-quantity" />
                       <input type="hidden" name="orderItemId" value={item.id} />
                       <input
                         type="number"
-                        name="amount"
-                        value={item.agent_commission_amount}
-                        min="0"
-                        step="0.01"
+                        name="quantity"
+                        min="0.001"
+                        step="0.001"
+                        value={item.final_quantity}
                         required
-                        style="width: 5rem; padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem;"
                       />
-                      <select name="status" required style="padding: 0.25rem 0.5rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background-color: white;">
-                        {commissionStatuses.map((status) => (
-                          <option value={status} selected={selected(item.agent_commission_status, status)}>{autoCapitalize(status)}</option>
+                      <button type="submit">Save</button>
+                    </form>
+                    <span class="is-right">{salesInvoiceLayout.rows[index]?.cells[2] ?? ""}</span>
+                    <span class="is-right">{salesInvoiceLayout.rows[index]?.cells[3] ?? ""}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div class="pdf-preview-total-row">
+                <span>{salesInvoiceLayout.totalLabel}</span>
+              </div>
+
+              <div class="pdf-preview-copy-block">
+                <h4>Delivery Preference</h4>
+                <p>{salesInvoiceLayout.paymentLines[0]}</p>
+                <p>{salesInvoiceLayout.paymentLines[1]}</p>
+              </div>
+
+              <div class="pdf-preview-copy-block">
+                <h4>{salesInvoiceLayout.paymentHeading}</h4>
+                <p>{salesInvoiceLayout.paymentLines[2]}</p>
+              </div>
+
+              <footer class="pdf-preview-invoice-footer">
+                <div class="pdf-preview-issuer">
+                  <p class="pdf-preview-signature-heading">{salesInvoiceLayout.issuerHeading}</p>
+                  <p class="pdf-preview-signature-name">{salesInvoiceLayout.issuerName}</p>
+                  <p>{salesInvoiceLayout.issuerSubline}</p>
+                </div>
+                <div class="pdf-preview-invoice-summary">
+                  <p>Paid: {formatCurrency(paidTotal)}</p>
+                  <p>Remaining: {formatCurrency(balance)}</p>
+                </div>
+              </footer>
+            </article>
+
+            <article class="document-preview" hidden>
+              <header class="document-preview-header">
+                <div>
+                  <p class="document-preview-kicker">Sales Invoice</p>
+                  <h3>{invoice?.invoice_number ?? "Pending invoice number"}</h3>
+                </div>
+                <div class="document-meta-grid">
+                  <div><span>Issued</span><strong>{formatDate(invoice?.issued_at ?? invoice?.created_at ?? null)}</strong></div>
+                  <div><span>Balance</span><strong>{formatCurrency(balance)}</strong></div>
+                </div>
+              </header>
+
+              <div class="document-party-grid">
+                <section>
+                  <p class="document-preview-label">Sold To</p>
+                  <h4>{order.customer ? fullName(order.customer) : "Unassigned customer"}</h4>
+                  <p>{order.customer?.address ?? "No address on file"}</p>
+                  <p>{order.customer?.email ?? "No email address"}</p>
+                </section>
+                <section>
+                  <p class="document-preview-label">Summary</p>
+                  <h4>{autoCapitalize(order.payment_status)}</h4>
+                  <p>Paid: {formatCurrency(paidTotal)}</p>
+                  <p>Remaining: {formatCurrency(balance)}</p>
+                </section>
+              </div>
+
+              <div class="invoice-edit-list">
+                <div class="document-table-head invoice-edit-head">
+                  <span>Product</span>
+                  <span>Quantity</span>
+                  <span>Unit Price</span>
+                  <span>Amount</span>
+                </div>
+                {order.customer_order_item.map((item) => (
+                  <div class="invoice-edit-row">
+                    <div class="invoice-product-copy">
+                      <strong>{item.product?.name ?? "Missing product"}</strong>
+                      <span>{item.add_details ?? "No additional details"}</span>
+                    </div>
+                    <form method="post" class="invoice-quantity-form">
+                      <input type="hidden" name="action" value="update-invoice-item-quantity" />
+                      <input type="hidden" name="orderItemId" value={item.id} />
+                      <input
+                        type="number"
+                        name="quantity"
+                        min="0.001"
+                        step="0.001"
+                        value={item.final_quantity}
+                        required
+                      />
+                      <button type="submit">Save</button>
+                    </form>
+                    <span>{formatCurrency(item.unit_price)}</span>
+                    <span>{formatCurrency(item.final_quantity * item.unit_price)}</span>
+                  </div>
+                ))}
+              </div>
+
+              <footer class="document-footer">
+                <div>
+                  <p class="document-preview-label">Invoice Number</p>
+                  <strong>{invoice?.invoice_number ?? "Pending invoice number"}</strong>
+                </div>
+                <div class="document-total">
+                  <span>Total Amount Due</span>
+                  <strong>{formatCurrency(invoiceTotal)}</strong>
+                </div>
+              </footer>
+            </article>
+          )}
+        </section>
+
+        {hasCommissionTab && (
+          <section class="order-tab-panel" data-order-detail-tab-panel="commission" role="tabpanel" hidden>
+            <div class="panel-header">
+              <div>
+                <h2>Commission</h2>
+                <p>Manage item-level commission values for the assigned agent.</p>
+              </div>
+            </div>
+
+            <div class="metric-card">
+              <span>Total Commission</span>
+              <strong>{formatCurrency(totalCommission)}</strong>
+            </div>
+
+            <div class="stack-list">
+              {order.customer_order_item.map((item) => (
+                <form method="post" class="stack-card">
+                  <input type="hidden" name="action" value="update-commission" />
+                  <input type="hidden" name="orderItemId" value={item.id} />
+
+                  <div class="stack-card-header">
+                    <div>
+                      <h3>{item.product?.name ?? "Missing product"}</h3>
+                      <p>{formatCurrency(item.unit_price)} x {item.final_quantity}</p>
+                    </div>
+                    <span class="pill">{autoCapitalize(item.agent_commission_status)}</span>
+                  </div>
+
+                  <div class="stack-card-grid">
+                    <label>
+                      <span>Commission</span>
+                      <input type="number" name="amount" min="0" step="0.01" value={item.agent_commission_amount} />
+                    </label>
+                    <label>
+                      <span>Status</span>
+                      <select name="status">
+                        {["unset", "set", "cancelled", "paid"].map((status) => (
+                          <option value={status} selected={status === item.agent_commission_status}>
+                            {autoCapitalize(status)}
+                          </option>
                         ))}
                       </select>
-                      <button type="submit" class="btn-table-manage" style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block;">Save</button>
-                    </form>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                    </label>
+                  </div>
 
-    <!-- 3. Payment History -->
-    <div class="content-section">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
-        <h3 style="margin: 0;">Payment History</h3>
-        
-        <div class="admin-panel" style="border: none; padding: 0; margin: 0; box-shadow: none; display: inline-block;">
-          <button type="button" class="btn-table-manage" data-open-create-sheet style="text-transform: none; font-size: 0.9rem; font-weight: 600; letter-spacing: normal;">Record Payment</button>
-          
-          <div class="hidden-create-form-holder" style="display: none;">
-            <form method="post" class="admin-form" style="margin: 0;">
-              <input type="hidden" name="action" value="record-payment" />
-              <input type="hidden" name="orderId" value={order.id} />
-              <label class="field-row"><span>Amount</span><input name="amount" type="number" min="0.01" step="0.01" required /></label>
-              <label class="field-row"><span>Method</span><input name="paymentMethod" required placeholder="cash, bank transfer" /></label>
-              <label class="field-row"><span>Payment date</span><input name="paymentDate" type="date" value={new Date().toISOString().slice(0, 10)} required /></label>
-              <label class="field-row"><span>Reference</span><input name="referenceNumber" /></label>
-              <label class="field-row"><span>Notes</span><textarea name="notes"></textarea></label>
-              <button type="submit" style="width: 100%;">Record payment</button>
-            </form>
+                  <label class="stack-card-notes">
+                    <span>Notes</span>
+                    <textarea name="notes" rows="3">{item.agent_commission_notes ?? ""}</textarea>
+                  </label>
+
+                  <div class="stack-card-actions">
+                    <button type="submit" class="primary-panel-button">Save Commission</button>
+                  </div>
+                </form>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section class="order-tab-panel" data-order-detail-tab-panel="payment-record" role="tabpanel" hidden>
+          <div class="panel-header">
+            <div>
+              <h2>Payment Record</h2>
+              <p>Track payments made against the invoice and remaining balance.</p>
+            </div>
+            <button type="button" class="primary-panel-button" data-toggle-payment-form disabled={balance <= 0}>
+              Create Payment Record
+            </button>
           </div>
-        </div>
-      </div>
 
-      {order.payment.length === 0 ? (
-        <p class="empty-state">No payments recorded.</p>
-      ) : (
-        <ul class="compact-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; margin: 0;">
-          {order.payment.map((payment) => (
-            <li style="padding: 0.75rem 1rem; background-color: var(--color-brand-cream); border-radius: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-              <span>{payment.payment_method} on {formatDate(payment.payment_date)}</span>
-              <strong>{formatCurrency(payment.amount)}</strong>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <span>Total Paid</span>
+              <strong>{formatCurrency(paidTotal)}</strong>
+            </div>
+            <div class="metric-card">
+              <span>Remaining Balance</span>
+              <strong>{formatCurrency(balance)}</strong>
+            </div>
+          </div>
+
+          <form method="post" class="payment-form" data-payment-form hidden>
+            <input type="hidden" name="action" value="record-payment" />
+            <input type="hidden" name="orderId" value={order.id} />
+
+            <div class="stack-card-grid">
+              <label>
+                <span>Amount</span>
+                <input type="number" name="amount" min="0.01" step="0.01" max={balance > 0 ? balance : undefined} required />
+              </label>
+              <label>
+                <span>Method</span>
+                <input type="text" name="paymentMethod" placeholder="cash, bank transfer" required />
+              </label>
+              <label>
+                <span>Payment Date</span>
+                <input type="date" name="paymentDate" value={new Date().toISOString().slice(0, 10)} required />
+              </label>
+              <label>
+                <span>Reference</span>
+                <input type="text" name="referenceNumber" />
+              </label>
+            </div>
+
+            <label class="stack-card-notes">
+              <span>Notes</span>
+              <textarea name="notes" rows="3"></textarea>
+            </label>
+
+            <div class="stack-card-actions">
+              <button type="submit" class="primary-panel-button">Save Payment Record</button>
+            </div>
+          </form>
+
+          {order.payment.length === 0 ? (
+            <p class="empty-copy">No payment records yet.</p>
+          ) : (
+            <div class="stack-list">
+              {order.payment.map((payment) => (
+                <article class="stack-card">
+                  <div class="stack-card-header">
+                    <div>
+                      <h3>{payment.payment_method}</h3>
+                      <p>{formatDate(payment.payment_date)}</p>
+                    </div>
+                    <strong>{formatCurrency(payment.amount)}</strong>
+                  </div>
+                  <div class="payment-meta">
+                    <span>{payment.reference_number ? `Reference: ${payment.reference_number}` : "No reference number"}</span>
+                    <span>{payment.notes ?? "No notes"}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section class="order-tab-panel" data-order-detail-tab-panel="notes" role="tabpanel" hidden>
+          <div class="panel-header">
+            <div>
+              <h2>Notes</h2>
+              <p>Save internal notes for this order.</p>
+            </div>
+          </div>
+
+          <form method="post" class="notes-form">
+            <input type="hidden" name="action" value="update-order-notes" />
+            <input type="hidden" name="orderId" value={order.id} />
+            <textarea
+              name="notes"
+              rows="14"
+              placeholder="Write internal notes for this order."
+            >{order.notes ?? ""}</textarea>
+            <div class="stack-card-actions">
+              <button type="submit" class="primary-panel-button">Save Notes</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </section>
   </div>
 </AdminPageFrame>
 
-<style>
-  /* Remove shadows on cards, add matching gray border and border-radius */
-  .content-section {
-    box-shadow: none !important;
-    border: 1px solid #d1d5db !important;
-    border-radius: 0.75rem !important;
+<script is:inline>
+  const tabTriggers = Array.from(document.querySelectorAll("[data-order-detail-tab-trigger]"));
+  const tabPanels = Array.from(document.querySelectorAll("[data-order-detail-tab-panel]"));
+
+  const setActiveTab = (target) => {
+    tabTriggers.forEach((trigger) => {
+      const isActive = trigger.dataset.tabTarget === target;
+      trigger.classList.toggle("is-active", isActive);
+      trigger.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+
+    tabPanels.forEach((panel) => {
+      const isActive = panel.dataset.orderDetailTabPanel === target;
+      panel.classList.toggle("is-active", isActive);
+      panel.hidden = !isActive;
+    });
+  };
+
+  tabTriggers.forEach((trigger) => {
+    trigger.addEventListener("click", () => {
+      const target = trigger.dataset.tabTarget;
+      if (target) setActiveTab(target);
+    });
+  });
+
+  document.querySelectorAll("[data-print-url]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const url = button.getAttribute("data-print-url");
+      if (!url) return;
+      const printWindow = window.open(url, "_blank", "noopener,noreferrer");
+      if (!printWindow) return;
+      printWindow.addEventListener("load", () => {
+        printWindow.print();
+      }, { once: true });
+    });
+  });
+
+  const paymentToggleButton = document.querySelector("[data-toggle-payment-form]");
+  const paymentForm = document.querySelector("[data-payment-form]");
+
+  if (paymentToggleButton && paymentForm) {
+    paymentToggleButton.addEventListener("click", () => {
+      const shouldOpen = paymentForm.hasAttribute("hidden");
+      paymentForm.toggleAttribute("hidden", !shouldOpen);
+    });
   }
-  
-  /* PDF Links aesthetics */
-  .pdf-links-container a {
+</script>
+
+<style>
+  :global(.admin-shell) {
+    max-width: none;
+    padding: 0;
+    gap: 0;
+  }
+
+  :global(.admin-header) {
+    display: none;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .order-detail-page {
+    display: grid;
+    grid-template-columns: minmax(320px, 520px) minmax(0, 1fr);
+    height: calc(100vh - 1.5rem);
+    overflow: hidden;
+  }
+
+  .order-detail-sidebar {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0;
+    min-height: 0;
+    background: #ffffff;
+    border-right: 1px solid rgba(17, 24, 39, 0.08);
+    overflow: hidden;
+  }
+
+  .order-detail-section {
+    padding: 2rem;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .order-detail-section + .order-detail-section {
+    border-top: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .order-detail-eyebrow {
+    margin: 0 0 1.25rem;
+    color: rgba(17, 24, 39, 0.56);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .order-title-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+    margin-bottom: 2rem;
+  }
+
+  .icon-button {
     display: inline-flex;
     align-items: center;
-    padding: 0.5rem 1rem;
-    border: 1px solid rgba(102, 24, 24, 0.15);
-    border-radius: 0.375rem;
-    font-size: 0.85rem;
-    font-weight: 600;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    color: #111827;
     text-decoration: none;
-    color: var(--color-brand-muted-black);
-    background-color: #ffffff;
-    transition: all 0.2s ease;
+    background: #ffffff;
   }
-  .pdf-links-container a:hover {
-    background-color: #f3f4f6;
-    border-color: var(--color-brand-muted-black);
+
+  .icon-button svg,
+  .document-action svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .order-title-copy h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    line-height: 1.15;
     color: #111827;
   }
+
+  .order-title-copy p {
+    margin: 0.35rem 0 0;
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.92rem;
+  }
+
+  .status-form {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .status-select,
+  .stack-card select,
+  .stack-card input,
+  .payment-form input {
+    min-height: 2.75rem;
+    border-radius: 0.8rem;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    background: #ffffff;
+    color: #111827;
+    padding: 0 0.9rem;
+    font: inherit;
+  }
+
+  .status-select {
+    min-width: 11rem;
+    font-weight: 600;
+  }
+
+  .status-save-button,
+  .primary-panel-button,
+  .invoice-quantity-form button {
+    min-height: 2.75rem;
+    border: none;
+    border-radius: 0.8rem;
+    background: #7f1d1d;
+    color: #ffffff;
+    padding: 0 1rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .status-save-button:disabled,
+  .primary-panel-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .detail-stack {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail-group {
+    padding: 1rem 0;
+    border-top: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .detail-group:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .detail-label,
+  .document-preview-label {
+    margin: 0 0 0.45rem;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .detail-value,
+  .detail-lines p {
+    margin: 0;
+    color: #111827;
+  }
+
+  .detail-lines {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .section-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .section-heading h2 {
+    margin: 0;
+    color: rgba(17, 24, 39, 0.78);
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+  }
+
+  .section-heading-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(17, 24, 39, 0.12);
+  }
+
+  .activity-timeline {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .activity-timeline li {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.2rem minmax(0, 1fr);
+    gap: 0.9rem;
+    padding: 0 0 1.25rem;
+  }
+
+  .activity-timeline li::after {
+    content: "";
+    position: absolute;
+    left: 0.34rem;
+    top: 1rem;
+    bottom: 0.15rem;
+    width: 1px;
+    background: rgba(17, 24, 39, 0.12);
+  }
+
+  .activity-timeline li:last-child::after {
+    display: none;
+  }
+
+  .activity-dot {
+    width: 0.7rem;
+    height: 0.7rem;
+    margin-top: 0.15rem;
+    border-radius: 999px;
+    background: #7f1d1d;
+  }
+
+  .activity-title,
+  .activity-meta,
+  .activity-copy time {
+    margin: 0;
+  }
+
+  .activity-title {
+    color: #111827;
+    font-weight: 600;
+  }
+
+  .activity-meta,
+  .activity-copy time,
+  .empty-copy,
+  .panel-header p,
+  .document-party-grid p,
+  .invoice-product-copy span,
+  .payment-meta span {
+    color: rgba(17, 24, 39, 0.62);
+  }
+
+  .activity-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .order-detail-main {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0;
+    min-height: 0;
+    padding: 2rem;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  .order-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .order-tab {
+    min-height: 2.75rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.85);
+    color: rgba(17, 24, 39, 0.66);
+    padding: 0 1rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .order-tab.is-active {
+    background: #111827;
+    border-color: #111827;
+    color: #ffffff;
+  }
+
+  .order-tab-panels {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .order-tab-panel {
+    display: none;
+    border-radius: 1.25rem;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    padding: 1.5rem;
+    backdrop-filter: blur(12px);
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .order-tab-panel.is-active {
+    display: block;
+  }
+
+  .panel-header,
+  .document-preview-header,
+  .document-footer,
+  .stack-card-header,
+  .stack-card-actions,
+  .payment-meta,
+  .invoice-edit-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .panel-header {
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .panel-header h2,
+  .stack-card-header h3,
+  .document-party-grid h4 {
+    margin: 0;
+    color: #111827;
+  }
+
+  .panel-header p,
+  .stack-card-header p {
+    margin: 0.35rem 0 0;
+  }
+
+  .panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .document-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    border-radius: 0.8rem;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    background: #ffffff;
+    color: #111827;
+    text-decoration: none;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .document-preview {
+    border-radius: 1rem;
+    background: #ffffff;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    padding: 1.5rem;
+  }
+
+  .document-preview-kicker {
+    margin: 0 0 0.35rem;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(17, 24, 39, 0.58);
+  }
+
+  .document-preview-header h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #111827;
+  }
+
+  .document-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    min-width: 18rem;
+  }
+
+  .document-meta-grid div,
+  .metric-card,
+  .pill {
+    border-radius: 0.9rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    background: #f8fafc;
+  }
+
+  .document-meta-grid div,
+  .metric-card {
+    padding: 0.9rem 1rem;
+  }
+
+  .document-meta-grid span,
+  .metric-card span {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .document-party-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+
+  .document-party-grid section {
+    padding: 1rem;
+    border-radius: 0.9rem;
+    background: #fafafa;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .document-table,
+  .invoice-edit-list,
+  .stack-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .document-table-head,
+  .document-table-row,
+  .invoice-edit-row {
+    display: grid;
+    gap: 1rem;
+    align-items: center;
+  }
+
+  .document-table-head,
+  .document-table-row {
+    grid-template-columns: minmax(180px, 2fr) repeat(3, minmax(90px, 1fr)) minmax(160px, 1.4fr);
+  }
+
+  .invoice-edit-head,
+  .invoice-edit-row {
+    grid-template-columns: minmax(220px, 2fr) minmax(170px, 1.2fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr);
+  }
+
+  .document-table-head {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0 0.15rem;
+  }
+
+  .document-table-row,
+  .invoice-edit-row {
+    padding: 1rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    background: #ffffff;
+    color: #111827;
+  }
+
+  .document-footer {
+    align-items: end;
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .document-total span {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .document-total strong {
+    color: #111827;
+    font-size: 1.15rem;
+  }
+
+  .empty-document-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22rem;
+    border-radius: 1rem;
+    border: 1px dashed rgba(17, 24, 39, 0.18);
+    background: rgba(255, 255, 255, 0.78);
+  }
+
+  .metric-card strong,
+  .payment-meta strong {
+    color: #111827;
+  }
+
+  .metrics-grid,
+  .stack-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+
+  .stack-card,
+  .payment-form,
+  .notes-form {
+    border-radius: 1rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    background: #ffffff;
+    padding: 1.25rem;
+  }
+
+  .stack-card-grid label,
+  .stack-card-notes,
+  .notes-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .stack-card-grid span,
+  .stack-card-notes span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .stack-card-notes {
+    margin-top: 1rem;
+  }
+
+  .stack-card textarea,
+  .payment-form textarea,
+  .notes-form textarea {
+    width: 100%;
+    min-width: 0;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    background: #ffffff;
+    color: #111827;
+    padding: 0.9rem 1rem;
+    font: inherit;
+    resize: vertical;
+  }
+
+  .stack-card-actions {
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+
+  .invoice-product-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .invoice-quantity-form {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+
+  .invoice-quantity-form input {
+    width: 6rem;
+  }
+
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2rem;
+    padding: 0 0.8rem;
+    color: #111827;
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .payment-meta {
+    flex-wrap: wrap;
+    margin-top: 1rem;
+  }
+
+  .notes-form textarea {
+    min-height: 22rem;
+  }
+
+  .order-detail-section,
+  .order-tab-panel {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(17, 24, 39, 0.24) transparent;
+  }
+
+  .order-detail-section::-webkit-scrollbar,
+  .order-tab-panel::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .order-detail-section::-webkit-scrollbar-track,
+  .order-tab-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .order-detail-section::-webkit-scrollbar-thumb,
+  .order-tab-panel::-webkit-scrollbar-thumb {
+    background: rgba(17, 24, 39, 0.22);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+
+  @media (max-width: 1080px) {
+    .order-detail-page {
+      height: auto;
+      grid-template-columns: 1fr;
+      overflow: visible;
+    }
+
+    .order-detail-main {
+      padding-top: 1.25rem;
+      overflow: visible;
+    }
+
+    .order-detail-sidebar {
+      grid-template-rows: auto auto;
+      overflow: visible;
+    }
+
+    .order-detail-section,
+    .order-tab-panel {
+      overflow: visible;
+    }
+  }
+
+  @media (max-width: 840px) {
+    .order-detail-section,
+    .order-detail-main,
+    .order-tab-panel,
+    .document-preview {
+      padding: 1.25rem;
+    }
+
+    .document-party-grid,
+    .metrics-grid,
+    .stack-card-grid,
+    .document-meta-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .document-table-head {
+      display: none;
+    }
+
+    .document-table-row,
+    .invoice-edit-row,
+    .invoice-edit-head {
+      grid-template-columns: 1fr;
+    }
+
+    .panel-header,
+    .document-preview-header,
+    .document-footer,
+    .stack-card-header,
+    .payment-meta,
+    .invoice-quantity-form {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .invoice-quantity-form input,
+    .status-select {
+      width: 100%;
+    }
+  }
 </style>
+

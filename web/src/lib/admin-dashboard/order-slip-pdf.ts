@@ -1,13 +1,12 @@
 import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
 import {
-  fullName,
-  orderTotal,
-} from "@/lib/order-documents/view";
+  buildOrderSlipLayout,
+  getBrandLines,
+} from "@/lib/order-documents/layout";
 
 const pageWidth = 595;
 const pageHeight = 842;
 const marginX = 40;
-const tableColumnWidths = [145, 60, 75, 75, 160] as const;
 const tableRowsPerPage = 10;
 
 type TextOptions = {
@@ -54,9 +53,10 @@ function buildOrderSlipPageContent(order: DocumentOrder, page: OrderSlipPage) {
 }
 
 function drawHeader(commands: string[], page: OrderSlipPage) {
-  addText(commands, pageWidth / 2, 802, "Meat and Poultry Products", { align: "center", size: 13 });
-  addText(commands, pageWidth / 2, 786, "Brgy. Tolo-Tolo Consolacion, Cebu", { align: "center", size: 10 });
-  addText(commands, pageWidth / 2, 771, "Cell #: 0917 777 0118 | 0932 215 9289", { align: "center", size: 10 });
+  const brandLines = getBrandLines();
+  addText(commands, pageWidth / 2, 802, brandLines[0], { align: "center", size: 13 });
+  addText(commands, pageWidth / 2, 786, brandLines[1], { align: "center", size: 10 });
+  addText(commands, pageWidth / 2, 771, brandLines[2], { align: "center", size: 10 });
   addText(commands, pageWidth / 2, 750, page.pageCount > 1 ? `ORDER SLIP - Page ${page.pageNumber}` : "ORDER SLIP", {
     align: "center",
     size: 14,
@@ -66,18 +66,26 @@ function drawHeader(commands: string[], page: OrderSlipPage) {
 }
 
 function drawOrderFields(commands: string[], order: DocumentOrder) {
-  const orderedBy = fullName(order.customer);
-  const seller = sellerName(order);
+  const layout = buildOrderSlipLayout(order);
 
-  addText(commands, 40, 717, `Date: ${formatDate(order.created_at)}`, { size: 10 });
+  addText(commands, 40, 717, layout.dateLabel, { size: 10 });
   drawLine(commands, 73, 713, 190, 713);
-  addText(commands, 40, 695, `Seller: ${seller}`, { size: 10 });
+  addText(commands, 40, 695, layout.sellerLabel, { size: 10 });
   drawLine(commands, 80, 691, 230, 691);
-  addText(commands, 310, 695, `Ordered by: ${orderedBy}`, { size: 10 });
+  addText(commands, 310, 695, layout.orderedByLabel, { size: 10 });
   drawLine(commands, 370, 691, 555, 691);
 }
 
 function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
+  const layout = buildOrderSlipLayout({
+    id: "",
+    created_at: "",
+    customer: null,
+    agent: null,
+    customer_order_item: items,
+    invoice: [],
+  });
+  const tableColumnWidths = layout.columns.map((column) => column.width);
   const tableTopY = 665;
   const rowHeight = 24;
   const tableWidth = tableColumnWidths.reduce((total, width) => total + width, 0);
@@ -99,23 +107,20 @@ function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
   });
 
   const headerY = tableTopY - 16;
-  addText(commands, tableLeftX + 6, headerY, "Product", { size: 9 });
-  addText(commands, tableLeftX + 151, headerY, "Quantity", { size: 9 });
-  addText(commands, tableLeftX + 211, headerY, "Unit Price", { size: 9 });
-  addText(commands, tableLeftX + 286, headerY, "Total", { size: 9 });
-  addText(commands, tableLeftX + 361, headerY, "Additional Details", { size: 9 });
+  addText(commands, tableLeftX + 6, headerY, layout.columns[0].label, { size: 9 });
+  addText(commands, tableLeftX + 151, headerY, layout.columns[1].label, { size: 9 });
+  addText(commands, tableLeftX + 211, headerY, layout.columns[2].label, { size: 9 });
+  addText(commands, tableLeftX + 286, headerY, layout.columns[3].label, { size: 9 });
+  addText(commands, tableLeftX + 361, headerY, layout.columns[4].label, { size: 9 });
 
-  items.forEach((item, index) => {
+  layout.rows.forEach((row, index) => {
     const rowY = tableTopY - rowHeight * (index + 1) - 16;
-    const quantity = formatQuantity(item.partial_quantity);
-    const unitPrice = formatMoney(item.unit_price);
-    const lineTotal = formatMoney(item.partial_quantity * item.unit_price);
 
-    addText(commands, tableLeftX + 6, rowY, truncate(item.product?.name ?? "Missing product", 24), { size: 8 });
-    addText(commands, tableLeftX + 151, rowY, quantity, { size: 8 });
-    addText(commands, tableLeftX + 211, rowY, unitPrice, { size: 8 });
-    addText(commands, tableLeftX + 286, rowY, lineTotal, { size: 8 });
-    addText(commands, tableLeftX + 361, rowY, truncate(item.add_details ?? "", 28), { size: 8 });
+    addText(commands, tableLeftX + 6, rowY, truncate(row.cells[0], 24), { size: 8 });
+    addText(commands, tableLeftX + 151, rowY, row.cells[1], { size: 8 });
+    addText(commands, tableLeftX + 211, rowY, row.cells[2], { size: 8 });
+    addText(commands, tableLeftX + 286, rowY, row.cells[3], { size: 8 });
+    addText(commands, tableLeftX + 361, rowY, truncate(row.cells[4], 28), { size: 8 });
   });
 
   return tableBottomY;
@@ -123,45 +128,36 @@ function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
 
 function drawOrderTotal(commands: string[], order: DocumentOrder, tableBottomY: number) {
   const totalY = tableBottomY - 24;
+  const layout = buildOrderSlipLayout(order);
 
-  addText(commands, 390, totalY, `Total ${formatMoney(orderTotal(order, "partial_quantity"))}`, { size: 11 });
+  addText(commands, 390, totalY, layout.totalLabel, { size: 11 });
   drawLine(commands, 440, totalY - 4, 555, totalY - 4);
 }
 
 function drawTermsAndSignatures(commands: string[], order: DocumentOrder) {
-  const acceptedBy = sellerName(order);
+  const layout = buildOrderSlipLayout(order);
 
-  addText(commands, 40, 348, "Delivery Preference", { size: 10 });
-  addText(commands, 40, 330, "Mode of Delivery: ( ) Pick-Up   ( ) Delivery", { size: 9 });
-  addText(commands, 40, 312, "Preferred Delivery Date and Time: ___________________", { size: 9 });
+  addText(commands, 40, 348, layout.deliveryHeading, { size: 10 });
+  addText(commands, 40, 330, layout.deliveryLines[0], { size: 9 });
+  addText(commands, 40, 312, layout.deliveryLines[1], { size: 9 });
 
-  addText(commands, 40, 277, "Payment Terms (For Order Confirmation)", { size: 10 });
-  addText(commands, 40, 259, "( ) Cash on Delivery (COD)  ( ) Bank Transfer   ( ) Gcash", { size: 9 });
+  addText(commands, 40, 277, layout.paymentHeading, { size: 10 });
+  addText(commands, 40, 259, layout.paymentLines[0], { size: 9 });
 
-  addText(commands, 40, 224, "Payment Due: ( ) Upon Delivery  ( ) Within___days", { size: 9 });
+  addText(commands, 40, 224, layout.paymentLines[1], { size: 9 });
 
-  addText(
-    commands,
-    40,
-    184,
-    "I hereby confirm the above order and agree to the pricing, delivery arrangement, and payment terms stated herein.",
-    { size: 8 },
-  );
+  addText(commands, 40, 184, layout.confirmationText, { size: 8 });
 
-  addText(commands, 40, 145, "Confirmed by (Buyer):", { size: 10 });
-  addText(commands, 40, 120, "Name: ________________________", { size: 9 });
-  addText(commands, 40, 98, "Signature: ___________________", { size: 9 });
-  addText(commands, 40, 76, "Date: ________________________", { size: 9 });
+  addText(commands, 40, 145, layout.buyerSignatureLines[0], { size: 10 });
+  addText(commands, 40, 120, layout.buyerSignatureLines[1], { size: 9 });
+  addText(commands, 40, 98, layout.buyerSignatureLines[2], { size: 9 });
+  addText(commands, 40, 76, layout.buyerSignatureLines[3], { size: 9 });
 
-  addText(commands, 330, 145, "Accepted by (Seller)", { size: 10 });
-  addText(commands, 330, 120, `Name: ${acceptedBy}`, { size: 9 });
+  addText(commands, 330, 145, layout.sellerSignatureHeading, { size: 10 });
+  addText(commands, 330, 120, layout.sellerSignatureLines[0], { size: 9 });
   drawLine(commands, 360, 116, 520, 116);
-  addText(commands, 330, 98, "Signature: ___________________", { size: 9 });
-  addText(commands, 330, 76, "Date: ________________________", { size: 9 });
-}
-
-function sellerName(order: DocumentOrder) {
-  return order.agent?.display_name ?? "Narcisan S. Galamiton";
+  addText(commands, 330, 98, layout.sellerSignatureLines[1], { size: 9 });
+  addText(commands, 330, 76, layout.sellerSignatureLines[2], { size: 9 });
 }
 
 function buildPdfDocument(contentStreams: string[]) {
@@ -243,18 +239,6 @@ function drawCircle(commands: string[], centerX: number, centerY: number, radius
     `${formatNumber(x + c)} ${formatNumber(y - radius)} ${formatNumber(x + radius)} ${formatNumber(y - c)} ${formatNumber(x + radius)} ${formatNumber(y)} c`,
     "S",
   ].join(" "));
-}
-
-function formatDate(value: string | null) {
-  return value ? value.slice(0, 10) : "";
-}
-
-function formatMoney(value: number) {
-  return `PHP ${value.toFixed(2)}`;
-}
-
-function formatQuantity(value: number) {
-  return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function truncate(value: string, maxLength: number) {

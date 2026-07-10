@@ -2,7 +2,7 @@ import type { OrderStatus } from "./actions";
 import { getOrderStatuses } from "./actions";
 
 export const orderSources = ["guest_shop", "agent_submitted", "admin_manual"] as const;
-export const paymentStatuses = ["unpaid", "partial", "paid", "refunded", "void"] as const;
+export const paymentStatuses = ["unpaid", "partial", "paid", "refunded"] as const;
 
 export type AdminOrderSource = (typeof orderSources)[number];
 export type AdminPaymentStatus = (typeof paymentStatuses)[number];

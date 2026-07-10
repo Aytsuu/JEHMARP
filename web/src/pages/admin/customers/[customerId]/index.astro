@@ -31,8 +31,8 @@ if (!customer) {
 }
 
 const customerOrders = data.orders.filter((order) => order.customer_id === customerId);
-const pendingOrders = customerOrders.filter((order) => !["closed", "rejected", "cancelled"].includes(order.order_status));
-const historicalOrders = customerOrders.filter((order) => ["closed", "rejected", "cancelled"].includes(order.order_status));
+const pendingOrders = customerOrders.filter((order) => order.order_status !== "closed");
+const historicalOrders = customerOrders.filter((order) => order.order_status === "closed");
 const assignedAgent = data.agents.find((agent) => agent.id === customer.assigned_agent_id);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---

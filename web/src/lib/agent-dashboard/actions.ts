@@ -257,7 +257,7 @@ function normalizeFormDataEntry(value: FormDataEntryValue | undefined) {
 function getActionSuccessMessage(action: AgentAction) {
   switch (action.type) {
     case "create-agent-order":
-      return "Order submitted for admin review.";
+      return "Order submitted.";
   }
 }
 

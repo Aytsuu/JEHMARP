@@ -8,7 +8,7 @@ describe("agent notifications", () => {
       orders: [
         {
           id: "order-1",
-          order_status: "submitted",
+          order_status: "pending",
           payment_status: "unpaid",
           created_at: "2026-07-07T00:00:00.000Z",
           customer: {
@@ -18,7 +18,7 @@ describe("agent notifications", () => {
         },
         {
           id: "order-2",
-          order_status: "approved",
+          order_status: "processing",
           payment_status: "unpaid",
           created_at: "2026-07-07T00:00:00.000Z",
           customer: null,

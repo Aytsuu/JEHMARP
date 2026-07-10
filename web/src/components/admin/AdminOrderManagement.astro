@@ -480,7 +480,7 @@ const activeMaxTotal = Math.min(
               const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
               const isUnread =
                 !order.admin_read_at &&
-                order.order_status === "submitted" &&
+                order.order_status === "pending" &&
                 order.source !== "admin_manual";
 
               return (

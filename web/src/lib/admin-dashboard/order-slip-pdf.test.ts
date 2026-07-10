@@ -10,8 +10,9 @@ describe("buildOrderSlipPdf", () => {
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
       source: "admin_manual",
-      order_status: "approved",
+      order_status: "processing",
       payment_status: "unpaid",
+      notes: null,
       approved_at: null,
       created_at: "2026-07-03T00:00:00.000Z",
       updated_at: "2026-07-03T00:00:00.000Z",
@@ -27,6 +28,8 @@ describe("buildOrderSlipPdf", () => {
       agent: {
         id: "64568f81-108b-42bd-b926-7e825dad67c6",
         display_name: "Ana Agent",
+        email: null,
+        contact: null,
       },
       customer_order_item: [
         {

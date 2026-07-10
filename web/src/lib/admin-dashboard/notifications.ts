@@ -35,7 +35,7 @@ export function getUnreadAdminOrderIds(
   return data.orders
     .filter(
       (order) =>
-        order.order_status === "submitted" &&
+        order.order_status === "pending" &&
         order.source !== "admin_manual" &&
         !order.admin_read_at,
     )
@@ -76,7 +76,7 @@ function buildAdminActionNotifications(
   data.orders
     .filter(
       (order) =>
-        order.order_status === "submitted" && order.source !== "admin_manual",
+        order.order_status === "pending" && order.source !== "admin_manual",
     )
     .forEach((order) => {
       notifications.push({

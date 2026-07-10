@@ -28,8 +28,8 @@ describe("buildAdminAnalytics", () => {
       { label: "2026-06", orderCount: 1, grossSales: 80 },
       { label: "2026-07", orderCount: 2, grossSales: 320 },
     ]);
-    expect(analytics.ordersByStatus.find((item) => item.label === "approved")).toEqual({
-      label: "approved",
+    expect(analytics.ordersByStatus.find((item) => item.label === "processing")).toEqual({
+      label: "processing",
       count: 2,
     });
     expect(analytics.paymentsByStatus.find((item) => item.label === "partial")).toEqual({
@@ -57,15 +57,15 @@ describe("buildAdminAnalytics", () => {
     ]);
   });
 
-  it("excludes cancelled orders from outstanding balance totals", () => {
+  it("keeps closed unpaid orders in outstanding balance totals", () => {
     const data = createAnalyticsData();
 
     data.orders = [
       ...data.orders,
       order({
-        id: "cancelled-order",
+        id: "closed-order",
         agentId: null,
-        status: "cancelled",
+        status: "closed",
         paymentStatus: "unpaid",
         createdAt: "2026-07-04T11:00:00.000Z",
         paymentAmounts: [],
@@ -77,9 +77,9 @@ describe("buildAdminAnalytics", () => {
 
     const analytics = buildAdminAnalytics(data, new Date("2026-07-04T12:00:00.000Z"));
 
-    expect(analytics.summary.outstandingBalance).toBe(90);
-    expect(analytics.ordersByStatus.find((item) => item.label === "cancelled")).toEqual({
-      label: "cancelled",
+    expect(analytics.summary.outstandingBalance).toBe(590);
+    expect(analytics.ordersByStatus.find((item) => item.label === "closed")).toEqual({
+      label: "closed",
       count: 1,
     });
   });
@@ -120,7 +120,7 @@ function createAnalyticsData(): AdminDashboardData {
       order({
         id: "order-1",
         agentId: "agent-id",
-        status: "approved",
+        status: "processing",
         paymentStatus: "partial",
         createdAt: "2026-07-04T09:00:00.000Z",
         paymentAmounts: [110],
@@ -132,7 +132,7 @@ function createAnalyticsData(): AdminDashboardData {
       order({
         id: "order-2",
         agentId: "agent-id",
-        status: "fulfilled",
+        status: "closed",
         paymentStatus: "paid",
         createdAt: "2026-07-03T10:00:00.000Z",
         paymentAmounts: [120],
@@ -144,7 +144,7 @@ function createAnalyticsData(): AdminDashboardData {
       order({
         id: "order-3",
         agentId: null,
-        status: "approved",
+        status: "processing",
         paymentStatus: "paid",
         createdAt: "2026-06-28T11:00:00.000Z",
         paymentAmounts: [80],
@@ -229,7 +229,7 @@ function customer(
 function order(params: {
   id: string;
   agentId: string | null;
-  status: "approved" | "fulfilled" | "cancelled";
+  status: "pending" | "processing" | "closed";
   paymentStatus: "unpaid" | "partial" | "paid";
   createdAt: string;
   paymentAmounts: number[];
@@ -244,11 +244,19 @@ function order(params: {
     source,
     order_status: params.status,
     payment_status: params.paymentStatus,
+    notes: null,
     approved_at: params.createdAt,
     created_at: params.createdAt,
     updated_at: params.createdAt,
     customer: null,
-    agent: params.agentId ? { id: params.agentId, display_name: "JEHMARP Agent" } : null,
+    agent: params.agentId
+      ? {
+          id: params.agentId,
+          display_name: "JEHMARP Agent",
+          email: null,
+          contact: null,
+        }
+      : null,
     customer_order_item: params.items,
     payment: params.paymentAmounts.map((amount, index) => ({
       id: `${params.id}-payment-${index}`,

@@ -10,16 +10,7 @@ const pageStatuses = ["draft", "published", "archived"] as const;
 const productCategories = ["pork", "chicken", "egg"] as const;
 const productUnitLabels = ["kg", "tray"] as const;
 const stockStatuses = ["in_stock", "limited", "out_of_stock"] as const;
-const orderStatuses = [
-  "draft",
-  "submitted",
-  "approved",
-  "processing",
-  "fulfilled",
-  "rejected",
-  "cancelled",
-  "closed",
-] as const;
+const orderStatuses = ["pending", "processing", "closed"] as const;
 const commissionStatuses = ["unset", "set", "cancelled", "paid"] as const;
 const inquiryStatuses = ["new", "reviewing", "responded", "closed", "spam"] as const;
 const resellerApplicationStatuses = ["submitted", "contacted", "closed"] as const;
@@ -33,6 +24,7 @@ export type CommissionStatus = (typeof commissionStatuses)[number];
 export type InvoiceStatus = "draft" | "issued" | "partially_paid" | "paid";
 export type InquiryStatus = (typeof inquiryStatuses)[number];
 export type ResellerApplicationStatus = (typeof resellerApplicationStatuses)[number];
+type OrderPaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 
 type AdminDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect">;
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
@@ -145,8 +137,6 @@ export type AdminAction =
         order_status: OrderStatus;
         payment_status: "unpaid";
         submitted_by: string;
-        approved_by?: string | null;
-        approved_at?: string | null;
         updated_at: string;
       };
       items: {
@@ -161,10 +151,16 @@ export type AdminAction =
       orderId: string;
       payload: {
         order_status: OrderStatus;
-        approved_by?: string | null;
-        approved_at?: string | null;
         admin_read_at: string;
         admin_read_by: string;
+        updated_at: string;
+      };
+    }
+  | {
+      type: "update-order-notes";
+      orderId: string;
+      payload: {
+        notes: string | null;
         updated_at: string;
       };
     }
@@ -352,6 +348,9 @@ export async function executeAdminAction(
     case "update-order-status":
       await executeTableUpdate(supabase, "customer_order", action.orderId, action.payload);
       return;
+    case "update-order-notes":
+      await executeTableUpdate(supabase, "customer_order", action.orderId, action.payload);
+      return;
     case "mark-order-read":
       await markAdminRecordRead(supabase, "customer_order", action.orderId, adminReadPayload(adminUserId));
       return;
@@ -369,6 +368,7 @@ export async function executeAdminAction(
       await markAdminRecordRead(supabase, "customer_order", action.payload.order_id, adminReadPayload(action.payload.recorded_by));
       return;
     case "save-invoice":
+      await assertOrderCanGenerateInvoice(supabase, action.payload.order_id);
       await executeTableUpsert(supabase, "invoice", action.invoiceId, action.payload);
       await markAdminRecordRead(supabase, "customer_order", action.payload.order_id, adminReadPayload(adminUserId));
       return;
@@ -393,22 +393,17 @@ export async function executeAdminAction(
   }
 }
 
-export function getAllowedNextOrderStatuses(status: OrderStatus): OrderStatus[] {
+export function getAllowedNextOrderStatuses(
+  status: OrderStatus,
+  paymentStatus?: OrderPaymentStatus,
+): OrderStatus[] {
   switch (status) {
-    case "draft":
-      return ["submitted", "cancelled"];
-    case "submitted":
-      return ["approved", "rejected", "cancelled"];
-    case "approved":
-      return ["processing", "fulfilled", "cancelled", "closed"];
+    case "pending":
+      return ["processing", "closed"];
     case "processing":
-      return ["fulfilled", "cancelled", "closed"];
-    case "fulfilled":
       return ["closed"];
-    case "rejected":
-    case "cancelled":
     case "closed":
-      return [];
+      return paymentStatus && paymentStatus !== "paid" ? ["processing"] : [];
   }
 }
 
@@ -537,7 +532,6 @@ function parseAdminActionFormDataOrThrow(
         },
       });
     case "create-order": {
-      const approvedAt = new Date().toISOString();
       const existingCustomerId = optionalUuid(formData, "customerId");
 
       return success({
@@ -554,11 +548,9 @@ function parseAdminActionFormDataOrThrow(
         payload: {
           agent_id: optionalUuid(formData, "agentId") ?? null,
           source: "admin_manual",
-          order_status: "approved",
+          order_status: "processing",
           payment_status: "unpaid",
           submitted_by: adminUserId,
-          approved_by: adminUserId,
-          approved_at: approvedAt,
           updated_at: new Date().toISOString(),
         },
         items: parseOrderItems(formData),
@@ -571,13 +563,20 @@ function parseAdminActionFormDataOrThrow(
         orderId: uuidSchema.parse(requiredString(formData, "orderId")),
         payload: {
           order_status: nextStatus,
-          approved_by: nextStatus === "approved" ? adminUserId : undefined,
-          approved_at: nextStatus === "approved" ? new Date().toISOString() : undefined,
           ...adminReadPayload(adminUserId),
           updated_at: new Date().toISOString(),
         },
       });
     }
+    case "update-order-notes":
+      return success({
+        type: "update-order-notes",
+        orderId: uuidSchema.parse(requiredString(formData, "orderId")),
+        payload: {
+          notes: optionalString(formData, "notes"),
+          updated_at: new Date().toISOString(),
+        },
+      });
     case "mark-order-read":
       return success({
         type: "mark-order-read",
@@ -885,6 +884,25 @@ async function findExistingCustomerIdByPhone(
   return data?.id ? String(data.id) : null;
 }
 
+async function assertOrderCanGenerateInvoice(
+  supabase: SupabaseServerClient,
+  orderId: string,
+) {
+  const { data, error } = await supabase
+    .from("customer_order")
+    .select("order_status")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to verify order status for invoice generation.");
+  }
+
+  if (!data || data.order_status !== "processing") {
+    throw new Error("Only processing orders can generate a sales invoice.");
+  }
+}
+
 function toCustomerUpdatePayload(payload: CustomerFormPayload) {
   return {
     first_name: payload.first_name,
@@ -985,7 +1003,7 @@ async function markAllAdminNotificationsRead(
     supabase
       .from("customer_order")
       .update(payload)
-      .eq("order_status", "submitted")
+      .eq("order_status", "pending")
       .neq("source", "admin_manual")
       .is("admin_read_at", null),
     supabase
@@ -1312,6 +1330,8 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Order created.";
     case "update-order-status":
       return "Order status updated.";
+    case "update-order-notes":
+      return "Order notes saved.";
     case "mark-order-read":
       return "Order marked as read.";
     case "update-commission":

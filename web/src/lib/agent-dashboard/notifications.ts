@@ -19,22 +19,22 @@ function buildAgentActionNotifications(
   const notifications: AgentNotification[] = [];
 
   data.orders.forEach((order) => {
-    if (order.order_status === "submitted") {
+    if (order.order_status === "pending") {
       notifications.push({
         id: `agent-order-pending-${order.id}`,
         type: "Order Status",
-        title: "Order submitted for review",
-        message: `Order #${order.id.slice(0, 8)} for customer ${order.customer ? fullName(order.customer) : "Guest"} is pending admin approval.`,
+        title: "Order pending review",
+        message: `Order #${order.id.slice(0, 8)} for customer ${order.customer ? fullName(order.customer) : "Guest"} is waiting for admin processing.`,
         date: order.created_at,
         link: `/agent/orders/${order.id}`,
         severity: "warning",
       });
-    } else if (order.order_status === "approved" && order.payment_status === "unpaid") {
+    } else if (order.order_status === "processing" && order.payment_status === "unpaid") {
       notifications.push({
         id: `agent-order-unpaid-${order.id}`,
         type: "Payment Alert",
-        title: "Order approved, payment pending",
-        message: `Order #${order.id.slice(0, 8)} for customer ${order.customer ? fullName(order.customer) : "Guest"} is approved. Please follow up on payment.`,
+        title: "Order processing, payment pending",
+        message: `Order #${order.id.slice(0, 8)} for customer ${order.customer ? fullName(order.customer) : "Guest"} is processing. Please follow up on payment.`,
         date: order.created_at,
         link: `/agent/orders/${order.id}`,
         severity: "info",

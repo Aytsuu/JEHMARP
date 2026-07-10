@@ -41,7 +41,7 @@ function createMockOrder(overrides: Record<string, unknown> = {}) {
     customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
     agent_id: null,
     source: "guest_shop",
-    order_status: "submitted",
+    order_status: "pending",
     payment_status: "partial",
     approved_at: null,
     created_at: "2026-07-03T00:00:00.000Z",
@@ -156,13 +156,13 @@ describe("loadAdminDashboardData", () => {
     await loadAdminDashboardData({
       orderFilters: {
         source: "guest_shop",
-        orderStatus: "submitted",
+        orderStatus: "pending",
         paymentStatus: "partial",
       },
     });
 
     expect(orderBuilder.eq).toHaveBeenCalledWith("source", "guest_shop");
-    expect(orderBuilder.eq).toHaveBeenCalledWith("order_status", "submitted");
+    expect(orderBuilder.eq).toHaveBeenCalledWith("order_status", "pending");
     expect(orderBuilder.eq).toHaveBeenCalledWith("payment_status", "partial");
   });
 
@@ -500,7 +500,7 @@ describe("loadAdminDashboardData", () => {
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
       source: "admin_manual",
-      order_status: "approved",
+      order_status: "processing",
       payment_status: "unpaid",
       approved_at: null,
       created_at: "2026-07-03T00:00:00.000Z",
@@ -539,7 +539,7 @@ describe("loadAdminDashboardData", () => {
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
       source: "admin_manual",
-      order_status: "approved",
+      order_status: "processing",
       payment_status: "unpaid",
       approved_at: null,
       created_at: "2026-07-03T00:00:00.000Z",
@@ -586,7 +586,7 @@ describe("loadAdminDashboardData", () => {
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
       source: "admin_manual",
-      order_status: "approved",
+      order_status: "processing",
       payment_status: "unpaid",
       approved_at: null,
       created_at: "2026-07-03T00:00:00.000Z",

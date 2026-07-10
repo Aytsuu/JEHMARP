@@ -36,11 +36,9 @@ describe("parseAdminActionFormData", () => {
         payload: {
           agent_id: null,
           source: "admin_manual",
-          order_status: "approved",
+          order_status: "processing",
           payment_status: "unpaid",
           submitted_by: adminUserId,
-          approved_by: adminUserId,
-          approved_at: expect.any(String),
           updated_at: expect.any(String),
         },
         items: [
@@ -110,11 +108,9 @@ describe("parseAdminActionFormData", () => {
         payload: {
           agent_id: null,
           source: "admin_manual",
-          order_status: "approved",
+          order_status: "processing",
           payment_status: "unpaid",
           submitted_by: adminUserId,
-          approved_by: adminUserId,
-          approved_at: expect.any(String),
           updated_at: expect.any(String),
         },
         items: [
@@ -442,11 +438,9 @@ describe("executeAdminAction", () => {
       payload: {
         agent_id: null,
         source: "admin_manual",
-        order_status: "approved",
+        order_status: "processing",
         payment_status: "unpaid",
         submitted_by: adminUserId,
-        approved_by: adminUserId,
-        approved_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -465,11 +459,9 @@ describe("executeAdminAction", () => {
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
       source: "admin_manual",
-      order_status: "approved",
+      order_status: "processing",
       payment_status: "unpaid",
       submitted_by: adminUserId,
-      approved_by: adminUserId,
-      approved_at: "2026-07-01T00:00:00.000Z",
       updated_at: "2026-07-01T00:00:00.000Z",
     });
     expect(itemInsert).toHaveBeenCalledWith([
@@ -524,11 +516,9 @@ describe("executeAdminAction", () => {
       payload: {
         agent_id: null,
         source: "admin_manual",
-        order_status: "approved",
+        order_status: "processing",
         payment_status: "unpaid",
         submitted_by: adminUserId,
-        approved_by: adminUserId,
-        approved_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -603,11 +593,9 @@ describe("executeAdminAction", () => {
       payload: {
         agent_id: null,
         source: "admin_manual",
-        order_status: "approved",
+        order_status: "processing",
         payment_status: "unpaid",
         submitted_by: adminUserId,
-        approved_by: adminUserId,
-        approved_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -628,18 +616,27 @@ describe("executeAdminAction", () => {
 });
 
 describe("getAllowedNextOrderStatuses", () => {
-  it("allows submitted orders to be approved, rejected, or cancelled", () => {
-    expect(getAllowedNextOrderStatuses("submitted")).toEqual([
-      "approved",
-      "rejected",
-      "cancelled",
+  it("allows pending orders to move into processing or closed", () => {
+    expect(getAllowedNextOrderStatuses("pending")).toEqual([
+      "processing",
+      "closed",
     ]);
   });
 
-  it("prevents terminal statuses from moving forward", () => {
-    expect(getAllowedNextOrderStatuses("closed")).toEqual([]);
-    expect(getAllowedNextOrderStatuses("cancelled")).toEqual([]);
-    expect(getAllowedNextOrderStatuses("rejected")).toEqual([]);
+  it("allows closed unpaid orders to reopen into processing", () => {
+    expect(getAllowedNextOrderStatuses("closed", "unpaid")).toEqual([
+      "processing",
+    ]);
+    expect(getAllowedNextOrderStatuses("closed", "partial")).toEqual([
+      "processing",
+    ]);
+    expect(getAllowedNextOrderStatuses("closed", "refunded")).toEqual([
+      "processing",
+    ]);
+  });
+
+  it("prevents paid closed orders from reopening", () => {
+    expect(getAllowedNextOrderStatuses("closed", "paid")).toEqual([]);
   });
 });
 

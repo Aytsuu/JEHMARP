@@ -130,7 +130,7 @@ begin
     values (
       '70000000-0000-4000-8000-000000000072',
       'agent_submitted',
-      'submitted',
+      'pending',
       'unpaid'
     );
   exception
@@ -205,7 +205,7 @@ begin
       and customer_id = '70000000-0000-4000-8000-000000000072'
       and agent_id = agent_profile_id
       and source = 'agent_submitted'
-      and order_status = 'submitted'
+      and order_status = 'pending'
       and payment_status = 'unpaid'
       and submitted_by = '22222222-2222-2222-2222-222222222222'
   ) then
@@ -237,12 +237,12 @@ begin
   select customer_id
   into new_customer_id
   from public.customer_order
-  where id = new_customer_order_id
-    and agent_id = agent_profile_id
-    and source = 'agent_submitted'
-    and order_status = 'submitted'
-    and payment_status = 'unpaid'
-    and submitted_by = '22222222-2222-2222-2222-222222222222';
+    where id = new_customer_order_id
+      and agent_id = agent_profile_id
+      and source = 'agent_submitted'
+      and order_status = 'pending'
+      and payment_status = 'unpaid'
+      and submitted_by = '22222222-2222-2222-2222-222222222222';
 
   if new_customer_id is null then
     raise exception 'Expected submitted new customer order to include agent ownership and workflow defaults';

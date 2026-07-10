@@ -8,13 +8,13 @@ import {
 describe("parseAdminOrderFilters", () => {
   it("parses supported search, source, status, payment, and total range filters", () => {
     const filters = parseAdminOrderFilters(
-      new URL("https://example.test/admin/orders?search= maria   cruz &source=guest_shop&orderStatus=submitted&paymentStatus=partial&minTotal=1000&maxTotal=2500.75"),
+      new URL("https://example.test/admin/orders?search= maria   cruz &source=guest_shop&orderStatus=pending&paymentStatus=partial&minTotal=1000&maxTotal=2500.75"),
     );
 
     expect(filters).toEqual({
       search: "maria cruz",
       source: "guest_shop",
-      orderStatus: "submitted",
+      orderStatus: "pending",
       paymentStatus: "partial",
       minTotal: 1000,
       maxTotal: 2500.75,
@@ -36,11 +36,11 @@ describe("serializeAdminOrderFilters", () => {
       serializeAdminOrderFilters({
         search: "order 42",
         paymentStatus: "paid",
-        orderStatus: "fulfilled",
+        orderStatus: "processing",
         source: "agent_submitted",
         maxTotal: 3000,
         minTotal: 500,
       }),
-    ).toBe("search=order+42&source=agent_submitted&orderStatus=fulfilled&paymentStatus=paid&minTotal=500&maxTotal=3000");
+    ).toBe("search=order+42&source=agent_submitted&orderStatus=processing&paymentStatus=paid&minTotal=500&maxTotal=3000");
   });
 });

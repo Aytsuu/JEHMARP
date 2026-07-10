@@ -158,7 +158,7 @@ export type AgentOrder = {
   agent_id: string | null;
   source: "guest_shop" | "agent_submitted" | "admin_manual";
   order_status: OrderStatus;
-  payment_status: "unpaid" | "partial" | "paid" | "refunded" | "void";
+  payment_status: "unpaid" | "partial" | "paid" | "refunded";
   approved_at: string | null;
   created_at: string;
   updated_at: string;

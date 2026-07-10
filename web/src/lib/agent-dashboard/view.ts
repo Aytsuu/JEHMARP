@@ -25,8 +25,6 @@ export function formatPaymentStatus(status: AgentOrder["payment_status"]) {
       return "Paid";
     case "refunded":
       return "Refunded";
-    case "void":
-      return "Void";
   }
 }
 
@@ -102,7 +100,6 @@ export function buildAgentPaymentSummary(orders: AgentOrder[]): AgentPaymentSumm
     partial: 0,
     paid: 0,
     refunded: 0,
-    void: 0,
   });
 }
 
@@ -119,5 +116,5 @@ function roundCurrency(value: number) {
 }
 
 function isOutstandingBalanceOrder(order: AgentOrder): boolean {
-  return order.order_status !== "cancelled";
+  return order.order_status !== "closed" || order.payment_status !== "paid";
 }

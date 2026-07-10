@@ -56,18 +56,9 @@ export type AdminAnalytics = {
   recentCustomers: AdminCustomer[];
 };
 
-const orderStatuses = [
-  "draft",
-  "submitted",
-  "approved",
-  "processing",
-  "fulfilled",
-  "rejected",
-  "cancelled",
-  "closed",
-] as const;
+const orderStatuses = ["pending", "processing", "closed"] as const;
 
-const paymentStatuses = ["unpaid", "partial", "paid", "refunded", "void"] as const;
+const paymentStatuses = ["unpaid", "partial", "paid", "refunded"] as const;
 
 export function buildAdminAnalytics(
   data: AdminDashboardData,
@@ -236,7 +227,7 @@ function orderEarnedCommission(order: AdminOrder): number {
 }
 
 function isOutstandingBalanceOrder(order: AdminOrder): boolean {
-  return order.order_status !== "cancelled";
+  return order.order_status !== "closed" || order.payment_status !== "paid";
 }
 
 function productName(data: AdminDashboardData, productId: string): string {
