@@ -2775,7 +2775,7 @@
     right: 0;
     bottom: 0;
     width: 100%;
-    max-width: 32rem;
+    max-width: var(--sheet-width, 32rem);
     /* Comfortable width for editing */
     background-color: #ffffff;
     box-shadow: -4px 0 30px rgba(0, 0, 0, 0.1);
@@ -2796,6 +2796,11 @@
     justify-content: space-between;
     padding: 1.5rem 2rem;
     border-bottom: 1px solid var(--color-brand-cream);
+  }
+
+  .drawer-sheet__header-content {
+    min-width: 0;
+    flex: 1;
   }
 
   .drawer-sheet__title {
@@ -2827,6 +2832,12 @@
     flex-grow: 1;
     overflow-y: auto;
     padding: 2rem;
+  }
+
+  .drawer-sheet__footer {
+    border-top: 1px solid var(--color-brand-cream);
+    padding: 1.25rem 2rem;
+    background-color: #ffffff;
   }
 
   .drawer-sheet__body form {
@@ -2887,6 +2898,11 @@
 
   .drawer-sheet__body form button[type="submit"]:hover {
     background-color: #551313;
+  }
+
+  html.sheet-open,
+  body.sheet-open {
+    overflow: hidden;
   }
 
   /* Flat manage button in tables */

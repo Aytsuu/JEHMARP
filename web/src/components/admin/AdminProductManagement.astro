@@ -1,4 +1,5 @@
 ---
+import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminProductManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminProductFilters } from "@/lib/admin-dashboard/product-filters";
 import {
@@ -48,7 +49,7 @@ function formatStockStatus(status: string): string {
   class="admin-panel"
   aria-labelledby="admin-products-title"
 >
-  <div class="hidden-create-form-holder" style="display: none;">
+  <Sheet id="create-product-sheet" header="Create Product" width="36rem">
     <form
       method="post"
       enctype="multipart/form-data"
@@ -126,7 +127,7 @@ function formatStockStatus(status: string): string {
       >
       <button type="submit">Save product</button>
     </form>
-  </div>
+  </Sheet>
 
   <div data-interactive-table>
     <div class="table-filters product-management-toolbar">
@@ -240,6 +241,7 @@ function formatStockStatus(status: string): string {
           type="button"
           class="btn-table-manage product-management-toolbar__create"
           data-open-create-sheet
+          data-sheet-target="#create-product-sheet"
           >Create Product</button
         >
       </div>

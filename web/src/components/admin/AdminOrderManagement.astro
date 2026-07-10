@@ -1,4 +1,5 @@
 ---
+import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminOrderManagementData } from "@/lib/admin-dashboard/data";
 import ViewButton from "@/components/ViewButton.astro";
 import { getOrderStatuses } from "@/lib/admin-dashboard/actions";
@@ -46,7 +47,7 @@ const activeMaxTotal = Math.min(
 ---
 
 <section id="admin-orders" class="admin-panel" aria-labelledby="admin-orders-title">
-  <div class="hidden-create-form-holder" style="display: none;">
+  <Sheet id="create-order-sheet" header="Create Order" width="42rem">
     <form method="post" class="admin-form" aria-labelledby="create-order-title">
       <input type="hidden" name="action" value="create-order" />
       <h3 id="create-order-title">Create order</h3>
@@ -197,7 +198,7 @@ const activeMaxTotal = Math.min(
         <button type="button" data-add-order-item disabled={!canCreateOrder}>Add item</button>
         <button type="submit" disabled={!canCreateOrder}>Create order</button>
       </form>
-    </div>
+  </Sheet>
 
   <div data-interactive-table>
     <div class="table-filters order-management-toolbar">
@@ -322,6 +323,7 @@ const activeMaxTotal = Math.min(
           type="button"
           class="btn-table-manage order-management-toolbar__create"
           data-open-create-sheet
+          data-sheet-target="#create-order-sheet"
           disabled={!canCreateOrder}
           >Create Order</button
         >

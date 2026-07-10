@@ -1,0 +1,75 @@
+---
+type Props = {
+  id?: string;
+  header?: string;
+  content?: string;
+  footer?: string;
+  width?: string;
+};
+
+const {
+  id = "drawer-sheet",
+  header,
+  content,
+  footer,
+  width = "32rem",
+} = Astro.props;
+
+const hasHeader = typeof header === "string" || Astro.slots.has("header");
+const hasContent = typeof content === "string" || Astro.slots.has("default");
+const hasFooter = typeof footer === "string" || Astro.slots.has("footer");
+---
+
+<div
+  class="drawer-sheet"
+  id={id}
+  aria-hidden="true"
+  data-sheet-root
+  style={`--sheet-width: ${width};`}
+>
+  <div class="drawer-sheet__backdrop" data-close-drawer></div>
+  <div class="drawer-sheet__content" data-sheet-content>
+    {hasHeader && (
+      <header class="drawer-sheet__header" data-sheet-header>
+        <div class="drawer-sheet__header-content">
+          {Astro.slots.has("header") ? (
+            <slot name="header" />
+          ) : (
+            <h3 class="drawer-sheet__title" data-sheet-title>{header}</h3>
+          )}
+        </div>
+        <button
+          type="button"
+          class="drawer-sheet__close"
+          data-close-drawer
+          aria-label="Close panel"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.5"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </header>
+    )}
+    {hasContent && (
+      <div class="drawer-sheet__body" data-drawer-body>
+        {Astro.slots.has("default") ? <slot /> : content}
+      </div>
+    )}
+    {hasFooter && (
+      <footer class="drawer-sheet__footer" data-sheet-footer>
+        {Astro.slots.has("footer") ? <slot name="footer" /> : footer}
+      </footer>
+    )}
+  </div>
+</div>
