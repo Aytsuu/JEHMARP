@@ -1,0 +1,27 @@
+---
+import AdminCustomerManagement from "@/components/admin/AdminCustomerManagement.astro";
+import { loadAdminCustomerManagementData } from "@/lib/admin-dashboard/data";
+import {
+  parseAdminCustomerFilters,
+  serializeAdminCustomerFilters,
+} from "@/lib/admin-dashboard/customer-filters";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const customerFilters = parseAdminCustomerFilters(Astro.url);
+const customerFilterQuery = serializeAdminCustomerFilters(customerFilters);
+const data = await loadAdminCustomerManagementData(customerFilters);
+---
+
+<AdminCustomerManagement
+  data={data}
+  activeFilters={customerFilters}
+  filterQuery={customerFilterQuery}
+/>

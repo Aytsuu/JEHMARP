@@ -4,7 +4,14 @@ import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
 } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  loadAdminDashboardData,
+  loadAdminInvoiceManagementData,
+} from "@/lib/admin-dashboard/data";
+import {
+  parseAdminInvoiceFilters,
+  serializeAdminInvoiceFilters,
+} from "@/lib/admin-dashboard/invoice-filters";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -15,7 +22,12 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
-const data = await loadAdminDashboardData();
+const invoiceFilters = parseAdminInvoiceFilters(Astro.url);
+const invoiceFilterQuery = serializeAdminInvoiceFilters(invoiceFilters);
+const [dashboardData, data] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminInvoiceManagementData(invoiceFilters),
+]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
@@ -25,7 +37,11 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Invoice Management"
   intro="Review invoices created from orders, open sales invoice PDFs, and record payments."
   feedback={feedback}
-  dashboardData={data}
+  dashboardData={dashboardData}
 >
-  <AdminInvoiceManagement data={data} />
+  <AdminInvoiceManagement
+    data={data}
+    activeFilters={invoiceFilters}
+    filterQuery={invoiceFilterQuery}
+  />
 </AdminPageFrame>

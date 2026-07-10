@@ -6,7 +6,14 @@ import {
   getInquiryStatuses,
   markUnreadAdminInquiriesRead,
 } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  loadAdminDashboardData,
+  loadAdminInquiryManagementData,
+} from "@/lib/admin-dashboard/data";
+import {
+  parseAdminInquiryFilters,
+  serializeAdminInquiryFilters,
+} from "@/lib/admin-dashboard/inquiry-filters";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -19,7 +26,12 @@ if (!adminRoute.ready) {
 
 await markUnreadAdminInquiriesRead(Astro, adminRoute.userId);
 
-const data = await loadAdminDashboardData();
+const inquiryFilters = parseAdminInquiryFilters(Astro.url);
+const inquiryFilterQuery = serializeAdminInquiryFilters(inquiryFilters);
+const [dashboardData, data] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminInquiryManagementData(inquiryFilters),
+]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
@@ -29,7 +41,12 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Contact Inquiry Management"
   intro="Review contact inquiries and update status or internal notes."
   feedback={feedback}
-  dashboardData={data}
+  dashboardData={dashboardData}
 >
-  <AdminInquiryManagement data={data} inquiryStatuses={getInquiryStatuses()} />
+  <AdminInquiryManagement
+    data={data}
+    inquiryStatuses={getInquiryStatuses()}
+    activeFilters={inquiryFilters}
+    filterQuery={inquiryFilterQuery}
+  />
 </AdminPageFrame>

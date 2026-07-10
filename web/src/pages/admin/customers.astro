@@ -2,7 +2,14 @@
 import AdminCustomerManagement from "@/components/admin/AdminCustomerManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  loadAdminCustomerManagementData,
+  loadAdminDashboardData,
+} from "@/lib/admin-dashboard/data";
+import {
+  parseAdminCustomerFilters,
+  serializeAdminCustomerFilters,
+} from "@/lib/admin-dashboard/customer-filters";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -13,7 +20,12 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
-const data = await loadAdminDashboardData();
+const customerFilters = parseAdminCustomerFilters(Astro.url);
+const customerFilterQuery = serializeAdminCustomerFilters(customerFilters);
+const [dashboardData, data] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminCustomerManagementData(customerFilters),
+]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
@@ -23,7 +35,11 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Customer Management"
   intro="Review customer records and update contact details, reseller status, or optional agent assignment."
   feedback={feedback}
-  dashboardData={data}
+  dashboardData={dashboardData}
 >
-  <AdminCustomerManagement data={data} />
+  <AdminCustomerManagement
+    data={data}
+    activeFilters={customerFilters}
+    filterQuery={customerFilterQuery}
+  />
 </AdminPageFrame>

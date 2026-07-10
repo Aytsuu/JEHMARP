@@ -5,7 +5,14 @@ import {
   formatAdminActionFeedback,
   getResellerApplicationStatuses,
 } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  loadAdminDashboardData,
+  loadAdminResellerApplicationManagementData,
+} from "@/lib/admin-dashboard/data";
+import {
+  parseAdminResellerApplicationFilters,
+  serializeAdminResellerApplicationFilters,
+} from "@/lib/admin-dashboard/reseller-application-filters";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -16,7 +23,13 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
-const data = await loadAdminDashboardData();
+const resellerApplicationFilters = parseAdminResellerApplicationFilters(Astro.url);
+const resellerApplicationFilterQuery =
+  serializeAdminResellerApplicationFilters(resellerApplicationFilters);
+const [dashboardData, data] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminResellerApplicationManagementData(resellerApplicationFilters),
+]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
@@ -26,10 +39,12 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Reseller Applications"
   intro="Review reseller applications and price-list email delivery status."
   feedback={feedback}
-  dashboardData={data}
+  dashboardData={dashboardData}
 >
   <AdminResellerApplications
     data={data}
     applicationStatuses={getResellerApplicationStatuses()}
+    activeFilters={resellerApplicationFilters}
+    filterQuery={resellerApplicationFilterQuery}
   />
 </AdminPageFrame>

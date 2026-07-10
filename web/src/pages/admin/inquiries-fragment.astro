@@ -1,0 +1,29 @@
+---
+import AdminInquiryManagement from "@/components/admin/AdminInquiryManagement.astro";
+import { getInquiryStatuses } from "@/lib/admin-dashboard/actions";
+import { loadAdminInquiryManagementData } from "@/lib/admin-dashboard/data";
+import {
+  parseAdminInquiryFilters,
+  serializeAdminInquiryFilters,
+} from "@/lib/admin-dashboard/inquiry-filters";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const inquiryFilters = parseAdminInquiryFilters(Astro.url);
+const inquiryFilterQuery = serializeAdminInquiryFilters(inquiryFilters);
+const data = await loadAdminInquiryManagementData(inquiryFilters);
+---
+
+<AdminInquiryManagement
+  data={data}
+  inquiryStatuses={getInquiryStatuses()}
+  activeFilters={inquiryFilters}
+  filterQuery={inquiryFilterQuery}
+/>

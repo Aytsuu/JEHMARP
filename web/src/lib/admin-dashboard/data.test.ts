@@ -226,6 +226,274 @@ describe("loadAdminDashboardData", () => {
     expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id]);
   });
 
+  it("filters admin invoices by invoice number, customer name, balance status, and total", async () => {
+    const matchingOrder = createMockOrder({
+      payment_status: "partial",
+      invoice: {
+        id: "7c66f907-8324-473c-b0b5-d017a4728121",
+        order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        invoice_number: "INV-00000042",
+        status: "issued",
+        issued_at: "2026-07-03T00:00:00.000Z",
+        due_at: null,
+        created_at: "2026-07-03T00:00:00.000Z",
+        updated_at: "2026-07-03T00:00:00.000Z",
+      },
+    });
+    const wrongBalanceOrder = createMockOrder({
+      id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      payment_status: "paid",
+      invoice: {
+        id: "8c66f907-8324-473c-b0b5-d017a4728121",
+        order_id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        invoice_number: "INV-00000043",
+        status: "issued",
+        issued_at: "2026-07-03T00:00:00.000Z",
+        due_at: null,
+        created_at: "2026-07-03T00:00:00.000Z",
+        updated_at: "2026-07-03T00:00:00.000Z",
+      },
+    });
+    const noInvoiceOrder = createMockOrder({
+      id: "69d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      customer: {
+        id: "d10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        first_name: "Juan",
+        last_name: "Reyes",
+        phone_number: "09172222222",
+        email: "juan@example.test",
+        address: "Pasig",
+        is_reseller: false,
+      },
+      invoice: [],
+    });
+    const orderBuilder = createQueryBuilder({
+      data: [matchingOrder, wrongBalanceOrder, noInvoiceOrder],
+      error: null,
+    });
+    const from = vi.fn((table: string) => (
+      table === "customer_order" ? orderBuilder : createQueryBuilder()
+    ));
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminInvoiceManagementData } = await import("./data");
+
+    const result = await loadAdminInvoiceManagementData({
+      search: "inv-00000042 maria",
+      balanceStatus: "partial",
+      minTotal: 1500,
+      maxTotal: 2000,
+    });
+
+    expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id]);
+    expect(result.invoiceTotalRange).toEqual({
+      min: 1800,
+      max: 1800,
+    });
+  });
+
+  it("filters admin customers by name, email, contact, assigned agent, and type", async () => {
+    const customerBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+          first_name: "Maria",
+          last_name: "Cruz",
+          phone_number: "09170000000",
+          email: "maria@example.test",
+          address: "Quezon City",
+          assigned_agent_id: "agent-1",
+          is_reseller: true,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+        {
+          id: "c10bb955-d8b1-4a26-a6e2-928fd33949e1",
+          first_name: "Ana",
+          last_name: "Reyes",
+          phone_number: "09171111111",
+          email: "ana@example.test",
+          address: "Makati",
+          assigned_agent_id: null,
+          is_reseller: false,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const agentBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "agent-1",
+          display_name: "Carlos Dela Cruz",
+        },
+      ],
+      error: null,
+    });
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return customerBuilder;
+      if (table === "agent_profile") return agentBuilder;
+      return createQueryBuilder();
+    });
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminCustomerManagementData } = await import("./data");
+
+    const result = await loadAdminCustomerManagementData({
+      search: "maria carlos 0917",
+      customerType: "reseller",
+    });
+
+    expect(result.customers.map((customer) => customer.id)).toEqual([
+      "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+    ]);
+    expect(result.agents).toEqual([
+      {
+        id: "agent-1",
+        display_name: "Carlos Dela Cruz",
+      },
+    ]);
+  });
+
+  it("filters admin agents by display name, email, contact, and status", async () => {
+    const agentBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "agent-1",
+          user_id: "user-1",
+          display_name: "Carlos Dela Cruz",
+          status: "active",
+          email: "carlos@example.test",
+          contact: "09170000000",
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+        {
+          id: "agent-2",
+          user_id: "user-2",
+          display_name: "Ana Reyes",
+          status: "inactive",
+          email: "ana@example.test",
+          contact: "09171111111",
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const from = vi.fn((table: string) => (
+      table === "agent_profile" ? agentBuilder : createQueryBuilder()
+    ));
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminAgentManagementData } = await import("./data");
+
+    const result = await loadAdminAgentManagementData({
+      search: "carlos 0917",
+      status: "active",
+    });
+
+    expect(result.agents.map((agent) => agent.id)).toEqual(["agent-1"]);
+  });
+
+  it("filters admin reseller applications by applicant, email, contact, and status", async () => {
+    const resellerBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "application-1",
+          name: "Maria Cruz",
+          email: "maria@example.test",
+          contact_number: "09170000000",
+          planned_transaction_type: "Retail",
+          expected_quantity_per_week: "50kg",
+          message: "Interested",
+          application_status: "submitted",
+          email_delivery_status: "pending",
+          price_list_sent_at: null,
+          email_error: null,
+          admin_read_at: null,
+          admin_read_by: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+        {
+          id: "application-2",
+          name: "Ana Reyes",
+          email: "ana@example.test",
+          contact_number: "09171111111",
+          planned_transaction_type: "Wholesale",
+          expected_quantity_per_week: "20kg",
+          message: null,
+          application_status: "contacted",
+          email_delivery_status: "sent",
+          price_list_sent_at: null,
+          email_error: null,
+          admin_read_at: null,
+          admin_read_by: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const from = vi.fn((table: string) => (
+      table === "reseller_application" ? resellerBuilder : createQueryBuilder()
+    ));
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminResellerApplicationManagementData } = await import("./data");
+
+    const result = await loadAdminResellerApplicationManagementData({
+      search: "maria 0917",
+      status: "submitted",
+    });
+
+    expect(result.resellerApplications.map((application) => application.id)).toEqual(["application-1"]);
+  });
+
+  it("filters admin inquiries by name, email, contact, and status", async () => {
+    const inquiryBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "inquiry-1",
+          name: "Maria Cruz",
+          email: "maria@example.test",
+          phone_number: "09170000000",
+          message: "Need pricing",
+          inquiry_status: "reviewing",
+          internal_notes: null,
+          admin_read_at: null,
+          admin_read_by: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+        {
+          id: "inquiry-2",
+          name: "Ana Reyes",
+          email: "ana@example.test",
+          phone_number: "09171111111",
+          message: "Hello",
+          inquiry_status: "closed",
+          internal_notes: null,
+          admin_read_at: null,
+          admin_read_by: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const from = vi.fn((table: string) => (
+      table === "contact_inquiry" ? inquiryBuilder : createQueryBuilder()
+    ));
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminInquiryManagementData } = await import("./data");
+
+    const result = await loadAdminInquiryManagementData({
+      search: "maria 0917",
+      status: "reviewing",
+    });
+
+    expect(result.contactInquiries.map((inquiry) => inquiry.id)).toEqual(["inquiry-1"]);
+  });
+
   it("normalizes nullable order child relations to empty arrays", async () => {
     const order = {
       id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",

@@ -1,0 +1,27 @@
+---
+import AdminAgentManagement from "@/components/admin/AdminAgentManagement.astro";
+import { loadAdminAgentManagementData } from "@/lib/admin-dashboard/data";
+import {
+  parseAdminAgentFilters,
+  serializeAdminAgentFilters,
+} from "@/lib/admin-dashboard/agent-filters";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const agentFilters = parseAdminAgentFilters(Astro.url);
+const agentFilterQuery = serializeAdminAgentFilters(agentFilters);
+const data = await loadAdminAgentManagementData(agentFilters);
+---
+
+<AdminAgentManagement
+  data={data}
+  activeFilters={agentFilters}
+  filterQuery={agentFilterQuery}
+/>

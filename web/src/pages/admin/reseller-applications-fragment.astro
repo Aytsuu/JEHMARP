@@ -1,0 +1,30 @@
+---
+import AdminResellerApplications from "@/components/admin/AdminResellerApplications.astro";
+import { getResellerApplicationStatuses } from "@/lib/admin-dashboard/actions";
+import { loadAdminResellerApplicationManagementData } from "@/lib/admin-dashboard/data";
+import {
+  parseAdminResellerApplicationFilters,
+  serializeAdminResellerApplicationFilters,
+} from "@/lib/admin-dashboard/reseller-application-filters";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const resellerApplicationFilters = parseAdminResellerApplicationFilters(Astro.url);
+const resellerApplicationFilterQuery =
+  serializeAdminResellerApplicationFilters(resellerApplicationFilters);
+const data = await loadAdminResellerApplicationManagementData(resellerApplicationFilters);
+---
+
+<AdminResellerApplications
+  data={data}
+  applicationStatuses={getResellerApplicationStatuses()}
+  activeFilters={resellerApplicationFilters}
+  filterQuery={resellerApplicationFilterQuery}
+/>

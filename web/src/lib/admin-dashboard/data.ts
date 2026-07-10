@@ -1,7 +1,12 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
+import type { AdminAgentFilters } from "./agent-filters";
+import type { AdminCustomerFilters } from "./customer-filters";
+import type { AdminInvoiceFilters } from "./invoice-filters";
+import type { AdminInquiryFilters } from "./inquiry-filters";
 import type { AdminOrderFilters } from "./order-filters";
 import type { AdminProductFilters } from "./product-filters";
+import type { AdminResellerApplicationFilters } from "./reseller-application-filters";
 import type {
   CommissionStatus,
   InquiryStatus,
@@ -275,6 +280,11 @@ export type AdminOrderTotalRange = {
   max: number;
 };
 
+export type AdminInvoiceTotalRange = {
+  min: number;
+  max: number;
+};
+
 export type AdminDashboardDataOptions = {
   productFilters?: AdminProductFilters;
   orderFilters?: AdminOrderFilters;
@@ -291,6 +301,31 @@ export type AdminProductManagementData = Pick<
 export type AdminOrderManagementData = Pick<
   AdminDashboardData,
   "agents" | "customers" | "orders" | "orderTotalRange" | "products"
+>;
+
+export type AdminCustomerManagementData = Pick<
+  AdminDashboardData,
+  "agents" | "customers"
+>;
+
+export type AdminAgentManagementData = Pick<
+  AdminDashboardData,
+  "agents"
+>;
+
+export type AdminInvoiceManagementData = {
+  orders: AdminOrder[];
+  invoiceTotalRange: AdminInvoiceTotalRange;
+};
+
+export type AdminInquiryManagementData = Pick<
+  AdminDashboardData,
+  "contactInquiries"
+>;
+
+export type AdminResellerApplicationManagementData = Pick<
+  AdminDashboardData,
+  "resellerApplications"
 >;
 
 export async function loadAdminDashboardData(
@@ -382,6 +417,66 @@ export async function loadAdminProductManagementData(
   return {
     products,
     productPriceRange,
+  };
+}
+
+export async function loadAdminInvoiceManagementData(
+  invoiceFilters: AdminInvoiceFilters = {},
+): Promise<AdminInvoiceManagementData> {
+  const supabase = createSupabaseAdminClient();
+  const [orders, invoiceTotalRange] = await Promise.all([
+    loadInvoices(supabase, 50, invoiceFilters),
+    loadInvoiceTotalRange(supabase),
+  ]);
+
+  return {
+    orders,
+    invoiceTotalRange,
+  };
+}
+
+export async function loadAdminCustomerManagementData(
+  customerFilters: AdminCustomerFilters = {},
+): Promise<AdminCustomerManagementData> {
+  const supabase = createSupabaseAdminClient();
+  const [agents, customers] = await Promise.all([
+    loadAgents(supabase),
+    loadCustomers(supabase, customerFilters),
+  ]);
+
+  return {
+    agents,
+    customers,
+  };
+}
+
+export async function loadAdminAgentManagementData(
+  agentFilters: AdminAgentFilters = {},
+): Promise<AdminAgentManagementData> {
+  const supabase = createSupabaseAdminClient();
+
+  return {
+    agents: await loadAgents(supabase, agentFilters),
+  };
+}
+
+export async function loadAdminInquiryManagementData(
+  inquiryFilters: AdminInquiryFilters = {},
+): Promise<AdminInquiryManagementData> {
+  const supabase = createSupabaseAdminClient();
+
+  return {
+    contactInquiries: await loadContactInquiries(supabase, 50, inquiryFilters),
+  };
+}
+
+export async function loadAdminResellerApplicationManagementData(
+  resellerApplicationFilters: AdminResellerApplicationFilters = {},
+): Promise<AdminResellerApplicationManagementData> {
+  const supabase = createSupabaseAdminClient();
+
+  return {
+    resellerApplications: await loadResellerApplications(supabase, 50, resellerApplicationFilters),
   };
 }
 
@@ -490,7 +585,10 @@ function escapePostgrestFilterValue(value: string) {
   return value.replace(/[%_,.]/g, (character) => `\\${character}`);
 }
 
-async function loadAgents(supabase: SupabaseAdminClient) {
+async function loadAgents(
+  supabase: SupabaseAdminClient,
+  filters: AdminAgentFilters = {},
+) {
   const { data, error } = await supabase
     .from("agent_profile")
     .select("id, user_id, display_name, status, email, contact, created_at, updated_at")
@@ -498,10 +596,19 @@ async function loadAgents(supabase: SupabaseAdminClient) {
 
   if (error) throw new Error("Unable to load admin agents.");
 
-  return (data ?? []) as AdminAgent[];
+  const agents = (data ?? []) as AdminAgent[];
+
+  if (!filters.search && !filters.status) {
+    return agents;
+  }
+
+  return filterAdminAgents(agents, filters);
 }
 
-async function loadCustomers(supabase: SupabaseAdminClient) {
+async function loadCustomers(
+  supabase: SupabaseAdminClient,
+  filters: AdminCustomerFilters = {},
+) {
   const { data, error } = await supabase
     .from("customer")
     .select(
@@ -511,7 +618,34 @@ async function loadCustomers(supabase: SupabaseAdminClient) {
 
   if (error) throw new Error("Unable to load admin customers.");
 
-  return (data ?? []) as AdminCustomer[];
+  const customers = (data ?? []) as AdminCustomer[];
+
+  if (!filters.search && !filters.customerType) {
+    return customers;
+  }
+
+  const agentNamesById = new Map<string, string>();
+
+  if (filters.search) {
+    const { data: agentData, error: agentError } = await supabase
+      .from("agent_profile")
+      .select("id, display_name");
+
+    if (agentError) throw new Error("Unable to load admin customers.");
+
+    (agentData ?? []).forEach((agent) => {
+      const normalizedAgent = agent as { id?: unknown; display_name?: unknown };
+
+      if (
+        typeof normalizedAgent.id === "string" &&
+        typeof normalizedAgent.display_name === "string"
+      ) {
+        agentNamesById.set(normalizedAgent.id, normalizedAgent.display_name);
+      }
+    });
+  }
+
+  return filterAdminCustomers(customers, filters, agentNamesById);
 }
 
 async function loadOrderTotalRange(
@@ -526,6 +660,35 @@ async function loadOrderTotalRange(
   const totals = ((data ?? []) as unknown[])
     .map(normalizeAdminOrder)
     .map(getAdminOrderDisplayTotal)
+    .filter((total) => Number.isFinite(total) && total >= 0);
+
+  if (totals.length === 0) {
+    return {
+      min: 0,
+      max: 0,
+    };
+  }
+
+  return {
+    min: Math.min(...totals),
+    max: Math.max(...totals),
+  };
+}
+
+async function loadInvoiceTotalRange(
+  supabase: SupabaseAdminClient,
+): Promise<AdminInvoiceTotalRange> {
+  const { data, error } = await supabase
+    .from("customer_order")
+    .select(adminOrderSelect)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error("Unable to load admin invoice total range.");
+
+  const totals = ((data ?? []) as unknown[])
+    .map(normalizeAdminOrder)
+    .filter(hasInvoice)
+    .map(getAdminInvoiceDisplayTotal)
     .filter((total) => Number.isFinite(total) && total >= 0);
 
   if (totals.length === 0) {
@@ -616,11 +779,96 @@ function filterAdminOrders(orders: AdminOrder[], filters: AdminOrderFilters) {
   });
 }
 
+async function loadInvoices(
+  supabase: SupabaseAdminClient,
+  limit: number,
+  filters: AdminInvoiceFilters = {},
+) {
+  const { data, error } = await supabase
+    .from("customer_order")
+    .select(adminOrderSelect)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error("Unable to load admin invoices.");
+
+  const orders = ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+
+  return filterAdminInvoices(orders, filters).slice(0, limit);
+}
+
+function filterAdminAgents(agents: AdminAgent[], filters: AdminAgentFilters) {
+  const searchTerms = filters.search
+    ?.toLowerCase()
+    .split(/\s+/)
+    .filter((term) => term.length > 0);
+
+  return agents.filter((agent) => {
+    const searchText = [agent.display_name, agent.email, agent.contact]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .join(" ")
+      .toLowerCase();
+    const matchesSearch = !searchTerms || searchTerms.every((term) => searchText.includes(term));
+    const matchesStatus = !filters.status || agent.status === filters.status;
+
+    return matchesSearch && matchesStatus;
+  });
+}
+
+function filterAdminInvoices(orders: AdminOrder[], filters: AdminInvoiceFilters) {
+  const search = filters.search?.toLowerCase();
+
+  return orders.filter((order) => {
+    if (!hasInvoice(order)) {
+      return false;
+    }
+
+    const total = getAdminInvoiceDisplayTotal(order);
+    const matchesSearch = !search || getAdminInvoiceSearchText(order).includes(search);
+    const matchesBalanceStatus =
+      !filters.balanceStatus || order.payment_status === filters.balanceStatus;
+    const matchesMinTotal = typeof filters.minTotal !== "number" || total >= filters.minTotal;
+    const matchesMaxTotal = typeof filters.maxTotal !== "number" || total <= filters.maxTotal;
+
+    return matchesSearch && matchesBalanceStatus && matchesMinTotal && matchesMaxTotal;
+  });
+}
+
+function filterAdminCustomers(
+  customers: AdminCustomer[],
+  filters: AdminCustomerFilters,
+  agentNamesById: ReadonlyMap<string, string>,
+) {
+  const searchTerms = filters.search
+    ?.toLowerCase()
+    .split(/\s+/)
+    .filter((term) => term.length > 0);
+
+  return customers.filter((customer) => {
+    const assignedAgent = customer.assigned_agent_id
+      ? agentNamesById.get(customer.assigned_agent_id) ?? ""
+      : "";
+    const searchText = getAdminCustomerSearchText(customer, assignedAgent);
+    const matchesSearch =
+      !searchTerms || searchTerms.every((term) => searchText.includes(term));
+    const matchesType =
+      !filters.customerType ||
+      (filters.customerType === "reseller" ? customer.is_reseller : !customer.is_reseller);
+
+    return matchesSearch && matchesType;
+  });
+}
+
 function getAdminOrderDisplayTotal(order: AdminOrder) {
   const quantityKey = order.invoice.length > 0 ? "final_quantity" : "partial_quantity";
 
   return order.customer_order_item.reduce((total, item) => {
     return total + item[quantityKey] * item.unit_price;
+  }, 0);
+}
+
+function getAdminInvoiceDisplayTotal(order: AdminOrder) {
+  return order.customer_order_item.reduce((total, item) => {
+    return total + item.final_quantity * item.unit_price;
   }, 0);
 }
 
@@ -646,12 +894,52 @@ function getAdminOrderSearchText(order: AdminOrder) {
     .toLowerCase();
 }
 
+function getAdminInvoiceSearchText(order: AdminOrder) {
+  const customer = order.customer;
+  const invoice = order.invoice[0];
+  const values = [
+    invoice?.invoice_number,
+    customer?.first_name,
+    customer?.last_name,
+    `${customer?.first_name ?? ""} ${customer?.last_name ?? ""}`.trim(),
+  ];
+
+  return values
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" ")
+    .toLowerCase();
+}
+
+function getAdminCustomerSearchText(customer: AdminCustomer, assignedAgent: string) {
+  const values = [
+    customer.first_name,
+    customer.last_name,
+    `${customer.first_name} ${customer.last_name}`.trim(),
+    customer.email,
+    customer.phone_number,
+    assignedAgent,
+  ];
+
+  return values
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .join(" ")
+    .toLowerCase();
+}
+
+function hasInvoice(order: AdminOrder) {
+  return order.invoice.length > 0;
+}
+
 function normalizeRelationArray<T>(value: T[] | T | null | undefined): T[] {
   if (Array.isArray(value)) return value;
   return value ? [value] : [];
 }
 
-async function loadContactInquiries(supabase: SupabaseAdminClient, limit: number) {
+async function loadContactInquiries(
+  supabase: SupabaseAdminClient,
+  limit: number,
+  filters: AdminInquiryFilters = {},
+) {
   const { data, error } = await supabase
     .from("contact_inquiry")
     .select(
@@ -662,10 +950,34 @@ async function loadContactInquiries(supabase: SupabaseAdminClient, limit: number
 
   if (error) throw new Error("Unable to load admin contact inquiries.");
 
-  return (data ?? []) as AdminContactInquiry[];
+  const inquiries = (data ?? []) as AdminContactInquiry[];
+
+  if (!filters.search && !filters.status) {
+    return inquiries;
+  }
+
+  const searchTerms = filters.search
+    ?.toLowerCase()
+    .split(/\s+/)
+    .filter((term) => term.length > 0);
+
+  return inquiries.filter((inquiry) => {
+    const searchText = [inquiry.name, inquiry.email, inquiry.phone_number]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .join(" ")
+      .toLowerCase();
+    const matchesSearch = !searchTerms || searchTerms.every((term) => searchText.includes(term));
+    const matchesStatus = !filters.status || inquiry.inquiry_status === filters.status;
+
+    return matchesSearch && matchesStatus;
+  });
 }
 
-async function loadResellerApplications(supabase: SupabaseAdminClient, limit: number) {
+async function loadResellerApplications(
+  supabase: SupabaseAdminClient,
+  limit: number,
+  filters: AdminResellerApplicationFilters = {},
+) {
   const { data, error } = await supabase
     .from("reseller_application")
     .select(
@@ -676,5 +988,25 @@ async function loadResellerApplications(supabase: SupabaseAdminClient, limit: nu
 
   if (error) throw new Error("Unable to load admin reseller applications.");
 
-  return (data ?? []) as AdminResellerApplication[];
+  const applications = (data ?? []) as AdminResellerApplication[];
+
+  if (!filters.search && !filters.status) {
+    return applications;
+  }
+
+  const searchTerms = filters.search
+    ?.toLowerCase()
+    .split(/\s+/)
+    .filter((term) => term.length > 0);
+
+  return applications.filter((application) => {
+    const searchText = [application.name, application.email, application.contact_number]
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+      .join(" ")
+      .toLowerCase();
+    const matchesSearch = !searchTerms || searchTerms.every((term) => searchText.includes(term));
+    const matchesStatus = !filters.status || application.application_status === filters.status;
+
+    return matchesSearch && matchesStatus;
+  });
 }

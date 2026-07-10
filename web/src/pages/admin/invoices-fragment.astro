@@ -1,0 +1,27 @@
+---
+import AdminInvoiceManagement from "@/components/admin/AdminInvoiceManagement.astro";
+import { loadAdminInvoiceManagementData } from "@/lib/admin-dashboard/data";
+import {
+  parseAdminInvoiceFilters,
+  serializeAdminInvoiceFilters,
+} from "@/lib/admin-dashboard/invoice-filters";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const invoiceFilters = parseAdminInvoiceFilters(Astro.url);
+const invoiceFilterQuery = serializeAdminInvoiceFilters(invoiceFilters);
+const data = await loadAdminInvoiceManagementData(invoiceFilters);
+---
+
+<AdminInvoiceManagement
+  data={data}
+  activeFilters={invoiceFilters}
+  filterQuery={invoiceFilterQuery}
+/>

@@ -2,7 +2,14 @@
 import AdminAgentManagement from "@/components/admin/AdminAgentManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  loadAdminAgentManagementData,
+  loadAdminDashboardData,
+} from "@/lib/admin-dashboard/data";
+import {
+  parseAdminAgentFilters,
+  serializeAdminAgentFilters,
+} from "@/lib/admin-dashboard/agent-filters";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -13,7 +20,12 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
-const data = await loadAdminDashboardData();
+const agentFilters = parseAdminAgentFilters(Astro.url);
+const agentFilterQuery = serializeAdminAgentFilters(agentFilters);
+const [dashboardData, data] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminAgentManagementData(agentFilters),
+]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
@@ -23,7 +35,11 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Agent Management"
   intro="Create agent auth accounts and manage agent profile status."
   feedback={feedback}
-  dashboardData={data}
+  dashboardData={dashboardData}
 >
-  <AdminAgentManagement data={data} />
+  <AdminAgentManagement
+    data={data}
+    activeFilters={agentFilters}
+    filterQuery={agentFilterQuery}
+  />
 </AdminPageFrame>
