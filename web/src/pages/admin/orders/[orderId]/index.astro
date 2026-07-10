@@ -40,7 +40,14 @@ const commissionStatuses = getCommissionStatuses();
 const allowedStatuses = getAllowedNextOrderStatuses(order.order_status);
 const canManageCommissions = canManageOrderCommissions(order);
 const invoice = order.invoice[0];
-const feedback = formatAdminActionFeedback(Astro.url);
+const rawFeedback = formatAdminActionFeedback(Astro.url);
+const feedback =
+  rawFeedback.status === "Order marked as read."
+    ? {
+        ...rawFeedback,
+        status: undefined,
+      }
+    : rawFeedback;
 ---
 
 <AdminPageFrame

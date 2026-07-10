@@ -700,15 +700,9 @@ function formatStockStatus(status: string): string {
                           ))}
                         </select>
                       </label>
-                      <label class="checkbox-row">
-                        <input
-                          type="checkbox"
-                          name="isActive"
-                          checked={product.is_active}
-                        />
-                        Active
-                      </label>
-                      <input type="hidden" name="isActive" value="" />
+                      {product.is_active && (
+                        <input type="hidden" name="isActive" value="on" />
+                      )}
 
                       <input type="hidden" name="name" value={product.name} />
                       <input

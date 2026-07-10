@@ -182,22 +182,37 @@ const skeletonRows = Array.from({ length: 6 });
                   </div>
                 </td>
                 <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                  <form method="post" style="margin: 0; width: 100%;">
-                    <input type="hidden" name="action" value="update-agent" />
-                    <input type="hidden" name="agentId" value={agent.id} />
-                    <input type="hidden" name="displayName" value={agent.display_name} />
-                    <input type="hidden" name="email" value={agent.email ?? ""} />
-                    <input type="hidden" name="contact" value={agent.contact ?? ""} />
-                    <select
-                      name="status"
-                      onchange="this.closest('form').submit()"
-                      style="padding: 0.25rem 0.5rem; font-size: 0.9rem; border-radius: 0.375rem; border: 1px solid #d1d5db; background-color: #ffffff; cursor: pointer; width: 100%;"
-                    >
-                      {agentStatuses.map((status) => (
-                        <option value={status} selected={selected(agent.status, status)}>{autoCapitalize(status)}</option>
-                      ))}
-                    </select>
-                  </form>
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Status: ${agent.display_name}`}
+                    style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;"
+                  >
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
+                      {autoCapitalize(agent.status)}
+                    </span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="update-agent" />
+                      <input type="hidden" name="agentId" value={agent.id} />
+                      <input type="hidden" name="displayName" value={agent.display_name} />
+                      <input type="hidden" name="email" value={agent.email ?? ""} />
+                      <input type="hidden" name="contact" value={agent.contact ?? ""} />
+                      <label>
+                        <span>Status</span>
+                        <select name="status" required>
+                          {agentStatuses.map((status) => (
+                            <option value={status} selected={selected(agent.status, status)}>
+                              {autoCapitalize(status)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button type="submit">Save status</button>
+                    </form>
+                  </div>
                 </td>
                 <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(agent.created_at)}</td>
                 <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;"><ViewButton href={`/admin/agents/${agent.id}`} /></td>
