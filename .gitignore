@@ -145,6 +145,7 @@ vite.config.ts.timestamp-*
 # Agentic Configuration
 .agents
 .codex
+.cursor
 .claude
 .gemini
 contexts
