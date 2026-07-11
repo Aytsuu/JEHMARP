@@ -331,6 +331,18 @@ Vercel production deployment is already automated through commit tracking, so th
 
 Use a GitHub environment named `production` for the deployment job. Enable required reviewers for that environment if migrations should require manual approval before production changes.
 
+## Supabase CLI Version
+
+Use `supabase/setup-cli@v3` and pin the CLI version to the version used by local development:
+
+```yaml
+- uses: supabase/setup-cli@v3
+  with:
+    version: 2.101.0
+```
+
+This project uses newer `supabase/config.toml` keys such as `auth.oauth_server`, `auth.web3`, `storage.vector`, `storage.analytics`, `storage.s3_protocol`, `db.health_timeout`, `db.network_restrictions`, and `db.migrations.enabled`. Older Supabase CLI versions fail before `supabase link` with config parse errors. If the local CLI is upgraded and `config.toml` changes, update the workflow pin in the same PR.
+
 ## Pull Request Validation
 
 Trigger:
@@ -489,7 +501,9 @@ jobs:
         run: npm run build
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.101.0
 
       - name: Start local Supabase
         run: supabase start
@@ -552,7 +566,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.101.0
 
       - name: Link production Supabase project
         run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "$SUPABASE_DB_PASSWORD"

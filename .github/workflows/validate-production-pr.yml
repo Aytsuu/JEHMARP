@@ -65,7 +65,12 @@ jobs:
         run: npm run build
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.101.0
+
+      - name: Show Supabase CLI version
+        run: supabase --version
 
       - name: Start local Supabase
         run: supabase start
