@@ -12,7 +12,7 @@ export async function getSignedInUser(context: RequestContext) {
   const { data, error } = await supabase.auth.getUser();
 
   if (error) {
-    if (isMissingSessionError(error)) {
+    if (isRecoverableSessionError(error)) {
       return null;
     }
 
@@ -80,10 +80,23 @@ export function getLoginErrorMessage(value: string | null) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-function isMissingSessionError(error: { name?: string; message?: string; status?: number }) {
+function isRecoverableSessionError(error: {
+  code?: string;
+  name?: string;
+  message?: string;
+  status?: number;
+}) {
+  const message = typeof error.message === "string" ? error.message.toLowerCase() : "";
+
   return (
     error.name === "AuthSessionMissingError"
     || error.status === 400
-    || (typeof error.message === "string" && error.message.toLowerCase().includes("session"))
+    || error.status === 401
+    || error.code === "session_not_found"
+    || message.includes("session")
+    || message.includes("jwt")
+    || message.includes("token")
+    || message.includes("refresh token")
+    || message.includes("invalid claim")
   );
 }

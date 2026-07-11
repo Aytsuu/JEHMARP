@@ -83,8 +83,38 @@
     @apply cursor-not-allowed opacity-60;
   }
 
+  button.form-submit-button--loading {
+    position: relative;
+    color: transparent !important;
+  }
+
+  button.form-submit-button--loading svg {
+    opacity: 0;
+  }
+
+  button.form-submit-button--loading::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1rem;
+    height: 1rem;
+    margin-top: -0.5rem;
+    margin-left: -0.5rem;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #ffffff;
+    border-radius: 999px;
+    animation: button-submit-spinner 0.7s linear infinite;
+  }
+
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-gray-900;
+  }
+}
+
+@keyframes button-submit-spinner {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -1865,7 +1895,7 @@
 
   .products-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    grid-template-columns: repeat(1, minmax(0, 1fr));
     gap: 2rem;
   }
 
@@ -1876,6 +1906,22 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
+  }
+
+  @media (min-width: 40rem) {
+    .products-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 80rem) {
+    .products-grid {
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+    }
+
+    .products-grid .product-card {
+      grid-column: span 4 / span 4;
+    }
   }
 
   .product-card__image-container {
@@ -3233,6 +3279,23 @@
 
   .order-create-form__existing-customer-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  .order-create-form__existing-customer-notice {
+    margin: 0 0 0.6rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid rgba(196, 39, 54, 0.2);
+    border-radius: 0.75rem;
+    background: rgba(196, 39, 54, 0.08);
+    color: rgba(120, 18, 28, 0.92);
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .order-create-form__existing-customer-notice[data-notice-kind="partial"] {
+    border-color: rgba(184, 120, 19, 0.24);
+    background: rgba(184, 120, 19, 0.08);
+    color: rgba(112, 70, 0, 0.92);
   }
 
   .order-create-form__name-row {

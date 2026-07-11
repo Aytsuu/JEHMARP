@@ -68,7 +68,7 @@ begin
     partial_quantity,
     final_quantity,
     agent_commission_amount,
-    agent_commission_status
+    agent_commission_paid
   )
   values (
     test_order_id,
@@ -76,7 +76,7 @@ begin
     2,
     999,
     80,
-    'set'
+    false
   )
   returning id into test_item_id;
 

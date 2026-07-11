@@ -45,7 +45,7 @@ function createOrder(overrides: Partial<AgentOrder> = {}): AgentOrder {
         price_type: "retail",
         add_details: null,
         agent_commission_amount: 80,
-        agent_commission_status: "set",
+        agent_commission_paid: false,
         agent_commission_notes: null,
         product: {
           id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -63,7 +63,7 @@ function createOrder(overrides: Partial<AgentOrder> = {}): AgentOrder {
         price_type: "retail",
         add_details: "Packed separately",
         agent_commission_amount: 20,
-        agent_commission_status: "paid",
+        agent_commission_paid: true,
         agent_commission_notes: null,
         product: {
           id: "9ad456ad-1d2e-41b2-b297-8ddf6304ece0",

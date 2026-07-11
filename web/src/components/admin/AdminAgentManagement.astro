@@ -63,7 +63,7 @@ const skeletonRows = Array.from({ length: 6 });
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
-            placeholder="Search agent name, email, or contact..."
+            placeholder="Search agent name or email..."
             autocomplete="off"
             data-agent-search-input
           />
@@ -113,17 +113,16 @@ const skeletonRows = Array.from({ length: 6 });
           <thead>
             <tr>
               <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Agent</th>
-              <th scope="col" style="width: 22%; padding: 1.1rem 0.75rem;">Email</th>
-              <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Contact</th>
+              <th scope="col" style="width: 30%; padding: 1.1rem 0.75rem;">Email</th>
               <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Status</th>
               <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Date Created</th>
-              <th scope="col" style="width: 12%; padding: 1.1rem 0.75rem;">Action</th>
+              <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Action</th>
             </tr>
           </thead>
           <tbody>
             {data.agents.length === 0 ? (
               <tr class="empty-row">
-                <td colspan="6" class="empty-state">No agents match the selected filters.</td>
+                <td colspan="5" class="empty-state">No agents match the selected filters.</td>
               </tr>
             ) : data.agents.map((agent) => (
               <tr data-status={agent.status}>
@@ -138,48 +137,15 @@ const skeletonRows = Array.from({ length: 6 });
                       <input type="hidden" name="action" value="update-agent" />
                       <input type="hidden" name="agentId" value={agent.id} />
                       <input type="hidden" name="status" value={agent.status} />
-                      <input type="hidden" name="email" value={agent.email ?? ""} />
-                      <input type="hidden" name="contact" value={agent.contact ?? ""} />
                       <label><span>Display name</span><input name="displayName" value={agent.display_name} required /></label>
                       <button type="submit">Save</button>
                     </form>
                   </div>
                 </td>
-                <td style="width: 22%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  <button type="button" class="table-cell-trigger" data-open-cell-popover data-popover-title={`Edit Email: ${agent.display_name}`} style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;">
-                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
-                      {agent.email ?? "No email"}
-                    </span>
-                  </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
-                      <input type="hidden" name="action" value="update-agent" />
-                      <input type="hidden" name="agentId" value={agent.id} />
-                      <input type="hidden" name="displayName" value={agent.display_name} />
-                      <input type="hidden" name="status" value={agent.status} />
-                      <input type="hidden" name="contact" value={agent.contact ?? ""} />
-                      <label><span>Email</span><input name="email" type="email" value={agent.email ?? ""} /></label>
-                      <button type="submit">Save</button>
-                    </form>
-                  </div>
-                </td>
-                <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  <button type="button" class="table-cell-trigger" data-open-cell-popover data-popover-title={`Edit Contact: ${agent.display_name}`} style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;">
-                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
-                      {agent.contact ?? "No contact"}
-                    </span>
-                  </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
-                      <input type="hidden" name="action" value="update-agent" />
-                      <input type="hidden" name="agentId" value={agent.id} />
-                      <input type="hidden" name="displayName" value={agent.display_name} />
-                      <input type="hidden" name="status" value={agent.status} />
-                      <input type="hidden" name="email" value={agent.email ?? ""} />
-                      <label><span>Contact</span><input name="contact" value={agent.contact ?? ""} /></label>
-                      <button type="submit">Save</button>
-                    </form>
-                  </div>
+                <td style="width: 30%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
+                    {agent.email ?? "No email"}
+                  </span>
                 </td>
                 <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                   <button
@@ -198,8 +164,6 @@ const skeletonRows = Array.from({ length: 6 });
                       <input type="hidden" name="action" value="update-agent" />
                       <input type="hidden" name="agentId" value={agent.id} />
                       <input type="hidden" name="displayName" value={agent.display_name} />
-                      <input type="hidden" name="email" value={agent.email ?? ""} />
-                      <input type="hidden" name="contact" value={agent.contact ?? ""} />
                       <label>
                         <span>Status</span>
                         <select name="status" required>
@@ -215,7 +179,7 @@ const skeletonRows = Array.from({ length: 6 });
                   </div>
                 </td>
                 <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(agent.created_at)}</td>
-                <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;"><ViewButton href={`/admin/agents/${agent.id}`} /></td>
+                <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle;"><ViewButton href={`/admin/agents/${agent.id}`} /></td>
               </tr>
             ))}
           </tbody>
@@ -237,8 +201,8 @@ const skeletonRows = Array.from({ length: 6 });
     <div class="table-wrap" aria-busy="true" aria-live="polite">
       <table class="product-table-skeleton" style="table-layout: fixed; width: 100%;">
         <caption class="sr-only">Loading filtered agents</caption>
-        <thead><tr><th scope="col">Agent</th><th scope="col">Email</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Date Created</th><th scope="col">Action</th></tr></thead>
-        <tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody>
+        <thead><tr><th scope="col">Agent</th><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Date Created</th><th scope="col">Action</th></tr></thead>
+        <tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody>
       </table>
     </div>
   </template>

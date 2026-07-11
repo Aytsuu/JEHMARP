@@ -11,7 +11,6 @@ const productCategories = ["pork", "chicken", "egg"] as const;
 const productUnitLabels = ["kg", "tray"] as const;
 const stockStatuses = ["in_stock", "limited", "out_of_stock"] as const;
 const orderStatuses = ["pending", "processing", "closed"] as const;
-const commissionStatuses = ["unset", "set", "cancelled", "paid"] as const;
 const inquiryStatuses = ["new", "reviewing", "responded", "closed", "spam"] as const;
 const resellerApplicationStatuses = ["submitted", "contacted", "closed"] as const;
 
@@ -20,7 +19,6 @@ export type ProductCategory = (typeof productCategories)[number];
 export type ProductUnitLabel = (typeof productUnitLabels)[number];
 export type StockStatus = (typeof stockStatuses)[number];
 export type OrderStatus = (typeof orderStatuses)[number];
-export type CommissionStatus = (typeof commissionStatuses)[number];
 export type InvoiceStatus = "draft" | "issued" | "partially_paid" | "paid";
 export type InquiryStatus = (typeof inquiryStatuses)[number];
 export type ResellerApplicationStatus = (typeof resellerApplicationStatuses)[number];
@@ -115,8 +113,6 @@ export type AdminAction =
       payload: {
         display_name: string;
         status: "active" | "inactive" | "suspended";
-        email?: string | null;
-        contact?: string | null;
         updated_at: string;
       };
     }
@@ -174,7 +170,7 @@ export type AdminAction =
       orderItemId: string;
       payload: {
         agent_commission_amount: number;
-        agent_commission_status: CommissionStatus;
+        agent_commission_paid: boolean;
         agent_commission_set_by: string | null;
         agent_commission_set_at: string | null;
         agent_commission_notes: string | null;
@@ -355,15 +351,18 @@ export async function executeAdminAction(
       await markAdminRecordRead(supabase, "customer_order", action.orderId, adminReadPayload(adminUserId));
       return;
     case "update-commission":
+      await assertOrderItemCommissionPayable(supabase, action.orderItemId, action.payload.agent_commission_paid);
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
     case "update-invoice-item-quantity":
+      await assertOrderItemInvoiceQuantityEditable(supabase, action.orderItemId);
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
     case "update-order-item-quantity":
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
     case "record-payment":
+      await assertOrderHasSalesInvoice(supabase, action.payload.order_id);
       await executeTableInsert(supabase, "payment", action.payload);
       await markAdminRecordRead(supabase, "customer_order", action.payload.order_id, adminReadPayload(action.payload.recorded_by));
       return;
@@ -436,10 +435,6 @@ export function getStockStatuses() {
 
 export function getOrderStatuses() {
   return [...orderStatuses];
-}
-
-export function getCommissionStatuses() {
-  return [...commissionStatuses];
 }
 
 export function getInquiryStatuses() {
@@ -526,8 +521,6 @@ function parseAdminActionFormDataOrThrow(
         payload: {
           display_name: requiredString(formData, "displayName"),
           status: enumValue(formData, "status", ["active", "inactive", "suspended"] as const),
-          email: optionalString(formData, "email"),
-          contact: optionalString(formData, "contact"),
           updated_at: new Date().toISOString(),
         },
       });
@@ -584,21 +577,22 @@ function parseAdminActionFormDataOrThrow(
         returnTo: optionalAdminReturnPath(formData, "returnTo"),
       });
     case "update-commission": {
-      const status = enumValue(formData, "status", commissionStatuses);
+      const amount = nonNegativeNumber(formData, "amount");
+      const isPaid = formData.get("isPaid") === "on";
       return success({
         type: "update-commission",
         orderItemId: uuidSchema.parse(requiredString(formData, "orderItemId")),
-        payload: status === "unset"
+        payload: amount <= 0
           ? {
               agent_commission_amount: 0,
-              agent_commission_status: status,
+              agent_commission_paid: false,
               agent_commission_set_by: null,
               agent_commission_set_at: null,
               agent_commission_notes: null,
             }
           : {
-              agent_commission_amount: nonNegativeNumber(formData, "amount"),
-              agent_commission_status: status,
+              agent_commission_amount: amount,
+              agent_commission_paid: isPaid,
               agent_commission_set_by: adminUserId,
               agent_commission_set_at: new Date().toISOString(),
               agent_commission_notes: optionalString(formData, "notes"),
@@ -901,6 +895,154 @@ async function assertOrderCanGenerateInvoice(
   if (!data || data.order_status !== "processing") {
     throw new Error("Only processing orders can generate a sales invoice.");
   }
+}
+
+async function assertOrderHasSalesInvoice(
+  supabase: SupabaseServerClient,
+  orderId: string,
+) {
+  const { data, error } = await supabase
+    .from("invoice")
+    .select("id")
+    .eq("order_id", orderId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to verify sales invoice before recording payment.");
+  }
+
+  if (!data?.id) {
+    throw new Error("Create a sales invoice before recording a payment.");
+  }
+}
+
+async function assertOrderItemInvoiceQuantityEditable(
+  supabase: SupabaseServerClient,
+  orderItemId: string,
+) {
+  const { data: orderItem, error: orderItemError } = await supabase
+    .from("customer_order_item")
+    .select("order_id")
+    .eq("id", orderItemId)
+    .maybeSingle();
+
+  if (orderItemError) {
+    throw new Error("Unable to verify invoice quantity update.");
+  }
+
+  const orderId = typeof orderItem?.order_id === "string" ? orderItem.order_id : null;
+
+  if (!orderId) {
+    throw new Error("Order item was not found.");
+  }
+
+  const { data: payment, error: paymentError } = await supabase
+    .from("payment")
+    .select("id")
+    .eq("order_id", orderId)
+    .limit(1)
+    .maybeSingle();
+
+  if (paymentError) {
+    throw new Error("Unable to verify existing payments before updating invoice quantity.");
+  }
+
+  if (payment?.id) {
+    throw new Error("Invoice quantities cannot be edited after a payment record has been created.");
+  }
+}
+
+async function assertOrderItemCommissionPayable(
+  supabase: SupabaseServerClient,
+  orderItemId: string,
+  isPaid: boolean,
+) {
+  if (!isPaid) {
+    return;
+  }
+
+  const { data: orderItem, error: orderItemError } = await supabase
+    .from("customer_order_item")
+    .select("id, order_id, final_quantity, unit_price, agent_commission_paid")
+    .eq("id", orderItemId)
+    .maybeSingle();
+
+  if (orderItemError) {
+    throw new Error("Unable to verify commission payment status.");
+  }
+
+  const orderId = typeof orderItem?.order_id === "string" ? orderItem.order_id : null;
+
+  if (!orderId) {
+    throw new Error("Order item was not found.");
+  }
+
+  const { data: payments, error: paymentError } = await supabase
+    .from("payment")
+    .select("amount")
+    .eq("order_id", orderId);
+
+  if (paymentError) {
+    throw new Error("Unable to verify payment records before updating commission.");
+  }
+
+  const paymentTotal = (payments ?? []).reduce((total, payment) => {
+    const amount = Number((payment as { amount?: unknown }).amount);
+    return total + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+
+  if (paymentTotal <= 0) {
+    throw new Error("Record a payment before marking commission as paid.");
+  }
+
+  const { data: orderItems, error: orderItemsError } = await supabase
+    .from("customer_order_item")
+    .select("id, final_quantity, unit_price, agent_commission_paid")
+    .eq("order_id", orderId);
+
+  if (orderItemsError) {
+    throw new Error("Unable to verify commission payment coverage.");
+  }
+
+  const currentItemTotal = roundCurrency(
+    Number(orderItem.final_quantity ?? 0) * Number(orderItem.unit_price ?? 0),
+  );
+  const paidCommissionCoverage = (orderItems ?? []).reduce((total, item) => {
+    const normalizedItem = item as {
+      id?: unknown;
+      final_quantity?: unknown;
+      unit_price?: unknown;
+      agent_commission_paid?: unknown;
+    };
+
+    if (typeof normalizedItem.id !== "string" || normalizedItem.id === orderItemId) {
+      return total;
+    }
+
+    if (normalizedItem.agent_commission_paid !== true) {
+      return total;
+    }
+
+    const quantity = Number(normalizedItem.final_quantity);
+    const unitPrice = Number(normalizedItem.unit_price);
+
+    if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
+      return total;
+    }
+
+    return total + roundCurrency(quantity * unitPrice);
+  }, 0);
+
+  const availableCoverage = roundCurrency(paymentTotal - paidCommissionCoverage);
+
+  if (currentItemTotal > availableCoverage) {
+    throw new Error("This commission cannot be marked as paid because recorded payments do not cover the item total.");
+  }
+}
+
+function roundCurrency(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function toCustomerUpdatePayload(payload: CustomerFormPayload) {

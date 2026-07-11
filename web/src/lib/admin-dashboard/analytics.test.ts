@@ -70,7 +70,7 @@ describe("buildAdminAnalytics", () => {
         createdAt: "2026-07-04T11:00:00.000Z",
         paymentAmounts: [],
         items: [
-          item("product-pork", "Pork Belly", "pork", 1, 500, 0, "unset"),
+          item("product-pork", "Pork Belly", "pork", 1, 500, 0, false),
         ],
       }),
     ];
@@ -125,8 +125,8 @@ function createAnalyticsData(): AdminDashboardData {
         createdAt: "2026-07-04T09:00:00.000Z",
         paymentAmounts: [110],
         items: [
-          item("product-chicken", "Chicken Thigh", "chicken", 2, 90, 60, "set"),
-          item("product-pork", "Pork Belly", "pork", 1, 20, 10, "set"),
+          item("product-chicken", "Chicken Thigh", "chicken", 2, 90, 60, false),
+          item("product-pork", "Pork Belly", "pork", 1, 20, 10, false),
         ],
       }),
       order({
@@ -137,8 +137,8 @@ function createAnalyticsData(): AdminDashboardData {
         createdAt: "2026-07-03T10:00:00.000Z",
         paymentAmounts: [120],
         items: [
-          item("product-chicken", "Chicken Thigh", "chicken", 1, 90, 50, "paid"),
-          item("product-pork", "Pork Belly", "pork", 1, 30, 0, "unset"),
+          item("product-chicken", "Chicken Thigh", "chicken", 1, 90, 50, true),
+          item("product-pork", "Pork Belly", "pork", 1, 30, 0, false),
         ],
       }),
       order({
@@ -149,7 +149,7 @@ function createAnalyticsData(): AdminDashboardData {
         createdAt: "2026-06-28T11:00:00.000Z",
         paymentAmounts: [80],
         items: [
-          item("product-pork", "Pork Belly", "pork", 1, 80, 0, "unset"),
+          item("product-pork", "Pork Belly", "pork", 1, 80, 0, false),
         ],
       }),
     ],
@@ -279,7 +279,7 @@ function item(
   quantity: number,
   unitPrice: number,
   commissionAmount: number,
-  commissionStatus: "unset" | "set" | "paid",
+  commissionPaid: boolean,
 ): AdminOrderItem {
   return {
     id: `${productId}-${unitPrice}`,
@@ -290,7 +290,7 @@ function item(
     price_type: "retail" as const,
     add_details: null,
     agent_commission_amount: commissionAmount,
-    agent_commission_status: commissionStatus,
+    agent_commission_paid: commissionPaid,
     agent_commission_notes: null,
     product: {
       id: productId,

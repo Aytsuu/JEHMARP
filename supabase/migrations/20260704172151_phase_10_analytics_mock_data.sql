@@ -266,7 +266,7 @@ begin
       '20202020-0000-4000-8000-000000000003',
       null,
       'guest_shop',
-      'pending',
+      'submitted',
       'unpaid',
       null,
       null,

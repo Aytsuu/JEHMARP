@@ -23,9 +23,24 @@ type Props = {
 const { data, activeFilters, filterQuery } = Astro.props;
 const activeProducts = data.products.filter((product) => product.is_active);
 const canCreateOrder = activeProducts.length > 0;
+const customerPaymentNoticeMap = new Map<string, "unpaid" | "partial">();
+
+for (const order of data.orders) {
+  if (!order.customer_id) continue;
+  if (customerPaymentNoticeMap.get(order.customer_id) === "unpaid") continue;
+  if (order.payment_status === "unpaid") {
+    customerPaymentNoticeMap.set(order.customer_id, "unpaid");
+    continue;
+  }
+  if (order.payment_status === "partial") {
+    customerPaymentNoticeMap.set(order.customer_id, "partial");
+  }
+}
+
 const customerOptions = data.customers.map((customer) => ({
   customer,
   label: `${fullName(customer)} - ${customer.phone_number}`,
+  paymentNotice: customerPaymentNoticeMap.get(customer.id) ?? "",
 }));
 const orderStatuses = getOrderStatuses();
 const hasActiveFilters = filterQuery.length > 0;
@@ -69,6 +84,11 @@ const activeMaxTotal = Math.min(
           <div class="admin-form-grid order-create-form__existing-customer-grid">
             <label class="field-row">
               <span>Search customer</span>
+              <p
+                class="order-create-form__existing-customer-notice"
+                hidden
+                data-customer-order-notice
+              ></p>
               <div class="order-customer-picker" data-customer-picker>
                 <input
                   name="customerLookup"
@@ -110,7 +130,7 @@ const activeMaxTotal = Math.min(
             </label>
           </div>
           <template data-customer-option-template>
-            {customerOptions.map(({ customer, label }) => (
+            {customerOptions.map(({ customer, label, paymentNotice }) => (
               <button
                 type="button"
                 class="order-customer-picker__option"
@@ -123,6 +143,7 @@ const activeMaxTotal = Math.min(
                 data-customer-address={customer.address}
                 data-customer-assigned-agent-id={customer.assigned_agent_id ?? ""}
                 data-customer-is-reseller={String(customer.is_reseller)}
+                data-customer-payment-notice={paymentNotice}
               >
                 <span class="order-customer-picker__option-title">{label}</span>
                 <span class="order-customer-picker__option-meta">
@@ -574,6 +595,7 @@ const activeMaxTotal = Math.min(
     const customerOptionsContainer = form.querySelector<HTMLElement>("[data-customer-options]");
     const customerOptionsEmpty = form.querySelector<HTMLElement>("[data-customer-options-empty]");
     const customerOptionTemplate = form.querySelector<HTMLTemplateElement>("[data-customer-option-template]");
+    const customerOrderNotice = form.querySelector<HTMLElement>("[data-customer-order-notice]");
     const newCustomerFields = form.querySelector<HTMLElement>("[data-new-customer-fields]");
     const firstNameInput = form.querySelector<HTMLInputElement>("input[data-customer-first-name]");
     const lastNameInput = form.querySelector<HTMLInputElement>("input[data-customer-last-name]");
@@ -671,6 +693,29 @@ const activeMaxTotal = Math.min(
       if (isResellerCheckbox) isResellerCheckbox.checked = customer?.dataset.customerIsReseller === "true";
     }
 
+    function updateCustomerOrderNotice(customer: HTMLElement | undefined) {
+      if (!customerOrderNotice) return;
+
+      const paymentNotice = customer?.dataset.customerPaymentNotice;
+      if (paymentNotice === "unpaid") {
+        customerOrderNotice.textContent = "This customer currently has an unpaid order.";
+        customerOrderNotice.dataset.noticeKind = "unpaid";
+        customerOrderNotice.hidden = false;
+        return;
+      }
+
+      if (paymentNotice === "partial") {
+        customerOrderNotice.textContent = "This customer currently has a partially paid order.";
+        customerOrderNotice.dataset.noticeKind = "partial";
+        customerOrderNotice.hidden = false;
+        return;
+      }
+
+      customerOrderNotice.textContent = "";
+      customerOrderNotice.hidden = true;
+      delete customerOrderNotice.dataset.noticeKind;
+    }
+
     function refreshCustomerMode() {
       const selectedCustomer = getRenderedCustomerOptions().find(
         (option) => option.dataset.customerLabel === customerSearch?.value,
@@ -682,6 +727,7 @@ const activeMaxTotal = Math.min(
       }
 
       fillCustomerFields(selectedCustomer);
+      updateCustomerOrderNotice(selectedCustomer);
 
       const fields = newCustomerFields?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
         "input, select, textarea",

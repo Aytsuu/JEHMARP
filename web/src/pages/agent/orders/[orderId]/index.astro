@@ -161,7 +161,7 @@ const feedback = formatAgentActionFeedback(Astro.url);
                 <td style="vertical-align: middle;">
                   {item.partial_quantity}
                 </td>
-                <td style="vertical-align: middle;">{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_status}</td>
+                <td style="vertical-align: middle;">{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_paid ? "Paid" : "Unpaid"}</td>
               </tr>
             ))}
           </tbody>

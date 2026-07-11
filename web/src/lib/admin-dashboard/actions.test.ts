@@ -271,7 +271,7 @@ describe("parseAdminActionFormData", () => {
     formData.set("action", "update-commission");
     formData.set("orderItemId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
     formData.set("amount", "125.25");
-    formData.set("status", "set");
+    formData.set("isPaid", "on");
     formData.set("notes", "Reviewed");
 
     const result = parseAdminActionFormData(formData, adminUserId);
@@ -287,19 +287,18 @@ describe("parseAdminActionFormData", () => {
           agent_commission_amount: 125.25,
           agent_commission_notes: "Reviewed",
           agent_commission_set_by: adminUserId,
-          agent_commission_status: "set",
+          agent_commission_paid: true,
         },
       });
       expect(result.action.payload.agent_commission_set_at).toEqual(expect.any(String));
     }
   });
 
-  it("clears commission audit fields when commission status is unset", () => {
+  it("clears commission audit fields when commission amount is zero", () => {
     const formData = new FormData();
     formData.set("action", "update-commission");
     formData.set("orderItemId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
-    formData.set("amount", "125.25");
-    formData.set("status", "unset");
+    formData.set("amount", "0");
     formData.set("notes", "Remove commission");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
@@ -312,7 +311,7 @@ describe("parseAdminActionFormData", () => {
           agent_commission_notes: null,
           agent_commission_set_at: null,
           agent_commission_set_by: null,
-          agent_commission_status: "unset",
+          agent_commission_paid: false,
         },
       },
     });
@@ -612,6 +611,134 @@ describe("executeAdminAction", () => {
     expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
       customer_id: customerId,
     }));
+  });
+
+  it("blocks marking a commission as paid when no payment record exists", async () => {
+    const customerOrderItemMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        id: "45e73d23-f25f-4de7-ae3a-ebcf34e995f1",
+        order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        final_quantity: 2,
+        unit_price: 100,
+        agent_commission_paid: false,
+      },
+      error: null,
+    }));
+    const customerOrderItemEq = vi.fn((field: string, value: string) => {
+      if (field === "id" && value === "45e73d23-f25f-4de7-ae3a-ebcf34e995f1") {
+        return { maybeSingle: customerOrderItemMaybeSingle };
+      }
+
+      if (field === "order_id" && value === "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb") {
+        return Promise.resolve({
+          data: [
+            {
+              id: "45e73d23-f25f-4de7-ae3a-ebcf34e995f1",
+              final_quantity: 2,
+              unit_price: 100,
+              agent_commission_paid: false,
+            },
+          ],
+          error: null,
+        });
+      }
+
+      throw new Error(`Unexpected eq on customer_order_item: ${field}=${value}`);
+    });
+    const customerOrderItemSelect = vi.fn(() => ({ eq: customerOrderItemEq }));
+    const customerOrderItemUpdate = vi.fn(() => ({ eq: vi.fn() }));
+    const paymentEq = vi.fn(() => Promise.resolve({ data: [], error: null }));
+    const paymentSelect = vi.fn(() => ({ eq: paymentEq }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer_order_item") {
+        return { select: customerOrderItemSelect, update: customerOrderItemUpdate };
+      }
+
+      if (table === "payment") {
+        return { select: paymentSelect };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "update-commission",
+      orderItemId: "45e73d23-f25f-4de7-ae3a-ebcf34e995f1",
+      payload: {
+        agent_commission_amount: 125.25,
+        agent_commission_paid: true,
+        agent_commission_set_by: adminUserId,
+        agent_commission_set_at: "2026-07-11T00:00:00.000Z",
+        agent_commission_notes: "Reviewed",
+      },
+    }, adminUserId)).rejects.toThrow("Record a payment before marking commission as paid.");
+
+    expect(customerOrderItemUpdate).not.toHaveBeenCalled();
+  });
+
+  it("blocks marking a commission as paid when recorded payments do not cover the item total", async () => {
+    const customerOrderItemMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        id: "item-2",
+        order_id: "order-1",
+        final_quantity: 3,
+        unit_price: 100,
+        agent_commission_paid: false,
+      },
+      error: null,
+    }));
+    const customerOrderItemEq = vi.fn((field: string, value: string) => {
+      if (field === "id" && value === "item-2") {
+        return { maybeSingle: customerOrderItemMaybeSingle };
+      }
+
+      if (field === "order_id" && value === "order-1") {
+        return Promise.resolve({
+          data: [
+            { id: "item-1", final_quantity: 2, unit_price: 100, agent_commission_paid: true },
+            { id: "item-2", final_quantity: 3, unit_price: 100, agent_commission_paid: false },
+          ],
+          error: null,
+        });
+      }
+
+      throw new Error(`Unexpected eq on customer_order_item: ${field}=${value}`);
+    });
+    const customerOrderItemSelect = vi.fn(() => ({ eq: customerOrderItemEq }));
+    const customerOrderItemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const customerOrderItemUpdate = vi.fn(() => ({ eq: customerOrderItemUpdateEq }));
+    const paymentEq = vi.fn(() => Promise.resolve({
+      data: [{ amount: 400 }],
+      error: null,
+    }));
+    const paymentSelect = vi.fn(() => ({ eq: paymentEq }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer_order_item") {
+        return { select: customerOrderItemSelect, update: customerOrderItemUpdate };
+      }
+
+      if (table === "payment") {
+        return { select: paymentSelect };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "update-commission",
+      orderItemId: "item-2",
+      payload: {
+        agent_commission_amount: 125.25,
+        agent_commission_paid: true,
+        agent_commission_set_by: adminUserId,
+        agent_commission_set_at: "2026-07-11T00:00:00.000Z",
+        agent_commission_notes: "Reviewed",
+      },
+    }, adminUserId)).rejects.toThrow(
+      "This commission cannot be marked as paid because recorded payments do not cover the item total.",
+    );
+
+    expect(customerOrderItemUpdateEq).not.toHaveBeenCalled();
   });
 });
 

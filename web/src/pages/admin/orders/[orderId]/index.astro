@@ -3,6 +3,7 @@ import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
   getAllowedNextOrderStatuses,
+  handleAdminDashboardAction,
 } from "@/lib/admin-dashboard/actions";
 import {
   loadAdminDashboardData,
@@ -38,6 +39,10 @@ if (!orderId) {
   return Astro.redirect("/admin/orders", 302);
 }
 
+if (Astro.request.method === "POST") {
+  return handleAdminDashboardAction(Astro, adminRoute.user.id, `/admin/orders/${orderId}`);
+}
+
 const [dashboardData, order] = await Promise.all([
   loadAdminDashboardData(),
   loadAdminOrder(orderId),
@@ -54,17 +59,28 @@ const feedback = rawFeedback.status === "Order marked as read."
 
 const invoice = order.invoice[0] ?? null;
 const hasSalesInvoice = Boolean(invoice);
+const hasPayments = order.payment.length > 0;
 const canGenerateInvoice = order.order_status === "processing";
-const hasCommissionTab = order.source === "agent_submitted" && Boolean(order.agent_id);
-const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
-const orderSlipPdfHref = `/admin/orders/${order.id}/order-slip.pdf`;
-const salesInvoicePdfHref = `/admin/orders/${order.id}/sales-invoice.pdf`;
 const invoiceTotal = orderTotal(order, "final_quantity");
 const paidTotal = orderPaymentTotal(order);
 const balance = orderBalance(order);
+const canCreatePaymentRecord = hasSalesInvoice && balance > 0;
+const canEditInvoiceQuantities = hasSalesInvoice && !hasPayments;
+const hasCommissionTab = Boolean(order.customer?.assigned_agent ?? order.agent);
+const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
+const orderSlipPdfHref = `/admin/orders/${order.id}/order-slip.pdf`;
+const salesInvoicePdfHref = `/admin/orders/${order.id}/sales-invoice.pdf`;
 const totalCommission = order.customer_order_item.reduce((total, item) => {
   return total + item.agent_commission_amount;
 }, 0);
+const totalPaidCommissionCoverage = order.customer_order_item.reduce((total, item) => {
+  if (!item.agent_commission_paid) {
+    return total;
+  }
+
+  return total + (item.final_quantity * item.unit_price);
+}, 0);
+const totalAvailableCommissionCoverage = Math.max(paidTotal - totalPaidCommissionCoverage, 0);
 const orderSlipLayout = buildOrderSlipLayout(order);
 const salesInvoiceLayout = buildSalesInvoiceLayout(order);
 const orderSlipGridTemplate = getDocumentColumnTemplate(orderSlipLayout.columns);
@@ -80,6 +96,31 @@ const orderStatusOptionLabel = (status: typeof availableStatuses[number]) => {
 
   return autoCapitalize(status);
 };
+
+const commissionItemTotal = (quantity: number, unitPrice: number) => quantity * unitPrice;
+const commissionCoverageRemaining = (itemId: string) => {
+  const paidCoverageExcludingCurrent = order.customer_order_item.reduce((total, item) => {
+    if (!item.agent_commission_paid || item.id === itemId) {
+      return total;
+    }
+
+    return total + commissionItemTotal(item.final_quantity, item.unit_price);
+  }, 0);
+
+  return Math.max(paidTotal - paidCoverageExcludingCurrent, 0);
+};
+const commissionItems = order.customer_order_item.map((item) => {
+  const itemTotalAmount = commissionItemTotal(item.final_quantity, item.unit_price);
+  const availableCoverageForItem = commissionCoverageRemaining(item.id);
+  const canMarkCommissionPaid = hasPayments && itemTotalAmount <= availableCoverageForItem;
+
+  return {
+    item,
+    itemTotalAmount,
+    availableCoverageForItem,
+    paidCheckboxDisabled: !item.agent_commission_paid && !canMarkCommissionPaid,
+  };
+});
 
 const timelineItems = [
   ...order.payment.map((payment) => ({
@@ -174,14 +215,14 @@ const timelineItems = [
 
           <div class="detail-group">
             <p class="detail-label">Agent</p>
-            <p class="detail-value">{order.agent?.display_name ?? "No assigned agent"}</p>
+            <p class="detail-value">{order.customer?.assigned_agent?.display_name ?? "No assigned agent"}</p>
           </div>
 
           <div class="detail-group">
             <p class="detail-label">Contact Information</p>
             <div class="detail-lines">
-              <p>{order.agent?.contact ?? "No contact number"}</p>
-              <p>{order.agent?.email ?? "No email address"}</p>
+              <p>{order.customer?.assigned_agent?.contact ?? "No contact number"}</p>
+              <p>{order.customer?.assigned_agent?.email ?? "No email address"}</p>
             </div>
           </div>
         </div>
@@ -317,7 +358,9 @@ const timelineItems = [
             <div>
               <h2>Sales Invoice</h2>
               <p>{hasSalesInvoice
-                ? "Manage invoice quantities and export the invoice."
+                ? canEditInvoiceQuantities
+                  ? "Manage invoice quantities and export the invoice."
+                  : "Invoice quantities are locked because payment records already exist."
                 : canGenerateInvoice
                   ? "No sales invoice has been created for this order yet."
                   : "Move this order to processing before creating a sales invoice."}</p>
@@ -377,9 +420,10 @@ const timelineItems = [
                         min="0.001"
                         step="0.001"
                         value={item.final_quantity}
+                        disabled={!canEditInvoiceQuantities}
                         required
                       />
-                      <button type="submit">Save</button>
+                      <button type="submit" disabled={!canEditInvoiceQuantities}>Save</button>
                     </form>
                     <span class="is-right">{salesInvoiceLayout.rows[index]?.cells[2] ?? ""}</span>
                     <span class="is-right">{salesInvoiceLayout.rows[index]?.cells[3] ?? ""}</span>
@@ -464,9 +508,10 @@ const timelineItems = [
                         min="0.001"
                         step="0.001"
                         value={item.final_quantity}
+                        disabled={!canEditInvoiceQuantities}
                         required
                       />
-                      <button type="submit">Save</button>
+                      <button type="submit" disabled={!canEditInvoiceQuantities}>Save</button>
                     </form>
                     <span>{formatCurrency(item.unit_price)}</span>
                     <span>{formatCurrency(item.final_quantity * item.unit_price)}</span>
@@ -493,55 +538,74 @@ const timelineItems = [
             <div class="panel-header">
               <div>
                 <h2>Commission</h2>
-                <p>Manage item-level commission values for the assigned agent.</p>
+                <p>Manage item-level commission values for the assigned agent. Paid commissions require recorded payments that cover each item total.</p>
               </div>
             </div>
 
-            <div class="metric-card">
-              <span>Total Commission</span>
-              <strong>{formatCurrency(totalCommission)}</strong>
+            <div class="metrics-grid">
+              <div class="metric-card">
+                <span>Total Commission</span>
+                <strong>{formatCurrency(totalCommission)}</strong>
+              </div>
+              <div class="metric-card">
+                <span>Payment Available For Paid Commissions</span>
+                <strong>{formatCurrency(totalAvailableCommissionCoverage)}</strong>
+              </div>
             </div>
 
             <div class="stack-list">
-              {order.customer_order_item.map((item) => (
-                <form method="post" class="stack-card">
-                  <input type="hidden" name="action" value="update-commission" />
-                  <input type="hidden" name="orderItemId" value={item.id} />
+              {commissionItems.map(({ item, itemTotalAmount, availableCoverageForItem, paidCheckboxDisabled }) => (
+                  <form method="post" class="stack-card">
+                    <input type="hidden" name="action" value="update-commission" />
+                    <input type="hidden" name="orderItemId" value={item.id} />
 
-                  <div class="stack-card-header">
-                    <div>
-                      <h3>{item.product?.name ?? "Missing product"}</h3>
-                      <p>{formatCurrency(item.unit_price)} x {item.final_quantity}</p>
+                    <div class="stack-card-header">
+                      <div>
+                        <h3>{item.product?.name ?? "Missing product"}</h3>
+                        <p>{formatCurrency(item.unit_price)} x {item.final_quantity}</p>
+                      </div>
+                      <span class="pill">
+                        {item.agent_commission_paid ? "Paid" : "Unpaid"}
+                      </span>
                     </div>
-                    <span class="pill">{autoCapitalize(item.agent_commission_status)}</span>
-                  </div>
 
-                  <div class="stack-card-grid">
-                    <label>
-                      <span>Commission</span>
-                      <input type="number" name="amount" min="0" step="0.01" value={item.agent_commission_amount} />
+                    <div class="stack-card-grid">
+                      <label>
+                        <span>Item Total</span>
+                        <input type="text" value={formatCurrency(itemTotalAmount)} readonly />
+                      </label>
+                      <label>
+                        <span>Commission</span>
+                        <input type="number" name="amount" min="0" step="0.01" value={item.agent_commission_amount} />
+                      </label>
+                      <label class="checkbox-row">
+                        <input
+                          type="checkbox"
+                          name="isPaid"
+                          checked={item.agent_commission_paid}
+                          disabled={paidCheckboxDisabled}
+                        />
+                        <span>Paid</span>
+                      </label>
+                    </div>
+
+                    {paidCheckboxDisabled && (
+                      <p class="commission-coverage-notice">
+                        {!hasPayments
+                          ? "Record a payment before marking this commission as paid."
+                          : `This item total of ${formatCurrency(itemTotalAmount)} exceeds the remaining paid coverage of ${formatCurrency(availableCoverageForItem)}.`}
+                      </p>
+                    )}
+
+                    <label class="stack-card-notes">
+                      <span>Notes</span>
+                      <textarea name="notes" rows="3">{item.agent_commission_notes ?? ""}</textarea>
                     </label>
-                    <label>
-                      <span>Status</span>
-                      <select name="status">
-                        {["unset", "set", "cancelled", "paid"].map((status) => (
-                          <option value={status} selected={status === item.agent_commission_status}>
-                            {autoCapitalize(status)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
 
-                  <label class="stack-card-notes">
-                    <span>Notes</span>
-                    <textarea name="notes" rows="3">{item.agent_commission_notes ?? ""}</textarea>
-                  </label>
-
-                  <div class="stack-card-actions">
-                    <button type="submit" class="primary-panel-button">Save Commission</button>
-                  </div>
-                </form>
+                    <div class="stack-card-actions">
+                      <button type="submit" class="primary-panel-button">Save Commission</button>
+                    </div>
+                  </form>
               ))}
             </div>
           </section>
@@ -551,9 +615,11 @@ const timelineItems = [
           <div class="panel-header">
             <div>
               <h2>Payment Record</h2>
-              <p>Track payments made against the invoice and remaining balance.</p>
+              <p>{hasSalesInvoice
+                ? "Track payments made against the invoice and remaining balance."
+                : "Create a sales invoice before recording any payment."}</p>
             </div>
-            <button type="button" class="primary-panel-button" data-toggle-payment-form disabled={balance <= 0}>
+            <button type="button" class="primary-panel-button" data-toggle-payment-form disabled={!canCreatePaymentRecord}>
               Create Payment Record
             </button>
           </div>
@@ -569,7 +635,7 @@ const timelineItems = [
             </div>
           </div>
 
-          <form method="post" class="payment-form" data-payment-form hidden>
+          <form method="post" class="payment-form" data-payment-form hidden={!canCreatePaymentRecord}>
             <input type="hidden" name="action" value="record-payment" />
             <input type="hidden" name="orderId" value={order.id} />
 

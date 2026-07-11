@@ -8,7 +8,6 @@ import type { AdminOrderFilters } from "./order-filters";
 import type { AdminProductFilters } from "./product-filters";
 import type { AdminResellerApplicationFilters } from "./reseller-application-filters";
 import type {
-  CommissionStatus,
   InquiryStatus,
   InvoiceStatus,
   OrderStatus,
@@ -39,13 +38,24 @@ const adminOrderSelect = `
     phone_number,
     email,
     address,
-    is_reseller
+    is_reseller,
+    assigned_agent_id,
+    assigned_agent:assigned_agent_id (
+      id,
+      user_id,
+      display_name,
+      status,
+      created_at,
+      updated_at
+    )
   ),
   agent:agent_id (
     id,
+    user_id,
     display_name,
-    email,
-    contact
+    status,
+    created_at,
+    updated_at
   ),
   customer_order_item (
     id,
@@ -56,7 +66,7 @@ const adminOrderSelect = `
     price_type,
     add_details,
     agent_commission_amount,
-    agent_commission_status,
+    agent_commission_paid,
     agent_commission_notes,
     product:product_id (
       id,
@@ -90,6 +100,19 @@ const adminOrderSelect = `
     to_status,
     changed_at,
     notes
+  )
+`;
+
+const adminOrderRangeSelect = `
+  id,
+  customer_order_item (
+    id,
+    partial_quantity,
+    final_quantity,
+    unit_price
+  ),
+  invoice (
+    id
   )
 `;
 
@@ -155,8 +178,10 @@ export type AdminCustomer = {
 
 export type AdminOrderCustomer = Pick<
   AdminCustomer,
-  "id" | "first_name" | "last_name" | "phone_number" | "email" | "address" | "is_reseller"
->;
+  "id" | "first_name" | "last_name" | "phone_number" | "email" | "address" | "is_reseller" | "assigned_agent_id"
+> & {
+  assigned_agent: Pick<AdminAgent, "id" | "display_name" | "email" | "contact"> | null;
+};
 
 export type AdminOrderItem = {
   id: string;
@@ -167,7 +192,7 @@ export type AdminOrderItem = {
   price_type: "retail" | "reseller";
   add_details: string | null;
   agent_commission_amount: number;
-  agent_commission_status: CommissionStatus;
+  agent_commission_paid: boolean;
   agent_commission_notes: string | null;
   product: Pick<AdminProduct, "id" | "name" | "unit_label" | "default_price"> | null;
 };
@@ -494,7 +519,12 @@ export async function loadAdminOrder(orderId: string): Promise<AdminOrder | null
 
   if (error) throw new Error("Unable to load admin order.");
 
-  return data ? normalizeAdminOrder(data) : null;
+  if (!data) {
+    return null;
+  }
+
+  const [order] = await enrichOrdersWithAgentEmails(supabase, [normalizeAdminOrder(data)]);
+  return order ?? null;
 }
 
 async function loadPages(supabase: SupabaseAdminClient) {
@@ -595,12 +625,24 @@ async function loadAgents(
 ) {
   const { data, error } = await supabase
     .from("agent_profile")
-    .select("id, user_id, display_name, status, email, contact, created_at, updated_at")
+    .select("id, user_id, display_name, status, created_at, updated_at")
     .order("display_name", { ascending: true });
 
   if (error) throw new Error("Unable to load admin agents.");
 
-  const agents = (data ?? []) as AdminAgent[];
+  const baseAgents = (data ?? []) as Array<
+    Omit<AdminAgent, "email" | "contact"> & { email?: never; contact?: never }
+  >;
+  const emailByUserId = await loadAuthEmailsByUserId(
+    supabase,
+    baseAgents.map((agent) => agent.user_id),
+  );
+
+  const agents = baseAgents.map((agent) => ({
+    ...agent,
+    email: emailByUserId.get(agent.user_id) ?? null,
+    contact: null,
+  })) as AdminAgent[];
 
   if (!filters.search && !filters.status) {
     return agents;
@@ -657,7 +699,7 @@ async function loadOrderTotalRange(
 ): Promise<AdminOrderTotalRange> {
   const { data, error } = await supabase
     .from("customer_order")
-    .select(adminOrderSelect);
+    .select(adminOrderRangeSelect);
 
   if (error) throw new Error("Unable to load admin order total range.");
 
@@ -684,7 +726,7 @@ async function loadInvoiceTotalRange(
 ): Promise<AdminInvoiceTotalRange> {
   const { data, error } = await supabase
     .from("customer_order")
-    .select(adminOrderSelect)
+    .select(adminOrderRangeSelect)
     .order("created_at", { ascending: false });
 
   if (error) throw new Error("Unable to load admin invoice total range.");
@@ -740,7 +782,10 @@ async function loadOrders(
 
   if (error) throw new Error("Unable to load admin orders.");
 
-  const orders = ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+  const orders = await enrichOrdersWithAgentEmails(
+    supabase,
+    ((data ?? []) as unknown[]).map(normalizeAdminOrder),
+  );
   const filteredOrders = shouldPostFilter
     ? filterAdminOrders(orders, filters)
     : orders;
@@ -795,7 +840,10 @@ async function loadInvoices(
 
   if (error) throw new Error("Unable to load admin invoices.");
 
-  const orders = ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+  const orders = await enrichOrdersWithAgentEmails(
+    supabase,
+    ((data ?? []) as unknown[]).map(normalizeAdminOrder),
+  );
 
   return filterAdminInvoices(orders, filters).slice(0, limit);
 }
@@ -937,6 +985,102 @@ function hasInvoice(order: AdminOrder) {
 function normalizeRelationArray<T>(value: T[] | T | null | undefined): T[] {
   if (Array.isArray(value)) return value;
   return value ? [value] : [];
+}
+
+async function enrichOrdersWithAgentEmails(
+  supabase: SupabaseAdminClient,
+  orders: AdminOrder[],
+): Promise<AdminOrder[]> {
+  const agentUserIds = orders
+    .flatMap((order) => [order.agent, order.customer?.assigned_agent ?? null])
+    .filter((agent): agent is NonNullable<AdminOrder["agent"]> & { user_id?: string } => Boolean(agent))
+    .map((agent) => agent.user_id)
+    .filter((userId): userId is string => typeof userId === "string" && userId.length > 0);
+
+  if (agentUserIds.length === 0) {
+    return orders.map((order) => ({
+      ...order,
+      agent: order.agent
+        ? {
+            id: order.agent.id,
+            display_name: order.agent.display_name,
+            email: order.agent.email ?? null,
+            contact: order.agent.contact ?? null,
+          }
+        : null,
+      customer: order.customer
+        ? {
+            ...order.customer,
+            assigned_agent: order.customer.assigned_agent
+              ? {
+                  id: order.customer.assigned_agent.id,
+                  display_name: order.customer.assigned_agent.display_name,
+                  email: order.customer.assigned_agent.email ?? null,
+                  contact: order.customer.assigned_agent.contact ?? null,
+                }
+              : null,
+          }
+        : null,
+    }));
+  }
+
+  const emailByUserId = await loadAuthEmailsByUserId(supabase, agentUserIds);
+
+  return orders.map((order) => ({
+    ...order,
+    agent: order.agent
+      ? {
+          id: order.agent.id,
+          display_name: order.agent.display_name,
+          email: emailByUserId.get((order.agent as { user_id?: string }).user_id ?? "") ?? null,
+          contact: null,
+        }
+      : null,
+    customer: order.customer
+      ? {
+          ...order.customer,
+          assigned_agent: order.customer.assigned_agent
+            ? {
+                id: order.customer.assigned_agent.id,
+                display_name: order.customer.assigned_agent.display_name,
+                email: emailByUserId.get(
+                  (order.customer.assigned_agent as { user_id?: string }).user_id ?? "",
+                ) ?? null,
+                contact: null,
+              }
+            : null,
+        }
+      : null,
+  }));
+}
+
+async function loadAuthEmailsByUserId(
+  supabase: SupabaseAdminClient,
+  userIds: string[],
+): Promise<Map<string, string | null>> {
+  const uniqueUserIds = [...new Set(userIds)];
+  const emailByUserId = new Map<string, string | null>();
+
+  if (uniqueUserIds.length === 0) {
+    return emailByUserId;
+  }
+
+  const { data, error } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: Math.max(uniqueUserIds.length, 1),
+  });
+
+  if (error) {
+    throw new Error("Unable to load admin agents.");
+  }
+
+  (data?.users ?? []).forEach((user) => {
+    if (typeof user.id === "string" && uniqueUserIds.includes(user.id)) {
+      emailByUserId.set(user.id, user.email ?? null);
+    }
+  });
+
+  return emailByUserId;
 }
 
 async function loadContactInquiries(

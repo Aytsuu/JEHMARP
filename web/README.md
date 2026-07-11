@@ -30,6 +30,9 @@ Required variables:
 PUBLIC_SUPABASE_URL=
 PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=
+LOCAL_SUPABASE_URL=
+LOCAL_SUPABASE_PUBLISHABLE_KEY=
+LOCAL_SUPABASE_SECRET_KEY=
 PUBLIC_TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
 UPSTASH_REDIS_REST_URL=
@@ -47,6 +50,19 @@ RESELLER_ADMIN_EMAIL=
 Use the conditional variables when the reseller application email workflow is enabled.
 
 Keep all server-only values in non-public variables. Only `PUBLIC_*` values belong in browser-exposed configuration.
+
+In development, the app prefers the local Supabase stack automatically and will use the local CLI defaults at `http://127.0.0.1:54321` unless you override them with `LOCAL_SUPABASE_*`. That prevents `npm run dev` from pointing at production even when `.env` still contains hosted project credentials.
+
+## Local Supabase Data
+
+Schema history and local-only data are separated:
+
+- `supabase/migrations/` is the shared database history for local and remote environments.
+- `supabase/seeds/` is for local reset data that should not be pushed as production migration history.
+
+The local Supabase config seeds `./seeds/local-auth-users.sql` on `supabase db reset`, so local admin and agent login setup stays out of migration history.
+
+Do not edit already-applied migration files to change local credentials, test users, or dashboard fixtures. Use a new migration for production-bound database changes, and use seed files for local-only reset data.
 
 ## Commands
 

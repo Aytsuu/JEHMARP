@@ -804,11 +804,48 @@ const categories: CategoryGroup[] = isAdmin
         });
       }
 
+      function initFormSubmissionState() {
+        const body = document.body;
+        if (body.dataset.formSubmissionStateInitialized === "true") return;
+        body.dataset.formSubmissionStateInitialized = "true";
+
+        document.addEventListener("submit", (event) => {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement)) return;
+          if ((form.getAttribute("method") || "get").toLowerCase() !== "post") return;
+          if (form.dataset.skipSubmitState === "true") return;
+
+          if (form.dataset.isSubmitting === "true") {
+            event.preventDefault();
+            return;
+          }
+
+          form.dataset.isSubmitting = "true";
+
+          const submitButtons = Array.from(
+            form.querySelectorAll<HTMLButtonElement>('button[type="submit"]'),
+          );
+          const submitter = event.submitter instanceof HTMLButtonElement
+            ? event.submitter
+            : null;
+
+          submitButtons.forEach((button) => {
+            button.disabled = true;
+          });
+
+          if (submitter) {
+            submitter.classList.add("form-submit-button--loading");
+            submitter.setAttribute("aria-busy", "true");
+          }
+        }, true);
+      }
+
       function initDashboardFeatures() {
         initSidebarUnreadBadges();
         initDrawerSheets();
         initCellPopovers();
         initInteractiveTables();
+        initFormSubmissionState();
       }
 
       document.addEventListener("DOMContentLoaded", initDashboardFeatures);

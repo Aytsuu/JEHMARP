@@ -6,6 +6,7 @@ import {
   escapeTextareaValue,
   formatCurrency,
 } from "@/lib/admin-dashboard/view";
+import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
   data: AdminProductManagementData;
@@ -66,7 +67,7 @@ function formatStockStatus(status: string): string {
       <input type="hidden" name="isActive" value="on" />
       <div class="admin-form-grid product-create-form__grid">
         <label class="field-row"
-          ><span>Name</span><input name="name" required /></label
+          ><span>Name</span><input name="name" required data-create-product-name /></label
         >
         <label class="field-row">
           <span>Unit label</span>
@@ -80,7 +81,7 @@ function formatStockStatus(status: string): string {
         </label>
         <label class="field-row">
           <span>Category</span>
-          <select name="category" required>
+          <select name="category" required data-create-product-category>
             {
               productCategories.map((category) => (
                 <option value={category}>{category}</option>
@@ -318,7 +319,7 @@ function formatStockStatus(status: string): string {
                   >
                     {product.image_path ? (
                       <img
-                        src={product.image_path}
+                        src={resolvePublicStorageUrl(product.image_path) ?? product.image_path}
                         alt={product.name}
                         style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;"
                       />
@@ -1148,5 +1149,53 @@ function formatStockStatus(status: string): string {
   document.addEventListener("astro:after-swap", initCreateProductImagePicker);
   if (document.readyState === "complete" || document.readyState === "interactive") {
     initCreateProductImagePicker();
+  }
+
+  function initCreateProductCategorySuggestion() {
+    const form = document.querySelector<HTMLFormElement>("#create-product-form");
+    if (!form || form.dataset.categorySuggestionInitialized === "true") return;
+
+    const nameInput = form.querySelector<HTMLInputElement>("[data-create-product-name]");
+    const categorySelect = form.querySelector<HTMLSelectElement>("[data-create-product-category]");
+    if (!nameInput || !categorySelect) return;
+
+    form.dataset.categorySuggestionInitialized = "true";
+    let lastSuggestedCategory = "";
+    let hasManualOverride = false;
+
+    function inferCategory(value: string) {
+      const normalizedValue = value.trim().toLowerCase();
+      if (!normalizedValue) return "";
+      if (normalizedValue.includes("chicken") || normalizedValue.includes("chick")) return "chicken";
+      if (normalizedValue.includes("pork")) return "pork";
+      if (normalizedValue.includes("egg")) return "egg";
+      return "";
+    }
+
+    function syncCategorySuggestion() {
+      const nextCategory = inferCategory(nameInput.value);
+      const currentCategory = categorySelect.value;
+      const canAutoApply = !hasManualOverride || currentCategory === lastSuggestedCategory;
+
+      if (nextCategory && canAutoApply && currentCategory !== nextCategory) {
+        categorySelect.value = nextCategory;
+        hasManualOverride = false;
+      }
+
+      lastSuggestedCategory = nextCategory;
+    }
+
+    nameInput.addEventListener("input", syncCategorySuggestion);
+    categorySelect.addEventListener("change", () => {
+      hasManualOverride = categorySelect.value !== lastSuggestedCategory;
+    });
+
+    syncCategorySuggestion();
+  }
+
+  document.addEventListener("DOMContentLoaded", initCreateProductCategorySuggestion);
+  document.addEventListener("astro:after-swap", initCreateProductCategorySuggestion);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initCreateProductCategorySuggestion();
   }
 </script>

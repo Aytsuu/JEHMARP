@@ -209,7 +209,7 @@ function buildAgentSales(data: AdminDashboardData): AgentSalesMetric[] {
 
 function orderExpectedCommission(order: AdminOrder): number {
   return roundCurrency(order.customer_order_item.reduce((total, item) => {
-    if (item.agent_commission_status !== "set" && item.agent_commission_status !== "paid") {
+    if (item.agent_commission_amount <= 0) {
       return total;
     }
 

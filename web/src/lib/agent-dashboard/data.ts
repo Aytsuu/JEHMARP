@@ -1,7 +1,7 @@
 import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { CommissionStatus, InvoiceStatus, OrderStatus, ProductCategory, StockStatus } from "@/lib/admin-dashboard/actions";
+import type { InvoiceStatus, OrderStatus, ProductCategory, StockStatus } from "@/lib/admin-dashboard/actions";
 import { buildAgentPaymentSummary, buildAgentSummary } from "./view";
 
 type AgentDashboardContext = Pick<APIContext, "cookies" | "request">;
@@ -35,7 +35,7 @@ const agentOrderSelect = `
     price_type,
     add_details,
     agent_commission_amount,
-    agent_commission_status,
+    agent_commission_paid,
     agent_commission_notes,
     product:product_id (
       id,
@@ -118,7 +118,7 @@ export type AgentOrderItem = {
   price_type: "retail" | "reseller";
   add_details: string | null;
   agent_commission_amount: number;
-  agent_commission_status: CommissionStatus;
+  agent_commission_paid: boolean;
   agent_commission_notes: string | null;
   product: Pick<AgentProduct, "id" | "name" | "unit_label" | "default_price"> | null;
 };

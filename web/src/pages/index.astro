@@ -2,9 +2,10 @@
 import HomePageSections from "@/components/HomePageSections.astro";
 import HomeHero from "@/components/home/HomeHero.astro";
 import Layout from "@/layouts/Layout.astro";
-import { getPublicPageContent } from "@/lib/public-website/content";
+import { getFeaturedPublicProducts, getPublicPageContent } from "@/lib/public-website/content";
 
 const content = await getPublicPageContent(Astro, "home");
+const featuredProducts = await getFeaturedPublicProducts(Astro, 4);
 const title = content.page?.title ?? "Home";
 
 const heroSection = content.sections.find((section) => section.type === "hero");
@@ -13,5 +14,5 @@ const otherSections = content.sections.filter((section) => section.type !== "her
 
 <Layout title={`${title} - JEHMARP`} description="JEHMARP public home page.">
 	{heroSection && <HomeHero section={heroSection} />}
-	<HomePageSections sections={otherSections} />
+	<HomePageSections sections={otherSections} featuredProducts={featuredProducts} />
 </Layout>
