@@ -1,0 +1,64 @@
+name: Production Smoke Tests
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy Production
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Smoke test production
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    env:
+      PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+
+    steps:
+      - name: Require production base URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${PRODUCTION_BASE_URL:?PRODUCTION_BASE_URL secret is required}"
+
+      - name: Check public pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in "/" "/shop" "/contact" "/login"; do
+            status="$(curl -sS -o /dev/null -w "%{http_code}" "${PRODUCTION_BASE_URL}${path}")"
+            echo "${path}: ${status}"
+            if [ "${status}" != "200" ]; then
+              exit 1
+            fi
+          done
+
+      - name: Check protected pages redirect unauthenticated users
+        shell: bash
+        run: |
+          set -euo pipefail
+          for path in "/admin" "/agent"; do
+            status="$(curl -sS -o /dev/null -w "%{http_code}" -L --max-redirs 0 "${PRODUCTION_BASE_URL}${path}" || true)"
+            echo "${path}: ${status}"
+            case "${status}" in
+              301|302|303|307|308) ;;
+              *) exit 1 ;;
+            esac
+          done
+
+      - name: Check invalid API requests are rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl -sS -o /dev/null -w "%{http_code}" -X POST -F "email=" -F "password=" "${PRODUCTION_BASE_URL}/api/login")"
+          echo "/api/login invalid POST: ${status}"
+          case "${status}" in
+            301|302|303|400|401|403|422) ;;
+            *) exit 1 ;;
+          esac

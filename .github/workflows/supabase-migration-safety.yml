@@ -1,0 +1,98 @@
+name: Supabase Migration Safety
+
+on:
+  pull_request:
+    paths:
+      - "supabase/**"
+  push:
+    paths:
+      - "supabase/**"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: supabase-migration-safety-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-migration-safety:
+    name: Local migration safety
+    runs-on: ubuntu-latest
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan changed migrations for risky SQL
+        shell: bash
+        env:
+          MIGRATION_REVIEWED: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'migration-reviewed') }}
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_ref="origin/${{ github.base_ref }}"
+            git fetch origin "${{ github.base_ref }}" --depth=1
+            changed_files="$(git diff --name-only "${base_ref}"...HEAD -- supabase/migrations || true)"
+          else
+            changed_files="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations || true)"
+          fi
+
+          if [ -z "${changed_files}" ]; then
+            echo "No changed migration files."
+            exit 0
+          fi
+
+          echo "Changed migration files:"
+          echo "${changed_files}"
+
+          risky_pattern='drop[[:space:]]+table|drop[[:space:]]+column|truncate|delete[[:space:]]+from|alter[[:space:]]+column.*set[[:space:]]+not[[:space:]]+null|drop[[:space:]]+policy|security[[:space:]]+definer|grant[[:space:]]+'
+          if echo "${changed_files}" | xargs grep -Ein "${risky_pattern}"; then
+            {
+              echo "### Risky migration SQL detected"
+              echo ""
+              echo "Review the matched migration SQL manually before merge."
+              echo "Add the \`migration-reviewed\` label to this PR after review."
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "${MIGRATION_REVIEWED}" != "true" ]; then
+              exit 1
+            fi
+          fi
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Replay local migrations
+        run: supabase db reset --local --no-seed
+
+      - name: Lint local database
+        run: supabase db lint --local --fail-on error
+
+      - name: Run SQL tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in supabase/tests/*.sql; do
+            echo "Running ${file}"
+            supabase db query --local --file "${file}"
+          done
+
+      - name: Link production Supabase project for dev to main checks
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Dry-run production migrations for dev to main checks
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
+        run: supabase db push --linked --dry-run --password "$SUPABASE_DB_PASSWORD"

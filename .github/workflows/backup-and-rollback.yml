@@ -1,0 +1,121 @@
+name: Backup and Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Operation to run
+        required: true
+        default: backup-production-db
+        type: choice
+        options:
+          - backup-production-db
+          - export-dashboard-data
+          - export-public-content
+          - migration-status
+          - rollback-checklist
+
+permissions:
+  contents: read
+
+jobs:
+  backup-and-rollback:
+    name: ${{ inputs.operation }}
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+
+      - name: Link production Supabase project
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Create backup directory
+        run: mkdir -p backups
+
+      - name: Backup production database
+        if: inputs.operation == 'backup-production-db'
+        run: |
+          {
+            echo "### Production database backup"
+            echo ""
+            echo "This artifact contains production data, including admin dashboard, agent dashboard, auth, storage metadata, and product image objects."
+            echo "Store it securely after download and delete local copies when they are no longer needed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          supabase db dump --linked --password "$SUPABASE_DB_PASSWORD" --role-only --file "backups/production-roles-${{ github.run_id }}.sql"
+          supabase db dump --linked --password "$SUPABASE_DB_PASSWORD" --file "backups/production-schema-${{ github.run_id }}.sql"
+          supabase db dump --linked --password "$SUPABASE_DB_PASSWORD" --data-only --use-copy --schema public,auth,storage --exclude "storage.buckets_vectors" --exclude "storage.vector_indexes" --file "backups/production-data-${{ github.run_id }}.sql"
+          mkdir -p "backups/storage"
+          supabase storage cp --linked --recursive "ss:///product-images" "backups/storage/product-images"
+
+      - name: Export dashboard data
+        if: inputs.operation == 'export-dashboard-data'
+        run: |
+          {
+            echo "### Dashboard data export"
+            echo ""
+            echo "CSV exports include the public tables used by the admin and agent dashboards."
+            echo "This artifact contains customer, order, invoice, payment, commission, inquiry, reseller, profile, product, content, media, and analytics data."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          supabase db query --linked --output csv "select * from public.profile order by created_at;" > "backups/profile-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.admin_role order by created_at;" > "backups/admin-role-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.agent_profile order by created_at;" > "backups/agent-profile-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.customer order by created_at;" > "backups/customer-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.product order by created_at;" > "backups/product-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.customer_order order by created_at;" > "backups/customer-order-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.customer_order_item order by created_at;" > "backups/customer-order-item-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.invoice order by created_at;" > "backups/invoice-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.payment order by created_at;" > "backups/payment-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.customer_order_status_history order by changed_at;" > "backups/customer-order-status-history-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.contact_inquiry order by created_at;" > "backups/contact-inquiry-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.reseller_application order by created_at;" > "backups/reseller-application-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.page order by slug;" > "backups/page-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.page_section order by page_id, sort_order;" > "backups/page-section-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.media_asset order by created_at;" > "backups/media-asset-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.analytics_daily order by day;" > "backups/analytics-daily-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.analytics_product_daily order by day, product_id;" > "backups/analytics-product-daily-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.analytics_agent_daily order by day, agent_id;" > "backups/analytics-agent-daily-${{ github.run_id }}.csv"
+
+      - name: Export public landing page content
+        if: inputs.operation == 'export-public-content'
+        run: |
+          supabase db query --linked --output csv "select * from public.page order by slug;" > "backups/page-${{ github.run_id }}.csv"
+          supabase db query --linked --output csv "select * from public.page_section order by page_id, sort_order;" > "backups/page-section-${{ github.run_id }}.csv"
+
+      - name: Show migration status
+        if: inputs.operation == 'migration-status'
+        run: supabase migration list --linked | tee "backups/migration-status-${{ github.run_id }}.txt"
+
+      - name: Create rollback checklist
+        if: inputs.operation == 'rollback-checklist'
+        run: |
+          {
+            echo "# Production Rollback Checklist"
+            echo ""
+            echo "Run ID: ${{ github.run_id }}"
+            echo ""
+            echo "1. Identify the failed deployment and the last known good deployment."
+            echo "2. Roll back the application through the hosting provider."
+            echo "3. Do not roll back database schema automatically."
+            echo "4. If data or schema repair is required, write and review an explicit SQL repair script."
+            echo "5. Create a fresh production backup before any repair script is executed."
+            echo "6. Verify public pages, login pages, admin redirects, and critical APIs after recovery."
+          } > backups/rollback-checklist-${{ github.run_id }}.md
+
+      - name: Upload operation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.operation }}-${{ github.run_id }}
+          path: backups/
+          if-no-files-found: error
+          retention-days: 7
