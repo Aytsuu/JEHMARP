@@ -44,6 +44,7 @@ const adminOrderSelect = `
       id,
       user_id,
       display_name,
+      contact,
       status,
       created_at,
       updated_at
@@ -53,6 +54,7 @@ const adminOrderSelect = `
     id,
     user_id,
     display_name,
+    contact,
     status,
     created_at,
     updated_at
@@ -561,13 +563,13 @@ async function loadAgents(
 ) {
   const { data, error } = await supabase
     .from("agent_profile")
-    .select("id, user_id, display_name, status, created_at, updated_at")
+    .select("id, user_id, display_name, contact, status, created_at, updated_at")
     .order("display_name", { ascending: true });
 
   if (error) throw new Error("Unable to load admin agents.");
 
   const baseAgents = (data ?? []) as Array<
-    Omit<AdminAgent, "email" | "contact"> & { email?: never; contact?: never }
+    Omit<AdminAgent, "email"> & { email?: never }
   >;
   const emailByUserId = await loadAuthEmailsByUserId(
     supabase,
@@ -577,7 +579,7 @@ async function loadAgents(
   const agents = baseAgents.map((agent) => ({
     ...agent,
     email: emailByUserId.get(agent.user_id) ?? null,
-    contact: null,
+    contact: agent.contact ?? null,
   })) as AdminAgent[];
 
   if (!filters.search && !filters.status) {
@@ -889,7 +891,7 @@ async function enrichOrdersWithAgentEmails(
           id: order.agent.id,
           display_name: order.agent.display_name,
           email: emailByUserId.get((order.agent as { user_id?: string }).user_id ?? "") ?? null,
-          contact: null,
+          contact: order.agent.contact ?? null,
         }
       : null,
     customer: order.customer
@@ -902,7 +904,7 @@ async function enrichOrdersWithAgentEmails(
                 email: emailByUserId.get(
                   (order.customer.assigned_agent as { user_id?: string }).user_id ?? "",
                 ) ?? null,
-                contact: null,
+                contact: order.customer.assigned_agent.contact ?? null,
               }
             : null,
         }

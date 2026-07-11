@@ -801,6 +801,33 @@ const categories: CategoryGroup[] = isAdmin
         });
       }
 
+      function initDigitsOnlyInputs() {
+        document.querySelectorAll<HTMLInputElement>("[data-digits-only]").forEach((input) => {
+          if (input.dataset.digitsOnlyInitialized === "true") return;
+          input.dataset.digitsOnlyInitialized = "true";
+
+          const allowedKeys = new Set([
+            "Backspace",
+            "Delete",
+            "Tab",
+            "ArrowLeft",
+            "ArrowRight",
+            "Home",
+            "End",
+          ]);
+
+          input.addEventListener("keydown", (event) => {
+            if (allowedKeys.has(event.key) || event.ctrlKey || event.metaKey) return;
+            if (!/^\d$/.test(event.key)) event.preventDefault();
+          });
+
+          input.addEventListener("input", () => {
+            const digitsOnly = input.value.replace(/\D/g, "");
+            if (input.value !== digitsOnly) input.value = digitsOnly;
+          });
+        });
+      }
+
       function initFormSubmissionState() {
         const body = document.body;
         if (body.dataset.formSubmissionStateInitialized === "true") return;
@@ -842,6 +869,7 @@ const categories: CategoryGroup[] = isAdmin
         initDrawerSheets();
         initCellPopovers();
         initInteractiveTables();
+        initDigitsOnlyInputs();
         initFormSubmissionState();
       }
 

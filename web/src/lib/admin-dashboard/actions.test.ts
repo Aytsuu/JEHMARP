@@ -235,6 +235,82 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("parses create-agent actions with normalized email and contact", () => {
+    const formData = new FormData();
+    formData.set("action", "create-agent");
+    formData.set("email", "  Agent@Example.Test ");
+    formData.set("contact", " 09171234567 ");
+    formData.set("password", "password123");
+    formData.set("displayName", "New Agent");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "create-agent",
+        payload: {
+          email: "agent@example.test",
+          contact: "09171234567",
+          password: "password123",
+          display_name: "New Agent",
+          status: "active",
+        },
+      },
+    });
+  });
+
+  it("rejects create-agent actions without a contact number", () => {
+    const formData = new FormData();
+    formData.set("action", "create-agent");
+    formData.set("email", "agent@example.test");
+    formData.set("contact", "   ");
+    formData.set("password", "password123");
+    formData.set("displayName", "New Agent");
+
+    expect(parseAdminActionFormData(formData, adminUserId).success).toBe(false);
+  });
+
+  it("rejects create-agent actions with non-numeric contact numbers", () => {
+    const formData = new FormData();
+    formData.set("action", "create-agent");
+    formData.set("email", "agent@example.test");
+    formData.set("contact", "0917-123-4567");
+    formData.set("password", "password123");
+    formData.set("displayName", "New Agent");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Contact number must be exactly 11 digits."],
+    });
+  });
+
+  it("rejects create-agent actions when contact number is not 11 digits", () => {
+    const formData = new FormData();
+    formData.set("action", "create-agent");
+    formData.set("email", "agent@example.test");
+    formData.set("contact", "0917123456");
+    formData.set("password", "password123");
+    formData.set("displayName", "New Agent");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Contact number must be exactly 11 digits."],
+    });
+  });
+
+  it("rejects create-agent actions with invalid email before other field errors", () => {
+    const formData = new FormData();
+    formData.set("action", "create-agent");
+    formData.set("email", "not-an-email");
+    formData.set("contact", "letters");
+    formData.set("password", "short");
+    formData.set("displayName", "");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Enter a valid email address."],
+    });
+  });
+
   it("rejects malformed page section JSON before writing", () => {
     const formData = new FormData();
     formData.set("action", "save-page-section");

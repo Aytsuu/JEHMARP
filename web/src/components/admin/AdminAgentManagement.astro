@@ -22,23 +22,29 @@ const skeletonRows = Array.from({ length: 6 });
     <div slot="header" class="agent-create-sheet__header-copy">
       <h3 class="drawer-sheet__title" data-sheet-title>Create Agent</h3>
       <p class="agent-create-sheet__header-description">
-        Add the agent's login details, display name, and initial account status.
+        Add the agent's login details, contact number, and display name. New accounts are created as active.
       </p>
     </div>
     <form id="create-agent-form" method="post" class="admin-form agent-create-form" aria-label="Create agent">
       <input type="hidden" name="action" value="create-agent" />
       <div class="admin-form-grid agent-create-form__grid">
-        <label class="field-row"><span>Email</span><input name="email" type="email" required /></label>
+        <label class="field-row"><span>Email</span><input name="email" type="email" required autocomplete="email" /></label>
+        <label class="field-row">
+          <span>Contact number</span>
+          <input
+            name="contact"
+            type="tel"
+            inputmode="numeric"
+            pattern="[0-9]{11}"
+            minlength="11"
+            maxlength="11"
+            required
+            autocomplete="tel"
+            data-digits-only
+          />
+        </label>
         <label class="field-row"><span>Temporary password</span><input name="password" type="password" minlength="8" required /></label>
         <label class="field-row"><span>Display name</span><input name="displayName" required /></label>
-        <label class="field-row">
-          <span>Status</span>
-          <select name="status" required>
-            {agentStatuses.map((status) => (
-              <option value={status}>{autoCapitalize(status)}</option>
-            ))}
-          </select>
-        </label>
       </div>
     </form>
     <div slot="footer" class="agent-create-sheet__footer">
@@ -62,7 +68,7 @@ const skeletonRows = Array.from({ length: 6 });
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
-            placeholder="Search agent name or email..."
+            placeholder="Search agent name, email, or contact..."
             autocomplete="off"
             data-agent-search-input
           />
@@ -95,21 +101,22 @@ const skeletonRows = Array.from({ length: 6 });
         <table class="dashboard-table">
           <thead>
             <tr>
-              <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Agent</th>
-              <th scope="col" style="width: 30%; padding: 1.1rem 0.75rem;">Email</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Status</th>
-              <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Date Created</th>
-              <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Action</th>
+              <th scope="col" style="width: 18%; padding: 1.1rem 0.75rem;">Agent</th>
+              <th scope="col" style="width: 22%; padding: 1.1rem 0.75rem;">Email</th>
+              <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Contact</th>
+              <th scope="col" style="width: 12%; padding: 1.1rem 0.75rem;">Status</th>
+              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Date Created</th>
+              <th scope="col" style="width: 18%; padding: 1.1rem 0.75rem;">Action</th>
             </tr>
           </thead>
           <tbody>
             {data.agents.length === 0 ? (
               <tr class="empty-row">
-                <td colspan="5" class="empty-state">No agents match the selected filters.</td>
+                <td colspan="6" class="empty-state">No agents match the selected filters.</td>
               </tr>
             ) : data.agents.map((agent) => (
               <tr data-status={agent.status}>
-                <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <td style="width: 18%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                   <button type="button" class="table-cell-trigger" data-open-cell-popover data-popover-title={`Edit Display Name: ${agent.display_name}`} style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;">
                     <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
                       {agent.display_name}
@@ -125,12 +132,17 @@ const skeletonRows = Array.from({ length: 6 });
                     </form>
                   </div>
                 </td>
-                <td style="width: 30%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <td style="width: 22%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                   <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
                     {agent.email ?? "No email"}
                   </span>
                 </td>
-                <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
+                    {agent.contact ?? "No contact"}
+                  </span>
+                </td>
+                <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                   <button
                     type="button"
                     class="table-cell-trigger"
@@ -161,8 +173,8 @@ const skeletonRows = Array.from({ length: 6 });
                     </form>
                   </div>
                 </td>
-                <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(agent.created_at)}</td>
-                <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle;"><ViewButton href={`/admin/agents/${agent.id}`} /></td>
+                <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(agent.created_at)}</td>
+                <td style="width: 18%; padding: 1.1rem 0.75rem; vertical-align: middle;"><ViewButton href={`/admin/agents/${agent.id}`} /></td>
               </tr>
             ))}
           </tbody>
@@ -193,8 +205,8 @@ const skeletonRows = Array.from({ length: 6 });
     <div class="table-wrap" aria-busy="true" aria-live="polite">
       <table class="product-table-skeleton dashboard-table">
         <caption class="sr-only">Loading filtered agents</caption>
-        <thead><tr><th scope="col">Agent</th><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Date Created</th><th scope="col">Action</th></tr></thead>
-        <tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody>
+        <thead><tr><th scope="col">Agent</th><th scope="col">Email</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Date Created</th><th scope="col">Action</th></tr></thead>
+        <tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody>
       </table>
     </div>
   </template>

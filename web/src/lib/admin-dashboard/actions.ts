@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 import { z } from "zod";
 
+import { parseContactNumber, parseEmailAddress } from "@/lib/formatters";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PRODUCT_IMAGE_BUCKET, isManagedStoragePath } from "@/lib/supabase/storage";
@@ -102,6 +103,7 @@ export type AdminAction =
       type: "create-agent";
       payload: {
         email: string;
+        contact: string;
         password: string;
         display_name: string;
         status: "active" | "inactive" | "suspended";
@@ -505,14 +507,7 @@ function parseAdminActionFormDataOrThrow(
     case "create-agent":
       return success({
         type: "create-agent",
-        payload: {
-          email: z.email().parse(requiredString(formData, "email")),
-          password: z.string().min(8, "Password must be at least 8 characters.").parse(
-            requiredString(formData, "password"),
-          ),
-          display_name: requiredString(formData, "displayName"),
-          status: enumValue(formData, "status", ["active", "inactive", "suspended"] as const),
-        },
+        payload: parseCreateAgentPayload(formData),
       });
     case "update-agent":
       return success({
@@ -689,6 +684,9 @@ async function executeAgentCreate(
   payload: Extract<AdminAction, { type: "create-agent" }>["payload"],
 ) {
   const adminClient = createSupabaseAdminClient();
+  await assertAgentEmailIsAvailable(adminClient, payload.email);
+  await assertAgentContactIsAvailable(adminClient, payload.contact);
+
   const { data, error } = await adminClient.auth.admin.createUser({
     email: payload.email,
     password: payload.password,
@@ -699,18 +697,72 @@ async function executeAgentCreate(
   });
 
   if (error || !data.user) {
+    if (error?.message?.toLowerCase().includes("already")) {
+      throw new Error("Email already exists for another account.");
+    }
+
     throw new Error("Unable to create agent auth account.");
   }
 
   const { error: profileError } = await adminClient.from("agent_profile").insert({
     user_id: data.user.id,
     display_name: payload.display_name,
+    contact: payload.contact,
     status: payload.status,
   });
 
   if (profileError) {
     await adminClient.auth.admin.deleteUser(data.user.id);
+
+    if (profileError.code === "23505") {
+      throw new Error("Contact number already exists for another agent.");
+    }
+
     throw new Error("Unable to create agent profile.");
+  }
+}
+
+async function assertAgentEmailIsAvailable(
+  adminClient: SupabaseAdminClient,
+  email: string,
+) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data, error } = await adminClient.auth.admin.listUsers({
+    page: 1,
+    perPage: 200,
+  });
+
+  if (error) {
+    throw new Error("Unable to validate existing agent email.");
+  }
+
+  const hasExistingEmail = (data?.users ?? []).some(
+    (user) => (user.email ?? "").trim().toLowerCase() === normalizedEmail,
+  );
+
+  if (hasExistingEmail) {
+    throw new Error("Email already exists for another account.");
+  }
+}
+
+async function assertAgentContactIsAvailable(
+  adminClient: SupabaseAdminClient,
+  contact: string,
+) {
+  const normalizedContact = contact.trim();
+  const { data, error } = await adminClient
+    .from("agent_profile")
+    .select("id")
+    .eq("contact", normalizedContact)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to validate existing agent contact number.");
+  }
+
+  if (data?.id) {
+    throw new Error("Contact number already exists for another agent.");
   }
 }
 
@@ -1368,6 +1420,23 @@ function parseOrderItems(formData: FormData) {
   }
 
   return parsedItems;
+}
+
+function parseCreateAgentPayload(
+  formData: FormData,
+): Extract<AdminAction, { type: "create-agent" }>["payload"] {
+  const email = parseEmailAddress(requiredString(formData, "email"));
+  const contact = parseContactNumber(requiredString(formData, "contact"));
+
+  return {
+    email,
+    contact,
+    password: z.string().min(8, "Password must be at least 8 characters.").parse(
+      requiredString(formData, "password"),
+    ),
+    display_name: requiredString(formData, "displayName"),
+    status: "active",
+  };
 }
 
 function parseCustomerFormPayload(
