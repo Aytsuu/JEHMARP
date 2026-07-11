@@ -23,6 +23,8 @@ describe("buildOrderSlipPdf", () => {
         phone_number: "09170000000",
         email: "maria@example.test",
         address: "Cebu",
+        assigned_agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+        assigned_agent: null,
         is_reseller: false,
       },
       agent: {

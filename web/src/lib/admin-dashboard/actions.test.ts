@@ -474,7 +474,7 @@ describe("executeAdminAction", () => {
     ]);
   });
 
-  it("reuses and refreshes a phone-matched customer before creating an admin order", async () => {
+  it("creates a new customer before creating an admin order even when the phone number already exists", async () => {
     const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
     const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
     const customerPayload = {
@@ -488,83 +488,14 @@ describe("executeAdminAction", () => {
       is_reseller: false,
       updated_at: "2026-07-01T00:00:00.000Z",
     };
-    const maybeSingle = vi.fn(() => Promise.resolve({ data: { id: customerId }, error: null }));
-    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
-    const customerSelect = vi.fn(() => ({ eq: customerLookupEq }));
-    const customerUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
-    const customerUpdate = vi.fn(() => ({ eq: customerUpdateEq }));
-    const orderInsert = vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
-      })),
+    const phoneMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const phoneLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: phoneMaybeSingle })) }));
+    const emailMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const emailLookupIlike = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: emailMaybeSingle })) }));
+    const customerSelect = vi.fn(() => ({
+      eq: phoneLookupEq,
+      ilike: emailLookupIlike,
     }));
-    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
-    const from = vi.fn((table: string) => {
-      if (table === "customer") return { select: customerSelect, update: customerUpdate };
-      if (table === "customer_order") return { insert: orderInsert };
-      if (table === "customer_order_item") return { insert: itemInsert };
-      throw new Error(`Unexpected table ${table}`);
-    });
-
-    await executeAdminAction({ from } as never, {
-      type: "create-order",
-      customer: {
-        type: "new",
-        payload: customerPayload,
-      },
-      payload: {
-        agent_id: null,
-        source: "admin_manual",
-        order_status: "processing",
-        payment_status: "unpaid",
-        submitted_by: adminUserId,
-        updated_at: "2026-07-01T00:00:00.000Z",
-      },
-      items: [
-        {
-          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
-          partial_quantity: 2,
-          final_quantity: 2,
-          add_details: null,
-        },
-      ],
-    });
-
-    expect(customerSelect).toHaveBeenCalledWith("id");
-    expect(customerLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
-    expect(customerUpdate).toHaveBeenCalledWith({
-      first_name: "Luz",
-      last_name: "Dela Cruz",
-      phone_number: "09171112222",
-      email: "luz@example.test",
-      address: "Stall 8",
-      assigned_agent_id: null,
-      is_reseller: false,
-      updated_at: "2026-07-01T00:00:00.000Z",
-    });
-    expect(customerUpdateEq).toHaveBeenCalledWith("id", customerId);
-    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
-      customer_id: customerId,
-    }));
-  });
-
-  it("creates a new customer before creating an admin order when no phone match exists", async () => {
-    const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
-    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
-    const customerPayload = {
-      first_name: "Luz",
-      last_name: "Dela Cruz",
-      phone_number: "09171112222",
-      email: "luz@example.test",
-      address: "Stall 8",
-      assigned_agent_id: null,
-      created_by: adminUserId,
-      is_reseller: false,
-      updated_at: "2026-07-01T00:00:00.000Z",
-    };
-    const maybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
-    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
-    const customerSelect = vi.fn(() => ({ eq: customerLookupEq }));
     const customerInsert = vi.fn(() => ({
       select: vi.fn(() => ({
         single: vi.fn(() => Promise.resolve({ data: { id: customerId }, error: null })),
@@ -607,6 +538,198 @@ describe("executeAdminAction", () => {
       ],
     });
 
+    expect(customerSelect).toHaveBeenCalledWith("id");
+    expect(phoneLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
+    expect(emailLookupIlike).toHaveBeenCalledWith("email", "luz@example.test");
+    expect(customerInsert).toHaveBeenCalledWith(customerPayload);
+    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
+      customer_id: customerId,
+    }));
+  });
+
+  it("rejects admin order creation when the new customer phone number already exists", async () => {
+    const maybeSingle = vi.fn(() => Promise.resolve({
+      data: { id: "existing-customer-id" },
+      error: null,
+    }));
+    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
+    const customerSelect = vi.fn(() => ({ eq: customerLookupEq }));
+    const customerInsert = vi.fn();
+    const orderInsert = vi.fn();
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "customer_order") return { insert: orderInsert };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "create-order",
+      customer: {
+        type: "new",
+        payload: {
+          first_name: "Luz",
+          last_name: "Dela Cruz",
+          phone_number: "09171112222",
+          email: "luz@example.test",
+          address: "Stall 8",
+          assigned_agent_id: null,
+          created_by: adminUserId,
+          is_reseller: false,
+          updated_at: "2026-07-01T00:00:00.000Z",
+        },
+      },
+      payload: {
+        agent_id: null,
+        source: "admin_manual",
+        order_status: "processing",
+        payment_status: "unpaid",
+        submitted_by: adminUserId,
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+      items: [
+        {
+          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          partial_quantity: 2,
+          final_quantity: 2,
+          add_details: null,
+        },
+      ],
+    })).rejects.toThrow("Phone number already exists for another customer.");
+
+    expect(customerSelect).toHaveBeenCalledWith("id");
+    expect(customerLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
+    expect(customerInsert).not.toHaveBeenCalled();
+    expect(orderInsert).not.toHaveBeenCalled();
+  });
+
+  it("rejects admin order creation when the new customer email already exists", async () => {
+    const phoneMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const phoneLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: phoneMaybeSingle })) }));
+    const emailMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { id: "existing-customer-id" },
+      error: null,
+    }));
+    const emailLookupIlike = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: emailMaybeSingle })) }));
+    const customerSelect = vi.fn(() => ({
+      eq: phoneLookupEq,
+      ilike: emailLookupIlike,
+    }));
+    const customerInsert = vi.fn();
+    const orderInsert = vi.fn();
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "customer_order") return { insert: orderInsert };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "create-order",
+      customer: {
+        type: "new",
+        payload: {
+          first_name: "Luz",
+          last_name: "Dela Cruz",
+          phone_number: "09171112222",
+          email: "LUZ@example.test",
+          address: "Stall 8",
+          assigned_agent_id: null,
+          created_by: adminUserId,
+          is_reseller: false,
+          updated_at: "2026-07-01T00:00:00.000Z",
+        },
+      },
+      payload: {
+        agent_id: null,
+        source: "admin_manual",
+        order_status: "processing",
+        payment_status: "unpaid",
+        submitted_by: adminUserId,
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+      items: [
+        {
+          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          partial_quantity: 2,
+          final_quantity: 2,
+          add_details: null,
+        },
+      ],
+    })).rejects.toThrow("Email already exists for another customer.");
+
+    expect(customerSelect).toHaveBeenCalledWith("id");
+    expect(phoneLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
+    expect(emailLookupIlike).toHaveBeenCalledWith("email", "luz@example.test");
+    expect(customerInsert).not.toHaveBeenCalled();
+    expect(orderInsert).not.toHaveBeenCalled();
+  });
+
+  it("creates a new customer before creating an admin order when no phone match exists", async () => {
+    const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const customerPayload = {
+      first_name: "Luz",
+      last_name: "Dela Cruz",
+      phone_number: "09171112222",
+      email: "luz@example.test",
+      address: "Stall 8",
+      assigned_agent_id: null,
+      created_by: adminUserId,
+      is_reseller: false,
+      updated_at: "2026-07-01T00:00:00.000Z",
+    };
+    const phoneMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: phoneMaybeSingle })) }));
+    const emailMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const customerLookupIlike = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: emailMaybeSingle })) }));
+    const customerSelect = vi.fn(() => ({
+      eq: customerLookupEq,
+      ilike: customerLookupIlike,
+    }));
+    const customerInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: customerId }, error: null })),
+      })),
+    }));
+    const orderInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
+      })),
+    }));
+    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "customer_order") return { insert: orderInsert };
+      if (table === "customer_order_item") return { insert: itemInsert };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from } as never, {
+      type: "create-order",
+      customer: {
+        type: "new",
+        payload: customerPayload,
+      },
+      payload: {
+        agent_id: null,
+        source: "admin_manual",
+        order_status: "processing",
+        payment_status: "unpaid",
+        submitted_by: adminUserId,
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+      items: [
+        {
+          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          partial_quantity: 2,
+          final_quantity: 2,
+          add_details: null,
+        },
+      ],
+    });
+
+    expect(customerSelect).toHaveBeenCalledWith("id");
+    expect(customerLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
+    expect(customerLookupIlike).toHaveBeenCalledWith("email", "luz@example.test");
     expect(customerInsert).toHaveBeenCalledWith(customerPayload);
     expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
       customer_id: customerId,

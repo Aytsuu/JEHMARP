@@ -809,15 +809,7 @@ async function resolveOrderCustomer(
     };
   }
 
-  const existingCustomerId = await findExistingCustomerIdByPhone(supabase, customer.payload.phone_number);
-
-  if (existingCustomerId) {
-    await executeTableUpdate(supabase, "customer", existingCustomerId, toCustomerUpdatePayload(customer.payload));
-    return {
-      customerId: existingCustomerId,
-      createdCustomerId: null,
-    };
-  }
+  await assertCustomerContactIsAvailable(supabase, customer.payload);
 
   const { data, error } = await supabase
     .from("customer")
@@ -834,6 +826,27 @@ async function resolveOrderCustomer(
     customerId,
     createdCustomerId: customerId,
   };
+}
+
+async function assertCustomerContactIsAvailable(
+  supabase: SupabaseServerClient,
+  payload: CustomerFormPayload,
+) {
+  const existingPhoneCustomerId = await findExistingCustomerIdByPhone(supabase, payload.phone_number);
+
+  if (existingPhoneCustomerId) {
+    throw new Error("Phone number already exists for another customer.");
+  }
+
+  if (!payload.email) {
+    return;
+  }
+
+  const existingEmailCustomerId = await findExistingCustomerIdByEmail(supabase, payload.email);
+
+  if (existingEmailCustomerId) {
+    throw new Error("Email already exists for another customer.");
+  }
 }
 
 async function loadExistingProduct(
@@ -872,7 +885,26 @@ async function findExistingCustomerIdByPhone(
     .maybeSingle();
 
   if (error) {
-    throw new Error("Unable to check existing customer.");
+    throw new Error("Unable to validate existing customer phone number.");
+  }
+
+  return data?.id ? String(data.id) : null;
+}
+
+async function findExistingCustomerIdByEmail(
+  supabase: SupabaseServerClient,
+  email: string,
+) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const { data, error } = await supabase
+    .from("customer")
+    .select("id")
+    .ilike("email", normalizedEmail)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to validate existing customer email.");
   }
 
   return data?.id ? String(data.id) : null;
@@ -972,11 +1004,11 @@ async function assertOrderItemCommissionPayable(
     throw new Error("Unable to verify commission payment status.");
   }
 
-  const orderId = typeof orderItem?.order_id === "string" ? orderItem.order_id : null;
-
-  if (!orderId) {
+  if (!orderItem || typeof orderItem.order_id !== "string") {
     throw new Error("Order item was not found.");
   }
+
+  const orderId = orderItem.order_id;
 
   const { data: payments, error: paymentError } = await supabase
     .from("payment")
@@ -1043,19 +1075,6 @@ async function assertOrderItemCommissionPayable(
 
 function roundCurrency(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function toCustomerUpdatePayload(payload: CustomerFormPayload) {
-  return {
-    first_name: payload.first_name,
-    last_name: payload.last_name,
-    phone_number: payload.phone_number,
-    email: payload.email,
-    address: payload.address,
-    assigned_agent_id: payload.assigned_agent_id,
-    is_reseller: payload.is_reseller,
-    updated_at: payload.updated_at,
-  };
 }
 
 async function cleanupCreatedOrderCustomer(
@@ -1255,7 +1274,7 @@ function optionalString(formData: FormData, key: string) {
 function optionalEmail(formData: FormData, key: string) {
   const value = optionalString(formData, key);
 
-  return value ? z.email().parse(value) : null;
+  return value ? z.email().parse(value.toLowerCase()) : null;
 }
 
 function optionalUuid(formData: FormData, key: string) {

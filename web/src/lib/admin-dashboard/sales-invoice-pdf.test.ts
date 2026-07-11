@@ -23,6 +23,8 @@ describe("buildSalesInvoicePdf", () => {
         phone_number: "09170000000",
         email: "maria@example.test",
         address: "Cebu",
+        assigned_agent_id: null,
+        assigned_agent: null,
         is_reseller: false,
       },
       agent: null,

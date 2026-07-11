@@ -105,6 +105,8 @@ function createAdminDashboardData(): AdminDashboardData {
         phone_number: "09170000000",
         email: "ada@example.com",
         address: "123 Road",
+        assigned_agent_id: null,
+        assigned_agent: null,
         is_reseller: false,
       },
       agent: null,

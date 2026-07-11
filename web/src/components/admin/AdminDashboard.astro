@@ -52,7 +52,7 @@ const analytics = buildAdminAnalytics(data);
 
     if (summaryCards.length === 0) return;
 
-    const summaryShell = summaryCards[0]?.closest(".admin-summary-grid");
+    const summaryShell = summaryCards[0]?.closest(".admin-summary-grid") as HTMLElement | null;
     if (!summaryShell || summaryShell.dataset.summaryInitialized === "true") return;
     summaryShell.dataset.summaryInitialized = "true";
 

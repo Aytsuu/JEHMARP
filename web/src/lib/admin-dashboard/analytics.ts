@@ -64,7 +64,7 @@ export function buildAdminAnalytics(
   data: AdminDashboardData,
   now = new Date(),
 ): AdminAnalytics {
-  const agentOrders = data.orders.filter((order) => order.agent_id);
+  const agentOrders = data.orders.filter((order) => getAnalyticsAgentId(order, data) !== null);
   const currentMonth = monthIdentifier(now);
   const currentDay = dayIdentifier(now);
 
@@ -177,12 +177,13 @@ function buildAgentSales(data: AdminDashboardData): AgentSalesMetric[] {
   const metrics = new Map<string, AgentSalesMetric>();
 
   for (const order of data.orders) {
-    if (!order.agent_id) continue;
+    const agentId = getAnalyticsAgentId(order, data);
 
-    const label = order.agent?.display_name
-      ?? data.agents.find((agent) => agent.id === order.agent_id)?.display_name
+    if (!agentId) continue;
+
+    const label = getAnalyticsAgentLabel(order, data, agentId)
       ?? "Unassigned agent";
-    const current = metrics.get(order.agent_id) ?? {
+    const current = metrics.get(agentId) ?? {
       label,
       orderCount: 0,
       grossSales: 0,
@@ -191,7 +192,7 @@ function buildAgentSales(data: AdminDashboardData): AgentSalesMetric[] {
       expectedCommission: 0,
     };
 
-    metrics.set(order.agent_id, {
+    metrics.set(agentId, {
       label: current.label,
       orderCount: current.orderCount + 1,
       grossSales: roundCurrency(current.grossSales + orderTotal(order, "final_quantity")),
@@ -205,6 +206,26 @@ function buildAgentSales(data: AdminDashboardData): AgentSalesMetric[] {
   }
 
   return Array.from(metrics.values()).sort((left, right) => right.grossSales - left.grossSales);
+}
+
+function getAnalyticsAgentId(order: AdminOrder, data: AdminDashboardData): string | null {
+  return order.agent_id
+    ?? order.agent?.id
+    ?? order.customer?.assigned_agent_id
+    ?? order.customer?.assigned_agent?.id
+    ?? data.customers.find((customer) => customer.id === order.customer_id)?.assigned_agent_id
+    ?? null;
+}
+
+function getAnalyticsAgentLabel(
+  order: AdminOrder,
+  data: AdminDashboardData,
+  agentId: string,
+): string | null {
+  return order.agent?.display_name
+    ?? order.customer?.assigned_agent?.display_name
+    ?? data.agents.find((agent) => agent.id === agentId)?.display_name
+    ?? null;
 }
 
 function orderExpectedCommission(order: AdminOrder): number {

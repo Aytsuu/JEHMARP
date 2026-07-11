@@ -1173,6 +1173,8 @@ function formatStockStatus(status: string): string {
     }
 
     function syncCategorySuggestion() {
+      if (!nameInput || !categorySelect) return;
+
       const nextCategory = inferCategory(nameInput.value);
       const currentCategory = categorySelect.value;
       const canAutoApply = !hasManualOverride || currentCategory === lastSuggestedCategory;
@@ -1184,6 +1186,8 @@ function formatStockStatus(status: string): string {
 
       lastSuggestedCategory = nextCategory;
     }
+
+    if (!nameInput || !categorySelect) return;
 
     nameInput.addEventListener("input", syncCategorySuggestion);
     categorySelect.addEventListener("change", () => {
