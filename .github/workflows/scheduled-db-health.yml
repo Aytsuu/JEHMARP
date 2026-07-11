@@ -1,0 +1,44 @@
+name: Scheduled DB Health
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  production-db-health:
+    name: Production database health
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.101.0
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      - name: Link production Supabase project
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Check migration status
+        run: supabase migration list --linked
+
+      - name: Run production advisors
+        run: supabase db advisors --linked --type all --level warn --fail-on error
+
+      - name: Check exposed public tables with RLS disabled
+        run: |
+          supabase db query --linked "select schemaname, tablename from pg_tables where schemaname in ('public', 'graphql_public') and rowsecurity = false order by schemaname, tablename;"

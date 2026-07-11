@@ -1,0 +1,67 @@
+name: Dependency and Security
+
+on:
+  schedule:
+    - cron: "0 19 * * 1"
+  pull_request:
+    paths:
+      - "web/package.json"
+      - "web/package-lock.json"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Audit production dependencies
+        working-directory: web
+        run: npm audit --audit-level=high --omit=dev
+
+      - name: Check public environment variable names
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE "PUBLIC_[A-Z0-9_]*(SECRET|TOKEN|PASSWORD|SERVICE_ROLE)" web/src web/.env.example web/README.md .env.example 2>/dev/null; then
+            echo "Potentially sensitive PUBLIC_* variable name found."
+            exit 1
+          fi
+
+  codeql:
+    name: CodeQL analysis
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3
