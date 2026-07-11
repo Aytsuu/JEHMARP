@@ -518,7 +518,7 @@ const categories: CategoryGroup[] = isAdmin
 
         closeButtons?.forEach((btn) => {
           btn.addEventListener("click", () => {
-            closeDrawer(btn.closest(".drawer-sheet"));
+            closeDrawer(btn.closest<HTMLElement>(".drawer-sheet"));
           });
         });
 
