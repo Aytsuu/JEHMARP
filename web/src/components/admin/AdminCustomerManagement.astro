@@ -30,20 +30,19 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
         data-current-filter-query={filterQuery}
         aria-label="Filter customers"
       >
-        <label class="order-filter-form__field order-filter-form__field--search">
-          <span>Search</span>
+        <div class="order-filter-form__field order-filter-form__field--search">
           <input
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
             placeholder="Search name, email, contact, or assigned agent..."
             autocomplete="off"
+            aria-label="Search customers"
             data-customer-search-input
           />
-        </label>
-        <label class="order-filter-form__field">
-          <span>Type</span>
-          <select name="customerType">
+        </div>
+        <div class="order-filter-form__field">
+          <select name="customerType" aria-label="Filter by customer type">
             <option value="">All types</option>
             {customerTypes.map((customerType) => (
               <option value={customerType} selected={activeFilters.customerType === customerType}>
@@ -51,7 +50,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
               </option>
             ))}
           </select>
-        </label>
+        </div>
       </form>
 
       <div class="order-management-toolbar__actions"></div>
@@ -62,12 +61,12 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
         <table class="dashboard-table">
           <thead>
             <tr>
-              <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Customer</th>
-              <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Email</th>
-              <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Contact</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Type</th>
-              <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Assigned Agent</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Action</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Email</th>
+              <th scope="col">Contact</th>
+              <th scope="col">Type</th>
+              <th scope="col">Assigned Agent</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -79,22 +78,14 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
               </tr>
             ) : data.customers.map((customer) => (
               <tr>
-                <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  {fullName(customer)}
-                </td>
-                <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  {customer.email ?? "No email"}
-                </td>
-                <td style="width: 20%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  {customer.phone_number}
-                </td>
-                <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                  {customer.is_reseller ? "Reseller" : "Retail"}
-                </td>
-                <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <td class="dashboard-table__cell--truncate">{fullName(customer)}</td>
+                <td class="dashboard-table__cell--truncate">{customer.email ?? "No email"}</td>
+                <td class="dashboard-table__cell--truncate">{customer.phone_number}</td>
+                <td>{customer.is_reseller ? "Reseller" : "Retail"}</td>
+                <td class="dashboard-table__cell--truncate">
                   {data.agents.find((agent) => agent.id === customer.assigned_agent_id)?.display_name ?? "None"}
                 </td>
-                <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                <td>
                   <ViewButton href={`/admin/customers/${customer.id}`} />
                 </td>
               </tr>
@@ -129,12 +120,12 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
         <caption class="sr-only">Loading filtered customers</caption>
         <thead>
           <tr>
-            <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Customer</th>
-            <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Email</th>
-            <th scope="col" style="width: 20%; padding: 1.1rem 0.75rem;">Contact</th>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Type</th>
-            <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Assigned Agent</th>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Action</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Email</th>
+            <th scope="col">Contact</th>
+            <th scope="col">Type</th>
+            <th scope="col">Assigned Agent</th>
+            <th scope="col">Action</th>
           </tr>
         </thead>
         <tbody>

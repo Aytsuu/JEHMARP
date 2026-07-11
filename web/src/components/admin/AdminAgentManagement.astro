@@ -62,20 +62,19 @@ const skeletonRows = Array.from({ length: 6 });
         data-current-filter-query={filterQuery}
         aria-label="Filter agents"
       >
-        <label class="order-filter-form__field order-filter-form__field--search">
-          <span>Search</span>
+        <div class="order-filter-form__field order-filter-form__field--search">
           <input
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
             placeholder="Search agent name, email, or contact..."
             autocomplete="off"
+            aria-label="Search agents"
             data-agent-search-input
           />
-        </label>
-        <label class="order-filter-form__field">
-          <span>Status</span>
-          <select name="status">
+        </div>
+        <div class="order-filter-form__field">
+          <select name="status" aria-label="Filter by status">
             <option value="">All statuses</option>
             {agentStatuses.map((status) => (
               <option value={status} selected={activeFilters.status === status}>
@@ -83,7 +82,7 @@ const skeletonRows = Array.from({ length: 6 });
               </option>
             ))}
           </select>
-        </label>
+        </div>
       </form>
 
       <div class="order-management-toolbar__actions">
@@ -101,12 +100,12 @@ const skeletonRows = Array.from({ length: 6 });
         <table class="dashboard-table">
           <thead>
             <tr>
-              <th scope="col" style="width: 18%; padding: 1.1rem 0.75rem;">Agent</th>
-              <th scope="col" style="width: 22%; padding: 1.1rem 0.75rem;">Email</th>
-              <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Contact</th>
-              <th scope="col" style="width: 12%; padding: 1.1rem 0.75rem;">Status</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Date Created</th>
-              <th scope="col" style="width: 18%; padding: 1.1rem 0.75rem;">Action</th>
+              <th scope="col">Agent</th>
+              <th scope="col">Email</th>
+              <th scope="col">Contact</th>
+              <th scope="col">Status</th>
+              <th scope="col">Date Created</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -116,13 +115,16 @@ const skeletonRows = Array.from({ length: 6 });
               </tr>
             ) : data.agents.map((agent) => (
               <tr data-status={agent.status}>
-                <td style="width: 18%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  <button type="button" class="table-cell-trigger" data-open-cell-popover data-popover-title={`Edit Display Name: ${agent.display_name}`} style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;">
-                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
-                      {agent.display_name}
-                    </span>
+                <td class="dashboard-table__cell--truncate">
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Display Name: ${agent.display_name}`}
+                  >
+                    <span>{agent.display_name}</span>
                   </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
+                  <div class="hidden-popover-form-holder">
                     <form method="post" class="admin-table-form">
                       <input type="hidden" name="action" value="update-agent" />
                       <input type="hidden" name="agentId" value={agent.id} />
@@ -132,29 +134,22 @@ const skeletonRows = Array.from({ length: 6 });
                     </form>
                   </div>
                 </td>
-                <td style="width: 22%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
-                    {agent.email ?? "No email"}
-                  </span>
+                <td class="dashboard-table__cell--truncate">
+                  <span>{agent.email ?? "No email"}</span>
                 </td>
-                <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                  <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block;">
-                    {agent.contact ?? "No contact"}
-                  </span>
+                <td class="dashboard-table__cell--truncate">
+                  <span>{agent.contact ?? "No contact"}</span>
                 </td>
-                <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                <td>
                   <button
                     type="button"
                     class="table-cell-trigger"
                     data-open-cell-popover
                     data-popover-title={`Edit Status: ${agent.display_name}`}
-                    style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;"
                   >
-                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
-                      {autoCapitalize(agent.status)}
-                    </span>
+                    <span>{autoCapitalize(agent.status)}</span>
                   </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
+                  <div class="hidden-popover-form-holder">
                     <form method="post" class="admin-table-form">
                       <input type="hidden" name="action" value="update-agent" />
                       <input type="hidden" name="agentId" value={agent.id} />
@@ -173,8 +168,8 @@ const skeletonRows = Array.from({ length: 6 });
                     </form>
                   </div>
                 </td>
-                <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(agent.created_at)}</td>
-                <td style="width: 18%; padding: 1.1rem 0.75rem; vertical-align: middle;"><ViewButton href={`/admin/agents/${agent.id}`} /></td>
+                <td>{formatDate(agent.created_at)}</td>
+                <td><ViewButton href={`/admin/agents/${agent.id}`} /></td>
               </tr>
             ))}
           </tbody>

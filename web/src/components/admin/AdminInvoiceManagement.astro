@@ -38,20 +38,19 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
         data-current-filter-query={filterQuery}
         aria-label="Filter invoices"
       >
-        <label class="order-filter-form__field order-filter-form__field--search">
-          <span>Search</span>
+        <div class="order-filter-form__field order-filter-form__field--search">
           <input
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
             placeholder="Search invoice number or customer name..."
             autocomplete="off"
+            aria-label="Search invoices"
             data-invoice-search-input
           />
-        </label>
-        <label class="order-filter-form__field">
-          <span>Balance</span>
-          <select name="balanceStatus">
+        </div>
+        <div class="order-filter-form__field">
+          <select name="balanceStatus" aria-label="Filter by balance status">
             <option value="">All balances</option>
             {invoiceBalanceStatuses.map((status) => (
               <option value={status} selected={activeFilters.balanceStatus === status}>
@@ -59,13 +58,13 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
               </option>
             ))}
           </select>
-        </label>
+        </div>
       </form>
     </div>
 
     <div data-invoice-table-shell>
       <div class="table-wrap">
-        <table class="dashboard-table dashboard-table--equal">
+        <table class="dashboard-table">
           <thead>
             <tr>
               <th scope="col">Invoice Number</th>
@@ -94,7 +93,7 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
 
               return (
                 <tr data-status={order.payment_status}>
-                  <td>
+                  <td class="dashboard-table__cell--truncate">
                     {invoice.invoice_number}
                   </td>
                   <td class="dashboard-table__cell--truncate">
@@ -140,7 +139,7 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
 
   <template data-invoice-filter-skeleton>
     <div class="table-wrap" aria-busy="true" aria-live="polite">
-      <table class="product-table-skeleton dashboard-table dashboard-table--equal">
+      <table class="product-table-skeleton dashboard-table">
         <caption class="sr-only">Loading filtered invoices</caption>
         <thead>
           <tr>

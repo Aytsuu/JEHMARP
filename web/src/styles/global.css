@@ -678,6 +678,10 @@
     outline-offset: 2px;
   }
 
+  .hidden-popover-form-holder {
+    display: none;
+  }
+
   .table-filters.product-management-toolbar,
   .table-filters.order-management-toolbar {
     display: grid;
@@ -3609,6 +3613,15 @@
     padding-right: 0.85rem;
   }
 
+  .table-filters__search {
+    flex: 1;
+    min-width: 15rem;
+  }
+
+  .table-filters__search input {
+    width: 100%;
+  }
+
   .table-filters select {
     border-radius: 0.375rem;
   }
@@ -3632,21 +3645,27 @@
     --dashboard-table-cell-padding-x: 0.7rem;
   }
 
-  .dashboard-table--equal th,
-  .dashboard-table--equal td {
-    width: 14%;
-  }
-
-  .dashboard-table__cell--image,
-  .dashboard-table__head--image {
-    width: 14%;
+  .dashboard-table__cell-form {
+    margin: 0;
   }
 
   .dashboard-table th,
   .dashboard-table td {
+    width: 14%;
     padding: var(--dashboard-table-cell-padding-y) var(--dashboard-table-cell-padding-x);
     min-height: 3rem;
     vertical-align: middle;
+  }
+
+  .dashboard-table th.dashboard-table__head--image,
+  .dashboard-table td.dashboard-table__cell--image {
+    width: 4rem;
+  }
+
+  .dashboard-table .unread-record-heading,
+  .dashboard-table .unread-record-cell {
+    width: 14%;
+    text-align: center;
   }
 
   .dashboard-table .table-cell-trigger {
@@ -3676,6 +3695,41 @@
     width: 100%;
     min-width: 0;
     overflow: hidden;
+  }
+
+  .dashboard-table__cell-inner .unread-record-form {
+    flex-shrink: 0;
+  }
+
+  .dashboard-table__cell-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+
+  .dashboard-table__cell--center {
+    text-align: center;
+  }
+
+  .dashboard-table__delivery-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: help;
+  }
+
+  .dashboard-table__delivery-status--sent {
+    color: #10b981;
+  }
+
+  .dashboard-table__delivery-status--failed {
+    color: #ef4444;
+  }
+
+  .dashboard-table__delivery-status--pending {
+    color: #6b7280;
   }
 
   .dashboard-table__image-button {

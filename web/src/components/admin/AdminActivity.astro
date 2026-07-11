@@ -16,13 +16,18 @@ const activityItems = buildAdminActivityItems(data);
     activityItems.length > 0 ? (
       <div data-interactive-table>
         <div class="table-filters">
-          <div style="flex: 1; min-width: 15rem;">
-            <input type="text" placeholder="Search activity..." data-search-input style="width: 100%;" />
+          <div class="table-filters__search">
+            <input
+              type="text"
+              placeholder="Search activity..."
+              data-search-input
+              aria-label="Search activity"
+            />
           </div>
         </div>
 
         <div class="table-wrap">
-          <table>
+          <table class="dashboard-table">
             <thead>
               <tr>
                 <th scope="col">Activity</th>
@@ -34,8 +39,8 @@ const activityItems = buildAdminActivityItems(data);
             <tbody>
               {activityItems.map((item) => (
                 <tr data-status={item.category}>
-                  <td>{item.title}</td>
-                  <td>{item.detail}</td>
+                  <td class="dashboard-table__cell--truncate">{item.title}</td>
+                  <td class="dashboard-table__cell--truncate">{item.detail}</td>
                   <td>{item.category}</td>
                   <td>{item.occurredAt}</td>
                 </tr>

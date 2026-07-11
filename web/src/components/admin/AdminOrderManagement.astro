@@ -67,7 +67,6 @@ const skeletonRows = Array.from({ length: 6 });
         <div class="order-create-section__body">
           <div class="admin-form-grid order-create-form__existing-customer-grid">
             <label class="field-row">
-              <span>Search customer</span>
               <p
                 class="order-create-form__existing-customer-notice"
                 hidden
@@ -78,6 +77,7 @@ const skeletonRows = Array.from({ length: 6 });
                   name="customerLookup"
                   autocomplete="off"
                   placeholder="Type a customer name"
+                  aria-label="Search customer"
                   data-customer-search
                   data-customer-search-input
                 />
@@ -338,20 +338,19 @@ const skeletonRows = Array.from({ length: 6 });
         data-current-filter-query={filterQuery}
         aria-label="Filter orders"
       >
-        <label class="order-filter-form__field order-filter-form__field--search">
-          <span>Search</span>
+        <div class="order-filter-form__field order-filter-form__field--search">
           <input
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
             placeholder="Search customer, phone, email, order ID..."
             autocomplete="off"
+            aria-label="Search orders"
             data-order-search-input
           />
-        </label>
-        <label class="order-filter-form__field">
-          <span>Source</span>
-          <select name="source">
+        </div>
+        <div class="order-filter-form__field">
+          <select name="source" aria-label="Filter by source">
             <option value="">All sources</option>
             {orderSources.map((source) => (
               <option value={source} selected={activeFilters.source === source}>
@@ -359,10 +358,9 @@ const skeletonRows = Array.from({ length: 6 });
               </option>
             ))}
           </select>
-        </label>
-        <label class="order-filter-form__field">
-          <span>Order status</span>
-          <select name="orderStatus">
+        </div>
+        <div class="order-filter-form__field">
+          <select name="orderStatus" aria-label="Filter by order status">
             <option value="">All order statuses</option>
             {orderStatuses.map((status) => (
               <option value={status} selected={activeFilters.orderStatus === status}>
@@ -370,10 +368,9 @@ const skeletonRows = Array.from({ length: 6 });
               </option>
             ))}
           </select>
-        </label>
-        <label class="order-filter-form__field">
-          <span>Payment status</span>
-          <select name="paymentStatus">
+        </div>
+        <div class="order-filter-form__field">
+          <select name="paymentStatus" aria-label="Filter by payment status">
             <option value="">All payment statuses</option>
             {paymentStatuses.map((status) => (
               <option value={status} selected={activeFilters.paymentStatus === status}>
@@ -381,7 +378,7 @@ const skeletonRows = Array.from({ length: 6 });
               </option>
             ))}
           </select>
-        </label>
+        </div>
       </form>
       <div class="order-management-toolbar__actions">
         <button
@@ -397,7 +394,7 @@ const skeletonRows = Array.from({ length: 6 });
 
     <div data-order-table-shell>
       <div class="table-wrap">
-        <table class="dashboard-table dashboard-table--equal">
+        <table class="dashboard-table">
           <thead>
             <tr>
               <th scope="col">Customer</th>
@@ -406,8 +403,8 @@ const skeletonRows = Array.from({ length: 6 });
               <th scope="col">Order Status</th>
               <th scope="col">Payment Status</th>
               <th scope="col">Order Total</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Action</th>
-              <th scope="col" class="unread-record-heading" style="width: 2%; padding: 1.1rem 0.75rem;"><span class="sr-only">Unread</span></th>
+              <th scope="col">Action</th>
+              <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
             </tr>
           </thead>
           <tbody>
@@ -427,23 +424,23 @@ const skeletonRows = Array.from({ length: 6 });
 
               return (
                 <tr data-status={order.order_status}>
-                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <td class="dashboard-table__cell--truncate">
                     {order.customer ? fullName(order.customer) : "Guest"}
                   </td>
-                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(order.created_at)}</td>
-                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatOrderSource(order.source)}</td>
-                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.order_status)}</td>
-                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{autoCapitalize(order.payment_status)}</td>
-                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(total)}</td>
-                  <td style="width: 14%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                    <form method="post" style="margin: 0;">
+                  <td>{formatDate(order.created_at)}</td>
+                  <td>{formatOrderSource(order.source)}</td>
+                  <td>{autoCapitalize(order.order_status)}</td>
+                  <td>{autoCapitalize(order.payment_status)}</td>
+                  <td>{formatCurrency(total)}</td>
+                  <td>
+                    <form method="post" class="dashboard-table__cell-form">
                       <input type="hidden" name="action" value="mark-order-read" />
                       <input type="hidden" name="orderId" value={order.id} />
                       <input type="hidden" name="returnTo" value={`/admin/orders/${order.id}`} />
                       <ViewButton type="submit" />
                     </form>
                   </td>
-                  <td class="unread-record-cell" style="width: 2%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                  <td class="unread-record-cell">
                     {isUnread && <span class="record-unread-dot" aria-label="Unread"></span>}
                   </td>
                 </tr>
@@ -475,18 +472,18 @@ const skeletonRows = Array.from({ length: 6 });
 
   <template data-order-filter-skeleton>
     <div class="table-wrap" aria-busy="true" aria-live="polite">
-      <table class="product-table-skeleton dashboard-table dashboard-table--equal">
+      <table class="product-table-skeleton dashboard-table">
         <caption class="sr-only">Loading filtered orders</caption>
         <thead>
           <tr>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Customer</th>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Date</th>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Source</th>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Order Status</th>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Payment Status</th>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Order Total</th>
-            <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Action</th>
-            <th scope="col" class="unread-record-heading" style="width: 2%; padding: 1.1rem 0.75rem;"><span class="sr-only">Unread</span></th>
+            <th scope="col">Customer</th>
+            <th scope="col">Date</th>
+            <th scope="col">Source</th>
+            <th scope="col">Order Status</th>
+            <th scope="col">Payment Status</th>
+            <th scope="col">Order Total</th>
+            <th scope="col">Action</th>
+            <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
           </tr>
         </thead>
         <tbody>
