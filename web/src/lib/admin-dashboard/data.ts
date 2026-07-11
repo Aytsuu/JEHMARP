@@ -103,19 +103,6 @@ const adminOrderSelect = `
   )
 `;
 
-const adminOrderRangeSelect = `
-  id,
-  customer_order_item (
-    id,
-    partial_quantity,
-    final_quantity,
-    unit_price
-  ),
-  invoice (
-    id
-  )
-`;
-
 export type AdminPage = {
   id: string;
   slug: string;
@@ -283,8 +270,6 @@ export type AdminDashboardData = {
   pages: AdminPage[];
   pageSections: AdminPageSection[];
   products: AdminProduct[];
-  productPriceRange: AdminProductPriceRange;
-  orderTotalRange: AdminOrderTotalRange;
   agents: AdminAgent[];
   customers: AdminCustomer[];
   orders: AdminOrder[];
@@ -301,21 +286,6 @@ export type AdminDashboardSummary = {
   resellerApplications: number;
 };
 
-export type AdminProductPriceRange = {
-  min: number;
-  max: number;
-};
-
-export type AdminOrderTotalRange = {
-  min: number;
-  max: number;
-};
-
-export type AdminInvoiceTotalRange = {
-  min: number;
-  max: number;
-};
-
 export type AdminDashboardDataOptions = {
   productFilters?: AdminProductFilters;
   orderFilters?: AdminOrderFilters;
@@ -326,12 +296,12 @@ export type AdminDashboardDataOptions = {
 
 export type AdminProductManagementData = Pick<
   AdminDashboardData,
-  "products" | "productPriceRange"
+  "products"
 >;
 
 export type AdminOrderManagementData = Pick<
   AdminDashboardData,
-  "agents" | "customers" | "orders" | "orderTotalRange" | "products"
+  "agents" | "customers" | "orders" | "products"
 >;
 
 export type AdminCustomerManagementData = Pick<
@@ -344,10 +314,7 @@ export type AdminAgentManagementData = Pick<
   "agents"
 >;
 
-export type AdminInvoiceManagementData = {
-  orders: AdminOrder[];
-  invoiceTotalRange: AdminInvoiceTotalRange;
-};
+export type AdminInvoiceManagementData = Pick<AdminDashboardData, "orders">;
 
 export type AdminInquiryManagementData = Pick<
   AdminDashboardData,
@@ -370,8 +337,6 @@ export async function loadAdminDashboardData(
     pages,
     pageSections,
     products,
-    productPriceRange,
-    orderTotalRange,
     agents,
     customers,
     orders,
@@ -381,8 +346,6 @@ export async function loadAdminDashboardData(
     loadPages(supabase),
     loadPageSections(supabase),
     loadProducts(supabase, options.productFilters),
-    loadProductPriceRange(supabase),
-    loadOrderTotalRange(supabase),
     loadAgents(supabase),
     loadCustomers(supabase),
     loadOrders(supabase, options.orderLimit ?? 50, options.orderFilters),
@@ -394,8 +357,6 @@ export async function loadAdminDashboardData(
     pages,
     pageSections,
     products,
-    productPriceRange,
-    orderTotalRange,
     agents,
     customers,
     orders,
@@ -434,9 +395,8 @@ export async function loadAdminOrderManagementData(
   orderFilters: AdminOrderFilters = {},
 ): Promise<AdminOrderManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [products, orderTotalRange, agents, customers, orders] = await Promise.all([
+  const [products, agents, customers, orders] = await Promise.all([
     loadProducts(supabase),
-    loadOrderTotalRange(supabase),
     loadAgents(supabase),
     loadCustomers(supabase),
     loadOrders(supabase, 50, orderFilters),
@@ -444,7 +404,6 @@ export async function loadAdminOrderManagementData(
 
   return {
     products,
-    orderTotalRange,
     agents,
     customers,
     orders,
@@ -457,14 +416,10 @@ export async function loadAdminProductManagementData(
   // Product filtering is used by the products fragment endpoint. Keep the query
   // server-side without loading the rest of the dashboard page payload.
   const supabase = createSupabaseAdminClient();
-  const [products, productPriceRange] = await Promise.all([
-    loadProducts(supabase, productFilters),
-    loadProductPriceRange(supabase),
-  ]);
+  const products = await loadProducts(supabase, productFilters);
 
   return {
     products,
-    productPriceRange,
   };
 }
 
@@ -472,14 +427,10 @@ export async function loadAdminInvoiceManagementData(
   invoiceFilters: AdminInvoiceFilters = {},
 ): Promise<AdminInvoiceManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [orders, invoiceTotalRange] = await Promise.all([
-    loadInvoices(supabase, 50, invoiceFilters),
-    loadInvoiceTotalRange(supabase),
-  ]);
+  const orders = await loadInvoices(supabase, 50, invoiceFilters);
 
   return {
     orders,
-    invoiceTotalRange,
   };
 }
 
@@ -568,32 +519,6 @@ async function loadPageSections(supabase: SupabaseAdminClient) {
   return (data ?? []) as AdminPageSection[];
 }
 
-async function loadProductPriceRange(
-  supabase: SupabaseAdminClient,
-): Promise<AdminProductPriceRange> {
-  const { data, error } = await supabase
-    .from("product")
-    .select("default_price");
-
-  if (error) throw new Error("Unable to load admin product price range.");
-
-  const prices = (data ?? [])
-    .map((product) => Number((product as { default_price?: unknown }).default_price))
-    .filter((price) => Number.isFinite(price) && price >= 0);
-
-  if (prices.length === 0) {
-    return {
-      min: 0,
-      max: 0,
-    };
-  }
-
-  return {
-    min: Math.min(...prices),
-    max: Math.max(...prices),
-  };
-}
-
 async function loadProducts(
   supabase: SupabaseAdminClient,
   filters: AdminProductFilters = {},
@@ -615,14 +540,6 @@ async function loadProducts(
 
   if (filters.stockStatus) {
     query = query.eq("stock_status", filters.stockStatus);
-  }
-
-  if (typeof filters.minPrice === "number") {
-    query = query.gte("default_price", filters.minPrice);
-  }
-
-  if (typeof filters.maxPrice === "number") {
-    query = query.lte("default_price", filters.maxPrice);
   }
 
   const { data, error } = await query
@@ -713,62 +630,6 @@ async function loadCustomers(
   return filterAdminCustomers(customers, filters, agentNamesById);
 }
 
-async function loadOrderTotalRange(
-  supabase: SupabaseAdminClient,
-): Promise<AdminOrderTotalRange> {
-  const { data, error } = await supabase
-    .from("customer_order")
-    .select(adminOrderRangeSelect);
-
-  if (error) throw new Error("Unable to load admin order total range.");
-
-  const totals = ((data ?? []) as unknown[])
-    .map(normalizeAdminOrder)
-    .map(getAdminOrderDisplayTotal)
-    .filter((total) => Number.isFinite(total) && total >= 0);
-
-  if (totals.length === 0) {
-    return {
-      min: 0,
-      max: 0,
-    };
-  }
-
-  return {
-    min: Math.min(...totals),
-    max: Math.max(...totals),
-  };
-}
-
-async function loadInvoiceTotalRange(
-  supabase: SupabaseAdminClient,
-): Promise<AdminInvoiceTotalRange> {
-  const { data, error } = await supabase
-    .from("customer_order")
-    .select(adminOrderRangeSelect)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error("Unable to load admin invoice total range.");
-
-  const totals = ((data ?? []) as unknown[])
-    .map(normalizeAdminOrder)
-    .filter(hasInvoice)
-    .map(getAdminInvoiceDisplayTotal)
-    .filter((total) => Number.isFinite(total) && total >= 0);
-
-  if (totals.length === 0) {
-    return {
-      min: 0,
-      max: 0,
-    };
-  }
-
-  return {
-    min: Math.min(...totals),
-    max: Math.max(...totals),
-  };
-}
-
 async function loadOrders(
   supabase: SupabaseAdminClient,
   limit: number,
@@ -827,23 +688,16 @@ function normalizeAdminOrder(order: unknown): AdminOrder {
 }
 
 function hasComputedOrderFilters(filters: AdminOrderFilters) {
-  return Boolean(
-    filters.search ||
-      typeof filters.minTotal === "number" ||
-      typeof filters.maxTotal === "number",
-  );
+  return Boolean(filters.search);
 }
 
 function filterAdminOrders(orders: AdminOrder[], filters: AdminOrderFilters) {
   const search = filters.search?.toLowerCase();
 
   return orders.filter((order) => {
-    const total = getAdminOrderDisplayTotal(order);
     const matchesSearch = !search || getAdminOrderSearchText(order).includes(search);
-    const matchesMinTotal = typeof filters.minTotal !== "number" || total >= filters.minTotal;
-    const matchesMaxTotal = typeof filters.maxTotal !== "number" || total <= filters.maxTotal;
 
-    return matchesSearch && matchesMinTotal && matchesMaxTotal;
+    return matchesSearch;
   });
 }
 
@@ -893,14 +747,11 @@ function filterAdminInvoices(orders: AdminOrder[], filters: AdminInvoiceFilters)
       return false;
     }
 
-    const total = getAdminInvoiceDisplayTotal(order);
     const matchesSearch = !search || getAdminInvoiceSearchText(order).includes(search);
     const matchesBalanceStatus =
       !filters.balanceStatus || order.payment_status === filters.balanceStatus;
-    const matchesMinTotal = typeof filters.minTotal !== "number" || total >= filters.minTotal;
-    const matchesMaxTotal = typeof filters.maxTotal !== "number" || total <= filters.maxTotal;
 
-    return matchesSearch && matchesBalanceStatus && matchesMinTotal && matchesMaxTotal;
+    return matchesSearch && matchesBalanceStatus;
   });
 }
 
@@ -927,20 +778,6 @@ function filterAdminCustomers(
 
     return matchesSearch && matchesType;
   });
-}
-
-function getAdminOrderDisplayTotal(order: AdminOrder) {
-  const quantityKey = order.invoice.length > 0 ? "final_quantity" : "partial_quantity";
-
-  return order.customer_order_item.reduce((total, item) => {
-    return total + item[quantityKey] * item.unit_price;
-  }, 0);
-}
-
-function getAdminInvoiceDisplayTotal(order: AdminOrder) {
-  return order.customer_order_item.reduce((total, item) => {
-    return total + item.final_quantity * item.unit_price;
-  }, 0);
 }
 
 function getAdminOrderSearchText(order: AdminOrder) {

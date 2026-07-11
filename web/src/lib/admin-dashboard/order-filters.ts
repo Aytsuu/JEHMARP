@@ -12,8 +12,6 @@ export type AdminOrderFilters = {
   source?: AdminOrderSource;
   orderStatus?: OrderStatus;
   paymentStatus?: AdminPaymentStatus;
-  minTotal?: number;
-  maxTotal?: number;
 };
 
 export function parseAdminOrderFilters(url: URL): AdminOrderFilters {
@@ -22,8 +20,6 @@ export function parseAdminOrderFilters(url: URL): AdminOrderFilters {
     ...optionalFilter("source", url.searchParams.get("source"), orderSources),
     ...optionalFilter("orderStatus", url.searchParams.get("orderStatus"), getOrderStatuses()),
     ...optionalFilter("paymentStatus", url.searchParams.get("paymentStatus"), paymentStatuses),
-    ...optionalNumberFilter("minTotal", url.searchParams.get("minTotal")),
-    ...optionalNumberFilter("maxTotal", url.searchParams.get("maxTotal")),
   };
 }
 
@@ -34,8 +30,6 @@ export function serializeAdminOrderFilters(filters: AdminOrderFilters): string {
   if (filters.source) params.set("source", filters.source);
   if (filters.orderStatus) params.set("orderStatus", filters.orderStatus);
   if (filters.paymentStatus) params.set("paymentStatus", filters.paymentStatus);
-  if (typeof filters.minTotal === "number") params.set("minTotal", String(filters.minTotal));
-  if (typeof filters.maxTotal === "number") params.set("maxTotal", String(filters.maxTotal));
 
   return params.toString();
 }
@@ -55,19 +49,5 @@ function optionalFilter<T extends string>(
 
   return normalized && allowedValues.includes(normalized as T)
     ? { [key]: normalized as T }
-    : {};
-}
-
-function optionalNumberFilter(
-  key: "minTotal" | "maxTotal",
-  value: string | null,
-) {
-  const normalized = value?.trim();
-  if (!normalized) return {};
-
-  const parsed = Number(normalized);
-
-  return Number.isFinite(parsed) && parsed >= 0
-    ? { [key]: parsed }
     : {};
 }

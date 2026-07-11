@@ -748,12 +748,9 @@ const categories: CategoryGroup[] = isAdmin
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.textContent = String(i);
-                btn.className = i === currentPage ? "btn-active-page" : "";
-                btn.style.padding = "0.25rem 0.65rem";
-                btn.style.minWidth = "2rem";
-                btn.style.border = "none";
-                btn.style.borderRadius = "0.25rem";
-                btn.style.cursor = "pointer";
+                btn.className = i === currentPage
+                  ? "table-pagination__page-button btn-active-page"
+                  : "table-pagination__page-button";
                 btn.addEventListener("click", () => {
                   currentPage = i;
                   updateTable();

@@ -43,23 +43,7 @@ const customerOptions = data.customers.map((customer) => ({
   paymentNotice: customerPaymentNoticeMap.get(customer.id) ?? "",
 }));
 const orderStatuses = getOrderStatuses();
-const hasActiveFilters = filterQuery.length > 0;
 const skeletonRows = Array.from({ length: 6 });
-const totalRangeMin = 0;
-const totalRangeMax = Math.max(
-  1,
-  Math.ceil(data.orderTotalRange.max),
-  Math.ceil(activeFilters.maxTotal ?? 0),
-  Math.ceil(activeFilters.minTotal ?? 0),
-);
-const activeMinTotal = Math.min(
-  totalRangeMax,
-  Math.max(totalRangeMin, activeFilters.minTotal ?? totalRangeMin),
-);
-const activeMaxTotal = Math.min(
-  totalRangeMax,
-  Math.max(activeMinTotal, activeFilters.maxTotal ?? totalRangeMax),
-);
 ---
 
 <section id="admin-orders" class="admin-panel" aria-labelledby="admin-orders-title">
@@ -398,71 +382,8 @@ const activeMaxTotal = Math.min(
             ))}
           </select>
         </label>
-        <fieldset
-          class="order-filter-form__total-range"
-          data-order-total-range
-          data-total-min={totalRangeMin}
-          data-total-max={totalRangeMax}
-        >
-          <legend>Order total</legend>
-          <input
-            type="hidden"
-            name="minTotal"
-            value={activeFilters.minTotal ?? ""}
-            data-total-min-hidden
-          />
-          <input
-            type="hidden"
-            name="maxTotal"
-            value={activeFilters.maxTotal ?? ""}
-            data-total-max-hidden
-          />
-          <div class="order-filter-form__range-values" aria-live="polite">
-            <span data-total-min-label>{formatCurrency(activeMinTotal)}</span>
-            <span data-total-max-label>{formatCurrency(activeMaxTotal)}</span>
-          </div>
-          <div class="dual-range-slider">
-            <div class="dual-range-slider__track" aria-hidden="true">
-              <span class="dual-range-slider__fill" data-total-range-fill></span>
-            </div>
-            <input
-              type="range"
-              min={totalRangeMin}
-              max={totalRangeMax}
-              step="1"
-              value={activeMinTotal}
-              aria-label="Minimum order total"
-              data-total-min-range
-            />
-            <input
-              type="range"
-              min={totalRangeMin}
-              max={totalRangeMax}
-              step="1"
-              value={activeMaxTotal}
-              aria-label="Maximum order total"
-              data-total-max-range
-            />
-          </div>
-        </fieldset>
-        <a
-          href="/admin/orders"
-          class="order-filter-form__reset"
-          data-order-filter-reset
-          hidden={!hasActiveFilters}
-        >
-          Clear
-        </a>
       </form>
       <div class="order-management-toolbar__actions">
-        <label class="order-management-toolbar__limit">
-          <span>Show</span>
-          <select data-limit-select>
-            <option value="10">10</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </label>
         <button
           type="button"
           class="btn-table-manage order-management-toolbar__create"
@@ -476,15 +397,15 @@ const activeMaxTotal = Math.min(
 
     <div data-order-table-shell>
       <div class="table-wrap">
-        <table style="table-layout: fixed; width: 100%;">
+        <table class="dashboard-table dashboard-table--equal">
           <thead>
             <tr>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Customer</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Date</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Source</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Order Status</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Payment Status</th>
-              <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Order Total</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Date</th>
+              <th scope="col">Source</th>
+              <th scope="col">Order Status</th>
+              <th scope="col">Payment Status</th>
+              <th scope="col">Order Total</th>
               <th scope="col" style="width: 14%; padding: 1.1rem 0.75rem;">Action</th>
               <th scope="col" class="unread-record-heading" style="width: 2%; padding: 1.1rem 0.75rem;"><span class="sr-only">Unread</span></th>
             </tr>
@@ -534,18 +455,27 @@ const activeMaxTotal = Math.min(
     </div>
 
       <div class="table-pagination">
-        <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
-        <div style="display: flex; gap: 0.25rem; align-items: center;">
-          <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
-          <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
-          <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
-        </div>
+      <div class="table-pagination__summary">
+        <span data-page-info></span>
+        <label class="table-pagination__limit">
+          <select data-limit-select>
+            <option value="10">10 rows</option>
+            <option value="50">50 rows</option>
+            <option value="100">100 rows</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-pagination__controls">
+        <button type="button" data-pagination-prev class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+        <div data-pagination-numbers class="table-pagination__numbers"></div>
+        <button type="button" data-pagination-next class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
+      </div>
       </div>
     </div>
 
   <template data-order-filter-skeleton>
     <div class="table-wrap" aria-busy="true" aria-live="polite">
-      <table class="product-table-skeleton" style="table-layout: fixed; width: 100%;">
+      <table class="product-table-skeleton dashboard-table dashboard-table--equal">
         <caption class="sr-only">Loading filtered orders</caption>
         <thead>
           <tr>
@@ -851,8 +781,6 @@ const activeMaxTotal = Math.min(
     const form = document.querySelector<HTMLFormElement>("[data-order-filter-form]");
     const tableShell = document.querySelector<HTMLElement>("[data-order-table-shell]");
     const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-order-filter-skeleton]");
-    const resetLink = document.querySelector<HTMLAnchorElement>("[data-order-filter-reset]");
-
     if (!form || !tableShell || !skeletonTemplate) return;
     if (form.dataset.orderFilterInitialized === "true") return;
     form.dataset.orderFilterInitialized = "true";
@@ -862,19 +790,9 @@ const activeMaxTotal = Math.min(
     const activeSkeletonTemplate = skeletonTemplate;
     const cacheKey = "admin-orders-filter-cache-v1";
     const fragmentPath = "/admin/orders-fragment";
-    const filterKeys = ["search", "source", "orderStatus", "paymentStatus", "minTotal", "maxTotal"] as const;
+    const filterKeys = ["search", "source", "orderStatus", "paymentStatus"] as const;
     const autoSubmitFields = activeForm.querySelectorAll<HTMLSelectElement>("select");
     const searchInput = activeForm.querySelector<HTMLInputElement>("[data-order-search-input]");
-    const totalRange = activeForm.querySelector<HTMLElement>("[data-order-total-range]");
-    const minRange = activeForm.querySelector<HTMLInputElement>("[data-total-min-range]");
-    const maxRange = activeForm.querySelector<HTMLInputElement>("[data-total-max-range]");
-    const minHidden = activeForm.querySelector<HTMLInputElement>("[data-total-min-hidden]");
-    const maxHidden = activeForm.querySelector<HTMLInputElement>("[data-total-max-hidden]");
-    const minLabel = activeForm.querySelector<HTMLElement>("[data-total-min-label]");
-    const maxLabel = activeForm.querySelector<HTMLElement>("[data-total-max-label]");
-    const rangeFill = activeForm.querySelector<HTMLElement>("[data-total-range-fill]");
-    const totalMin = Number(totalRange?.dataset.totalMin ?? "0");
-    const totalMax = Number(totalRange?.dataset.totalMax ?? "1");
     let submitTimer: number | undefined;
     let searchTimer: number | undefined;
     let activeFetchController: AbortController | undefined;
@@ -921,45 +839,6 @@ const activeMaxTotal = Math.min(
 
     function buildUrl(path: string, targetQuery: string) {
       return targetQuery ? `${path}?${targetQuery}` : path;
-    }
-
-    function formatTotal(value: number) {
-      return new Intl.NumberFormat("en-PH", {
-        style: "currency",
-        currency: "PHP",
-        maximumFractionDigits: 0,
-      }).format(value);
-    }
-
-    function syncTotalRange() {
-      if (!minRange || !maxRange || !minHidden || !maxHidden) return;
-
-      let minValue = Number(minRange.value);
-      let maxValue = Number(maxRange.value);
-
-      if (minValue > maxValue) {
-        if (document.activeElement === minRange) {
-          maxValue = minValue;
-          maxRange.value = String(maxValue);
-        } else {
-          minValue = maxValue;
-          minRange.value = String(minValue);
-        }
-      }
-
-      minHidden.value = minValue > totalMin ? String(minValue) : "";
-      maxHidden.value = maxValue < totalMax ? String(maxValue) : "";
-
-      if (minLabel) minLabel.textContent = formatTotal(minValue);
-      if (maxLabel) maxLabel.textContent = formatTotal(maxValue);
-
-      if (rangeFill) {
-        const span = Math.max(totalMax - totalMin, 1);
-        const left = ((minValue - totalMin) / span) * 100;
-        const right = 100 - ((maxValue - totalMin) / span) * 100;
-        rangeFill.style.left = `${left}%`;
-        rangeFill.style.right = `${right}%`;
-      }
     }
 
     function showSkeletonForQuery(targetQuery: string) {
@@ -1021,7 +900,6 @@ const activeMaxTotal = Math.min(
         );
         replaceOrdersFragment(fragmentHtml);
         activeForm.dataset.currentFilterQuery = targetQuery;
-        if (resetLink) resetLink.hidden = targetQuery.length === 0;
         writeCache([...readCache(), targetQuery]);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -1039,7 +917,6 @@ const activeMaxTotal = Math.min(
     function submitFilters() {
       window.clearTimeout(submitTimer);
       submitTimer = window.setTimeout(() => {
-        syncTotalRange();
         void applyFilters(normalizeFormQuery());
       }, 120);
     }
@@ -1048,7 +925,6 @@ const activeMaxTotal = Math.min(
 
     activeForm.addEventListener("submit", (event) => {
       event.preventDefault();
-      syncTotalRange();
       void applyFilters(normalizeFormQuery());
     });
 
@@ -1059,21 +935,6 @@ const activeMaxTotal = Math.min(
     searchInput?.addEventListener("input", () => {
       window.clearTimeout(searchTimer);
       searchTimer = window.setTimeout(submitFilters, 450);
-    });
-
-    minRange?.addEventListener("input", syncTotalRange);
-    maxRange?.addEventListener("input", syncTotalRange);
-    minRange?.addEventListener("change", submitFilters);
-    maxRange?.addEventListener("change", submitFilters);
-    syncTotalRange();
-
-    resetLink?.addEventListener("click", (event) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-        return;
-      }
-
-      event.preventDefault();
-      void applyFilters("");
     });
   }
 

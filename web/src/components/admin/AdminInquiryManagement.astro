@@ -12,7 +12,6 @@ type Props = {
 };
 
 const { data, inquiryStatuses, activeFilters, filterQuery } = Astro.props;
-const hasActiveFilters = filterQuery.length > 0;
 const skeletonRows = Array.from({ length: 6 });
 ---
 
@@ -33,13 +32,8 @@ const skeletonRows = Array.from({ length: 6 });
             ))}
           </select>
         </label>
-        <a href="/admin/inquiries" class="order-filter-form__reset" data-inquiry-filter-reset hidden={!hasActiveFilters}>Clear</a>
       </form>
       <div class="order-management-toolbar__actions">
-        <label class="order-management-toolbar__limit">
-          <span>Show</span>
-          <select data-limit-select><option value="10">10</option><option value="50">50</option><option value="100">100</option></select>
-        </label>
       </div>
     </div>
     <div data-inquiry-table-shell>
@@ -67,7 +61,7 @@ const skeletonRows = Array.from({ length: 6 });
         </table>
       </div>
     </div>
-    <div class="table-pagination"><span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span><div style="display: flex; gap: 0.25rem; align-items: center;"><button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button><div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div><button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button></div></div>
+    <div class="table-pagination"><div class="table-pagination__summary"><span data-page-info></span><label class="table-pagination__limit"><select data-limit-select><option value="10">10 rows</option><option value="50">50 rows</option><option value="100">100 rows</option></select></label></div><div class="table-pagination__controls"><button type="button" data-pagination-prev class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button><div data-pagination-numbers class="table-pagination__numbers"></div><button type="button" data-pagination-next class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button></div></div>
   </div>
   <template data-inquiry-filter-skeleton><div class="table-wrap" aria-busy="true" aria-live="polite"><table class="product-table-skeleton" style="table-layout: fixed; width: 100%;"><caption class="sr-only">Loading filtered inquiries</caption><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Contact</th><th scope="col">Message</th><th scope="col">Status</th></tr></thead><tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody></table></div></template>
 </section>
@@ -77,7 +71,6 @@ const skeletonRows = Array.from({ length: 6 });
     const form = document.querySelector<HTMLFormElement>("[data-inquiry-filter-form]");
     const tableShell = document.querySelector<HTMLElement>("[data-inquiry-table-shell]");
     const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-inquiry-filter-skeleton]");
-    const resetLink = document.querySelector<HTMLAnchorElement>("[data-inquiry-filter-reset]");
     if (!form || !tableShell || !skeletonTemplate) return;
     if (form.dataset.inquiryFilterInitialized === "true") return;
     form.dataset.inquiryFilterInitialized = "true";
@@ -94,13 +87,12 @@ const skeletonRows = Array.from({ length: 6 });
     function buildUrl(path: string, targetQuery: string) { return targetQuery ? `${path}?${targetQuery}` : path; }
     function showSkeletonForQuery(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); const cachedQueries = readCache(); if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) return; const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true); if (skeleton) activeTableShell.replaceChildren(skeleton); }
     function replaceFragment(fragmentHtml: string) { const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html"); const nextTableShell = parsed.querySelector<HTMLElement>("[data-inquiry-table-shell]"); if (!nextTableShell) throw new Error("Inquiries fragment did not include a table."); activeTableShell.innerHTML = nextTableShell.innerHTML; document.dispatchEvent(new Event("dashboard:interactive-table-updated")); }
-    async function applyFilters(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); if (targetQuery === currentQuery) return; showSkeletonForQuery(targetQuery); activeFetchController?.abort(); const fetchController = new AbortController(); activeFetchController = fetchController; try { const response = await fetch(buildUrl(fragmentPath, targetQuery), { headers: { "X-Requested-With": "fetch" }, signal: fetchController.signal }); if (!response.ok) throw new Error(`Inquiry filters failed with ${response.status}.`); const fragmentHtml = await response.text(); window.history.replaceState({ inquiryFilterQuery: targetQuery }, "", buildUrl("/admin/inquiries", targetQuery)); replaceFragment(fragmentHtml); activeForm.dataset.currentFilterQuery = targetQuery; if (resetLink) resetLink.hidden = targetQuery.length === 0; writeCache([...readCache(), targetQuery]); } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; window.location.href = buildUrl("/admin/inquiries", targetQuery); } finally { if (activeFetchController === fetchController) activeFetchController = undefined; } }
+    async function applyFilters(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); if (targetQuery === currentQuery) return; showSkeletonForQuery(targetQuery); activeFetchController?.abort(); const fetchController = new AbortController(); activeFetchController = fetchController; try { const response = await fetch(buildUrl(fragmentPath, targetQuery), { headers: { "X-Requested-With": "fetch" }, signal: fetchController.signal }); if (!response.ok) throw new Error(`Inquiry filters failed with ${response.status}.`); const fragmentHtml = await response.text(); window.history.replaceState({ inquiryFilterQuery: targetQuery }, "", buildUrl("/admin/inquiries", targetQuery)); replaceFragment(fragmentHtml); activeForm.dataset.currentFilterQuery = targetQuery; writeCache([...readCache(), targetQuery]); } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; window.location.href = buildUrl("/admin/inquiries", targetQuery); } finally { if (activeFetchController === fetchController) activeFetchController = undefined; } }
     function submitFilters() { window.clearTimeout(submitTimer); submitTimer = window.setTimeout(() => { void applyFilters(normalizeFormQuery()); }, 120); }
     writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
     activeForm.addEventListener("submit", (event) => { event.preventDefault(); void applyFilters(normalizeFormQuery()); });
     autoSubmitFields.forEach((field) => field.addEventListener("change", submitFilters));
     searchInput?.addEventListener("input", () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(submitFilters, 450); });
-    resetLink?.addEventListener("click", (event) => { if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); void applyFilters(""); });
   }
   document.addEventListener("DOMContentLoaded", initAdminInquiryFilters);
   document.addEventListener("astro:after-swap", initAdminInquiryFilters);

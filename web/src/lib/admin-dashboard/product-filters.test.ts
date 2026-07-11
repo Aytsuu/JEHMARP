@@ -6,23 +6,21 @@ import {
 } from "./product-filters";
 
 describe("parseAdminProductFilters", () => {
-  it("parses supported search, category, status, and price range filters", () => {
+  it("parses supported search, category, and status filters", () => {
     const filters = parseAdminProductFilters(
-      new URL("https://example.test/admin/products?search= belly &category=pork&stockStatus=limited&minPrice=100&maxPrice=250.50"),
+      new URL("https://example.test/admin/products?search= belly &category=pork&stockStatus=limited"),
     );
 
     expect(filters).toEqual({
       search: "belly",
       category: "pork",
       stockStatus: "limited",
-      minPrice: 100,
-      maxPrice: 250.5,
     });
   });
 
   it("ignores unsupported or invalid filter values", () => {
     const filters = parseAdminProductFilters(
-      new URL("https://example.test/admin/products?category=beef&stockStatus=hidden&minPrice=-1&maxPrice=bad"),
+      new URL("https://example.test/admin/products?category=beef&stockStatus=hidden"),
     );
 
     expect(filters).toEqual({});
@@ -36,9 +34,7 @@ describe("serializeAdminProductFilters", () => {
         search: "egg tray",
         stockStatus: "in_stock",
         category: "egg",
-        maxPrice: 300,
-        minPrice: 50,
       }),
-    ).toBe("search=egg+tray&category=egg&stockStatus=in_stock&minPrice=50&maxPrice=300");
+    ).toBe("search=egg+tray&category=egg&stockStatus=in_stock");
   });
 });

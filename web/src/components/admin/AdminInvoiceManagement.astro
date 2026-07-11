@@ -19,23 +19,7 @@ type Props = {
 };
 
 const { data, activeFilters, filterQuery } = Astro.props;
-const hasActiveFilters = filterQuery.length > 0;
 const skeletonRows = Array.from({ length: 6 });
-const totalRangeMin = 0;
-const totalRangeMax = Math.max(
-  1,
-  Math.ceil(data.invoiceTotalRange.max),
-  Math.ceil(activeFilters.maxTotal ?? 0),
-  Math.ceil(activeFilters.minTotal ?? 0),
-);
-const activeMinTotal = Math.min(
-  totalRangeMax,
-  Math.max(totalRangeMin, activeFilters.minTotal ?? totalRangeMin),
-);
-const activeMaxTotal = Math.min(
-  totalRangeMax,
-  Math.max(activeMinTotal, activeFilters.maxTotal ?? totalRangeMax),
-);
 
 function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
   if (status === "partial") return "Partial payment";
@@ -76,86 +60,21 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
             ))}
           </select>
         </label>
-        <fieldset
-          class="order-filter-form__total-range"
-          data-invoice-total-range
-          data-total-min={totalRangeMin}
-          data-total-max={totalRangeMax}
-        >
-          <legend>Invoice total</legend>
-          <input
-            type="hidden"
-            name="minTotal"
-            value={activeFilters.minTotal ?? ""}
-            data-total-min-hidden
-          />
-          <input
-            type="hidden"
-            name="maxTotal"
-            value={activeFilters.maxTotal ?? ""}
-            data-total-max-hidden
-          />
-          <div class="order-filter-form__range-values" aria-live="polite">
-            <span data-total-min-label>{formatCurrency(activeMinTotal)}</span>
-            <span data-total-max-label>{formatCurrency(activeMaxTotal)}</span>
-          </div>
-          <div class="dual-range-slider">
-            <div class="dual-range-slider__track" aria-hidden="true">
-              <span class="dual-range-slider__fill" data-total-range-fill></span>
-            </div>
-            <input
-              type="range"
-              min={totalRangeMin}
-              max={totalRangeMax}
-              step="1"
-              value={activeMinTotal}
-              aria-label="Minimum invoice total"
-              data-total-min-range
-            />
-            <input
-              type="range"
-              min={totalRangeMin}
-              max={totalRangeMax}
-              step="1"
-              value={activeMaxTotal}
-              aria-label="Maximum invoice total"
-              data-total-max-range
-            />
-          </div>
-        </fieldset>
-        <a
-          href="/admin/invoices"
-          class="order-filter-form__reset"
-          data-invoice-filter-reset
-          hidden={!hasActiveFilters}
-        >
-          Clear
-        </a>
       </form>
-      <div class="order-management-toolbar__actions">
-        <label class="order-management-toolbar__limit">
-          <span>Show</span>
-          <select data-limit-select>
-            <option value="10">10</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </label>
-      </div>
     </div>
 
     <div data-invoice-table-shell>
       <div class="table-wrap">
-        <table style="table-layout: fixed; width: 100%;">
+        <table class="dashboard-table dashboard-table--equal">
           <thead>
             <tr>
-              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Invoice Number</th>
-              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Customer</th>
-              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Date</th>
-              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Invoice Total</th>
-              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Paid</th>
-              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Balance</th>
-              <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Action</th>
+              <th scope="col">Invoice Number</th>
+              <th scope="col">Customer</th>
+              <th scope="col">Date</th>
+              <th scope="col">Invoice Total</th>
+              <th scope="col">Paid</th>
+              <th scope="col">Balance</th>
+              <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -175,17 +94,17 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
 
               return (
                 <tr data-status={order.payment_status}>
-                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                  <td>
                     {invoice.invoice_number}
                   </td>
-                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <td class="dashboard-table__cell--truncate">
                     {order.customer ? fullName(order.customer) : "Guest"}
                   </td>
-                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatDate(invoice.created_at)}</td>
-                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(invoiceTotal)}</td>
-                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(paidTotal)}</td>
-                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">{formatCurrency(balance)}</td>
-                  <td style="width: 14.28%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                  <td>{formatDate(invoice.created_at)}</td>
+                  <td>{formatCurrency(invoiceTotal)}</td>
+                  <td>{formatCurrency(paidTotal)}</td>
+                  <td>{formatCurrency(balance)}</td>
+                  <td>
                     <TableActionMenu
                       menuLabel={`Open actions for ${invoice.invoice_number}`}
                       pdfHref={salesInvoicePdfHref}
@@ -201,28 +120,37 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
     </div>
 
     <div class="table-pagination">
-      <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
-      <div style="display: flex; gap: 0.25rem; align-items: center;">
-        <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
-        <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
-        <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+      <div class="table-pagination__summary">
+        <span data-page-info></span>
+        <label class="table-pagination__limit">
+          <select data-limit-select>
+            <option value="10">10 rows</option>
+            <option value="50">50 rows</option>
+            <option value="100">100 rows</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-pagination__controls">
+        <button type="button" data-pagination-prev class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+        <div data-pagination-numbers class="table-pagination__numbers"></div>
+        <button type="button" data-pagination-next class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
       </div>
     </div>
   </div>
 
   <template data-invoice-filter-skeleton>
     <div class="table-wrap" aria-busy="true" aria-live="polite">
-      <table class="product-table-skeleton" style="table-layout: fixed; width: 100%;">
+      <table class="product-table-skeleton dashboard-table dashboard-table--equal">
         <caption class="sr-only">Loading filtered invoices</caption>
         <thead>
           <tr>
-            <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Invoice Number</th>
-            <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Customer</th>
-            <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Date</th>
-            <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Invoice Total</th>
-            <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Paid</th>
-            <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Balance</th>
-            <th scope="col" style="width: 14.28%; padding: 1.1rem 0.75rem;">Action</th>
+            <th scope="col">Invoice Number</th>
+            <th scope="col">Customer</th>
+            <th scope="col">Date</th>
+            <th scope="col">Invoice Total</th>
+            <th scope="col">Paid</th>
+            <th scope="col">Balance</th>
+            <th scope="col">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -248,8 +176,6 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
     const form = document.querySelector<HTMLFormElement>("[data-invoice-filter-form]");
     const tableShell = document.querySelector<HTMLElement>("[data-invoice-table-shell]");
     const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-invoice-filter-skeleton]");
-    const resetLink = document.querySelector<HTMLAnchorElement>("[data-invoice-filter-reset]");
-
     if (!form || !tableShell || !skeletonTemplate) return;
     if (form.dataset.invoiceFilterInitialized === "true") return;
     form.dataset.invoiceFilterInitialized = "true";
@@ -259,19 +185,9 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
     const activeSkeletonTemplate = skeletonTemplate;
     const cacheKey = "admin-invoices-filter-cache-v1";
     const fragmentPath = "/admin/invoices-fragment";
-    const filterKeys = ["search", "balanceStatus", "minTotal", "maxTotal"] as const;
+    const filterKeys = ["search", "balanceStatus"] as const;
     const autoSubmitFields = activeForm.querySelectorAll<HTMLSelectElement>("select");
     const searchInput = activeForm.querySelector<HTMLInputElement>("[data-invoice-search-input]");
-    const totalRange = activeForm.querySelector<HTMLElement>("[data-invoice-total-range]");
-    const minRange = activeForm.querySelector<HTMLInputElement>("[data-total-min-range]");
-    const maxRange = activeForm.querySelector<HTMLInputElement>("[data-total-max-range]");
-    const minHidden = activeForm.querySelector<HTMLInputElement>("[data-total-min-hidden]");
-    const maxHidden = activeForm.querySelector<HTMLInputElement>("[data-total-max-hidden]");
-    const minLabel = activeForm.querySelector<HTMLElement>("[data-total-min-label]");
-    const maxLabel = activeForm.querySelector<HTMLElement>("[data-total-max-label]");
-    const rangeFill = activeForm.querySelector<HTMLElement>("[data-total-range-fill]");
-    const totalMin = Number(totalRange?.dataset.totalMin ?? "0");
-    const totalMax = Number(totalRange?.dataset.totalMax ?? "1");
     let submitTimer: number | undefined;
     let searchTimer: number | undefined;
     let activeFetchController: AbortController | undefined;
@@ -318,45 +234,6 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
 
     function buildUrl(path: string, targetQuery: string) {
       return targetQuery ? `${path}?${targetQuery}` : path;
-    }
-
-    function formatTotal(value: number) {
-      return new Intl.NumberFormat("en-PH", {
-        style: "currency",
-        currency: "PHP",
-        maximumFractionDigits: 0,
-      }).format(value);
-    }
-
-    function syncTotalRange() {
-      if (!minRange || !maxRange || !minHidden || !maxHidden) return;
-
-      let minValue = Number(minRange.value);
-      let maxValue = Number(maxRange.value);
-
-      if (minValue > maxValue) {
-        if (document.activeElement === minRange) {
-          maxValue = minValue;
-          maxRange.value = String(maxValue);
-        } else {
-          minValue = maxValue;
-          minRange.value = String(minValue);
-        }
-      }
-
-      minHidden.value = minValue > totalMin ? String(minValue) : "";
-      maxHidden.value = maxValue < totalMax ? String(maxValue) : "";
-
-      if (minLabel) minLabel.textContent = formatTotal(minValue);
-      if (maxLabel) maxLabel.textContent = formatTotal(maxValue);
-
-      if (rangeFill) {
-        const span = Math.max(totalMax - totalMin, 1);
-        const left = ((minValue - totalMin) / span) * 100;
-        const right = 100 - ((maxValue - totalMin) / span) * 100;
-        rangeFill.style.left = `${left}%`;
-        rangeFill.style.right = `${right}%`;
-      }
     }
 
     function showSkeletonForQuery(targetQuery: string) {
@@ -418,7 +295,6 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
         );
         replaceInvoicesFragment(fragmentHtml);
         activeForm.dataset.currentFilterQuery = targetQuery;
-        if (resetLink) resetLink.hidden = targetQuery.length === 0;
         writeCache([...readCache(), targetQuery]);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -436,7 +312,6 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
     function submitFilters() {
       window.clearTimeout(submitTimer);
       submitTimer = window.setTimeout(() => {
-        syncTotalRange();
         void applyFilters(normalizeFormQuery());
       }, 120);
     }
@@ -445,7 +320,6 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
 
     activeForm.addEventListener("submit", (event) => {
       event.preventDefault();
-      syncTotalRange();
       void applyFilters(normalizeFormQuery());
     });
 
@@ -456,21 +330,6 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
     searchInput?.addEventListener("input", () => {
       window.clearTimeout(searchTimer);
       searchTimer = window.setTimeout(submitFilters, 450);
-    });
-
-    minRange?.addEventListener("input", syncTotalRange);
-    maxRange?.addEventListener("input", syncTotalRange);
-    minRange?.addEventListener("change", submitFilters);
-    maxRange?.addEventListener("change", submitFilters);
-    syncTotalRange();
-
-    resetLink?.addEventListener("click", (event) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-        return;
-      }
-
-      event.preventDefault();
-      void applyFilters("");
     });
   }
 

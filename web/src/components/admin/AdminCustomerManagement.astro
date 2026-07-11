@@ -12,7 +12,6 @@ type Props = {
 };
 
 const { data, activeFilters, filterQuery } = Astro.props;
-const hasActiveFilters = filterQuery.length > 0;
 const skeletonRows = Array.from({ length: 6 });
 
 function formatCustomerType(customerType: (typeof customerTypes)[number]) {
@@ -53,31 +52,14 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             ))}
           </select>
         </label>
-        <a
-          href="/admin/customers"
-          class="order-filter-form__reset"
-          data-customer-filter-reset
-          hidden={!hasActiveFilters}
-        >
-          Clear
-        </a>
       </form>
 
-      <div class="order-management-toolbar__actions">
-        <label class="order-management-toolbar__limit">
-          <span>Show</span>
-          <select data-limit-select>
-            <option value="10">10</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </label>
-      </div>
+      <div class="order-management-toolbar__actions"></div>
     </div>
 
     <div data-customer-table-shell>
       <div class="table-wrap">
-        <table style="table-layout: fixed; width: 100%;">
+        <table class="dashboard-table">
           <thead>
             <tr>
               <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Customer</th>
@@ -123,18 +105,27 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
     </div>
 
     <div class="table-pagination">
-      <span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span>
-      <div style="display: flex; gap: 0.25rem; align-items: center;">
-        <button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button>
-        <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
-        <button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button>
+      <div class="table-pagination__summary">
+        <span data-page-info></span>
+        <label class="table-pagination__limit">
+          <select data-limit-select>
+            <option value="10">10 rows</option>
+            <option value="50">50 rows</option>
+            <option value="100">100 rows</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-pagination__controls">
+        <button type="button" data-pagination-prev class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+        <div data-pagination-numbers class="table-pagination__numbers"></div>
+        <button type="button" data-pagination-next class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
       </div>
     </div>
   </div>
 
   <template data-customer-filter-skeleton>
     <div class="table-wrap" aria-busy="true" aria-live="polite">
-      <table class="product-table-skeleton" style="table-layout: fixed; width: 100%;">
+      <table class="product-table-skeleton dashboard-table">
         <caption class="sr-only">Loading filtered customers</caption>
         <thead>
           <tr>
@@ -168,8 +159,6 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
     const form = document.querySelector<HTMLFormElement>("[data-customer-filter-form]");
     const tableShell = document.querySelector<HTMLElement>("[data-customer-table-shell]");
     const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-customer-filter-skeleton]");
-    const resetLink = document.querySelector<HTMLAnchorElement>("[data-customer-filter-reset]");
-
     if (!form || !tableShell || !skeletonTemplate) return;
     if (form.dataset.customerFilterInitialized === "true") return;
     form.dataset.customerFilterInitialized = "true";
@@ -289,7 +278,6 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
         );
         replaceCustomersFragment(fragmentHtml);
         activeForm.dataset.currentFilterQuery = targetQuery;
-        if (resetLink) resetLink.hidden = targetQuery.length === 0;
         writeCache([...readCache(), targetQuery]);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -327,14 +315,6 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
       searchTimer = window.setTimeout(submitFilters, 450);
     });
 
-    resetLink?.addEventListener("click", (event) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-        return;
-      }
-
-      event.preventDefault();
-      void applyFilters("");
-    });
   }
 
   document.addEventListener("DOMContentLoaded", initAdminCustomerFilters);

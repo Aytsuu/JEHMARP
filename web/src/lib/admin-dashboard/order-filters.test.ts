@@ -6,9 +6,9 @@ import {
 } from "./order-filters";
 
 describe("parseAdminOrderFilters", () => {
-  it("parses supported search, source, status, payment, and total range filters", () => {
+  it("parses supported search, source, status, and payment filters", () => {
     const filters = parseAdminOrderFilters(
-      new URL("https://example.test/admin/orders?search= maria   cruz &source=guest_shop&orderStatus=pending&paymentStatus=partial&minTotal=1000&maxTotal=2500.75"),
+      new URL("https://example.test/admin/orders?search= maria   cruz &source=guest_shop&orderStatus=pending&paymentStatus=partial"),
     );
 
     expect(filters).toEqual({
@@ -16,14 +16,12 @@ describe("parseAdminOrderFilters", () => {
       source: "guest_shop",
       orderStatus: "pending",
       paymentStatus: "partial",
-      minTotal: 1000,
-      maxTotal: 2500.75,
     });
   });
 
   it("ignores unsupported or invalid filter values", () => {
     const filters = parseAdminOrderFilters(
-      new URL("https://example.test/admin/orders?source=marketplace&orderStatus=missing&paymentStatus=unknown&minTotal=-1&maxTotal=bad"),
+      new URL("https://example.test/admin/orders?source=marketplace&orderStatus=missing&paymentStatus=unknown"),
     );
 
     expect(filters).toEqual({});
@@ -38,9 +36,7 @@ describe("serializeAdminOrderFilters", () => {
         paymentStatus: "paid",
         orderStatus: "processing",
         source: "agent_submitted",
-        maxTotal: 3000,
-        minTotal: 500,
       }),
-    ).toBe("search=order+42&source=agent_submitted&orderStatus=processing&paymentStatus=paid&minTotal=500&maxTotal=3000");
+    ).toBe("search=order+42&source=agent_submitted&orderStatus=processing&paymentStatus=paid");
   });
 });

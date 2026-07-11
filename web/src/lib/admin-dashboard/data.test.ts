@@ -109,16 +109,12 @@ describe("loadAdminDashboardData", () => {
         search: "belly",
         category: "pork",
         stockStatus: "limited",
-        minPrice: 100,
-        maxPrice: 250,
       },
     });
 
     expect(productBuilder.or).toHaveBeenCalledWith("name.ilike.%belly%,description.ilike.%belly%");
     expect(productBuilder.eq).toHaveBeenCalledWith("category", "pork");
     expect(productBuilder.eq).toHaveBeenCalledWith("stock_status", "limited");
-    expect(productBuilder.gte).toHaveBeenCalledWith("default_price", 100);
-    expect(productBuilder.lte).toHaveBeenCalledWith("default_price", 250);
   });
 
   it("loads product management data without loading the rest of the dashboard", async () => {
@@ -132,16 +128,11 @@ describe("loadAdminDashboardData", () => {
     });
 
     expect(createSupabaseAdminClient).toHaveBeenCalledTimes(1);
-    expect(from).toHaveBeenCalledTimes(2);
+    expect(from).toHaveBeenCalledTimes(1);
     expect(from).toHaveBeenNthCalledWith(1, "product");
-    expect(from).toHaveBeenNthCalledWith(2, "product");
     expect(productBuilder.or).toHaveBeenCalledWith("name.ilike.%belly%,description.ilike.%belly%");
     expect(result).toEqual({
       products: [],
-      productPriceRange: {
-        min: 0,
-        max: 0,
-      },
     });
   });
 
@@ -166,7 +157,7 @@ describe("loadAdminDashboardData", () => {
     expect(orderBuilder.eq).toHaveBeenCalledWith("payment_status", "partial");
   });
 
-  it("filters admin orders by search and total on the server", async () => {
+  it("filters admin orders by search on the server", async () => {
     const matchingOrder = createMockOrder();
     const lowTotalOrder = createMockOrder({
       id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
@@ -219,14 +210,12 @@ describe("loadAdminDashboardData", () => {
 
     const result = await loadAdminOrderManagementData({
       search: "maria",
-      minTotal: 1000,
-      maxTotal: 1500,
     });
 
-    expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id]);
+    expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id, lowTotalOrder.id]);
   });
 
-  it("filters admin invoices by invoice number, customer name, balance status, and total", async () => {
+  it("filters admin invoices by invoice number, customer name, and balance status", async () => {
     const matchingOrder = createMockOrder({
       payment_status: "partial",
       invoice: {
@@ -280,15 +269,9 @@ describe("loadAdminDashboardData", () => {
     const result = await loadAdminInvoiceManagementData({
       search: "inv-00000042 maria",
       balanceStatus: "partial",
-      minTotal: 1500,
-      maxTotal: 2000,
     });
 
     expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id]);
-    expect(result.invoiceTotalRange).toEqual({
-      min: 1800,
-      max: 1800,
-    });
   });
 
   it("filters admin customers by name, email, contact, assigned agent, and type", async () => {
