@@ -290,13 +290,15 @@ export type AdminDashboardData = {
   orders: AdminOrder[];
   contactInquiries: AdminContactInquiry[];
   resellerApplications: AdminResellerApplication[];
-  summary: {
-    submittedOrders: number;
-    openInquiries: number;
-    customers: number;
-    activeProducts: number;
-    newResellerApplications: number;
-  };
+  summary: AdminDashboardSummary;
+};
+
+export type AdminDashboardSummary = {
+  orders: number;
+  inquiries: number;
+  customers: number;
+  products: number;
+  resellerApplications: number;
 };
 
 export type AdminProductPriceRange = {
@@ -399,16 +401,33 @@ export async function loadAdminDashboardData(
     orders,
     contactInquiries,
     resellerApplications,
-    summary: {
-      submittedOrders: orders.filter((order) => order.order_status === "pending").length,
-      openInquiries: contactInquiries.filter((inquiry) => inquiry.inquiry_status !== "closed").length,
-      customers: customers.length,
-      activeProducts: products.filter((product) => product.is_active).length,
-      newResellerApplications: resellerApplications.filter(
-        (application) => application.application_status === "submitted",
-      ).length,
-    },
+    summary: buildAdminDashboardSummary({
+      orders,
+      customers,
+      products,
+      contactInquiries,
+      resellerApplications,
+    }),
   };
+}
+
+export async function loadAdminDashboardSummaryData(): Promise<AdminDashboardSummary> {
+  const supabase = createSupabaseAdminClient();
+  const [orders, customers, products, contactInquiries, resellerApplications] = await Promise.all([
+    loadDashboardSummaryOrders(supabase),
+    loadDashboardSummaryCustomers(supabase),
+    loadDashboardSummaryProducts(supabase),
+    loadDashboardSummaryContactInquiries(supabase),
+    loadDashboardSummaryResellerApplications(supabase),
+  ]);
+
+  return buildAdminDashboardSummary({
+    orders,
+    customers,
+    products,
+    contactInquiries,
+    resellerApplications,
+  });
 }
 
 export async function loadAdminOrderManagementData(
@@ -1157,4 +1176,86 @@ async function loadResellerApplications(
 
     return matchesSearch && matchesStatus;
   });
+}
+
+function buildAdminDashboardSummary({
+  orders,
+  customers,
+  products,
+  contactInquiries,
+  resellerApplications,
+}: Pick<
+  AdminDashboardData,
+  "orders" | "customers" | "products" | "contactInquiries" | "resellerApplications"
+>): AdminDashboardSummary {
+  return {
+    orders: orders.length,
+    inquiries: contactInquiries.length,
+    customers: customers.length,
+    products: products.length,
+    resellerApplications: resellerApplications.length,
+  };
+}
+
+async function loadDashboardSummaryOrders(
+  supabase: SupabaseAdminClient,
+): Promise<AdminOrder[]> {
+  const { data, error } = await supabase
+    .from("customer_order")
+    .select("id, customer_order_item(id), invoice(id)")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error("Unable to load admin orders.");
+
+  return ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+}
+
+async function loadDashboardSummaryCustomers(
+  supabase: SupabaseAdminClient,
+): Promise<AdminCustomer[]> {
+  const { data, error } = await supabase
+    .from("customer")
+    .select("id");
+
+  if (error) throw new Error("Unable to load admin customers.");
+
+  return (data ?? []) as AdminCustomer[];
+}
+
+async function loadDashboardSummaryProducts(
+  supabase: SupabaseAdminClient,
+): Promise<AdminProduct[]> {
+  const { data, error } = await supabase
+    .from("product")
+    .select("id");
+
+  if (error) throw new Error("Unable to load admin products.");
+
+  return (data ?? []) as AdminProduct[];
+}
+
+async function loadDashboardSummaryContactInquiries(
+  supabase: SupabaseAdminClient,
+): Promise<AdminContactInquiry[]> {
+  const { data, error } = await supabase
+    .from("contact_inquiry")
+    .select("id")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error("Unable to load admin contact inquiries.");
+
+  return (data ?? []) as AdminContactInquiry[];
+}
+
+async function loadDashboardSummaryResellerApplications(
+  supabase: SupabaseAdminClient,
+): Promise<AdminResellerApplication[]> {
+  const { data, error } = await supabase
+    .from("reseller_application")
+    .select("id")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error("Unable to load admin reseller applications.");
+
+  return (data ?? []) as AdminResellerApplication[];
 }

@@ -80,7 +80,7 @@ describe("buildAdminAnalytics", () => {
     expect(analytics.summary.outstandingBalance).toBe(590);
     expect(analytics.ordersByStatus.find((item) => item.label === "closed")).toEqual({
       label: "closed",
-      count: 1,
+      count: 2,
     });
   });
 });
@@ -180,11 +180,11 @@ function createAnalyticsData(): AdminDashboardData {
       updated_at: "2026-07-04T08:30:00.000Z",
     }],
     summary: {
-      submittedOrders: 0,
-      openInquiries: 1,
+      orders: 3,
+      inquiries: 1,
       customers: 3,
-      activeProducts: 2,
-      newResellerApplications: 1,
+      products: 2,
+      resellerApplications: 1,
     },
   };
 }

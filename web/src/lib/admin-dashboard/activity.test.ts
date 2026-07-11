@@ -155,11 +155,11 @@ function createAdminDashboardData(): AdminDashboardData {
       updated_at: "2026-07-04T14:00:00.000Z",
     }],
     summary: {
-      submittedOrders: 0,
-      openInquiries: 0,
+      orders: 1,
+      inquiries: 1,
       customers: 1,
-      activeProducts: 1,
-      newResellerApplications: 1,
+      products: 1,
+      resellerApplications: 1,
     },
   };
 }
