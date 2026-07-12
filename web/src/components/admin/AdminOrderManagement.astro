@@ -43,7 +43,7 @@ for (const order of data.orders) {
 
 const customerOptions = data.customers.map((customer) => ({
   customer,
-  label: `${fullName(customer)} - ${customer.phone_number}`,
+  label: fullName(customer),
   paymentNotice: customerPaymentNoticeMap.get(customer.id) ?? "",
 }));
 const orderStatuses = getOrderStatuses();
@@ -133,10 +133,7 @@ const skeletonRows = Array.from({ length: 6 });
                 data-customer-is-reseller={String(customer.is_reseller)}
                 data-customer-payment-notice={paymentNotice}
               >
-                <span class="order-customer-picker__option-title">{label}</span>
-                <span class="order-customer-picker__option-meta">
-                  {customer.email ?? customer.address}
-                </span>
+                {label}
               </button>
             ))}
           </template>
@@ -548,7 +545,6 @@ const skeletonRows = Array.from({ length: 6 });
           skeleton.className = "order-customer-picker__skeleton";
           skeleton.innerHTML = `
             <span class="table-skeleton-block table-skeleton-block--wide"></span>
-            <span class="table-skeleton-block table-skeleton-block--short"></span>
           `;
           return skeleton;
         }),
