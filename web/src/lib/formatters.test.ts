@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { autoCapitalize, formatOrderSource } from "./formatters";
+import {
+  autoCapitalize,
+  formatOrderSource,
+  parseContactNumber,
+  parseEmailAddress,
+} from "./formatters";
 
 describe("autoCapitalize", () => {
   it("should capitalize a single word", () => {
@@ -37,5 +42,36 @@ describe("formatOrderSource", () => {
 
   it("should return N/A for null/undefined", () => {
     expect(formatOrderSource(null)).toBe("N/A");
+  });
+});
+
+describe("parseEmailAddress", () => {
+  it("normalizes and validates email addresses", () => {
+    expect(parseEmailAddress(" Agent@Example.Test ")).toBe("agent@example.test");
+  });
+
+  it("rejects invalid email addresses", () => {
+    expect(() => parseEmailAddress("not-an-email")).toThrow("Enter a valid email address.");
+  });
+});
+
+describe("parseContactNumber", () => {
+  it("accepts digit-only contact numbers", () => {
+    expect(parseContactNumber(" 09171234567 ")).toBe("09171234567");
+  });
+
+  it("rejects contact numbers that are not exactly 11 digits", () => {
+    expect(() => parseContactNumber("0917123456")).toThrow(
+      "Contact number must be exactly 11 digits.",
+    );
+    expect(() => parseContactNumber("091712345678")).toThrow(
+      "Contact number must be exactly 11 digits.",
+    );
+  });
+
+  it("rejects contact numbers with non-digit characters", () => {
+    expect(() => parseContactNumber("0917-123-4567")).toThrow(
+      "Contact number must be exactly 11 digits.",
+    );
   });
 });

@@ -1,0 +1,43 @@
+---
+import AdminContentPageLayout from "@/components/admin/AdminContentPageLayout.astro";
+import AdminContentPreviewFrame from "@/components/admin/AdminContentPreviewFrame.astro";
+import PageShell from "@/components/PageShell.astro";
+import PublicContactPageContent from "@/components/public-website/PublicContactPageContent.astro";
+import { loadAdminContentPreviewPage } from "@/lib/admin-dashboard/content-preview-page";
+import { getPublicEnv } from "@/lib/env";
+import { ADMIN_CONTENT_PREVIEW_ROOT } from "@/lib/public-website/admin-content-preview";
+import { getPublicPageContent } from "@/lib/public-website/content";
+import { getContactInquiryFeedback } from "@/lib/public-website/contact-inquiries";
+
+export const prerender = false;
+
+const preview = await loadAdminContentPreviewPage(Astro);
+
+if (!preview.ready) {
+  return preview.response;
+}
+
+const contactPath = `${ADMIN_CONTENT_PREVIEW_ROOT}/contact`;
+const content = await getPublicPageContent(Astro, "contact");
+const title = content.page?.title ?? "Contact";
+const { turnstileSiteKey } = getPublicEnv();
+const feedback = getContactInquiryFeedback(Astro.url);
+---
+
+<AdminContentPageLayout
+  title={`${title} Preview - JEHMARP`}
+  description="Admin contact page preview."
+  feedback={preview.feedback}
+  dashboardData={preview.dashboardData}
+>
+  <AdminContentPreviewFrame activePath="/contact">
+    <PageShell title={title}>
+      <PublicContactPageContent
+        content={content}
+        feedback={feedback}
+        turnstileSiteKey={turnstileSiteKey ?? null}
+        returnPath={contactPath}
+      />
+    </PageShell>
+  </AdminContentPreviewFrame>
+</AdminContentPageLayout>

@@ -1,0 +1,19 @@
+---
+import TableEmptyIllustration from "@/components/dashboard/TableEmptyIllustration.astro";
+
+type Props = {
+  colspan: number;
+  message: string;
+};
+
+const { colspan, message } = Astro.props;
+---
+
+<tr class="empty-row">
+  <td colspan={colspan} class="empty-state">
+    <div class="dashboard-table-empty-state">
+      <TableEmptyIllustration />
+      <p class="dashboard-table-empty-state__message">{message}</p>
+    </div>
+  </td>
+</tr>

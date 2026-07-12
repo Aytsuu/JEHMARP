@@ -1,0 +1,208 @@
+---
+import {
+  plannedTransactionTypeLabels,
+  type ResellerApplicationFeedback,
+} from "@/lib/public-website/reseller-applications";
+
+type Props = {
+  feedback: ResellerApplicationFeedback | null;
+  turnstileSiteKey: string | null;
+  returnPath?: string;
+};
+
+const { feedback, turnstileSiteKey, returnPath } = Astro.props;
+const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
+---
+
+{
+  feedback?.status === "submitted" && (
+    <section class="message-block" aria-labelledby="reseller-confirmation">
+      <h2 id="reseller-confirmation">Application submitted</h2>
+      <p>Your reseller application was submitted for review.</p>
+      {feedback.reference && <p>Reference: {feedback.reference}</p>}
+    </section>
+  )
+}
+
+{
+  feedback?.status === "error" && (
+    <section class="message-block" aria-labelledby="reseller-error">
+      <h2 id="reseller-error">Application was not submitted</h2>
+      <p>{feedback.message}</p>
+    </section>
+  )
+}
+
+<div class="business-layout">
+  <div class="business-info">
+    <section
+      aria-labelledby="what-it-means-heading"
+      class="business-info__section"
+    >
+      <h3 id="what-it-means-heading" class="business-subtitle">
+        What it means to be a Reseller
+      </h3>
+      <p class="business-text">
+        JEHMARP supports retailers, market sellers, restaurants, and online
+        merchants that need dependable meat supply with clear product pricing. As
+        a verified reseller, you get access to preferred wholesale pricing, bulk
+        packaging, and scheduled fresh deliveries to support your daily
+        operations.
+      </p>
+    </section>
+
+    <section aria-labelledby="how-to-be-heading" class="business-info__section">
+      <h3 id="how-to-be-heading" class="business-subtitle">
+        How to be a Reseller
+      </h3>
+      <ol class="reseller-steps">
+        <li>
+          <strong>Submit Application</strong>
+          <p>
+            Fill out the business details and expected weekly volume in the form
+            on the right.
+          </p>
+        </li>
+        <li>
+          <strong>Verification & Review</strong>
+          <p>
+            Our administration team checks applications to align on volume and
+            logistics.
+          </p>
+        </li>
+        <li>
+          <strong>Wholesale Ordering</strong>
+          <p>
+            Once verified, you will receive the active price list and start
+            submitting orders.
+          </p>
+        </li>
+      </ol>
+    </section>
+  </div>
+
+  <div class="business-form">
+    <section
+      class="form-section"
+      aria-labelledby="reseller-application-title"
+      style="margin-top: 0;"
+    >
+      <h3
+        id="reseller-application-title"
+        class="business-subtitle"
+        style="margin-bottom: 1.5rem;"
+      >
+        Reseller Form
+      </h3>
+      <form class="form-grid" method="post" action="/api/reseller-applications">
+        {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
+        <fieldset class="fieldset-block">
+          <legend>Business details</legend>
+          <div class="form-grid form-grid--two-column">
+            <div class="field-row">
+              <label for="name">Name</label>
+              <input
+                id="name"
+                name="name"
+                required
+                autocomplete="name"
+                maxlength="120"
+              />
+            </div>
+            <div class="field-row">
+              <label for="email">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autocomplete="email"
+                maxlength="254"
+              />
+            </div>
+            <div class="field-row">
+              <label for="contactNumber">Contact number</label>
+              <input
+                id="contactNumber"
+                name="contactNumber"
+                required
+                autocomplete="tel"
+                maxlength="50"
+              />
+            </div>
+            <div class="field-row">
+              <label for="plannedTransactionType">Transaction type</label>
+              <select
+                id="plannedTransactionType"
+                name="plannedTransactionType"
+                required
+              >
+                <option value="">Select type</option>
+                {
+                  plannedTransactionOptions.map(([value, label]) => (
+                    <option value={value}>{label}</option>
+                  ))
+                }
+              </select>
+            </div>
+          </div>
+          <div class="field-row">
+            <label for="address">Business address</label>
+            <textarea
+              id="address"
+              name="address"
+              required
+              autocomplete="street-address"
+              maxlength="500"></textarea>
+          </div>
+        </fieldset>
+
+        <fieldset class="fieldset-block">
+          <legend>Supply needs</legend>
+          <div class="field-row">
+            <label for="expectedQuantityPerWeek">Expected quantity per week</label
+            >
+            <input
+              id="expectedQuantityPerWeek"
+              name="expectedQuantityPerWeek"
+              required
+              maxlength="120"
+              placeholder="Example: 40 kg chicken, 20 kg pork"
+            />
+          </div>
+          <div class="field-row">
+            <label for="message">Message</label>
+            <textarea id="message" name="message" maxlength="1000"></textarea>
+          </div>
+        </fieldset>
+
+        <div class="turnstile-container">
+          {
+            turnstileSiteKey ? (
+              <div class="cf-turnstile" data-sitekey={turnstileSiteKey} />
+            ) : (
+              <p class="error-message">Reseller verification is not configured.</p>
+            )
+          }
+        </div>
+
+        <div class="button-row">
+          <button type="submit" disabled={!turnstileSiteKey}
+            >Submit application</button
+          >
+        </div>
+      </form>
+    </section>
+  </div>
+</div>
+
+{
+  turnstileSiteKey && (
+    <script
+      is:inline
+      src="https://challenges.cloudflare.com/turnstile/v0/api.js"
+      async
+      defer
+    />
+  )
+}

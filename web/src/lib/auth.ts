@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { throwLoadError } from "@/lib/load-error";
 
 export type DashboardRole = "admin" | "agent";
 
@@ -12,11 +13,11 @@ export async function getSignedInUser(context: RequestContext) {
   const { data, error } = await supabase.auth.getUser();
 
   if (error) {
-    if (isMissingSessionError(error)) {
+    if (isRecoverableSessionError(error)) {
       return null;
     }
 
-    throw new Error("Unable to load the signed-in user.");
+    throwLoadError("Unable to load the signed-in user.");
   }
 
   return data.user;
@@ -43,7 +44,7 @@ export async function getDashboardRoleWithClient(
     .maybeSingle();
 
   if (adminError) {
-    throw new Error("Unable to load admin role.");
+    throwLoadError("Unable to load admin role.");
   }
 
   if (adminRole) {
@@ -58,7 +59,7 @@ export async function getDashboardRoleWithClient(
     .maybeSingle();
 
   if (agentError) {
-    throw new Error("Unable to load agent profile.");
+    throwLoadError("Unable to load agent profile.");
   }
 
   if (!agentProfile) {
@@ -80,10 +81,23 @@ export function getLoginErrorMessage(value: string | null) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
-function isMissingSessionError(error: { name?: string; message?: string; status?: number }) {
+function isRecoverableSessionError(error: {
+  code?: string;
+  name?: string;
+  message?: string;
+  status?: number;
+}) {
+  const message = typeof error.message === "string" ? error.message.toLowerCase() : "";
+
   return (
     error.name === "AuthSessionMissingError"
     || error.status === 400
-    || (typeof error.message === "string" && error.message.toLowerCase().includes("session"))
+    || error.status === 401
+    || error.code === "session_not_found"
+    || message.includes("session")
+    || message.includes("jwt")
+    || message.includes("token")
+    || message.includes("refresh token")
+    || message.includes("invalid claim")
   );
 }

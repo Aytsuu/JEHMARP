@@ -6,22 +6,20 @@ import {
 } from "./invoice-filters";
 
 describe("parseAdminInvoiceFilters", () => {
-  it("parses supported search, balance, and total range filters", () => {
+  it("parses supported search and balance filters", () => {
     const filters = parseAdminInvoiceFilters(
-      new URL("https://example.test/admin/invoices?search= inv-0042   maria cruz &balanceStatus=partial&minTotal=1000&maxTotal=2500.75"),
+      new URL("https://example.test/admin/invoices?search= inv-0042   maria cruz &balanceStatus=partial"),
     );
 
     expect(filters).toEqual({
       search: "inv-0042 maria cruz",
       balanceStatus: "partial",
-      minTotal: 1000,
-      maxTotal: 2500.75,
     });
   });
 
   it("ignores unsupported or invalid invoice filter values", () => {
     const filters = parseAdminInvoiceFilters(
-      new URL("https://example.test/admin/invoices?balanceStatus=refunded&minTotal=-1&maxTotal=bad"),
+      new URL("https://example.test/admin/invoices?balanceStatus=refunded"),
     );
 
     expect(filters).toEqual({});
@@ -34,9 +32,7 @@ describe("serializeAdminInvoiceFilters", () => {
       serializeAdminInvoiceFilters({
         search: "INV-42 maria",
         balanceStatus: "paid",
-        minTotal: 500,
-        maxTotal: 3000,
       }),
-    ).toBe("search=INV-42+maria&balanceStatus=paid&minTotal=500&maxTotal=3000");
+    ).toBe("search=INV-42+maria&balanceStatus=paid");
   });
 });

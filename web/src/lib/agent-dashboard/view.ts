@@ -46,7 +46,7 @@ export function orderBalance(order: AgentOrder) {
 
 export function orderExpectedCommission(order: AgentOrder) {
   const total = order.customer_order_item.reduce((sum, item) => {
-    if (item.agent_commission_status !== "set" && item.agent_commission_status !== "paid") {
+    if (item.agent_commission_amount <= 0) {
       return sum;
     }
 

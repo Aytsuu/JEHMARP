@@ -82,13 +82,7 @@ jobs:
         run: supabase db lint --local --fail-on error
 
       - name: Run SQL tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          for file in supabase/tests/*.sql; do
-            echo "Running ${file}"
-            supabase db query --local --file "${file}"
-          done
+        run: bash supabase/tests/run.sh
 
       - name: Link production Supabase project
         run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "$SUPABASE_DB_PASSWORD"

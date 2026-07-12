@@ -1,11 +1,8 @@
 ---
 import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
-import {
-  getPublicPageContent,
-  getSectionEntries,
-  getSectionHeading,
-} from "@/lib/public-website/content";
+import PublicOurStoryPageContent from "@/components/public-website/PublicOurStoryPageContent.astro";
+import { getPublicPageContent } from "@/lib/public-website/content";
 
 const content = await getPublicPageContent(Astro, "our-story");
 const title = content.page?.title ?? "Our Story";
@@ -13,32 +10,6 @@ const title = content.page?.title ?? "Our Story";
 
 <Layout title={`${title} - JEHMARP`} description="JEHMARP public story page.">
   <PageShell title={title}>
-    <div class="our-story-container">
-      <h2 class="page-title-brand">OUR STORY</h2>
-      <div class="our-story-content">
-        {
-          content.sections.length > 0 ? (
-            content.sections.map((section) => {
-              const entries = getSectionEntries(section);
-              const heading = getSectionHeading(section);
-              const hasCustomHeading = heading && heading !== "Our Story" && heading !== "Section";
-
-              return (
-                <div class="our-story-section">
-                  {hasCustomHeading && (
-                    <h3 class="our-story-subheading">{heading}</h3>
-                  )}
-                  {entries.map(([, value]) => (
-                    <p class="our-story-paragraph">{value}</p>
-                  ))}
-                </div>
-              );
-            })
-          ) : (
-            <p class="our-story-paragraph">Our story has not been published yet.</p>
-          )
-        }
-      </div>
-    </div>
+    <PublicOurStoryPageContent content={content} />
   </PageShell>
 </Layout>

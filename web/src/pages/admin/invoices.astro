@@ -1,9 +1,7 @@
 ---
 import AdminInvoiceManagement from "@/components/admin/AdminInvoiceManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import {
-  formatAdminActionFeedback,
-} from "@/lib/admin-dashboard/actions";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import {
   loadAdminDashboardData,
   loadAdminInvoiceManagementData,
@@ -34,7 +32,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
 <AdminPageFrame
   title="Admin Invoices - JEHMARP"
   description="Admin invoice creation, payment tracking, and balance management."
-  heading="Invoice Management"
+  heading="Invoice Records"
   intro="Review invoices created from orders, open sales invoice PDFs, and record payments."
   feedback={feedback}
   dashboardData={dashboardData}

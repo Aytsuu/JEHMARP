@@ -66,8 +66,7 @@ function createMockOrder(overrides: Record<string, unknown> = {}) {
         price_type: "retail",
         add_details: null,
         agent_commission_amount: 0,
-        agent_commission_status: "unset",
-        agent_commission_notes: null,
+        agent_commission_paid: false,
         product: null,
       },
     ],
@@ -109,16 +108,12 @@ describe("loadAdminDashboardData", () => {
         search: "belly",
         category: "pork",
         stockStatus: "limited",
-        minPrice: 100,
-        maxPrice: 250,
       },
     });
 
     expect(productBuilder.or).toHaveBeenCalledWith("name.ilike.%belly%,description.ilike.%belly%");
     expect(productBuilder.eq).toHaveBeenCalledWith("category", "pork");
     expect(productBuilder.eq).toHaveBeenCalledWith("stock_status", "limited");
-    expect(productBuilder.gte).toHaveBeenCalledWith("default_price", 100);
-    expect(productBuilder.lte).toHaveBeenCalledWith("default_price", 250);
   });
 
   it("loads product management data without loading the rest of the dashboard", async () => {
@@ -132,16 +127,11 @@ describe("loadAdminDashboardData", () => {
     });
 
     expect(createSupabaseAdminClient).toHaveBeenCalledTimes(1);
-    expect(from).toHaveBeenCalledTimes(2);
+    expect(from).toHaveBeenCalledTimes(1);
     expect(from).toHaveBeenNthCalledWith(1, "product");
-    expect(from).toHaveBeenNthCalledWith(2, "product");
     expect(productBuilder.or).toHaveBeenCalledWith("name.ilike.%belly%,description.ilike.%belly%");
     expect(result).toEqual({
       products: [],
-      productPriceRange: {
-        min: 0,
-        max: 0,
-      },
     });
   });
 
@@ -166,7 +156,7 @@ describe("loadAdminDashboardData", () => {
     expect(orderBuilder.eq).toHaveBeenCalledWith("payment_status", "partial");
   });
 
-  it("filters admin orders by search and total on the server", async () => {
+  it("filters admin orders by search on the server", async () => {
     const matchingOrder = createMockOrder();
     const lowTotalOrder = createMockOrder({
       id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
@@ -189,8 +179,7 @@ describe("loadAdminDashboardData", () => {
           price_type: "retail",
           add_details: null,
           agent_commission_amount: 0,
-          agent_commission_status: "unset",
-          agent_commission_notes: null,
+          agent_commission_paid: false,
           product: null,
         },
       ],
@@ -219,14 +208,12 @@ describe("loadAdminDashboardData", () => {
 
     const result = await loadAdminOrderManagementData({
       search: "maria",
-      minTotal: 1000,
-      maxTotal: 1500,
     });
 
-    expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id]);
+    expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id, lowTotalOrder.id]);
   });
 
-  it("filters admin invoices by invoice number, customer name, balance status, and total", async () => {
+  it("filters admin invoices by invoice number, customer name, and balance status", async () => {
     const matchingOrder = createMockOrder({
       payment_status: "partial",
       invoice: {
@@ -280,15 +267,9 @@ describe("loadAdminDashboardData", () => {
     const result = await loadAdminInvoiceManagementData({
       search: "inv-00000042 maria",
       balanceStatus: "partial",
-      minTotal: 1500,
-      maxTotal: 2000,
     });
 
     expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id]);
-    expect(result.invoiceTotalRange).toEqual({
-      min: 1800,
-      max: 1800,
-    });
   });
 
   it("filters admin customers by name, email, contact, assigned agent, and type", async () => {
@@ -335,7 +316,22 @@ describe("loadAdminDashboardData", () => {
       if (table === "agent_profile") return agentBuilder;
       return createQueryBuilder();
     });
-    createSupabaseAdminClient.mockReturnValue({ from });
+    createSupabaseAdminClient.mockReturnValue({
+      from,
+      auth: {
+        admin: {
+          listUsers: vi.fn(() => Promise.resolve({
+            data: {
+              users: [{
+                id: "user-1",
+                email: "carlos@example.test",
+              }],
+            },
+            error: null,
+          })),
+        },
+      },
+    });
     const { loadAdminCustomerManagementData } = await import("./data");
 
     const result = await loadAdminCustomerManagementData({
@@ -350,6 +346,8 @@ describe("loadAdminDashboardData", () => {
       {
         id: "agent-1",
         display_name: "Carlos Dela Cruz",
+        email: null,
+        contact: null,
       },
     ]);
   });
@@ -383,11 +381,32 @@ describe("loadAdminDashboardData", () => {
     const from = vi.fn((table: string) => (
       table === "agent_profile" ? agentBuilder : createQueryBuilder()
     ));
-    createSupabaseAdminClient.mockReturnValue({ from });
+    createSupabaseAdminClient.mockReturnValue({
+      from,
+      auth: {
+        admin: {
+          listUsers: vi.fn(() => Promise.resolve({
+            data: {
+              users: [
+                {
+                  id: "user-1",
+                  email: "carlos@example.test",
+                },
+                {
+                  id: "user-2",
+                  email: "ana@example.test",
+                },
+              ],
+            },
+            error: null,
+          })),
+        },
+      },
+    });
     const { loadAdminAgentManagementData } = await import("./data");
 
     const result = await loadAdminAgentManagementData({
-      search: "carlos 0917",
+      search: "carlos",
       status: "active",
     });
 
@@ -609,5 +628,158 @@ describe("loadAdminDashboardData", () => {
     const result = await loadAdminOrder(order.id);
 
     expect(result?.invoice).toEqual([invoice]);
+  });
+
+  it("builds dashboard summary totals from all matching records", async () => {
+    const orderBuilder = createQueryBuilder({
+      data: [
+        createMockOrder({ order_status: "pending" }),
+        createMockOrder({
+          id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+          order_status: "closed",
+        }),
+      ],
+      error: null,
+    });
+    const customerBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "customer-1",
+          first_name: "Maria",
+          last_name: "Cruz",
+          phone_number: "09170000000",
+          email: "maria@example.test",
+          address: "Quezon City",
+          assigned_agent_id: null,
+          is_reseller: false,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const inquiryBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "inquiry-1",
+          name: "Maria Cruz",
+          email: "maria@example.test",
+          phone_number: "09170000000",
+          message: "Need pricing",
+          inquiry_status: "reviewing",
+          internal_notes: null,
+          admin_read_at: null,
+          admin_read_by: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+        {
+          id: "inquiry-2",
+          name: "Ana Reyes",
+          email: "ana@example.test",
+          phone_number: "09171111111",
+          message: "Hello",
+          inquiry_status: "closed",
+          internal_notes: null,
+          admin_read_at: null,
+          admin_read_by: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const productBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "product-1",
+          name: "Pork Belly",
+          category: "pork",
+          description: null,
+          unit_label: "kg",
+          default_price: 250,
+          reseller_price: 230,
+          stock_status: "in_stock",
+          image_path: null,
+          is_active: true,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+        {
+          id: "product-2",
+          name: "Chicken Breast",
+          category: "chicken",
+          description: null,
+          unit_label: "kg",
+          default_price: 200,
+          reseller_price: 180,
+          stock_status: "limited",
+          image_path: null,
+          is_active: false,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const resellerBuilder = createQueryBuilder({
+      data: [
+        {
+          id: "application-1",
+          name: "Maria Cruz",
+          email: "maria@example.test",
+          contact_number: "09170000000",
+          planned_transaction_type: "Retail",
+          expected_quantity_per_week: "50kg",
+          message: "Interested",
+          application_status: "submitted",
+          email_delivery_status: "pending",
+          price_list_sent_at: null,
+          email_error: null,
+          admin_read_at: null,
+          admin_read_by: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+        {
+          id: "application-2",
+          name: "Ana Reyes",
+          email: "ana@example.test",
+          contact_number: "09171111111",
+          planned_transaction_type: "Wholesale",
+          expected_quantity_per_week: "20kg",
+          message: null,
+          application_status: "closed",
+          email_delivery_status: "sent",
+          price_list_sent_at: null,
+          email_error: null,
+          admin_read_at: null,
+          admin_read_by: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+          updated_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
+      error: null,
+    });
+    const from = vi.fn((table: string) => {
+      if (table === "customer_order") return orderBuilder;
+      if (table === "customer") return customerBuilder;
+      if (table === "contact_inquiry") return inquiryBuilder;
+      if (table === "product") return productBuilder;
+      if (table === "reseller_application") return resellerBuilder;
+      return createQueryBuilder();
+    });
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminDashboardSummaryData } = await import("./data");
+
+    const result = await loadAdminDashboardSummaryData();
+
+    expect(result).toEqual({
+      orders: 2,
+      inquiries: 2,
+      customers: 1,
+      products: 2,
+      resellerApplications: 2,
+    });
   });
 });

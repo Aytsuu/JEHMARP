@@ -1,16 +1,22 @@
 ---
-import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+import type {
+  PublicFeaturedProduct,
+  PublicPageSectionRecord,
+} from "@/lib/public-website/content";
+import { toAdminContentPreviewHref } from "@/lib/public-website/admin-content-preview";
+import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
   sections: PublicPageSectionRecord[];
+  featuredProducts: PublicFeaturedProduct[];
+  previewRoot?: string;
 };
 
-type FeaturedItem = {
-  name: string;
-  description: string;
-};
+const { sections, featuredProducts, previewRoot } = Astro.props;
 
-const { sections } = Astro.props;
+function linkHref(href: string) {
+  return previewRoot ? toAdminContentPreviewHref(href) : href;
+}
 
 const about = sections.find((section) => section.type === "about");
 const missionVisionCoreValues = sections.find(
@@ -23,24 +29,6 @@ const shopInfoSource = sections.find(
 
 const coreValues = asStringArray(missionVisionCoreValues?.content.coreValues);
 const taglineItems = asStringArray(taglines?.content.items);
-const featuredItems: FeaturedItem[] = [
-  {
-    name: "Pork Belly",
-    description: "Fresh, carefully handled pork belly prepared for everyday frying, braising, and grilling.",
-  },
-  {
-    name: "Chicken Breast",
-    description: "Lean chicken breast cuts prepared daily for practical family meals and bulk cooking.",
-  },
-  {
-    name: "Ground Pork",
-    description: "Freshly ground pork ready for lumpia, patties, meatballs, and other home favorites.",
-  },
-  {
-    name: "Porkchop",
-    description: "Clean porkchop cuts for grilling, frying, and budget-friendly family meals.",
-  },
-];
 const storefrontBenefits = [
   {
     title: "Direct from Local Farmers",
@@ -130,6 +118,10 @@ function getProductImage(name: string): string {
     return "/images/beef_short_ribs.png";
   if (normalized.includes("ground pork")) return "/images/ground_pork.png";
   return "/images/meat_cluster.svg";
+}
+
+function getFeaturedProductImage(product: PublicFeaturedProduct): string {
+  return resolvePublicStorageUrl(product.image_path) ?? getProductImage(product.name);
 }
 
 function formatTagline(tagline: string): string {
@@ -256,7 +248,7 @@ function formatTagline(tagline: string): string {
                 </p>
               )}
             </div>
-            <a href="/our-story" class="tagline-button">
+            <a href={linkHref("/our-story")} class="tagline-button">
               Our Story
             </a>
           </div>
@@ -303,7 +295,7 @@ function formatTagline(tagline: string): string {
                 >
                   Featured products
                 </h2>
-                <a href="/shop" class="featured-products__link">
+                <a href={linkHref("/shop")} class="featured-products__link">
                   Browse all products
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -324,23 +316,27 @@ function formatTagline(tagline: string): string {
                 </a>
               </div>
               <div class="products-grid">
-                {featuredItems.map((item) => (
-                  <article class="product-card">
-                    <div class="product-card__image-container">
-                      <img
-                        src={getProductImage(item.name)}
-                        alt={item.name}
-                        class="product-card__image"
-                      />
-                    </div>
-                    <div class="product-card__content">
-                      <h3 class="product-card__title">{item.name}</h3>
-                      <p class="product-card__description">
-                        {item.description}
-                      </p>
-                    </div>
-                  </article>
-                ))}
+                {featuredProducts.length > 0 ? (
+                  featuredProducts.map((product) => (
+                    <article class="product-card">
+                      <div class="product-card__image-container">
+                        <img
+                          src={getFeaturedProductImage(product)}
+                          alt={product.name}
+                          class="product-card__image"
+                        />
+                      </div>
+                      <div class="product-card__content">
+                        <h3 class="product-card__title">{product.name}</h3>
+                        <p class="product-card__description">
+                          {product.description ?? "Fresh, carefully prepared cuts available from the JEHMARP product catalog."}
+                        </p>
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p class="empty-state">No active products are available yet.</p>
+                )}
               </div>
             </section>
           </div>

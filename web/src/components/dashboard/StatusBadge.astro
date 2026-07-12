@@ -1,0 +1,19 @@
+---
+import { autoCapitalize } from "@/lib/formatters";
+import {
+  resolveStatusBadgeVariant,
+  type StatusBadgeKind,
+} from "@/lib/status-badge";
+
+type Props = {
+  status: string;
+  kind: StatusBadgeKind;
+  label?: string;
+};
+
+const { status, kind, label } = Astro.props;
+const variant = resolveStatusBadgeVariant(kind, status);
+const displayLabel = label ?? autoCapitalize(status);
+---
+
+<span class={`status-badge status-badge--${variant}`}>{displayLabel}</span>

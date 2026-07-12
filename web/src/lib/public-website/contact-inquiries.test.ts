@@ -65,10 +65,15 @@ describe("submitContactInquiry", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "turnstile_secret");
 
-    const fetcher = vi.fn(() =>
-      Promise.resolve(Response.json({ id: "contact-inquiry-id" }, { status: 201 })),
-    );
+    const fetcher = vi.fn((url: string) => {
+      if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
+        return Promise.resolve(Response.json({ success: true }));
+      }
+
+      return Promise.resolve(Response.json({ id: "contact-inquiry-id" }, { status: 201 }));
+    });
 
     const id = await submitContactInquiry(validPayload(), {
       fetch: fetcher as typeof fetch,
@@ -76,10 +81,19 @@ describe("submitContactInquiry", () => {
       userAgent: "vitest",
     });
 
-    const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
-    const headers = new Headers(init?.headers);
+    const edgeCall = fetcher.mock.calls.find(
+      ([url]) => url === "https://example.supabase.co/functions/v1/contact-inquiry",
+    ) as unknown as [string, RequestInit];
+    const headers = new Headers(edgeCall?.[1]?.headers);
 
     expect(id).toBe("contact-inquiry-id");
+    expect(fetcher).toHaveBeenCalledWith(
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(FormData),
+      }),
+    );
     expect(fetcher).toHaveBeenCalledWith(
       "https://example.supabase.co/functions/v1/contact-inquiry",
       expect.objectContaining({
@@ -97,10 +111,17 @@ describe("submitContactInquiry", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "turnstile_secret");
 
     await expect(
       submitContactInquiry(validPayload(), {
-        fetch: (() => Promise.resolve(Response.json({ error: "Too many inquiries." }, { status: 429 }))) as typeof fetch,
+        fetch: ((url: string) => {
+          if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
+            return Promise.resolve(Response.json({ success: true }));
+          }
+
+          return Promise.resolve(Response.json({ error: "Too many inquiries." }, { status: 429 }));
+        }) as typeof fetch,
       }),
     ).rejects.toThrow("Too many inquiries.");
   });

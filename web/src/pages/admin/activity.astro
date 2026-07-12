@@ -3,6 +3,10 @@ import AdminActivity from "@/components/admin/AdminActivity.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  parseAdminActivityFilters,
+  serializeAdminActivityFilters,
+} from "@/lib/admin-dashboard/activity-filters";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -13,6 +17,8 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
+const activityFilters = parseAdminActivityFilters(Astro.url);
+const activityFilterQuery = serializeAdminActivityFilters(activityFilters);
 const data = await loadAdminDashboardData();
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
@@ -25,5 +31,9 @@ const feedback = formatAdminActionFeedback(Astro.url);
   feedback={feedback}
   dashboardData={data}
 >
-  <AdminActivity data={data} />
+  <AdminActivity
+    data={data}
+    activeFilters={activityFilters}
+    filterQuery={activityFilterQuery}
+  />
 </AdminPageFrame>

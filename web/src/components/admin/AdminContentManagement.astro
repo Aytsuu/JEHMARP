@@ -1,4 +1,5 @@
 ---
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 import {
   escapeTextareaValue,
@@ -28,7 +29,7 @@ const sectionsByPage = data.pages.map((page) => ({
             <dt>Slug</dt>
             <dd>{page.slug}</dd>
             <dt>Status</dt>
-            <dd>{page.status}</dd>
+            <dd><StatusBadge kind="page" status={page.status} /></dd>
           </dl>
         </div>
 
@@ -52,7 +53,7 @@ const sectionsByPage = data.pages.map((page) => ({
                   <tr>
                     <td>{section.type}</td>
                     <td>{section.sort_order}</td>
-                    <td>{section.status}</td>
+                    <td><StatusBadge kind="page" status={section.status} /></td>
                     <td>
                       <details>
                         <summary>View JSON</summary>

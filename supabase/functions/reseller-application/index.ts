@@ -8,13 +8,11 @@ import {
   releaseRedisRateLimitReservation,
   sendResellerPriceList,
   validateResellerApplicationInput,
-  verifyTurnstileToken,
 } from "./workflow.ts";
 
 type AppConfig = {
   supabaseUrl: string;
   supabaseServiceKey: string;
-  turnstileSecret?: string;
   resendApiKey?: string;
   resellerPriceListFrom?: string;
   resellerAdminEmail?: string;
@@ -92,15 +90,7 @@ async function handleCreateApplication(
 
   const clientIp = normalizeClientIp(request.headers.get("x-client-ip"));
   const userAgent = normalizeNullableString(request.headers.get("x-client-user-agent"));
-  const turnstile = await verifyTurnstileToken(fetch, {
-    secret: config.turnstileSecret,
-    token: validation.data.turnstileToken,
-    remoteIp: clientIp,
-  });
-
-  if (!turnstile.success) {
-    return jsonResponse({ error: turnstile.error }, 400);
-  }
+  // Turnstile is verified once in the Astro API before this trusted server-to-server call.
 
   const redisRateLimit = await checkRedisRateLimits(config, validation.data.email, clientIp);
 
@@ -395,7 +385,6 @@ function getConfig(): AppConfig {
   return {
     supabaseUrl,
     supabaseServiceKey,
-    turnstileSecret: Deno.env.get("TURNSTILE_SECRET_KEY") ?? undefined,
     resendApiKey: Deno.env.get("RESEND_API_KEY") ?? undefined,
     resellerPriceListFrom: Deno.env.get("RESELLER_PRICE_LIST_FROM") ?? undefined,
     resellerAdminEmail: Deno.env.get("RESELLER_ADMIN_EMAIL") ?? undefined,

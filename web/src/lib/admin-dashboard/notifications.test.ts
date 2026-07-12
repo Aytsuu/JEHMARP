@@ -25,7 +25,7 @@ describe("admin notifications", () => {
       orders: [
         {
           id: "order-1",
-          order_status: "submitted",
+          order_status: "pending",
           source: "guest_shop",
           admin_read_at: null,
           created_at: "2026-07-07T00:00:00.000Z",
@@ -73,7 +73,7 @@ describe("admin notifications", () => {
       orders: [
         {
           id: "order-middle",
-          order_status: "submitted",
+          order_status: "pending",
           source: "guest_shop",
           admin_read_at: null,
           created_at: "2026-07-07T01:00:00.000Z",
@@ -105,7 +105,7 @@ describe("admin notifications", () => {
       orders: [
         {
           id: "order-1",
-          order_status: "submitted",
+          order_status: "pending",
           source: "admin_manual",
           admin_read_at: null,
           created_at: "2026-07-07T00:00:00.000Z",
@@ -135,7 +135,7 @@ describe("admin notifications", () => {
       orders: [
         {
           id: "order-1",
-          order_status: "submitted",
+          order_status: "pending",
           source: "guest_shop",
           admin_read_at: "2026-07-07T01:00:00.000Z",
           created_at: "2026-07-07T00:00:00.000Z",

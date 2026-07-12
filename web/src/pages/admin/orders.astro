@@ -1,7 +1,10 @@
 ---
 import AdminOrderManagement from "@/components/admin/AdminOrderManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import {
+  formatAdminActionFeedback,
+  markUnreadAdminOrdersRead,
+} from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import {
   parseAdminOrderFilters,
@@ -16,6 +19,8 @@ const adminRoute = await requireAdminRoute(Astro);
 if (!adminRoute.ready) {
   return adminRoute.response;
 }
+
+await markUnreadAdminOrdersRead(Astro, adminRoute.userId);
 
 const orderFilters = parseAdminOrderFilters(Astro.url);
 const orderFilterQuery = serializeAdminOrderFilters(orderFilters);

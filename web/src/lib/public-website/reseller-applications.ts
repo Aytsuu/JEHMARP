@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { getServerEnv } from "@/lib/env";
+import { deliverResellerPriceListEmailIfConfigured } from "@/lib/public-website/reseller-price-list-email";
+import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
 
 export const plannedTransactionTypeLabels = {
   retail_resale: "Retail resale",
@@ -58,6 +60,7 @@ export type ResellerApplicationSubmitOptions = {
   fetch?: typeof fetch;
   clientIp?: string | null;
   userAgent?: string | null;
+  supabase?: ReturnType<typeof import("@/lib/supabase/admin").createSupabaseAdminClient>;
 };
 
 export type ResellerApplicationFeedback =
@@ -104,6 +107,12 @@ export async function submitResellerApplication(
 ): Promise<string> {
   const env = getServerEnv();
   const fetcher = options.fetch ?? fetch;
+
+  await verifyTurnstileToken(env.turnstileSecretKey, payload.turnstileToken, {
+    fetch: fetcher,
+    clientIp: options.clientIp,
+  });
+
   const headers = new Headers({
     Authorization: `Bearer ${env.supabaseServerKey}`,
     apikey: env.supabaseServerKey,
@@ -127,6 +136,13 @@ export async function submitResellerApplication(
 
   if (!response.ok || typeof body.id !== "string") {
     throw new Error(typeof body.error === "string" ? body.error : "Unable to submit reseller application.");
+  }
+
+  if (body.emailDeliveryStatus !== "sent") {
+    await deliverResellerPriceListEmailIfConfigured(body.id, {
+      fetch: fetcher,
+      supabase: options.supabase,
+    });
   }
 
   return body.id;

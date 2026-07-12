@@ -70,7 +70,7 @@ describe("buildAdminAnalytics", () => {
         createdAt: "2026-07-04T11:00:00.000Z",
         paymentAmounts: [],
         items: [
-          item("product-pork", "Pork Belly", "pork", 1, 500, 0, "unset"),
+          item("product-pork", "Pork Belly", "pork", 1, 500, 0, false),
         ],
       }),
     ];
@@ -80,8 +80,42 @@ describe("buildAdminAnalytics", () => {
     expect(analytics.summary.outstandingBalance).toBe(590);
     expect(analytics.ordersByStatus.find((item) => item.label === "closed")).toEqual({
       label: "closed",
-      count: 1,
+      count: 2,
     });
+  });
+
+  it("attributes admin-created orders to the customer's assigned agent in agent performance analytics", () => {
+    const data = createAnalyticsData();
+
+    data.orders = [
+      order({
+        id: "admin-order-for-assigned-agent",
+        agentId: null,
+        customerId: "customer-two",
+        customerAssignedAgentId: "agent-id",
+        customerAssignedAgentName: "JEHMARP Agent",
+        status: "processing",
+        paymentStatus: "partial",
+        createdAt: "2026-07-04T13:00:00.000Z",
+        paymentAmounts: [50],
+        items: [
+          item("product-pork", "Pork Belly", "pork", 2, 100, 20, false),
+        ],
+      }),
+    ];
+
+    const analytics = buildAdminAnalytics(data, new Date("2026-07-04T14:00:00.000Z"));
+
+    expect(analytics.salesByAgent).toEqual([
+      {
+        label: "JEHMARP Agent",
+        orderCount: 1,
+        grossSales: 200,
+        paidAmount: 50,
+        earnedCommission: 5,
+        expectedCommission: 15,
+      },
+    ]);
   });
 });
 
@@ -93,14 +127,6 @@ function createAnalyticsData(): AdminDashboardData {
       product("product-pork", "Pork Belly", "pork"),
       product("product-chicken", "Chicken Thigh", "chicken"),
     ],
-    productPriceRange: {
-      min: 0,
-      max: 100,
-    },
-    orderTotalRange: {
-      min: 0,
-      max: 320,
-    },
     agents: [{
       id: "agent-id",
       user_id: "22222222-2222-2222-2222-222222222222",
@@ -125,8 +151,8 @@ function createAnalyticsData(): AdminDashboardData {
         createdAt: "2026-07-04T09:00:00.000Z",
         paymentAmounts: [110],
         items: [
-          item("product-chicken", "Chicken Thigh", "chicken", 2, 90, 60, "set"),
-          item("product-pork", "Pork Belly", "pork", 1, 20, 10, "set"),
+          item("product-chicken", "Chicken Thigh", "chicken", 2, 90, 60, false),
+          item("product-pork", "Pork Belly", "pork", 1, 20, 10, false),
         ],
       }),
       order({
@@ -137,19 +163,21 @@ function createAnalyticsData(): AdminDashboardData {
         createdAt: "2026-07-03T10:00:00.000Z",
         paymentAmounts: [120],
         items: [
-          item("product-chicken", "Chicken Thigh", "chicken", 1, 90, 50, "paid"),
-          item("product-pork", "Pork Belly", "pork", 1, 30, 0, "unset"),
+          item("product-chicken", "Chicken Thigh", "chicken", 1, 90, 50, true),
+          item("product-pork", "Pork Belly", "pork", 1, 30, 0, false),
         ],
       }),
       order({
         id: "order-3",
         agentId: null,
+        customerId: "customer-three",
+        customerAssignedAgentId: null,
         status: "processing",
         paymentStatus: "paid",
         createdAt: "2026-06-28T11:00:00.000Z",
         paymentAmounts: [80],
         items: [
-          item("product-pork", "Pork Belly", "pork", 1, 80, 0, "unset"),
+          item("product-pork", "Pork Belly", "pork", 1, 80, 0, false),
         ],
       }),
     ],
@@ -180,11 +208,11 @@ function createAnalyticsData(): AdminDashboardData {
       updated_at: "2026-07-04T08:30:00.000Z",
     }],
     summary: {
-      submittedOrders: 0,
-      openInquiries: 1,
+      orders: 3,
+      inquiries: 1,
       customers: 3,
-      activeProducts: 2,
-      newResellerApplications: 1,
+      products: 2,
+      resellerApplications: 1,
     },
   };
 }
@@ -229,6 +257,9 @@ function customer(
 function order(params: {
   id: string;
   agentId: string | null;
+  customerId?: string;
+  customerAssignedAgentId?: string | null;
+  customerAssignedAgentName?: string | null;
   status: "pending" | "processing" | "closed";
   paymentStatus: "unpaid" | "partial" | "paid";
   createdAt: string;
@@ -239,7 +270,7 @@ function order(params: {
 
   return {
     id: params.id,
-    customer_id: "customer-one",
+    customer_id: params.customerId ?? "customer-one",
     agent_id: params.agentId,
     source,
     order_status: params.status,
@@ -248,7 +279,6 @@ function order(params: {
     approved_at: params.createdAt,
     created_at: params.createdAt,
     updated_at: params.createdAt,
-    customer: null,
     agent: params.agentId
       ? {
           id: params.agentId,
@@ -257,6 +287,25 @@ function order(params: {
           contact: null,
         }
       : null,
+    customer: {
+      id: params.customerId ?? "customer-one",
+      first_name: "Assigned",
+      last_name: "Customer",
+      phone_number: "09170000000",
+      email: "assigned@example.com",
+      address: "123 Road",
+      is_reseller: false,
+      assigned_agent_id: params.customerAssignedAgentId ?? params.agentId,
+      assigned_agent:
+        (params.customerAssignedAgentId ?? params.agentId)
+          ? {
+              id: params.customerAssignedAgentId ?? params.agentId ?? "",
+              display_name: params.customerAssignedAgentName ?? "JEHMARP Agent",
+              email: null,
+              contact: null,
+            }
+          : null,
+    },
     customer_order_item: params.items,
     payment: params.paymentAmounts.map((amount, index) => ({
       id: `${params.id}-payment-${index}`,
@@ -279,7 +328,7 @@ function item(
   quantity: number,
   unitPrice: number,
   commissionAmount: number,
-  commissionStatus: "unset" | "set" | "paid",
+  commissionPaid: boolean,
 ): AdminOrderItem {
   return {
     id: `${productId}-${unitPrice}`,
@@ -290,8 +339,7 @@ function item(
     price_type: "retail" as const,
     add_details: null,
     agent_commission_amount: commissionAmount,
-    agent_commission_status: commissionStatus,
-    agent_commission_notes: null,
+    agent_commission_paid: commissionPaid,
     product: {
       id: productId,
       name: productName,

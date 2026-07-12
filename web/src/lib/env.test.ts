@@ -75,6 +75,13 @@ describe("parseServerEnv", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("PUBLIC_TURNSTILE_SITE_KEY", "");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "");
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESELLER_PRICE_LIST_FROM", "");
+    vi.stubEnv("RESELLER_ADMIN_EMAIL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
 
     expect(getServerEnv()).toEqual({
       supabaseUrl: "https://example.supabase.co",
@@ -89,6 +96,21 @@ describe("parseServerEnv", () => {
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_runtime_key");
 
     expect(getRuntimeServerEnv().SUPABASE_SECRET_KEY).toBe("sb_secret_runtime_key");
+  });
+
+  it("prefers the local Supabase connection in development", () => {
+    const env = parseServerEnv({
+      DEV: true,
+      PUBLIC_SUPABASE_URL: "https://production.supabase.co",
+      PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_prod_key",
+      SUPABASE_SECRET_KEY: "sb_secret_prod_key",
+    });
+
+    expect(env).toEqual({
+      supabaseUrl: "http://127.0.0.1:54321",
+      supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
+      supabaseServerKey: "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz",
+    });
   });
 });
 
@@ -114,13 +136,14 @@ describe("parsePublicEnv", () => {
     ).toThrow("Invalid public environment configuration");
   });
 
-  it("reads validated values from import.meta.env", () => {
+  it("reads validated local values from import.meta.env during development", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
+    vi.stubEnv("PUBLIC_TURNSTILE_SITE_KEY", "");
 
     expect(getPublicEnv()).toEqual({
-      supabaseUrl: "https://example.supabase.co",
-      supabasePublishableKey: "sb_publishable_test_key",
+      supabaseUrl: "http://127.0.0.1:54321",
+      supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
     });
   });
 
@@ -132,5 +155,18 @@ describe("parsePublicEnv", () => {
     });
 
     expect(env.turnstileSiteKey).toBe("site_key");
+  });
+
+  it("prefers the local Supabase public connection in development", () => {
+    const env = parsePublicEnv({
+      DEV: true,
+      PUBLIC_SUPABASE_URL: "https://production.supabase.co",
+      PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_prod_key",
+    });
+
+    expect(env).toEqual({
+      supabaseUrl: "http://127.0.0.1:54321",
+      supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
+    });
   });
 });

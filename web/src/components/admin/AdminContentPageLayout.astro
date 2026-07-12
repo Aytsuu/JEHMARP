@@ -1,0 +1,116 @@
+---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import type { AdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import {
+  getUnreadAdminInquiryIds,
+  getUnreadAdminOrderIds,
+  getUnreadAdminResellerApplicationIds,
+} from "@/lib/admin-dashboard/notifications";
+import { adminDashboardRoutes } from "@/config/navigation";
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+
+type Props = {
+  title: string;
+  description: string;
+  feedback?: AdminActionFeedback;
+  dashboardData?: AdminDashboardData;
+};
+
+const { title, description, feedback, dashboardData } = Astro.props;
+const unreadOrderCount = dashboardData ? getUnreadAdminOrderIds(dashboardData).length : 0;
+const unreadInquiryCount = dashboardData ? getUnreadAdminInquiryIds(dashboardData).length : 0;
+const unreadResellerApplicationCount = dashboardData
+  ? getUnreadAdminResellerApplicationIds(dashboardData).length
+  : 0;
+const unreadNotificationCount =
+  unreadOrderCount + unreadInquiryCount + unreadResellerApplicationCount;
+---
+
+<DashboardLayout
+  title={title}
+  description={description}
+  navLabel="Admin operations"
+  navItems={adminDashboardRoutes}
+  sidebarUnreadBadges={{
+    "/admin/orders": {
+      count: unreadOrderCount,
+    },
+    "/admin/inquiries": {
+      count: unreadInquiryCount,
+    },
+    "/admin/reseller-applications": {
+      count: unreadResellerApplicationCount,
+    },
+    "/admin/notifications": {
+      count: unreadNotificationCount,
+    },
+  }}
+>
+  <div class="admin-content-page" data-admin-content-page>
+    {
+      feedback?.status && (
+        <p class="admin-content-page__feedback status-message" role="status">
+          {feedback.status}
+        </p>
+      )
+    }
+    {
+      feedback?.error && (
+        <p class="admin-content-page__feedback error-message" role="alert">
+          {feedback.error}
+        </p>
+      )
+    }
+    <slot />
+  </div>
+</DashboardLayout>
+
+{
+  feedback?.cleanPath && (
+    <script is:inline define:vars={{ adminFeedbackCleanPath: feedback.cleanPath }}>
+      if (typeof adminFeedbackCleanPath === "string" && window.history.replaceState) {
+        window.history.replaceState(window.history.state, "", adminFeedbackCleanPath);
+      }
+    </script>
+  )
+}
+
+<style>
+  :global(.dashboard-body:has([data-admin-content-page])) {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  :global(.dashboard-frame:has([data-admin-content-page])) {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :global(.dashboard-main:has([data-admin-content-page])) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    max-height: 100vh;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .admin-content-page {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .admin-content-page__feedback {
+    flex-shrink: 0;
+    margin: 0;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+  }
+</style>
