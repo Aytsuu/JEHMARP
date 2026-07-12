@@ -13,6 +13,9 @@ describe("deliverResellerPriceListEmailIfConfigured", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESELLER_PRICE_LIST_FROM", "");
+    vi.stubEnv("RESELLER_ADMIN_EMAIL", "");
 
     const supabase = {
       from: vi.fn(),

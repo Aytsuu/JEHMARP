@@ -75,6 +75,13 @@ describe("parseServerEnv", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("PUBLIC_TURNSTILE_SITE_KEY", "");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "");
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESELLER_PRICE_LIST_FROM", "");
+    vi.stubEnv("RESELLER_ADMIN_EMAIL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
 
     expect(getServerEnv()).toEqual({
       supabaseUrl: "https://example.supabase.co",
@@ -132,6 +139,7 @@ describe("parsePublicEnv", () => {
   it("reads validated local values from import.meta.env during development", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
+    vi.stubEnv("PUBLIC_TURNSTILE_SITE_KEY", "");
 
     expect(getPublicEnv()).toEqual({
       supabaseUrl: "http://127.0.0.1:54321",
