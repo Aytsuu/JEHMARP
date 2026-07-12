@@ -50,7 +50,7 @@ export async function getPublicPageContent(
     .maybeSingle();
 
   if (pageError) {
-    throw new Error(`Unable to load page content for ${slug}`);
+    throwLoadError(`Unable to load page content for ${slug}`, pageError);
   }
 
   if (!page) {
@@ -68,7 +68,7 @@ export async function getPublicPageContent(
     .order("sort_order", { ascending: true });
 
   if (sectionError) {
-    throw new Error(`Unable to load page sections for ${slug}`);
+    throwLoadError(`Unable to load page sections for ${slug}`, sectionError);
   }
 
   return {
