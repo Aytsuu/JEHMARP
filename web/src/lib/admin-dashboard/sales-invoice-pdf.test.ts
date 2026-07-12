@@ -39,7 +39,6 @@ describe("buildSalesInvoicePdf", () => {
           add_details: "Cut small",
           agent_commission_amount: 0,
           agent_commission_paid: false,
-          agent_commission_notes: null,
           product: {
             id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
             name: "Pork Belly",

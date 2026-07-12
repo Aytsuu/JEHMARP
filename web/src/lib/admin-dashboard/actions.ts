@@ -175,7 +175,6 @@ export type AdminAction =
         agent_commission_paid: boolean;
         agent_commission_set_by: string | null;
         agent_commission_set_at: string | null;
-        agent_commission_notes: string | null;
       };
     }
   | {
@@ -583,14 +582,12 @@ function parseAdminActionFormDataOrThrow(
               agent_commission_paid: false,
               agent_commission_set_by: null,
               agent_commission_set_at: null,
-              agent_commission_notes: null,
             }
           : {
               agent_commission_amount: amount,
               agent_commission_paid: isPaid,
               agent_commission_set_by: adminUserId,
               agent_commission_set_at: new Date().toISOString(),
-              agent_commission_notes: optionalString(formData, "notes"),
             },
       });
     }

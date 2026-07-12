@@ -348,7 +348,6 @@ describe("parseAdminActionFormData", () => {
     formData.set("orderItemId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
     formData.set("amount", "125.25");
     formData.set("isPaid", "on");
-    formData.set("notes", "Reviewed");
 
     const result = parseAdminActionFormData(formData, adminUserId);
 
@@ -361,7 +360,6 @@ describe("parseAdminActionFormData", () => {
         type: "update-commission",
         payload: {
           agent_commission_amount: 125.25,
-          agent_commission_notes: "Reviewed",
           agent_commission_set_by: adminUserId,
           agent_commission_paid: true,
         },
@@ -375,7 +373,6 @@ describe("parseAdminActionFormData", () => {
     formData.set("action", "update-commission");
     formData.set("orderItemId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
     formData.set("amount", "0");
-    formData.set("notes", "Remove commission");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
       success: true,
@@ -384,7 +381,6 @@ describe("parseAdminActionFormData", () => {
         orderItemId: "45e73d23-f25f-4de7-ae3a-ebcf34e995f1",
         payload: {
           agent_commission_amount: 0,
-          agent_commission_notes: null,
           agent_commission_set_at: null,
           agent_commission_set_by: null,
           agent_commission_paid: false,
@@ -868,7 +864,6 @@ describe("executeAdminAction", () => {
         agent_commission_paid: true,
         agent_commission_set_by: adminUserId,
         agent_commission_set_at: "2026-07-11T00:00:00.000Z",
-        agent_commission_notes: "Reviewed",
       },
     }, adminUserId)).rejects.toThrow("Record a payment before marking commission as paid.");
 
@@ -931,7 +926,6 @@ describe("executeAdminAction", () => {
         agent_commission_paid: true,
         agent_commission_set_by: adminUserId,
         agent_commission_set_at: "2026-07-11T00:00:00.000Z",
-        agent_commission_notes: "Reviewed",
       },
     }, adminUserId)).rejects.toThrow(
       "This commission cannot be marked as paid because recorded payments do not cover the item total.",

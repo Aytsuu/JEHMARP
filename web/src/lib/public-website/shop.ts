@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { throwLoadError } from "@/lib/load-error";
 
 export const PRODUCT_PUBLIC_COLUMNS = [
   "id",
@@ -113,7 +114,7 @@ export async function listPublicProducts(
     .range(from, to);
 
   if (error) {
-    throw new Error("Unable to load public products");
+    throwLoadError("Unable to load public products");
   }
 
   return {

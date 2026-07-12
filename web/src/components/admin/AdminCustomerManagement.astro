@@ -250,11 +250,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
           signal: fetchController.signal,
         });
 
-        if (!response.ok) {
-          throw new Error(`Customer filters failed with ${response.status}.`);
-        }
-
-        const fragmentHtml = await response.text();
+        const fragmentHtml = await window.readDashboardFragmentResponse(response);
         window.history.replaceState(
           { customerFilterQuery: targetQuery },
           "",

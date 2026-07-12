@@ -868,11 +868,7 @@ const skeletonRows = Array.from({ length: 6 });
           signal: fetchController.signal,
         });
 
-        if (!response.ok) {
-          throw new Error(`Order filters failed with ${response.status}.`);
-        }
-
-        const fragmentHtml = await response.text();
+        const fragmentHtml = await window.readDashboardFragmentResponse(response);
         window.history.replaceState(
           { orderFilterQuery: targetQuery },
           "",

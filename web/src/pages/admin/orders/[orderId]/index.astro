@@ -40,7 +40,11 @@ if (!orderId) {
 }
 
 if (Astro.request.method === "POST") {
-  return handleAdminDashboardAction(Astro, adminRoute.user.id, `/admin/orders/${orderId}`);
+  return handleAdminDashboardAction(
+    Astro,
+    adminRoute.userId,
+    `/admin/orders/${orderId}`,
+  );
 }
 
 const [dashboardData, order] = await Promise.all([
@@ -53,9 +57,10 @@ if (!order) {
 }
 
 const rawFeedback = formatAdminActionFeedback(Astro.url);
-const feedback = rawFeedback.status === "Order marked as read."
-  ? { ...rawFeedback, status: undefined }
-  : rawFeedback;
+const feedback =
+  rawFeedback.status === "Order marked as read."
+    ? { ...rawFeedback, status: undefined }
+    : rawFeedback;
 
 const invoice = order.invoice[0] ?? null;
 const hasSalesInvoice = Boolean(invoice);
@@ -73,23 +78,36 @@ const salesInvoicePdfHref = `/admin/orders/${order.id}/sales-invoice.pdf`;
 const totalCommission = order.customer_order_item.reduce((total, item) => {
   return total + item.agent_commission_amount;
 }, 0);
-const totalPaidCommissionCoverage = order.customer_order_item.reduce((total, item) => {
-  if (!item.agent_commission_paid) {
-    return total;
-  }
+const totalPaidCommissionCoverage = order.customer_order_item.reduce(
+  (total, item) => {
+    if (!item.agent_commission_paid) {
+      return total;
+    }
 
-  return total + (item.final_quantity * item.unit_price);
-}, 0);
-const totalAvailableCommissionCoverage = Math.max(paidTotal - totalPaidCommissionCoverage, 0);
+    return total + item.final_quantity * item.unit_price;
+  },
+  0,
+);
+const totalAvailableCommissionCoverage = Math.max(
+  paidTotal - totalPaidCommissionCoverage,
+  0,
+);
 const orderSlipLayout = buildOrderSlipLayout(order);
 const salesInvoiceLayout = buildSalesInvoiceLayout(order);
-const orderSlipGridTemplate = getDocumentColumnTemplate(orderSlipLayout.columns);
-const salesInvoiceGridTemplate = getDocumentColumnTemplate(salesInvoiceLayout.columns);
-const nextStatuses = getAllowedNextOrderStatuses(order.order_status, order.payment_status);
+const orderSlipGridTemplate = getDocumentColumnTemplate(
+  orderSlipLayout.columns,
+);
+const salesInvoiceGridTemplate = getDocumentColumnTemplate(
+  salesInvoiceLayout.columns,
+);
+const nextStatuses = getAllowedNextOrderStatuses(
+  order.order_status,
+  order.payment_status,
+);
 const availableStatuses = [order.order_status, ...nextStatuses].filter(
   (value, index, values) => values.indexOf(value) === index,
 );
-const orderStatusOptionLabel = (status: typeof availableStatuses[number]) => {
+const orderStatusOptionLabel = (status: (typeof availableStatuses)[number]) => {
   if (order.order_status === "closed" && status === "processing") {
     return "Open";
   }
@@ -97,22 +115,30 @@ const orderStatusOptionLabel = (status: typeof availableStatuses[number]) => {
   return autoCapitalize(status);
 };
 
-const commissionItemTotal = (quantity: number, unitPrice: number) => quantity * unitPrice;
+const commissionItemTotal = (quantity: number, unitPrice: number) =>
+  quantity * unitPrice;
 const commissionCoverageRemaining = (itemId: string) => {
-  const paidCoverageExcludingCurrent = order.customer_order_item.reduce((total, item) => {
-    if (!item.agent_commission_paid || item.id === itemId) {
-      return total;
-    }
+  const paidCoverageExcludingCurrent = order.customer_order_item.reduce(
+    (total, item) => {
+      if (!item.agent_commission_paid || item.id === itemId) {
+        return total;
+      }
 
-    return total + commissionItemTotal(item.final_quantity, item.unit_price);
-  }, 0);
+      return total + commissionItemTotal(item.final_quantity, item.unit_price);
+    },
+    0,
+  );
 
   return Math.max(paidTotal - paidCoverageExcludingCurrent, 0);
 };
 const commissionItems = order.customer_order_item.map((item) => {
-  const itemTotalAmount = commissionItemTotal(item.final_quantity, item.unit_price);
+  const itemTotalAmount = commissionItemTotal(
+    item.final_quantity,
+    item.unit_price,
+  );
   const availableCoverageForItem = commissionCoverageRemaining(item.id);
-  const canMarkCommissionPaid = hasPayments && itemTotalAmount <= availableCoverageForItem;
+  const canMarkCommissionPaid =
+    hasPayments && itemTotalAmount <= availableCoverageForItem;
 
   return {
     item,
@@ -133,15 +159,21 @@ const timelineItems = [
     id: `status-${entry.id}`,
     title: `Order moved to ${autoCapitalize(entry.to_status)}`,
     timestamp: entry.changed_at,
-    meta: entry.notes ?? (entry.from_status ? `From ${autoCapitalize(entry.from_status)}` : "Status update"),
+    meta:
+      entry.notes ??
+      (entry.from_status
+        ? `From ${autoCapitalize(entry.from_status)}`
+        : "Status update"),
   })),
   ...(invoice
-    ? [{
-        id: `invoice-${invoice.id}`,
-        title: "Invoice created",
-        timestamp: invoice.created_at,
-        meta: invoice.invoice_number,
-      }]
+    ? [
+        {
+          id: `invoice-${invoice.id}`,
+          title: "Invoice created",
+          timestamp: invoice.created_at,
+          meta: invoice.invoice_number,
+        },
+      ]
     : []),
   {
     id: `created-${order.id}`,
@@ -150,7 +182,9 @@ const timelineItems = [
     meta: formatOrderSource(order.source),
   },
 ].sort((left, right) => {
-  return new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime();
+  return (
+    new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
+  );
 });
 ---
 
@@ -168,7 +202,11 @@ const timelineItems = [
         <p class="order-detail-eyebrow">Order / Order Details</p>
 
         <div class="order-title-row">
-          <a href="/admin/orders" class="icon-button" aria-label="Back to orders">
+          <a
+            href="/admin/orders"
+            class="icon-button"
+            aria-label="Back to orders"
+          >
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="m15 18-6-6 6-6"></path>
             </svg>
@@ -182,13 +220,23 @@ const timelineItems = [
           <form method="post" class="status-form">
             <input type="hidden" name="action" value="update-order-status" />
             <input type="hidden" name="orderId" value={order.id} />
-            <label class="sr-only" for="order-status-select">Order status</label>
-            <select id="order-status-select" name="orderStatus" class="status-select">
-              {availableStatuses.map((status) => (
-                <option value={status} selected={status === order.order_status}>
-                  {orderStatusOptionLabel(status)}
-                </option>
-              ))}
+            <label class="sr-only" for="order-status-select">Order status</label
+            >
+            <select
+              id="order-status-select"
+              name="orderStatus"
+              class="status-select"
+            >
+              {
+                availableStatuses.map((status) => (
+                  <option
+                    value={status}
+                    selected={status === order.order_status}
+                  >
+                    {orderStatusOptionLabel(status)}
+                  </option>
+                ))
+              }
             </select>
             <button type="submit" class="status-save-button">Save</button>
           </form>
@@ -197,12 +245,20 @@ const timelineItems = [
         <div class="detail-stack">
           <div class="detail-group">
             <p class="detail-label">Customer</p>
-            <p class="detail-value">{order.customer ? fullName(order.customer) : "Unassigned customer"}</p>
+            <p class="detail-value">
+              {
+                order.customer
+                  ? fullName(order.customer)
+                  : "Unassigned customer"
+              }
+            </p>
           </div>
 
           <div class="detail-group">
             <p class="detail-label">Address</p>
-            <p class="detail-value">{order.customer?.address ?? "No address on file"}</p>
+            <p class="detail-value">
+              {order.customer?.address ?? "No address on file"}
+            </p>
           </div>
 
           <div class="detail-group">
@@ -215,14 +271,23 @@ const timelineItems = [
 
           <div class="detail-group">
             <p class="detail-label">Agent</p>
-            <p class="detail-value">{order.customer?.assigned_agent?.display_name ?? "No assigned agent"}</p>
+            <p class="detail-value">
+              {
+                order.customer?.assigned_agent?.display_name ??
+                  "No assigned agent"
+              }
+            </p>
           </div>
 
           <div class="detail-group">
             <p class="detail-label">Contact Information</p>
             <div class="detail-lines">
-              <p>{order.customer?.assigned_agent?.contact ?? "No contact number"}</p>
-              <p>{order.customer?.assigned_agent?.email ?? "No email address"}</p>
+              <p>
+                {order.customer?.assigned_agent?.contact ?? "No contact number"}
+              </p>
+              <p>
+                {order.customer?.assigned_agent?.email ?? "No email address"}
+              </p>
             </div>
           </div>
         </div>
@@ -235,391 +300,528 @@ const timelineItems = [
           <span class="section-heading-line"></span>
         </div>
 
-        {timelineItems.length === 0 ? (
-          <p class="empty-copy">No activity recorded yet.</p>
-        ) : (
-          <ol class="activity-timeline">
-            {timelineItems.map((item) => (
-              <li>
-                <span class="activity-dot" aria-hidden="true"></span>
-                <div class="activity-copy">
-                  <p class="activity-title">{item.title}</p>
-                  <p class="activity-meta">{item.meta}</p>
-                  <time datetime={item.timestamp}>{formatDate(item.timestamp)}</time>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
+        {
+          timelineItems.length === 0 ? (
+            <p class="empty-copy">No activity recorded yet.</p>
+          ) : (
+            <ol class="activity-timeline">
+              {timelineItems.map((item) => (
+                <li>
+                  <span class="activity-dot" aria-hidden="true" />
+                  <div class="activity-copy">
+                    <p class="activity-title">{item.title}</p>
+                    <p class="activity-meta">{item.meta}</p>
+                    <time datetime={item.timestamp}>
+                      {formatDate(item.timestamp)}
+                    </time>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )
+        }
       </section>
     </aside>
 
     <section class="order-detail-main">
       <div class="order-tabs" role="tablist" aria-label="Order detail sections">
-        <button type="button" class="order-tab is-active" data-order-detail-tab-trigger data-tab-target="order-slip" role="tab" aria-selected="true">
+        <button
+          type="button"
+          class="order-tab is-active"
+          data-order-detail-tab-trigger
+          data-tab-target="order-slip"
+          role="tab"
+          aria-selected="true"
+        >
           Order Slip
         </button>
-        <button type="button" class="order-tab" data-order-detail-tab-trigger data-tab-target="sales-invoice" role="tab" aria-selected="false">
+        <button
+          type="button"
+          class="order-tab"
+          data-order-detail-tab-trigger
+          data-tab-target="sales-invoice"
+          role="tab"
+          aria-selected="false"
+        >
           Sales Invoice
         </button>
-        {hasCommissionTab && (
-          <button type="button" class="order-tab" data-order-detail-tab-trigger data-tab-target="commission" role="tab" aria-selected="false">
-            Commission
-          </button>
-        )}
-        <button type="button" class="order-tab" data-order-detail-tab-trigger data-tab-target="payment-record" role="tab" aria-selected="false">
+        {
+          hasCommissionTab && (
+            <button
+              type="button"
+              class="order-tab"
+              data-order-detail-tab-trigger
+              data-tab-target="commission"
+              role="tab"
+              aria-selected="false"
+            >
+              Commission
+            </button>
+          )
+        }
+        <button
+          type="button"
+          class="order-tab"
+          data-order-detail-tab-trigger
+          data-tab-target="payment-record"
+          role="tab"
+          aria-selected="false"
+        >
           Payment Record
         </button>
-        <button type="button" class="order-tab" data-order-detail-tab-trigger data-tab-target="notes" role="tab" aria-selected="false">
+        <button
+          type="button"
+          class="order-tab"
+          data-order-detail-tab-trigger
+          data-tab-target="notes"
+          role="tab"
+          aria-selected="false"
+        >
           Notes
         </button>
       </div>
 
       <div class="order-tab-panels">
-        <section class="order-tab-panel order-tab-panel--document is-active" data-order-detail-tab-panel="order-slip" role="tabpanel">
-          <article class="document-preview document-preview--pdf-like document-preview--rounded-sm">
-            <header class="pdf-preview-header">
-              <div class="pdf-preview-brand">
-                {orderSlipLayout.brandLines.map((line, index) => (
-                  <p class:list={["pdf-preview-brand-line", index === 0 && "pdf-preview-brand-line--strong"]}>{line}</p>
-                ))}
-              </div>
-              <div class="pdf-preview-logo">LOGO</div>
-              <h3 class="pdf-preview-title">{orderSlipLayout.title}</h3>
-            </header>
-
-            <div class="pdf-preview-fields pdf-preview-fields--two-column">
-              <div class="pdf-preview-field-line"><span>{orderSlipLayout.dateLabel}</span></div>
-              <div></div>
-              <div class="pdf-preview-field-line"><span>{orderSlipLayout.sellerLabel}</span></div>
-              <div class="pdf-preview-field-line"><span>{orderSlipLayout.orderedByLabel}</span></div>
+        <section
+          class="order-tab-panel order-tab-panel--document document-preview--pdf-like document-preview--rounded-sm is-active"
+          data-order-detail-tab-panel="order-slip"
+          role="tabpanel"
+        >
+          <header class="pdf-preview-header">
+            <div class="pdf-preview-brand">
+              {
+                orderSlipLayout.brandLines.map((line, index) => (
+                  <p
+                    class:list={[
+                      "pdf-preview-brand-line",
+                      index === 0 && "pdf-preview-brand-line--strong",
+                    ]}
+                  >
+                    {line}
+                  </p>
+                ))
+              }
             </div>
+            <div class="pdf-preview-logo">LOGO</div>
+            <h3 class="pdf-preview-title">{orderSlipLayout.title}</h3>
+          </header>
 
-            <div class="pdf-preview-table" style={`--pdf-grid-template:${orderSlipGridTemplate};`}>
-              <div class="pdf-preview-table__head">
-                {orderSlipLayout.columns.map((column) => (
-                  <span class:list={[column.align && `is-${column.align}`]}>{column.label}</span>
-                ))}
-              </div>
-              {orderSlipLayout.rows.map((row) => (
+          <div class="pdf-preview-fields pdf-preview-fields--two-column">
+            <div class="pdf-preview-field-line">
+              <span>{orderSlipLayout.dateLabel}</span>
+            </div>
+            <div></div>
+            <div class="pdf-preview-field-line">
+              <span>{orderSlipLayout.sellerLabel}</span>
+            </div>
+            <div class="pdf-preview-field-line">
+              <span>{orderSlipLayout.orderedByLabel}</span>
+            </div>
+          </div>
+
+          <div
+            class="pdf-preview-table"
+            style={`--pdf-grid-template:${orderSlipGridTemplate};`}
+          >
+            <div class="pdf-preview-table__head">
+              {
+                orderSlipLayout.columns.map((column) => (
+                  <span class:list={[column.align && `is-${column.align}`]}>
+                    {column.label}
+                  </span>
+                ))
+              }
+            </div>
+            {
+              orderSlipLayout.rows.map((row) => (
                 <div class="pdf-preview-table__row">
                   {row.cells.map((cell, cellIndex) => (
-                    <span class:list={[orderSlipLayout.columns[cellIndex]?.align && `is-${orderSlipLayout.columns[cellIndex]?.align}`]}>
+                    <span
+                      class:list={[
+                        orderSlipLayout.columns[cellIndex]?.align &&
+                          `is-${orderSlipLayout.columns[cellIndex]?.align}`,
+                      ]}
+                    >
                       {cell || "\u00A0"}
                     </span>
                   ))}
                 </div>
-              ))}
-            </div>
-
-            <div class="pdf-preview-total-row">
-              <span>{orderSlipLayout.totalLabel}</span>
-            </div>
-
-            <div class="pdf-preview-copy-block">
-              <h4>{orderSlipLayout.deliveryHeading}</h4>
-              {orderSlipLayout.deliveryLines.map((line) => <p>{line}</p>)}
-            </div>
-
-            <div class="pdf-preview-copy-block">
-              <h4>{orderSlipLayout.paymentHeading}</h4>
-              {orderSlipLayout.paymentLines.map((line) => <p>{line}</p>)}
-            </div>
-
-            <p class="pdf-preview-confirmation">{orderSlipLayout.confirmationText}</p>
-
-            <footer class="pdf-preview-signatures">
-              <div class="pdf-preview-signature-block">
-                <p class="pdf-preview-signature-heading">{orderSlipLayout.buyerSignatureLines[0]}</p>
-                <p>{orderSlipLayout.buyerSignatureLines[1]}</p>
-                <p>{orderSlipLayout.buyerSignatureLines[2]}</p>
-                <p>{orderSlipLayout.buyerSignatureLines[3]}</p>
-              </div>
-              <div class="pdf-preview-signature-block">
-                <p class="pdf-preview-signature-heading">{orderSlipLayout.sellerSignatureHeading}</p>
-                <p class="pdf-preview-signature-name">{orderSlipLayout.sellerSignatureLines[0]}</p>
-                <p>{orderSlipLayout.sellerSignatureLines[1]}</p>
-                <p>{orderSlipLayout.sellerSignatureLines[2]}</p>
-              </div>
-            </footer>
-            <div class="document-preview-floating-bar">
-              <div class="panel-actions">
-                <a href={orderSlipPdfHref} class="document-action" target="_blank" rel="noreferrer">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"></path></svg>
-                  <span>Open PDF</span>
-                </a>
-              </div>
-            </div>
-          </article>
-        </section>
-
-        <section class="order-tab-panel" data-order-detail-tab-panel="sales-invoice" role="tabpanel" hidden>
-          <div class="panel-header">
-            <div>
-              <h2>Sales Invoice</h2>
-              <p>{hasSalesInvoice
-                ? canEditInvoiceQuantities
-                  ? "Manage invoice quantities and export the invoice."
-                  : "Invoice quantities are locked because payment records already exist."
-                : canGenerateInvoice
-                  ? "No sales invoice has been created for this order yet."
-                  : "Move this order to processing before creating a sales invoice."}</p>
-            </div>
-            {hasSalesInvoice && (
-              <div class="panel-actions">
-                <a href={salesInvoicePdfHref} class="document-action" target="_blank" rel="noreferrer">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"></path></svg>
-                  <span>Open PDF</span>
-                </a>
-              </div>
-            )}
+              ))
+            }
           </div>
 
-          {!hasSalesInvoice ? (
-            <div class="empty-document-state">
-              <form method="post">
-                <input type="hidden" name="action" value="save-invoice" />
-                <input type="hidden" name="orderId" value={order.id} />
-                <button type="submit" class="primary-panel-button" disabled={!canGenerateInvoice}>Create Sales Invoice</button>
-              </form>
+          <div class="pdf-preview-total-row">
+            <span>{orderSlipLayout.totalLabel}</span>
+          </div>
+
+          <div class="pdf-preview-copy-block">
+            <h4>{orderSlipLayout.deliveryHeading}</h4>
+            {orderSlipLayout.deliveryLines.map((line) => <p>{line}</p>)}
+          </div>
+
+          <div class="pdf-preview-copy-block">
+            <h4>{orderSlipLayout.paymentHeading}</h4>
+            {orderSlipLayout.paymentLines.map((line) => <p>{line}</p>)}
+          </div>
+
+          <p class="pdf-preview-confirmation">
+            {orderSlipLayout.confirmationText}
+          </p>
+
+          <footer class="pdf-preview-signatures">
+            <div class="pdf-preview-signature-block">
+              <p class="pdf-preview-signature-heading">
+                {orderSlipLayout.buyerSignatureLines[0]}
+              </p>
+              <p>{orderSlipLayout.buyerSignatureLines[1]}</p>
+              <p>{orderSlipLayout.buyerSignatureLines[2]}</p>
+              <p>{orderSlipLayout.buyerSignatureLines[3]}</p>
             </div>
-          ) : (
-            <article class="document-preview document-preview--pdf-like">
-              <header class="pdf-preview-header">
-                <div class="pdf-preview-brand">
-                  {salesInvoiceLayout.brandLines.map((line, index) => (
-                    <p class:list={["pdf-preview-brand-line", index === 0 && "pdf-preview-brand-line--strong"]}>{line}</p>
-                  ))}
-                </div>
-                <div class="pdf-preview-logo">LOGO</div>
-                <h3 class="pdf-preview-title">{salesInvoiceLayout.title}</h3>
-              </header>
-
-              <div class="pdf-preview-fields pdf-preview-fields--two-column">
-                <div class="pdf-preview-field-line"><span>{salesInvoiceLayout.dateLabel}</span></div>
-                <div class="pdf-preview-field-line"><span>{salesInvoiceLayout.invoiceNumberLabel}</span></div>
-                <div class="pdf-preview-field-line"><span>{salesInvoiceLayout.soldToLabel}</span></div>
-                <div class="pdf-preview-field-line"><span>{salesInvoiceLayout.addressLabel}</span></div>
-              </div>
-
-              <div class="pdf-preview-table" style={`--pdf-grid-template:${salesInvoiceGridTemplate};`}>
-                <div class="pdf-preview-table__head">
-                  {salesInvoiceLayout.columns.map((column) => (
-                    <span class:list={[column.align && `is-${column.align}`]}>{column.label}</span>
-                  ))}
-                </div>
-                {order.customer_order_item.map((item, index) => (
-                  <div class="pdf-preview-table__row pdf-preview-table__row--editable">
-                    <span>{salesInvoiceLayout.rows[index]?.cells[0] ?? "Missing product"}</span>
-                    <form method="post" class="pdf-preview-quantity-form">
-                      <input type="hidden" name="action" value="update-invoice-item-quantity" />
-                      <input type="hidden" name="orderItemId" value={item.id} />
-                      <input
-                        type="number"
-                        name="quantity"
-                        min="0.001"
-                        step="0.001"
-                        value={item.final_quantity}
-                        disabled={!canEditInvoiceQuantities}
-                        required
-                      />
-                      <button type="submit" disabled={!canEditInvoiceQuantities}>Save</button>
-                    </form>
-                    <span class="is-right">{salesInvoiceLayout.rows[index]?.cells[2] ?? ""}</span>
-                    <span class="is-right">{salesInvoiceLayout.rows[index]?.cells[3] ?? ""}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div class="pdf-preview-total-row">
-                <span>{salesInvoiceLayout.totalLabel}</span>
-              </div>
-
-              <div class="pdf-preview-copy-block">
-                <h4>Delivery Preference</h4>
-                <p>{salesInvoiceLayout.paymentLines[0]}</p>
-                <p>{salesInvoiceLayout.paymentLines[1]}</p>
-              </div>
-
-              <div class="pdf-preview-copy-block">
-                <h4>{salesInvoiceLayout.paymentHeading}</h4>
-                <p>{salesInvoiceLayout.paymentLines[2]}</p>
-              </div>
-
-              <footer class="pdf-preview-invoice-footer">
-                <div class="pdf-preview-issuer">
-                  <p class="pdf-preview-signature-heading">{salesInvoiceLayout.issuerHeading}</p>
-                  <p class="pdf-preview-signature-name">{salesInvoiceLayout.issuerName}</p>
-                  <p>{salesInvoiceLayout.issuerSubline}</p>
-                </div>
-                <div class="pdf-preview-invoice-summary">
-                  <p>Paid: {formatCurrency(paidTotal)}</p>
-                  <p>Remaining: {formatCurrency(balance)}</p>
-                </div>
-              </footer>
-            </article>
-
-            <article class="document-preview" hidden>
-              <header class="document-preview-header">
-                <div>
-                  <p class="document-preview-kicker">Sales Invoice</p>
-                  <h3>{invoice?.invoice_number ?? "Pending invoice number"}</h3>
-                </div>
-                <div class="document-meta-grid">
-                  <div><span>Issued</span><strong>{formatDate(invoice?.issued_at ?? invoice?.created_at ?? null)}</strong></div>
-                  <div><span>Balance</span><strong>{formatCurrency(balance)}</strong></div>
-                </div>
-              </header>
-
-              <div class="document-party-grid">
-                <section>
-                  <p class="document-preview-label">Sold To</p>
-                  <h4>{order.customer ? fullName(order.customer) : "Unassigned customer"}</h4>
-                  <p>{order.customer?.address ?? "No address on file"}</p>
-                  <p>{order.customer?.email ?? "No email address"}</p>
-                </section>
-                <section>
-                  <p class="document-preview-label">Summary</p>
-                  <h4>{autoCapitalize(order.payment_status)}</h4>
-                  <p>Paid: {formatCurrency(paidTotal)}</p>
-                  <p>Remaining: {formatCurrency(balance)}</p>
-                </section>
-              </div>
-
-              <div class="invoice-edit-list">
-                <div class="document-table-head invoice-edit-head">
-                  <span>Product</span>
-                  <span>Quantity</span>
-                  <span>Unit Price</span>
-                  <span>Amount</span>
-                </div>
-                {order.customer_order_item.map((item) => (
-                  <div class="invoice-edit-row">
-                    <div class="invoice-product-copy">
-                      <strong>{item.product?.name ?? "Missing product"}</strong>
-                      <span>{item.add_details ?? "No additional details"}</span>
-                    </div>
-                    <form method="post" class="invoice-quantity-form">
-                      <input type="hidden" name="action" value="update-invoice-item-quantity" />
-                      <input type="hidden" name="orderItemId" value={item.id} />
-                      <input
-                        type="number"
-                        name="quantity"
-                        min="0.001"
-                        step="0.001"
-                        value={item.final_quantity}
-                        disabled={!canEditInvoiceQuantities}
-                        required
-                      />
-                      <button type="submit" disabled={!canEditInvoiceQuantities}>Save</button>
-                    </form>
-                    <span>{formatCurrency(item.unit_price)}</span>
-                    <span>{formatCurrency(item.final_quantity * item.unit_price)}</span>
-                  </div>
-                ))}
-              </div>
-
-              <footer class="document-footer">
-                <div>
-                  <p class="document-preview-label">Invoice Number</p>
-                  <strong>{invoice?.invoice_number ?? "Pending invoice number"}</strong>
-                </div>
-                <div class="document-total">
-                  <span>Total Amount Due</span>
-                  <strong>{formatCurrency(invoiceTotal)}</strong>
-                </div>
-              </footer>
-            </article>
-          )}
+            <div class="pdf-preview-signature-block">
+              <p class="pdf-preview-signature-heading">
+                {orderSlipLayout.sellerSignatureHeading}
+              </p>
+              <p class="pdf-preview-signature-name">
+                {orderSlipLayout.sellerSignatureLines[0]}
+              </p>
+              <p>{orderSlipLayout.sellerSignatureLines[1]}</p>
+              <p>{orderSlipLayout.sellerSignatureLines[2]}</p>
+            </div>
+          </footer>
+          <div class="document-preview-floating-bar">
+            <div class="panel-actions">
+              <a
+                href={orderSlipPdfHref}
+                class="document-action"
+                target="_blank"
+                rel="noreferrer"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"
+                  ><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path
+                    d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"
+                  ></path></svg
+                >
+                <span>Open PDF</span>
+              </a>
+            </div>
+          </div>
         </section>
 
-        {hasCommissionTab && (
-          <section class="order-tab-panel" data-order-detail-tab-panel="commission" role="tabpanel" hidden>
-            <div class="panel-header">
-              <div>
-                <h2>Commission</h2>
-                <p>Manage item-level commission values for the assigned agent. Paid commissions require recorded payments that cover each item total.</p>
+        <section
+          class:list={[
+            "order-tab-panel",
+            hasSalesInvoice &&
+              "order-tab-panel--document document-preview--pdf-like document-preview--rounded-sm",
+          ]}
+          data-order-detail-tab-panel="sales-invoice"
+          role="tabpanel"
+          hidden
+        >
+          {
+            !hasSalesInvoice ? (
+              <div class="sales-invoice-empty-state">
+                <svg class="sales-invoice-empty-state__icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="8" y1="13" x2="16" y2="13"></line>
+                  <line x1="8" y1="17" x2="16" y2="17"></line>
+                  <line x1="8" y1="9" x2="10" y2="9"></line>
+                </svg>
+                <p>No sales invoice has been created for this order yet.</p>
+                <form method="post">
+                  <input type="hidden" name="action" value="save-invoice" />
+                  <input type="hidden" name="orderId" value={order.id} />
+                  <button
+                    type="submit"
+                    class="primary-panel-button"
+                    disabled={!canGenerateInvoice}
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 5v14"></path>
+                      <path d="M5 12h14"></path>
+                    </svg>
+                    <span>Create Sales Invoice</span>
+                  </button>
+                </form>
               </div>
-            </div>
+            ) : (
+              <>
+                <header class="pdf-preview-header">
+                  <div class="pdf-preview-brand">
+                    {salesInvoiceLayout.brandLines.map((line, index) => (
+                      <p
+                        class:list={[
+                          "pdf-preview-brand-line",
+                          index === 0 && "pdf-preview-brand-line--strong",
+                        ]}
+                      >
+                        {line}
+                      </p>
+                    ))}
+                  </div>
+                  <div class="pdf-preview-logo">LOGO</div>
+                  <h3 class="pdf-preview-title">{salesInvoiceLayout.title}</h3>
+                </header>
 
-            <div class="metrics-grid">
-              <div class="metric-card">
-                <span>Total Commission</span>
-                <strong>{formatCurrency(totalCommission)}</strong>
-              </div>
-              <div class="metric-card">
-                <span>Payment Available For Paid Commissions</span>
-                <strong>{formatCurrency(totalAvailableCommissionCoverage)}</strong>
-              </div>
-            </div>
+                <div class="pdf-preview-fields pdf-preview-fields--two-column">
+                  <div class="pdf-preview-field-line">
+                    <span>{salesInvoiceLayout.dateLabel}</span>
+                  </div>
+                  <div class="pdf-preview-field-line">
+                    <span>{salesInvoiceLayout.invoiceNumberLabel}</span>
+                  </div>
+                  <div class="pdf-preview-field-line">
+                    <span>{salesInvoiceLayout.soldToLabel}</span>
+                  </div>
+                  <div class="pdf-preview-field-line">
+                    <span>{salesInvoiceLayout.addressLabel}</span>
+                  </div>
+                </div>
 
-            <div class="stack-list">
-              {commissionItems.map(({ item, itemTotalAmount, availableCoverageForItem, paidCheckboxDisabled }) => (
-                  <form method="post" class="stack-card">
-                    <input type="hidden" name="action" value="update-commission" />
-                    <input type="hidden" name="orderItemId" value={item.id} />
-
-                    <div class="stack-card-header">
-                      <div>
-                        <h3>{item.product?.name ?? "Missing product"}</h3>
-                        <p>{formatCurrency(item.unit_price)} x {item.final_quantity}</p>
-                      </div>
-                      <span class="pill">
-                        {item.agent_commission_paid ? "Paid" : "Unpaid"}
+                <div
+                  class="pdf-preview-table"
+                  style={`--pdf-grid-template:${salesInvoiceGridTemplate};`}
+                >
+                  <div class="pdf-preview-table__head">
+                    {salesInvoiceLayout.columns.map((column) => (
+                      <span class:list={[column.align && `is-${column.align}`]}>
+                        {column.label}
+                      </span>
+                    ))}
+                  </div>
+                  {order.customer_order_item.map((item, index) => (
+                    <div class="pdf-preview-table__row pdf-preview-table__row--editable">
+                      <span>
+                        {salesInvoiceLayout.rows[index]?.cells[0] ??
+                          "Missing product"}
+                      </span>
+                      <form method="post" class="pdf-preview-quantity-form">
+                        <input
+                          type="hidden"
+                          name="action"
+                          value="update-invoice-item-quantity"
+                        />
+                        <input
+                          type="hidden"
+                          name="orderItemId"
+                          value={item.id}
+                        />
+                        <input
+                          type="number"
+                          name="quantity"
+                          min="0.001"
+                          step="0.001"
+                          value={item.final_quantity}
+                          disabled={!canEditInvoiceQuantities}
+                          required
+                        />
+                        <button
+                          type="submit"
+                          disabled={!canEditInvoiceQuantities}
+                        >
+                          Save
+                        </button>
+                      </form>
+                      <span class="is-right">
+                        {salesInvoiceLayout.rows[index]?.cells[2] ?? ""}
+                      </span>
+                      <span class="is-right">
+                        {salesInvoiceLayout.rows[index]?.cells[3] ?? ""}
                       </span>
                     </div>
+                  ))}
+                </div>
 
-                    <div class="stack-card-grid">
-                      <label>
-                        <span>Item Total</span>
-                        <input type="text" value={formatCurrency(itemTotalAmount)} readonly />
-                      </label>
-                      <label>
-                        <span>Commission</span>
-                        <input type="number" name="amount" min="0" step="0.01" value={item.agent_commission_amount} />
-                      </label>
-                      <label class="checkbox-row">
-                        <input
-                          type="checkbox"
-                          name="isPaid"
-                          checked={item.agent_commission_paid}
-                          disabled={paidCheckboxDisabled}
-                        />
-                        <span>Paid</span>
-                      </label>
-                    </div>
+                <div class="pdf-preview-total-row">
+                  <span>{salesInvoiceLayout.totalLabel}</span>
+                </div>
 
-                    {paidCheckboxDisabled && (
-                      <p class="commission-coverage-notice">
-                        {!hasPayments
-                          ? "Record a payment before marking this commission as paid."
-                          : `This item total of ${formatCurrency(itemTotalAmount)} exceeds the remaining paid coverage of ${formatCurrency(availableCoverageForItem)}.`}
-                      </p>
-                    )}
+                <div class="pdf-preview-copy-block">
+                  <h4>Delivery Preference</h4>
+                  <p>{salesInvoiceLayout.paymentLines[0]}</p>
+                  <p>{salesInvoiceLayout.paymentLines[1]}</p>
+                </div>
 
-                    <label class="stack-card-notes">
-                      <span>Notes</span>
-                      <textarea name="notes" rows="3">{item.agent_commission_notes ?? ""}</textarea>
-                    </label>
+                <div class="pdf-preview-copy-block">
+                  <h4>{salesInvoiceLayout.paymentHeading}</h4>
+                  <p>{salesInvoiceLayout.paymentLines[2]}</p>
+                </div>
 
-                    <div class="stack-card-actions">
-                      <button type="submit" class="primary-panel-button">Save Commission</button>
-                    </div>
-                  </form>
-              ))}
-            </div>
-          </section>
-        )}
+                <footer class="pdf-preview-invoice-footer">
+                  <div class="pdf-preview-issuer">
+                    <p class="pdf-preview-signature-heading">
+                      {salesInvoiceLayout.issuerHeading}
+                    </p>
+                    <p class="pdf-preview-signature-name">
+                      {salesInvoiceLayout.issuerName}
+                    </p>
+                    <p>{salesInvoiceLayout.issuerSubline}</p>
+                  </div>
+                  <div class="pdf-preview-invoice-summary">
+                    <p>Paid: {formatCurrency(paidTotal)}</p>
+                    <p>Remaining: {formatCurrency(balance)}</p>
+                  </div>
+                </footer>
 
-        <section class="order-tab-panel" data-order-detail-tab-panel="payment-record" role="tabpanel" hidden>
+                <div class="document-preview-floating-bar">
+                  <div class="panel-actions">
+                    <a
+                      href={salesInvoicePdfHref}
+                      class="document-action"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <>
+                          <path d="M15 3h6v6" />
+                          <path d="M10 14 21 3" />
+                          <path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4" />
+                        </>
+                      </svg>
+                      <span>Open PDF</span>
+                    </a>
+                  </div>
+                </div>
+              </>
+            )
+          }
+        </section>
+
+        {
+          hasCommissionTab && (
+            <section
+              class="order-tab-panel"
+              data-order-detail-tab-panel="commission"
+              role="tabpanel"
+              hidden
+            >
+              <div class="panel-header">
+                <div>
+                  <h2>Commission</h2>
+                  <p>
+                    Manage item-level commission values for the assigned agent.
+                    Paid commissions require recorded payments that cover each
+                    item total.
+                  </p>
+                </div>
+              </div>
+
+              <div class="metrics-grid">
+                <div class="metric-card">
+                  <span>Total Commission</span>
+                  <strong>{formatCurrency(totalCommission)}</strong>
+                </div>
+                <div class="metric-card">
+                  <span>Payment Available For Paid Commissions</span>
+                  <strong>
+                    {formatCurrency(totalAvailableCommissionCoverage)}
+                  </strong>
+                </div>
+              </div>
+
+              <div class="stack-list">
+                {commissionItems.map(
+                  ({
+                    item,
+                    itemTotalAmount,
+                    availableCoverageForItem,
+                    paidCheckboxDisabled,
+                  }) => (
+                    <form method="post" class="stack-card">
+                      <input
+                        type="hidden"
+                        name="action"
+                        value="update-commission"
+                      />
+                      <input type="hidden" name="orderItemId" value={item.id} />
+
+                      <div class="stack-card-header">
+                        <div>
+                          <h3>{item.product?.name ?? "Missing product"}</h3>
+                          <p>
+                            {formatCurrency(item.unit_price)} x{" "}
+                            {item.final_quantity}
+                          </p>
+                        </div>
+                        <span class="pill">
+                          {item.agent_commission_paid ? "Paid" : "Unpaid"}
+                        </span>
+                      </div>
+
+                      <div class="stack-card-grid">
+                        <label>
+                          <span>Item Total</span>
+                          <input
+                            type="text"
+                            value={formatCurrency(itemTotalAmount)}
+                            readonly
+                          />
+                        </label>
+                        <label>
+                          <span>Commission</span>
+                          <input
+                            type="number"
+                            name="amount"
+                            min="0"
+                            step="0.01"
+                            value={item.agent_commission_amount}
+                          />
+                        </label>
+                        <label class="checkbox-row">
+                          <input
+                            type="checkbox"
+                            name="isPaid"
+                            checked={item.agent_commission_paid}
+                            disabled={paidCheckboxDisabled}
+                          />
+                          <span>Paid</span>
+                        </label>
+                      </div>
+
+                      {paidCheckboxDisabled && (
+                        <p class="commission-coverage-notice">
+                          {!hasPayments
+                            ? "Record a payment before marking this commission as paid."
+                            : `This item total of ${formatCurrency(itemTotalAmount)} exceeds the remaining paid coverage of ${formatCurrency(availableCoverageForItem)}.`}
+                        </p>
+                      )}
+
+                      <div class="stack-card-actions">
+                        <button type="submit" class="primary-panel-button">
+                          Save Commission
+                        </button>
+                      </div>
+                    </form>
+                  ),
+                )}
+              </div>
+            </section>
+          )
+        }
+
+        <section
+          class="order-tab-panel"
+          data-order-detail-tab-panel="payment-record"
+          role="tabpanel"
+          hidden
+        >
           <div class="panel-header">
             <div>
               <h2>Payment Record</h2>
-              <p>{hasSalesInvoice
-                ? "Track payments made against the invoice and remaining balance."
-                : "Create a sales invoice before recording any payment."}</p>
+              <p>
+                {
+                  hasSalesInvoice
+                    ? "Track payments made against the invoice and remaining balance."
+                    : "Create a sales invoice before recording any payment."
+                }
+              </p>
             </div>
-            <button type="button" class="primary-panel-button" data-toggle-payment-form disabled={!canCreatePaymentRecord}>
+            <button
+              type="button"
+              class="primary-panel-button"
+              data-toggle-payment-form
+              disabled={!canCreatePaymentRecord}
+            >
               Create Payment Record
             </button>
           </div>
@@ -635,22 +837,44 @@ const timelineItems = [
             </div>
           </div>
 
-          <form method="post" class="payment-form" data-payment-form hidden={!canCreatePaymentRecord}>
+          <form
+            method="post"
+            class="payment-form"
+            data-payment-form
+            hidden={!canCreatePaymentRecord}
+          >
             <input type="hidden" name="action" value="record-payment" />
             <input type="hidden" name="orderId" value={order.id} />
 
             <div class="stack-card-grid">
               <label>
                 <span>Amount</span>
-                <input type="number" name="amount" min="0.01" step="0.01" max={balance > 0 ? balance : undefined} required />
+                <input
+                  type="number"
+                  name="amount"
+                  min="0.01"
+                  step="0.01"
+                  max={balance > 0 ? balance : undefined}
+                  required
+                />
               </label>
               <label>
                 <span>Method</span>
-                <input type="text" name="paymentMethod" placeholder="cash, bank transfer" required />
+                <input
+                  type="text"
+                  name="paymentMethod"
+                  placeholder="cash, bank transfer"
+                  required
+                />
               </label>
               <label>
                 <span>Payment Date</span>
-                <input type="date" name="paymentDate" value={new Date().toISOString().slice(0, 10)} required />
+                <input
+                  type="date"
+                  name="paymentDate"
+                  value={new Date().toISOString().slice(0, 10)}
+                  required
+                />
               </label>
               <label>
                 <span>Reference</span>
@@ -664,34 +888,47 @@ const timelineItems = [
             </label>
 
             <div class="stack-card-actions">
-              <button type="submit" class="primary-panel-button">Save Payment Record</button>
+              <button type="submit" class="primary-panel-button"
+                >Save Payment Record</button
+              >
             </div>
           </form>
 
-          {order.payment.length === 0 ? (
-            <p class="empty-copy">No payment records yet.</p>
-          ) : (
-            <div class="stack-list">
-              {order.payment.map((payment) => (
-                <article class="stack-card">
-                  <div class="stack-card-header">
-                    <div>
-                      <h3>{payment.payment_method}</h3>
-                      <p>{formatDate(payment.payment_date)}</p>
+          {
+            order.payment.length === 0 ? (
+              <p class="empty-copy">No payment records yet.</p>
+            ) : (
+              <div class="stack-list">
+                {order.payment.map((payment) => (
+                  <article class="stack-card">
+                    <div class="stack-card-header">
+                      <div>
+                        <h3>{payment.payment_method}</h3>
+                        <p>{formatDate(payment.payment_date)}</p>
+                      </div>
+                      <strong>{formatCurrency(payment.amount)}</strong>
                     </div>
-                    <strong>{formatCurrency(payment.amount)}</strong>
-                  </div>
-                  <div class="payment-meta">
-                    <span>{payment.reference_number ? `Reference: ${payment.reference_number}` : "No reference number"}</span>
-                    <span>{payment.notes ?? "No notes"}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
+                    <div class="payment-meta">
+                      <span>
+                        {payment.reference_number
+                          ? `Reference: ${payment.reference_number}`
+                          : "No reference number"}
+                      </span>
+                      <span>{payment.notes ?? "No notes"}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )
+          }
         </section>
 
-        <section class="order-tab-panel" data-order-detail-tab-panel="notes" role="tabpanel" hidden>
+        <section
+          class="order-tab-panel"
+          data-order-detail-tab-panel="notes"
+          role="tabpanel"
+          hidden
+        >
           <div class="panel-header">
             <div>
               <h2>Notes</h2>
@@ -706,9 +943,12 @@ const timelineItems = [
               name="notes"
               rows="14"
               placeholder="Write internal notes for this order."
-            >{order.notes ?? ""}</textarea>
+              >{order.notes ?? ""}</textarea
+            >
             <div class="stack-card-actions">
-              <button type="submit" class="primary-panel-button">Save Notes</button>
+              <button type="submit" class="primary-panel-button"
+                >Save Notes</button
+              >
             </div>
           </form>
         </section>
@@ -718,8 +958,12 @@ const timelineItems = [
 </AdminPageFrame>
 
 <script is:inline>
-  const tabTriggers = Array.from(document.querySelectorAll("[data-order-detail-tab-trigger]"));
-  const tabPanels = Array.from(document.querySelectorAll("[data-order-detail-tab-panel]"));
+  const tabTriggers = Array.from(
+    document.querySelectorAll("[data-order-detail-tab-trigger]"),
+  );
+  const tabPanels = Array.from(
+    document.querySelectorAll("[data-order-detail-tab-panel]"),
+  );
 
   const setActiveTab = (target) => {
     tabTriggers.forEach((trigger) => {
@@ -742,7 +986,9 @@ const timelineItems = [
     });
   });
 
-  const paymentToggleButton = document.querySelector("[data-toggle-payment-form]");
+  const paymentToggleButton = document.querySelector(
+    "[data-toggle-payment-form]",
+  );
   const paymentForm = document.querySelector("[data-payment-form]");
 
   if (paymentToggleButton && paymentForm) {
@@ -1041,26 +1287,40 @@ const timelineItems = [
   .order-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-bottom: 1.5rem;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
   }
 
   .order-tab {
-    min-height: 2.75rem;
-    border: 1px solid rgba(17, 24, 39, 0.08);
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.85);
+    min-height: 2.25rem;
+    margin-bottom: -1px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent !important;
     color: rgba(17, 24, 39, 0.66);
-    padding: 0 1rem;
+    padding: 0.45rem 0.75rem;
     font: inherit;
+    font-size: 0.875rem;
     font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
     cursor: pointer;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  .order-tab:hover:not(.is-active) {
+    color: #111827;
+    background: transparent !important;
   }
 
   .order-tab.is-active {
-    background: #111827;
-    border-color: #111827;
-    color: #ffffff;
+    background: transparent !important;
+    border-bottom-color: #111827;
+    color: #111827;
   }
 
   .order-tab-panels {
@@ -1085,6 +1345,17 @@ const timelineItems = [
 
   .order-tab-panel.is-active {
     display: block;
+  }
+
+  .order-tab-panel--document.document-preview--pdf-like {
+    border-radius: 0.125rem;
+    padding: 2.75rem 2.5rem;
+    padding-bottom: 6.5rem;
+    border: 1px solid #d7d7d7;
+    box-shadow: none;
+    background: #ffffff;
+    backdrop-filter: none;
+    color: #111111;
   }
 
   .panel-header,
@@ -1224,12 +1495,18 @@ const timelineItems = [
 
   .document-table-head,
   .document-table-row {
-    grid-template-columns: minmax(180px, 2fr) repeat(3, minmax(90px, 1fr)) minmax(160px, 1.4fr);
+    grid-template-columns: minmax(180px, 2fr) repeat(
+        3,
+        minmax(90px, 1fr)
+      ) minmax(160px, 1.4fr);
   }
 
   .invoice-edit-head,
   .invoice-edit-row {
-    grid-template-columns: minmax(220px, 2fr) minmax(170px, 1.2fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr);
+    grid-template-columns: minmax(220px, 2fr) minmax(170px, 1.2fr) minmax(
+        120px,
+        0.8fr
+      ) minmax(120px, 0.8fr);
   }
 
   .document-table-head {
@@ -1272,14 +1549,54 @@ const timelineItems = [
     font-size: 1.15rem;
   }
 
-  .empty-document-state {
+  .sales-invoice-empty-state {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 0.75rem;
     min-height: 22rem;
-    border-radius: 1rem;
-    border: 1px dashed rgba(17, 24, 39, 0.18);
-    background: rgba(255, 255, 255, 0.78);
+    text-align: center;
+  }
+
+  .sales-invoice-empty-state__icon {
+    width: 3.5rem;
+    height: 3.5rem;
+    color: rgba(17, 24, 39, 0.28);
+    flex-shrink: 0;
+  }
+
+  .sales-invoice-empty-state p {
+    margin: 0;
+    color: rgba(17, 24, 39, 0.72);
+  }
+
+  .sales-invoice-empty-state form {
+    margin: 0.25rem 0 0;
+  }
+
+  .sales-invoice-empty-state .primary-panel-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    border-radius: 0.65rem;
+  }
+
+  .sales-invoice-empty-state .primary-panel-button svg {
+    width: 0.95rem;
+    height: 0.95rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
   }
 
   .metric-card strong,
@@ -1466,4 +1783,3 @@ const timelineItems = [
     }
   }
 </style>
-

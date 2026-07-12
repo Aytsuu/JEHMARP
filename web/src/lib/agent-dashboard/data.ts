@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { throwLoadError } from "@/lib/load-error";
 import type { InvoiceStatus, OrderStatus, ProductCategory, StockStatus } from "@/lib/admin-dashboard/actions";
 import { buildAgentPaymentSummary, buildAgentSummary } from "./view";
 
@@ -36,7 +37,6 @@ const agentOrderSelect = `
     add_details,
     agent_commission_amount,
     agent_commission_paid,
-    agent_commission_notes,
     product:product_id (
       id,
       name,
@@ -119,7 +119,6 @@ export type AgentOrderItem = {
   add_details: string | null;
   agent_commission_amount: number;
   agent_commission_paid: boolean;
-  agent_commission_notes: string | null;
   product: Pick<AgentProduct, "id" | "name" | "unit_label" | "default_price"> | null;
 };
 
@@ -229,7 +228,7 @@ export async function loadAgentOrder(
     .eq("id", orderId)
     .maybeSingle();
 
-  if (error) throw new Error("Unable to load agent order.");
+  if (error) throwLoadError("Unable to load agent order.");
 
   return data ? normalizeAgentOrder(data) : null;
 }
@@ -242,7 +241,7 @@ async function loadAgentProfile(supabase: SupabaseServerClient, userId: string) 
     .eq("status", "active")
     .maybeSingle();
 
-  if (error) throw new Error("Unable to load agent profile.");
+  if (error) throwLoadError("Unable to load agent profile.");
   if (!data) throw new Error("Active agent profile was not found.");
 
   return data as AgentProfile;
@@ -254,7 +253,7 @@ async function loadAssignedCustomers(supabase: SupabaseServerClient) {
     .select("id, first_name, last_name, phone_number, email, address, assigned_agent_id, is_reseller, created_at, updated_at")
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error("Unable to load assigned customers.");
+  if (error) throwLoadError("Unable to load assigned customers.");
 
   return (data ?? []) as AgentCustomer[];
 }
@@ -266,7 +265,7 @@ async function loadActiveProducts(supabase: SupabaseServerClient) {
     .eq("is_active", true)
     .order("name", { ascending: true });
 
-  if (error) throw new Error("Unable to load active products.");
+  if (error) throwLoadError("Unable to load active products.");
 
   return (data ?? []) as AgentProduct[];
 }
@@ -278,7 +277,7 @@ async function loadAccessibleOrders(supabase: SupabaseServerClient) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) throw new Error("Unable to load agent orders.");
+  if (error) throwLoadError("Unable to load agent orders.");
 
   return ((data ?? []) as unknown[]).map(normalizeAgentOrder);
 }

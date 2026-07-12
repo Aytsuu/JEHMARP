@@ -340,7 +340,6 @@ function item(
     add_details: null,
     agent_commission_amount: commissionAmount,
     agent_commission_paid: commissionPaid,
-    agent_commission_notes: null,
     product: {
       id: productId,
       name: productName,

@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { throwLoadError } from "@/lib/load-error";
 
 export type DashboardRole = "admin" | "agent";
 
@@ -16,7 +17,7 @@ export async function getSignedInUser(context: RequestContext) {
       return null;
     }
 
-    throw new Error("Unable to load the signed-in user.");
+    throwLoadError("Unable to load the signed-in user.");
   }
 
   return data.user;
@@ -43,7 +44,7 @@ export async function getDashboardRoleWithClient(
     .maybeSingle();
 
   if (adminError) {
-    throw new Error("Unable to load admin role.");
+    throwLoadError("Unable to load admin role.");
   }
 
   if (adminRole) {
@@ -58,7 +59,7 @@ export async function getDashboardRoleWithClient(
     .maybeSingle();
 
   if (agentError) {
-    throw new Error("Unable to load agent profile.");
+    throwLoadError("Unable to load agent profile.");
   }
 
   if (!agentProfile) {

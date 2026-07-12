@@ -68,6 +68,12 @@ const analytics = buildAdminAnalytics(data);
           },
         });
 
+        if (response.status === 503) {
+          const body = await response.json().catch(() => null) as { redirectUrl?: string } | null;
+          window.location.assign(body?.redirectUrl || "/system-issue");
+          return;
+        }
+
         if (!response.ok) {
           throw new Error(`Dashboard summary failed with ${response.status}.`);
         }

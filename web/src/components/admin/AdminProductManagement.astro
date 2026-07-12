@@ -962,11 +962,7 @@ function formatStockStatus(status: string): string {
           signal: fetchController.signal,
         });
 
-        if (!response.ok) {
-          throw new Error(`Product filters failed with ${response.status}.`);
-        }
-
-        const fragmentHtml = await response.text();
+        const fragmentHtml = await window.readDashboardFragmentResponse(response);
         if (updateHistory) {
           window.history.replaceState(
             { productFilterQuery: targetQuery },

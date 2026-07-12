@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { throwLoadError } from "@/lib/load-error";
 
 export type PublicPageRecord = {
   id: string;
@@ -89,7 +90,7 @@ export async function getFeaturedPublicProducts(
     .limit(limit);
 
   if (error) {
-    throw new Error("Unable to load featured public products");
+    throwLoadError("Unable to load featured public products");
   }
 
   return (data ?? []) as PublicFeaturedProduct[];

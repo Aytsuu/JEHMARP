@@ -268,11 +268,7 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
           signal: fetchController.signal,
         });
 
-        if (!response.ok) {
-          throw new Error(`Invoice filters failed with ${response.status}.`);
-        }
-
-        const fragmentHtml = await response.text();
+        const fragmentHtml = await window.readDashboardFragmentResponse(response);
         window.history.replaceState(
           { invoiceFilterQuery: targetQuery },
           "",

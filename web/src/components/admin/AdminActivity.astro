@@ -204,9 +204,8 @@ const emptyMessage = activeFilters.search
           headers: { "X-Requested-With": "fetch" },
           signal: fetchController.signal,
         });
-        if (!response.ok) throw new Error(`Activity filters failed with ${response.status}.`);
+        const fragmentHtml = await window.readDashboardFragmentResponse(response);
 
-        const fragmentHtml = await response.text();
         window.history.replaceState(
           { activityFilterQuery: targetQuery },
           "",

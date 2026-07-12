@@ -4192,10 +4192,17 @@
     border-radius: 0.125rem;
   }
 
-  .order-tab-panel--document {
+  .order-tab-panel--document:not(.document-preview--pdf-like) {
     padding: 0 !important;
     background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    backdrop-filter: none !important;
     overflow: hidden;
+  }
+
+  .order-tab-panel--document.document-preview--pdf-like {
+    backdrop-filter: none !important;
   }
 
   .document-preview-floating-bar {

@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { throwLoadError } from "@/lib/load-error";
 
 import type { AdminAgentFilters } from "./agent-filters";
 import type { AdminCustomerFilters } from "./customer-filters";
@@ -69,7 +70,6 @@ const adminOrderSelect = `
     add_details,
     agent_commission_amount,
     agent_commission_paid,
-    agent_commission_notes,
     product:product_id (
       id,
       name,
@@ -182,7 +182,6 @@ export type AdminOrderItem = {
   add_details: string | null;
   agent_commission_amount: number;
   agent_commission_paid: boolean;
-  agent_commission_notes: string | null;
   product: Pick<AdminProduct, "id" | "name" | "unit_label" | "default_price"> | null;
 };
 
@@ -489,7 +488,7 @@ export async function loadAdminOrder(orderId: string): Promise<AdminOrder | null
     .eq("id", orderId)
     .maybeSingle();
 
-  if (error) throw new Error("Unable to load admin order.");
+  if (error) throwLoadError("Unable to load admin order.");
 
   if (!data) {
     return null;
@@ -505,7 +504,7 @@ async function loadPages(supabase: SupabaseAdminClient) {
     .select("id, slug, title, status, published_at, created_at, updated_at")
     .order("slug", { ascending: true });
 
-  if (error) throw new Error("Unable to load admin pages.");
+  if (error) throwLoadError("Unable to load admin pages.");
 
   return (data ?? []) as AdminPage[];
 }
@@ -516,7 +515,7 @@ async function loadPageSections(supabase: SupabaseAdminClient) {
     .select("id, page_id, type, sort_order, content, status, created_at, updated_at")
     .order("sort_order", { ascending: true });
 
-  if (error) throw new Error("Unable to load admin page sections.");
+  if (error) throwLoadError("Unable to load admin page sections.");
 
   return (data ?? []) as AdminPageSection[];
 }
@@ -548,7 +547,7 @@ async function loadProducts(
     .order("is_active", { ascending: false })
     .order("name", { ascending: true });
 
-  if (error) throw new Error("Unable to load admin products.");
+  if (error) throwLoadError("Unable to load admin products.");
 
   return (data ?? []) as AdminProduct[];
 }
@@ -566,7 +565,7 @@ async function loadAgents(
     .select("id, user_id, display_name, contact, status, created_at, updated_at")
     .order("display_name", { ascending: true });
 
-  if (error) throw new Error("Unable to load admin agents.");
+  if (error) throwLoadError("Unable to load admin agents.");
 
   const baseAgents = (data ?? []) as Array<
     Omit<AdminAgent, "email"> & { email?: never }
@@ -600,7 +599,7 @@ async function loadCustomers(
     )
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error("Unable to load admin customers.");
+  if (error) throwLoadError("Unable to load admin customers.");
 
   const customers = (data ?? []) as AdminCustomer[];
 
@@ -615,7 +614,7 @@ async function loadCustomers(
       .from("agent_profile")
       .select("id, display_name");
 
-    if (agentError) throw new Error("Unable to load admin customers.");
+    if (agentError) throwLoadError("Unable to load admin customers.");
 
     (agentData ?? []).forEach((agent) => {
       const normalizedAgent = agent as { id?: unknown; display_name?: unknown };
@@ -662,7 +661,7 @@ async function loadOrders(
 
   const { data, error } = await orderedQuery;
 
-  if (error) throw new Error("Unable to load admin orders.");
+  if (error) throwLoadError("Unable to load admin orders.");
 
   const orders = await enrichOrdersWithAgentEmails(
     supabase,
@@ -713,7 +712,7 @@ async function loadInvoices(
     .select(adminOrderSelect)
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error("Unable to load admin invoices.");
+  if (error) throwLoadError("Unable to load admin invoices.");
 
   const orders = await enrichOrdersWithAgentEmails(
     supabase,
@@ -929,7 +928,7 @@ async function loadAuthEmailsByUserId(
   });
 
   if (error) {
-    throw new Error("Unable to load admin agents.");
+    throwLoadError("Unable to load admin agents.");
   }
 
   (data?.users ?? []).forEach((user) => {
@@ -954,7 +953,7 @@ async function loadContactInquiries(
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) throw new Error("Unable to load admin contact inquiries.");
+  if (error) throwLoadError("Unable to load admin contact inquiries.");
 
   const inquiries = (data ?? []) as AdminContactInquiry[];
 
@@ -992,7 +991,7 @@ async function loadResellerApplications(
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) throw new Error("Unable to load admin reseller applications.");
+  if (error) throwLoadError("Unable to load admin reseller applications.");
 
   const applications = (data ?? []) as AdminResellerApplication[];
 
@@ -1044,7 +1043,7 @@ async function loadDashboardSummaryOrders(
     .select("id, customer_order_item(id), invoice(id)")
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error("Unable to load admin orders.");
+  if (error) throwLoadError("Unable to load admin orders.");
 
   return ((data ?? []) as unknown[]).map(normalizeAdminOrder);
 }
@@ -1056,7 +1055,7 @@ async function loadDashboardSummaryCustomers(
     .from("customer")
     .select("id");
 
-  if (error) throw new Error("Unable to load admin customers.");
+  if (error) throwLoadError("Unable to load admin customers.");
 
   return (data ?? []) as AdminCustomer[];
 }
@@ -1068,7 +1067,7 @@ async function loadDashboardSummaryProducts(
     .from("product")
     .select("id");
 
-  if (error) throw new Error("Unable to load admin products.");
+  if (error) throwLoadError("Unable to load admin products.");
 
   return (data ?? []) as AdminProduct[];
 }
@@ -1081,7 +1080,7 @@ async function loadDashboardSummaryContactInquiries(
     .select("id")
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error("Unable to load admin contact inquiries.");
+  if (error) throwLoadError("Unable to load admin contact inquiries.");
 
   return (data ?? []) as AdminContactInquiry[];
 }
@@ -1094,7 +1093,7 @@ async function loadDashboardSummaryResellerApplications(
     .select("id")
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error("Unable to load admin reseller applications.");
+  if (error) throwLoadError("Unable to load admin reseller applications.");
 
   return (data ?? []) as AdminResellerApplication[];
 }
