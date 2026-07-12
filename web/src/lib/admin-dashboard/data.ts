@@ -785,7 +785,6 @@ function getAdminOrderSearchText(order: AdminOrder) {
   const customer = order.customer;
   const agent = order.agent;
   const values = [
-    order.id,
     order.source,
     order.order_status,
     order.payment_status,

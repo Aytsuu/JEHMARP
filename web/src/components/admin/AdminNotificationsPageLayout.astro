@@ -16,7 +16,7 @@ type Props = {
   title: string;
   description: string;
   heading: string;
-  intro: string;
+  intro?: string;
   backUrl?: string;
   backLabel?: string;
   feedback?: AdminActionFeedback;
@@ -50,6 +50,7 @@ const unreadNotificationCount =
   unreadOrderCount + unreadInquiryCount + unreadResellerApplicationCount;
 const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
 const isPageReady = pageAvailability.status === "ready";
+const hasHeadingMeta = Astro.slots.has("heading-meta");
 ---
 
 <DashboardLayout
@@ -92,7 +93,15 @@ const isPageReady = pageAvailability.status === "ready";
             )}
             <div class="admin-notifications-page__heading-copy">
               <h1 id={headingId} class="admin-notifications-page__title">{heading}</h1>
-              <p class="admin-notifications-page__intro">{intro}</p>
+              {
+                hasHeadingMeta ? (
+                  <div class="admin-notifications-page__heading-meta">
+                    <slot name="heading-meta" />
+                  </div>
+                ) : (
+                  intro && <p class="admin-notifications-page__intro">{intro}</p>
+                )
+              }
             </div>
           </div>
         </header>
@@ -229,6 +238,55 @@ const isPageReady = pageAvailability.status === "ready";
     font-size: 0.95rem;
     line-height: 1.55;
     color: var(--color-brand-muted-black);
+  }
+
+  .admin-notifications-page__heading-meta {
+    margin-top: 0.65rem;
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem 1.1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta__item) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    color: var(--color-brand-muted-black);
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta__item--wide) {
+    flex: 1 1 100%;
+    align-items: flex-start;
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta__icon) {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    color: #6b7280;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta__item--wide .record-meta__icon) {
+    margin-top: 0.15rem;
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta__text) {
+    min-width: 0;
+    white-space: pre-line;
   }
 
   .admin-notifications-page__content {

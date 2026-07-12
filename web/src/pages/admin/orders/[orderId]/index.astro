@@ -236,7 +236,8 @@ const markAllCommissionPaidDisabledReason = (() => {
 
   return null;
 })();
-const markAllCommissionPaidDisabled = markAllCommissionPaidDisabledReason !== null;
+const markAllCommissionPaidDisabled =
+  markAllCommissionPaidDisabledReason !== null;
 
 const customerDisplayName = order.customer
   ? fullName(order.customer)
@@ -288,6 +289,15 @@ const timelineItems = [
     new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
   );
 });
+
+const returnToParam = Astro.url.searchParams.get("returnTo");
+const backHref =
+  returnToParam?.startsWith("/admin/") && !returnToParam.startsWith("//")
+    ? returnToParam
+    : "/admin/orders";
+const backLabel = backHref.startsWith("/admin/customers/")
+  ? "Back to customer record"
+  : "Back to orders";
 ---
 
 <AdminPageFrame
@@ -298,14 +308,14 @@ const timelineItems = [
   feedback={feedback}
   dashboardData={dashboardData}
 >
-  <div class="order-detail-page">
+  <div class="order-detail-page" data-order-detail-page>
     <aside class="order-detail-sidebar">
       <div class="order-sidebar-header">
         <p class="order-detail-eyebrow">Order / Order Details</p>
 
         <div class="order-summary-top">
           <div class="order-summary-top__main">
-            <RouteBackButton href="/admin/orders" label="Back to orders" />
+            <RouteBackButton href={backHref} label={backLabel} />
 
             <div class="order-title-copy">
               <h1>{orderCode}</h1>
@@ -350,16 +360,14 @@ const timelineItems = [
                       <label>
                         <span>Status</span>
                         <select name="orderStatus" required>
-                          {
-                            availableStatuses.map((status) => (
-                              <option
-                                value={status}
-                                selected={status === order.order_status}
-                              >
-                                {orderStatusOptionLabel(status)}
-                              </option>
-                            ))
-                          }
+                          {availableStatuses.map((status) => (
+                            <option
+                              value={status}
+                              selected={status === order.order_status}
+                            >
+                              {orderStatusOptionLabel(status)}
+                            </option>
+                          ))}
                         </select>
                       </label>
                     </form>
@@ -394,11 +402,15 @@ const timelineItems = [
               >
                 <span class="order-party-card__meta-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
-                    <path d="M12 21s-7-4.35-7-10a7 7 0 1 1 14 0c0 5.65-7 10-7 10Z"></path>
+                    <path
+                      d="M12 21s-7-4.35-7-10a7 7 0 1 1 14 0c0 5.65-7 10-7 10Z"
+                    ></path>
                     <circle cx="12" cy="11" r="2.5"></circle>
                   </svg>
                 </span>
-                <span class="order-party-card__meta-text">{customerAddress}</span>
+                <span class="order-party-card__meta-text"
+                  >{customerAddress}</span
+                >
               </li>
               <li
                 class:list={[
@@ -422,7 +434,9 @@ const timelineItems = [
                       {customerPhone}
                     </a>
                   ) : (
-                    <span class="order-party-card__meta-text">{customerPhone}</span>
+                    <span class="order-party-card__meta-text">
+                      {customerPhone}
+                    </span>
                   )
                 }
               </li>
@@ -434,7 +448,8 @@ const timelineItems = [
               >
                 <span class="order-party-card__meta-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
-                    <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+                    <path
+                      d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
                     ></path>
                     <path d="m22 6-10 7L2 6"></path>
                   </svg>
@@ -448,7 +463,9 @@ const timelineItems = [
                       {customerEmail}
                     </a>
                   ) : (
-                    <span class="order-party-card__meta-text">{customerEmail}</span>
+                    <span class="order-party-card__meta-text">
+                      {customerEmail}
+                    </span>
                   )
                 }
               </li>
@@ -467,7 +484,9 @@ const timelineItems = [
               <li
                 class:list={[
                   "order-party-card__meta-item",
-                  { "is-placeholder": !order.customer?.assigned_agent?.contact },
+                  {
+                    "is-placeholder": !order.customer?.assigned_agent?.contact,
+                  },
                 ]}
               >
                 <span class="order-party-card__meta-icon" aria-hidden="true">
@@ -486,7 +505,9 @@ const timelineItems = [
                       {agentPhone}
                     </a>
                   ) : (
-                    <span class="order-party-card__meta-text">{agentPhone}</span>
+                    <span class="order-party-card__meta-text">
+                      {agentPhone}
+                    </span>
                   )
                 }
               </li>
@@ -498,7 +519,8 @@ const timelineItems = [
               >
                 <span class="order-party-card__meta-icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24">
-                    <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+                    <path
+                      d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
                     ></path>
                     <path d="m22 6-10 7L2 6"></path>
                   </svg>
@@ -512,7 +534,9 @@ const timelineItems = [
                       {agentEmail}
                     </a>
                   ) : (
-                    <span class="order-party-card__meta-text">{agentEmail}</span>
+                    <span class="order-party-card__meta-text">
+                      {agentEmail}
+                    </span>
                   )
                 }
               </li>
@@ -617,6 +641,7 @@ const timelineItems = [
           data-order-detail-tab-panel="order-slip"
           role="tabpanel"
         >
+          <div class="document-preview-scroll">
           <header class="pdf-preview-header">
             <div class="pdf-preview-brand">
               {
@@ -718,7 +743,8 @@ const timelineItems = [
               <p>{orderSlipLayout.sellerSignatureLines[2]}</p>
             </div>
           </footer>
-          <div class="document-preview-floating-bar">
+          </div>
+          <div class="document-preview-toolbar">
             <div class="panel-actions">
               <a
                 href={orderSlipPdfHref}
@@ -783,6 +809,7 @@ const timelineItems = [
               </div>
             ) : (
               <>
+                <div class="document-preview-scroll">
                 <header class="pdf-preview-header">
                   <div class="pdf-preview-brand">
                     {salesInvoiceLayout.brandLines.map((line, index) => (
@@ -894,13 +921,9 @@ const timelineItems = [
                     </p>
                     <p>{salesInvoiceLayout.issuerSubline}</p>
                   </div>
-                  <div class="pdf-preview-invoice-summary">
-                    <p>Paid: {formatCurrency(paidTotal)}</p>
-                    <p>Remaining: {formatCurrency(balance)}</p>
-                  </div>
                 </footer>
-
-                <div class="document-preview-floating-bar">
+                </div>
+                <div class="document-preview-toolbar">
                   <div class="panel-actions">
                     <a
                       href={salesInvoicePdfHref}
@@ -1073,19 +1096,14 @@ const timelineItems = [
                 disabled={!canCreatePaymentRecord}
               >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 5v14" />
-                  <path d="M5 12h14" />
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path>
                 </svg>
                 <span>Create Payment Record</span>
               </button>
             </div>
 
-            <form
-              method="post"
-              class="payment-form"
-              data-payment-form
-              hidden
-            >
+            <form method="post" class="payment-form" data-payment-form hidden>
               <input type="hidden" name="action" value="record-payment" />
               <input type="hidden" name="orderId" value={order.id} />
 
@@ -1136,8 +1154,8 @@ const timelineItems = [
                   class="primary-panel-button primary-panel-button--compact"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 5v14" />
-                    <path d="M5 12h14" />
+                    <path d="M12 5v14"></path>
+                    <path d="M5 12h14"></path>
                   </svg>
                   <span>Save Payment Record</span>
                 </button>
@@ -1179,11 +1197,9 @@ const timelineItems = [
                         </strong>
                       </div>
                       <p class="payment-row__meta">
-                        {
-                          payment.reference_number
-                            ? `Reference: ${payment.reference_number}`
-                            : "No reference number"
-                        }
+                        {payment.reference_number
+                          ? `Reference: ${payment.reference_number}`
+                          : "No reference number"}
                         {" • "}
                         {payment.notes ?? "No notes"}
                       </p>
@@ -1221,8 +1237,9 @@ const timelineItems = [
                   title="Undo"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M9 7H5v4" />
-                    <path d="M5 11c1.5-3 4.5-5 8-5 4.4 0 8 3.6 8 8s-3.6 8-8 8" />
+                    <path d="M9 7H5v4"></path>
+                    <path d="M5 11c1.5-3 4.5-5 8-5 4.4 0 8 3.6 8 8s-3.6 8-8 8"
+                    ></path>
                   </svg>
                 </button>
                 <button
@@ -1233,13 +1250,15 @@ const timelineItems = [
                   title="Redo"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M15 7h4v4" />
-                    <path d="M19 11c-1.5-3-4.5-5-8-5-4.4 0-8 3.6-8 8s3.6 8 8 8" />
+                    <path d="M15 7h4v4"></path>
+                    <path d="M19 11c-1.5-3-4.5-5-8-5-4.4 0-8 3.6-8 8s3.6 8 8 8"
+                    ></path>
                   </svg>
                 </button>
               </div>
 
-              <span class="order-notes-toolbar__separator" aria-hidden="true"></span>
+              <span class="order-notes-toolbar__separator" aria-hidden="true"
+              ></span>
 
               <div class="order-notes-toolbar__group">
                 <button
@@ -1280,7 +1299,8 @@ const timelineItems = [
                 </button>
               </div>
 
-              <span class="order-notes-toolbar__separator" aria-hidden="true"></span>
+              <span class="order-notes-toolbar__separator" aria-hidden="true"
+              ></span>
 
               <label class="order-notes-toolbar__control">
                 <span class="sr-only">Text style</span>
@@ -1337,7 +1357,8 @@ const timelineItems = [
                 />
               </label>
 
-              <span class="order-notes-toolbar__separator" aria-hidden="true"></span>
+              <span class="order-notes-toolbar__separator" aria-hidden="true"
+              ></span>
 
               <div class="order-notes-toolbar__group">
                 <button
@@ -1348,12 +1369,12 @@ const timelineItems = [
                   title="Bullet list"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <line x1="9" y1="6" x2="20" y2="6" />
-                    <line x1="9" y1="12" x2="20" y2="12" />
-                    <line x1="9" y1="18" x2="20" y2="18" />
-                    <circle cx="5" cy="6" r="1" />
-                    <circle cx="5" cy="12" r="1" />
-                    <circle cx="5" cy="18" r="1" />
+                    <line x1="9" y1="6" x2="20" y2="6"></line>
+                    <line x1="9" y1="12" x2="20" y2="12"></line>
+                    <line x1="9" y1="18" x2="20" y2="18"></line>
+                    <circle cx="5" cy="6" r="1"></circle>
+                    <circle cx="5" cy="12" r="1"></circle>
+                    <circle cx="5" cy="18" r="1"></circle>
                   </svg>
                 </button>
                 <button
@@ -1364,17 +1385,18 @@ const timelineItems = [
                   title="Numbered list"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <line x1="10" y1="6" x2="20" y2="6" />
-                    <line x1="10" y1="12" x2="20" y2="12" />
-                    <line x1="10" y1="18" x2="20" y2="18" />
-                    <path d="M4 6h1v4H4z" />
-                    <path d="M4 16h1v2H4z" />
-                    <path d="M6 18H4v-2h1.5L4 14h2" />
+                    <line x1="10" y1="6" x2="20" y2="6"></line>
+                    <line x1="10" y1="12" x2="20" y2="12"></line>
+                    <line x1="10" y1="18" x2="20" y2="18"></line>
+                    <path d="M4 6h1v4H4z"></path>
+                    <path d="M4 16h1v2H4z"></path>
+                    <path d="M6 18H4v-2h1.5L4 14h2"></path>
                   </svg>
                 </button>
               </div>
 
-              <span class="order-notes-toolbar__separator" aria-hidden="true"></span>
+              <span class="order-notes-toolbar__separator" aria-hidden="true"
+              ></span>
 
               <div class="order-notes-toolbar__group">
                 <button
@@ -1385,9 +1407,9 @@ const timelineItems = [
                   title="Align left"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <line x1="4" y1="6" x2="20" y2="6" />
-                    <line x1="4" y1="12" x2="14" y2="12" />
-                    <line x1="4" y1="18" x2="18" y2="18" />
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <line x1="4" y1="12" x2="14" y2="12"></line>
+                    <line x1="4" y1="18" x2="18" y2="18"></line>
                   </svg>
                 </button>
                 <button
@@ -1398,9 +1420,9 @@ const timelineItems = [
                   title="Align center"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <line x1="4" y1="6" x2="20" y2="6" />
-                    <line x1="7" y1="12" x2="17" y2="12" />
-                    <line x1="5" y1="18" x2="19" y2="18" />
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                    <line x1="5" y1="18" x2="19" y2="18"></line>
                   </svg>
                 </button>
                 <button
@@ -1411,14 +1433,15 @@ const timelineItems = [
                   title="Align right"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <line x1="4" y1="6" x2="20" y2="6" />
-                    <line x1="10" y1="12" x2="20" y2="12" />
-                    <line x1="6" y1="18" x2="20" y2="18" />
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <line x1="10" y1="12" x2="20" y2="12"></line>
+                    <line x1="6" y1="18" x2="20" y2="18"></line>
                   </svg>
                 </button>
               </div>
 
-              <span class="order-notes-toolbar__separator" aria-hidden="true"></span>
+              <span class="order-notes-toolbar__separator" aria-hidden="true"
+              ></span>
 
               <div class="order-notes-toolbar__group">
                 <button
@@ -1429,7 +1452,7 @@ const timelineItems = [
                   title="Insert divider"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <line x1="4" y1="12" x2="20" y2="12" />
+                    <line x1="4" y1="12" x2="20" y2="12"></line>
                   </svg>
                 </button>
                 <button
@@ -1440,11 +1463,11 @@ const timelineItems = [
                   title="Clear formatting"
                 >
                   <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M4 7h9" />
-                    <path d="M9 7 5 19" />
-                    <path d="m14 16 6-6" />
-                    <path d="m15 15 5 5" />
-                    <path d="m20 15-5 5" />
+                    <path d="M4 7h9"></path>
+                    <path d="M9 7 5 19"></path>
+                    <path d="m14 16 6-6"></path>
+                    <path d="m15 15 5 5"></path>
+                    <path d="m20 15-5 5"></path>
                   </svg>
                 </button>
               </div>
@@ -1506,9 +1529,14 @@ const timelineItems = [
   const orderStatusPanel = document.querySelector("[data-order-status-panel]");
   const orderStatusForm = document.querySelector("[data-order-status-form]");
 
-  if (orderStatusPanel instanceof HTMLElement && orderStatusForm instanceof HTMLFormElement) {
+  if (
+    orderStatusPanel instanceof HTMLElement &&
+    orderStatusForm instanceof HTMLFormElement
+  ) {
     const saveUrl = orderStatusPanel.dataset.saveUrl;
-    const statusSelect = orderStatusForm.querySelector('select[name="orderStatus"]');
+    const statusSelect = orderStatusForm.querySelector(
+      'select[name="orderStatus"]',
+    );
 
     if (statusSelect instanceof HTMLSelectElement && saveUrl) {
       let lastSavedStatus = statusSelect.value;
@@ -1613,8 +1641,7 @@ const timelineItems = [
       }
 
       if (!Number.isFinite(amount) || amount <= 0) {
-        notice.textContent =
-          "Set a commission amount before marking as paid.";
+        notice.textContent = "Set a commission amount before marking as paid.";
         notice.classList.add("commission-row__notice--blocked");
         return;
       }
@@ -1664,7 +1691,9 @@ const timelineItems = [
       const markAllCheckbox = commissionEditor.querySelector(
         "[data-commission-mark-all]",
       );
-      const markAllLabel = commissionEditor.querySelector(".commission-mark-all");
+      const markAllLabel = commissionEditor.querySelector(
+        ".commission-mark-all",
+      );
 
       if (!(markAllCheckbox instanceof HTMLInputElement)) {
         return;
@@ -2053,7 +2082,9 @@ const timelineItems = [
         });
       }
 
-      const foreColorSelect = notesPanel.querySelector("[data-notes-fore-color]");
+      const foreColorSelect = notesPanel.querySelector(
+        "[data-notes-fore-color]",
+      );
 
       if (foreColorSelect instanceof HTMLSelectElement) {
         foreColorSelect.addEventListener("mousedown", (event) => {
@@ -2114,10 +2145,38 @@ const timelineItems = [
 </script>
 
 <style>
-  :global(.admin-shell) {
+  :global(.dashboard-body:has([data-order-detail-page])) {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  :global(.dashboard-frame:has([data-order-detail-page])) {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :global(.dashboard-main:has([data-order-detail-page])) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    max-height: 100vh;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  :global(.admin-shell:has([data-order-detail-page])) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     max-width: none;
+    width: 100%;
+    min-height: 0;
+    height: 100%;
     padding: 0;
     gap: 0;
+    overflow: hidden;
   }
 
   :global(.admin-header) {
@@ -2139,7 +2198,9 @@ const timelineItems = [
   .order-detail-page {
     display: grid;
     grid-template-columns: minmax(320px, 520px) minmax(0, 1fr);
-    height: 100vh;
+    flex: 1;
+    min-height: 0;
+    height: 100%;
     overflow: hidden;
   }
 
@@ -2673,6 +2734,11 @@ const timelineItems = [
     overflow: hidden;
   }
 
+  .order-tab-panels > .order-tab-panel.is-active {
+    flex: 1;
+    min-height: 0;
+  }
+
   .order-tab-panel {
     display: none;
     border-radius: 1.25rem;
@@ -2691,13 +2757,39 @@ const timelineItems = [
 
   .order-tab-panel--document.document-preview--pdf-like {
     border-radius: 0.125rem;
-    padding: 2.75rem 2.5rem;
-    padding-bottom: 6.5rem;
+    padding: 0;
     border: 1px solid #d7d7d7;
     box-shadow: none;
     background: #ffffff;
     backdrop-filter: none;
     color: #111111;
+    overflow: hidden;
+  }
+
+  .order-tab-panel--document.document-preview--pdf-like.is-active {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .document-preview-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 2.75rem 2.5rem;
+    scrollbar-gutter: stable;
+  }
+
+  .document-preview-toolbar {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    padding: 0.85rem 1.5rem 1.15rem;
+    background: #ffffff;
+    border-top: 1px solid rgba(17, 24, 39, 0.06);
+  }
+
+  .document-preview-toolbar .panel-actions {
+    margin: 0;
   }
 
   .panel-header,
@@ -2749,22 +2841,6 @@ const timelineItems = [
     text-decoration: none;
     font-weight: 600;
     cursor: pointer;
-  }
-
-  [data-order-detail-tab-panel="order-slip"] .document-preview-floating-bar,
-  [data-order-detail-tab-panel="sales-invoice"] .document-preview-floating-bar {
-    bottom: 0;
-    margin-top: 1rem;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    backdrop-filter: none;
-    padding: 0;
-  }
-
-  [data-order-detail-tab-panel="order-slip"].order-tab-panel--document.document-preview--pdf-like,
-  [data-order-detail-tab-panel="sales-invoice"].order-tab-panel--document.document-preview--pdf-like {
-    padding-bottom: 3.25rem;
   }
 
   [data-order-detail-tab-panel="order-slip"] .document-action,
@@ -3541,6 +3617,19 @@ const timelineItems = [
   }
 
   @media (max-width: 1080px) {
+    :global(.dashboard-body:has([data-order-detail-page])),
+    :global(.dashboard-frame:has([data-order-detail-page])),
+    :global(.dashboard-main:has([data-order-detail-page])) {
+      height: auto;
+      max-height: none;
+      overflow: visible;
+    }
+
+    :global(.admin-shell:has([data-order-detail-page])) {
+      height: auto;
+      overflow: visible;
+    }
+
     .order-detail-page {
       height: auto;
       grid-template-columns: 1fr;
