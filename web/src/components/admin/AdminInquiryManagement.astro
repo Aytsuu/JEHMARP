@@ -56,25 +56,9 @@ const skeletonRows = Array.from({ length: 6 });
                 colspan={5}
                 message="No inquiries match the selected filters."
               />
-            ) : data.contactInquiries.map((inquiry) => {
-              const isUnread = !inquiry.admin_read_at && inquiry.inquiry_status === "new";
-              return (
+            ) : data.contactInquiries.map((inquiry) => (
                 <tr data-status={inquiry.inquiry_status}>
-                  <td class="dashboard-table__cell--truncate">
-                    <div class="dashboard-table__cell-inner">
-                      <span class="dashboard-table__cell-label">{inquiry.name}</span>
-                      {isUnread && (
-                        <form method="post" class="unread-record-form">
-                          <input type="hidden" name="action" value="mark-inquiry-read" />
-                          <input type="hidden" name="inquiryId" value={inquiry.id} />
-                          <button type="submit" class="unread-record-button">
-                            <span class="record-unread-dot" aria-label="Unread"></span>
-                            <span class="sr-only">Mark inquiry as read</span>
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  </td>
+                  <td class="dashboard-table__cell--truncate">{inquiry.name}</td>
                   <td class="dashboard-table__cell--truncate">{inquiry.email ?? "-"}</td>
                   <td class="dashboard-table__cell--truncate">{inquiry.phone_number ?? "-"}</td>
                   <td class="dashboard-table__cell--truncate" title={inquiry.message}>{inquiry.message}</td>
@@ -107,8 +91,7 @@ const skeletonRows = Array.from({ length: 6 });
                     </div>
                   </td>
                 </tr>
-              );
-            })}
+              ))}
           </tbody>
         </table>
       </DashboardTableBoard>

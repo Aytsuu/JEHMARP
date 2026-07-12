@@ -67,16 +67,7 @@ const skeletonRows = Array.from({ length: 6 });
                   data-application-id={application.id}
                   {...(isUnread ? { "data-reseller-unread": "true" } : {})}
                 >
-                  <td class="dashboard-table__cell--truncate">
-                    <div class="dashboard-table__cell-inner">
-                      <span class="dashboard-table__cell-label">{application.name}</span>
-                      {
-                        isUnread && (
-                          <span class="record-unread-dot" aria-label="Unread"></span>
-                        )
-                      }
-                    </div>
-                  </td>
+                  <td class="dashboard-table__cell--truncate">{application.name}</td>
                   <td class="dashboard-table__cell--truncate">{application.email}</td>
                   <td class="dashboard-table__cell--truncate">{application.contact_number}</td>
                   <td>{application.expected_quantity_per_week}</td>
@@ -217,7 +208,6 @@ const skeletonRows = Array.from({ length: 6 });
         );
         if (!row) return;
         row.removeAttribute("data-reseller-unread");
-        row.querySelector(".record-unread-dot")?.remove();
       });
     }
 

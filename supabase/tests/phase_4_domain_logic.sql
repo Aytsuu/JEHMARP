@@ -58,9 +58,13 @@ begin
   values (
     test_customer_id,
     'admin_manual',
-    'draft'
+    'pending'
   )
   returning id into test_order_id;
+
+  update public.customer_order
+  set order_status = 'processing'
+  where id = test_order_id;
 
   insert into public.customer_order_item (
     order_id,
@@ -347,7 +351,7 @@ begin
   values (
     reseller_customer_id,
     'admin_manual',
-    'approved'
+    'processing'
   )
   returning id into reseller_order_id;
 
@@ -398,7 +402,7 @@ begin
   values (
     test_customer_id,
     'admin_manual',
-    'approved'
+    'processing'
   )
   returning id into reseller_order_id;
 
@@ -416,7 +420,7 @@ begin
   );
 
   update public.customer_order
-  set order_status = 'cancelled'
+  set order_status = 'closed'
   where id = reseller_order_id;
 
   select payment_status
@@ -424,8 +428,8 @@ begin
   from public.customer_order
   where id = reseller_order_id;
 
-  if text_result <> 'void' then
-    raise exception 'Expected unpaid cancelled order payment status void, got %', text_result;
+  if text_result <> 'unpaid' then
+    raise exception 'Expected unpaid closed order payment status unpaid, got %', text_result;
   end if;
 
   insert into public.customer_order (
@@ -436,7 +440,7 @@ begin
   values (
     test_customer_id,
     'admin_manual',
-    'approved'
+    'processing'
   )
   returning id into reseller_order_id;
 
@@ -467,7 +471,7 @@ begin
   );
 
   update public.customer_order
-  set order_status = 'cancelled'
+  set order_status = 'closed'
   where id = reseller_order_id;
 
   select payment_status
@@ -475,18 +479,14 @@ begin
   from public.customer_order
   where id = reseller_order_id;
 
-  if text_result <> 'refunded' then
-    raise exception 'Expected paid cancelled order payment status refunded, got %', text_result;
+  if text_result <> 'partial' then
+    raise exception 'Expected partially paid closed order payment status partial, got %', text_result;
   end if;
-
-  update public.customer_order
-  set order_status = 'submitted'
-  where id = test_order_id;
 
   blocked := false;
   begin
     update public.customer_order
-    set order_status = 'fulfilled'
+    set order_status = 'pending'
     where id = test_order_id;
   exception
     when others then

@@ -405,22 +405,17 @@ const skeletonRows = Array.from({ length: 6 });
               <th scope="col">Payment Status</th>
               <th scope="col">Order Total</th>
               <th scope="col">Action</th>
-              <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
             </tr>
           </thead>
           <tbody>
             {data.orders.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={8}
+                colspan={7}
                 message="No orders match the selected filters."
               />
             ) : data.orders.map((order) => {
               const invoice = order.invoice[0];
               const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
-              const isUnread =
-                !order.admin_read_at &&
-                order.order_status === "pending" &&
-                order.source !== "admin_manual";
 
               return (
                 <tr data-status={order.order_status}>
@@ -433,15 +428,7 @@ const skeletonRows = Array.from({ length: 6 });
                   <td><StatusBadge kind="payment" status={order.payment_status} /></td>
                   <td>{formatCurrency(total)}</td>
                   <td>
-                    <form method="post" class="dashboard-table__cell-form">
-                      <input type="hidden" name="action" value="mark-order-read" />
-                      <input type="hidden" name="orderId" value={order.id} />
-                      <input type="hidden" name="returnTo" value={`/admin/orders/${order.id}`} />
-                      <ViewButton type="submit" />
-                    </form>
-                  </td>
-                  <td class="unread-record-cell">
-                    {isUnread && <span class="record-unread-dot" aria-label="Unread"></span>}
+                    <ViewButton href={`/admin/orders/${order.id}`} />
                   </td>
                 </tr>
               );
@@ -467,7 +454,6 @@ const skeletonRows = Array.from({ length: 6 });
             <th scope="col">Payment Status</th>
             <th scope="col">Order Total</th>
             <th scope="col">Action</th>
-            <th scope="col" class="unread-record-heading"><span class="sr-only">Unread</span></th>
           </tr>
         </thead>
         <tbody>
@@ -479,7 +465,6 @@ const skeletonRows = Array.from({ length: 6 });
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
             </tr>
           ))}

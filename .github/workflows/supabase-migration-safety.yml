@@ -86,13 +86,7 @@ jobs:
         run: supabase db lint --local --fail-on error
 
       - name: Run SQL tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          for file in supabase/tests/*.sql; do
-            echo "Running ${file}"
-            supabase db query --local --file "${file}"
-          done
+        run: bash supabase/tests/run.sh
 
       - name: Link production Supabase project for dev to main checks
         if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'

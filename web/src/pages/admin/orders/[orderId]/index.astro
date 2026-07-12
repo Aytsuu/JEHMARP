@@ -5,6 +5,7 @@ import {
   formatAdminActionFeedback,
   getAllowedNextOrderStatuses,
   handleAdminDashboardAction,
+  markAdminOrderReadIfUnread,
 } from "@/lib/admin-dashboard/actions";
 import {
   loadAdminDashboardData,
@@ -57,6 +58,8 @@ const [dashboardData, order] = await Promise.all([
 if (!order) {
   return Astro.redirect("/admin/orders", 302);
 }
+
+await markAdminOrderReadIfUnread(Astro, orderId, adminRoute.userId);
 
 const rawFeedback = formatAdminActionFeedback(Astro.url);
 const feedback =

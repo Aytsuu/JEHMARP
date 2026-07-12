@@ -311,6 +311,40 @@ export async function markUnreadAdminInquiriesRead(
   }
 }
 
+export async function markUnreadAdminOrdersRead(
+  context: Pick<APIContext, "cookies" | "request">,
+  adminUserId: string,
+) {
+  const { error } = await createSupabaseServerClient(context)
+    .from("customer_order")
+    .update(adminReadPayload(adminUserId))
+    .eq("order_status", "pending")
+    .neq("source", "admin_manual")
+    .is("admin_read_at", null);
+
+  if (error) {
+    throw new Error("Unable to mark orders as read.");
+  }
+}
+
+export async function markAdminOrderReadIfUnread(
+  context: Pick<APIContext, "cookies" | "request">,
+  orderId: string,
+  adminUserId: string,
+) {
+  const { error } = await createSupabaseServerClient(context)
+    .from("customer_order")
+    .update(adminReadPayload(adminUserId))
+    .eq("id", orderId)
+    .eq("order_status", "pending")
+    .neq("source", "admin_manual")
+    .is("admin_read_at", null);
+
+  if (error) {
+    throw new Error("Unable to mark order as read.");
+  }
+}
+
 const viewedResellerApplicationIdsSchema = z
   .array(uuidSchema)
   .min(1, "At least one application id is required.")

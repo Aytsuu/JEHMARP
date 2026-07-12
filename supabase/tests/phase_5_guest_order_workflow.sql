@@ -58,7 +58,7 @@ begin
   from public.customer_order
   where id = test_order_id
     and source = 'guest_shop'
-    and order_status = 'submitted'
+    and order_status = 'pending'
     and payment_status = 'unpaid'
     and agent_id is null
     and submitted_by is null;
