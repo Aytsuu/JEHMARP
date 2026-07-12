@@ -19,6 +19,14 @@ export type ResellerApplicationInput = {
   turnstileToken: string;
 };
 
+export const plannedTransactionTypeLabels: Record<PlannedTransactionType, string> = {
+  retail_resale: "Retail resale",
+  restaurant_supply: "Restaurant supply",
+  market_stall: "Market stall",
+  online_resale: "Online resale",
+  other: "Other",
+};
+
 export type ResellerProduct = {
   name: string;
   category: string;
@@ -205,7 +213,7 @@ export async function sendResellerPriceList(
       from: config.from,
       to: [application.email],
       bcc: config.adminEmail ? [config.adminEmail] : undefined,
-      subject: "JEHMARP reseller price list",
+      subject: "Your JEHMARP reseller price list",
       html: buildPriceListHtml(application, products),
       text: buildPriceListText(application, products),
     }),
@@ -307,39 +315,180 @@ export function buildPriceListHtml(
   application: StoredResellerApplication,
   products: ResellerProduct[],
 ): string {
-  const rows = products.map((product) => `
+  const productRows = products.length > 0
+    ? products.map((product, index) => buildProductRow(product, index)).join("")
+    : `
+      <tr>
+        <td colspan="5" style="padding:20px 16px;text-align:center;color:#4b5563;font-size:14px;line-height:1.5;">
+          No active products are available right now. Our team will follow up with pricing details.
+        </td>
+      </tr>
+    `;
+
+  const applicationSummary = [
+    { label: "Reference", value: application.id },
+    { label: "Business type", value: plannedTransactionTypeLabels[application.plannedTransactionType] },
+    { label: "Expected weekly volume", value: application.expectedQuantityPerWeek },
+    { label: "Contact number", value: application.contactNumber },
+  ];
+
+  const summaryRows = applicationSummary.map((item) => `
     <tr>
-      <td>${escapeHtml(product.name)}</td>
-      <td>${escapeHtml(product.category)}</td>
-      <td>${escapeHtml(product.unit_label)}</td>
-      <td>${formatCurrency(product.default_price)}</td>
-      <td>${formatCurrency(product.reseller_price)}</td>
+      <td style="padding:10px 0;border-bottom:1px solid #f0e6c8;color:#6b7280;font-size:13px;width:42%;vertical-align:top;">
+        ${escapeHtml(item.label)}
+      </td>
+      <td style="padding:10px 0;border-bottom:1px solid #f0e6c8;color:#111827;font-size:14px;font-weight:600;vertical-align:top;">
+        ${escapeHtml(item.value)}
+      </td>
     </tr>
   `).join("");
-  const priceRows = rows || `
-    <tr>
-      <td colspan="5">No active products are available right now.</td>
-    </tr>
-  `;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta name="supported-color-schemes" content="light" />
+    <title>Your JEHMARP reseller price list</title>
+  </head>
+  <body style="margin:0;padding:0;background-color:#f3efe4;color:#111827;font-family:'DM Sans',Arial,Helvetica,sans-serif;">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f3efe4;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px;background-color:#ffffff;border:1px solid #eadfce;border-radius:20px;overflow:hidden;">
+            <tr>
+              <td style="background-color:#661818;background:linear-gradient(135deg,#661818 0%,#7a1f1f 100%);padding:28px 32px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                  <tr>
+                    <td>
+                      <p style="margin:0 0 8px;font-size:12px;line-height:1.4;letter-spacing:0.18em;text-transform:uppercase;color:#f5de59;font-weight:700;">
+                        JEHMARP Wholesale
+                      </p>
+                      <h1 style="margin:0;font-size:28px;line-height:1.2;color:#ffffff;font-weight:700;">
+                        Your reseller price list
+                      </h1>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:32px 32px 12px;">
+                <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:#111827;">
+                  Hello ${escapeHtml(application.name)},
+                </p>
+                <p style="margin:0;font-size:15px;line-height:1.7;color:#4b5563;">
+                  Thank you for applying as a JEHMARP reseller. Your application is on file and the current wholesale pricing is below.
+                  Our team will review your details and contact you about verification and ordering.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:8px 32px 24px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fffad9;border:1px solid #f0e6c8;border-radius:16px;">
+                  <tr>
+                    <td style="padding:20px 22px;">
+                      <p style="margin:0 0 12px;font-size:12px;line-height:1.4;letter-spacing:0.14em;text-transform:uppercase;color:#661818;font-weight:700;">
+                        Application summary
+                      </p>
+                      <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                        ${summaryRows}
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 8px;">
+                <p style="margin:0 0 12px;font-size:12px;line-height:1.4;letter-spacing:0.14em;text-transform:uppercase;color:#661818;font-weight:700;">
+                  Current reseller pricing
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 24px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #eadfce;border-radius:14px;overflow:hidden;">
+                  <thead>
+                    <tr style="background-color:#661818;">
+                      <th align="left" style="padding:14px 12px;font-size:11px;line-height:1.4;letter-spacing:0.08em;text-transform:uppercase;color:#f5de59;font-weight:700;">Product</th>
+                      <th align="left" style="padding:14px 10px;font-size:11px;line-height:1.4;letter-spacing:0.08em;text-transform:uppercase;color:#f5de59;font-weight:700;">Category</th>
+                      <th align="left" style="padding:14px 10px;font-size:11px;line-height:1.4;letter-spacing:0.08em;text-transform:uppercase;color:#f5de59;font-weight:700;">Unit</th>
+                      <th align="right" style="padding:14px 10px;font-size:11px;line-height:1.4;letter-spacing:0.08em;text-transform:uppercase;color:#f5de59;font-weight:700;">Retail</th>
+                      <th align="right" style="padding:14px 12px;font-size:11px;line-height:1.4;letter-spacing:0.08em;text-transform:uppercase;color:#f5de59;font-weight:700;">Reseller</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${productRows}
+                  </tbody>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 28px;">
+                <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#faf7ef;border:1px solid #eadfce;border-radius:16px;">
+                  <tr>
+                    <td style="padding:22px 22px 8px;">
+                      <p style="margin:0 0 14px;font-size:12px;line-height:1.4;letter-spacing:0.14em;text-transform:uppercase;color:#661818;font-weight:700;">
+                        What happens next
+                      </p>
+                      <ol style="margin:0;padding:0 0 0 20px;color:#4b5563;font-size:14px;line-height:1.7;">
+                        <li style="margin-bottom:8px;">Our administration team reviews your application and expected volume.</li>
+                        <li style="margin-bottom:8px;">We confirm verification details and delivery logistics with you.</li>
+                        <li style="margin-bottom:0;">Once approved, you can start placing wholesale orders using these reseller prices.</li>
+                      </ol>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 32px 32px;">
+                <p style="margin:0;font-size:14px;line-height:1.7;color:#4b5563;">
+                  If you have questions about this price list or your application, reply to this email and include your reference number.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background-color:#fffad9;padding:20px 32px;border-top:1px solid #f0e6c8;">
+                <p style="margin:0 0 6px;font-size:13px;line-height:1.5;color:#661818;font-weight:700;">
+                  JEHMARP
+                </p>
+                <p style="margin:0;font-size:12px;line-height:1.6;color:#6b7280;">
+                  Premium meat supply for retailers, restaurants, market sellers, and online merchants.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+}
+
+function buildProductRow(product: ResellerProduct, index: number): string {
+  const rowBackground = index % 2 === 0 ? "#ffffff" : "#fffdf5";
 
   return `
-    <div>
-      <p>Hello ${escapeHtml(application.name)},</p>
-      <p>Thank you for applying as a JEHMARP reseller. Here is the current reseller price list.</p>
-      <table border="1" cellpadding="8" cellspacing="0">
-        <thead>
-          <tr>
-            <th align="left">Product</th>
-            <th align="left">Category</th>
-            <th align="left">Unit</th>
-            <th align="right">Default price</th>
-            <th align="right">Reseller price</th>
-          </tr>
-        </thead>
-        <tbody>${priceRows}</tbody>
-      </table>
-      <p>JEHMARP will review your application details and contact you for the next steps.</p>
-    </div>
+    <tr style="background-color:${rowBackground};">
+      <td style="padding:14px 12px;font-size:14px;line-height:1.5;color:#111827;font-weight:600;border-top:1px solid #f0e6c8;">
+        ${escapeHtml(product.name)}
+      </td>
+      <td style="padding:14px 10px;font-size:13px;line-height:1.5;color:#4b5563;border-top:1px solid #f0e6c8;">
+        ${escapeHtml(formatCategory(product.category))}
+      </td>
+      <td style="padding:14px 10px;font-size:13px;line-height:1.5;color:#4b5563;border-top:1px solid #f0e6c8;">
+        ${escapeHtml(product.unit_label)}
+      </td>
+      <td align="right" style="padding:14px 10px;font-size:13px;line-height:1.5;color:#6b7280;border-top:1px solid #f0e6c8;">
+        ${escapeHtml(formatCurrency(product.default_price))}
+      </td>
+      <td align="right" style="padding:14px 12px;font-size:14px;line-height:1.5;color:#661818;font-weight:700;border-top:1px solid #f0e6c8;">
+        ${escapeHtml(formatCurrency(product.reseller_price))}
+      </td>
+    </tr>
   `;
 }
 
@@ -351,7 +500,7 @@ export function buildPriceListText(
     ? products.map((product) =>
         [
           product.name,
-          product.category,
+          formatCategory(product.category),
           product.unit_label,
           formatCurrency(product.default_price),
           formatCurrency(product.reseller_price),
@@ -360,14 +509,31 @@ export function buildPriceListText(
     : "No active products are available right now.";
 
   return [
+    "JEHMARP WHOLESALE",
+    "Your reseller price list",
+    "",
     `Hello ${application.name},`,
     "",
-    "Thank you for applying as a JEHMARP reseller. Here is the current reseller price list.",
+    "Thank you for applying as a JEHMARP reseller. Your application is on file and the current wholesale pricing is below.",
     "",
-    "Product | Category | Unit | Default price | Reseller price",
+    "Application summary",
+    `Reference: ${application.id}`,
+    `Business type: ${plannedTransactionTypeLabels[application.plannedTransactionType]}`,
+    `Expected weekly volume: ${application.expectedQuantityPerWeek}`,
+    `Contact number: ${application.contactNumber}`,
+    "",
+    "Current reseller pricing",
+    "Product | Category | Unit | Retail | Reseller",
     rows,
     "",
-    "JEHMARP will review your application details and contact you for the next steps.",
+    "What happens next",
+    "1. Our administration team reviews your application and expected volume.",
+    "2. We confirm verification details and delivery logistics with you.",
+    "3. Once approved, you can start placing wholesale orders using these reseller prices.",
+    "",
+    "If you have questions, reply to this email and include your reference number.",
+    "",
+    "JEHMARP",
   ].join("\n");
 }
 
@@ -396,6 +562,16 @@ function formatCurrency(value: number | string): string {
   const amount = typeof value === "number" ? value : Number(value);
 
   return Number.isFinite(amount) ? `PHP ${amount.toFixed(2)}` : "PHP 0.00";
+}
+
+function formatCategory(value: string): string {
+  const normalized = value.trim();
+
+  if (!normalized) {
+    return "General";
+  }
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 async function incrementExpiringCounter(

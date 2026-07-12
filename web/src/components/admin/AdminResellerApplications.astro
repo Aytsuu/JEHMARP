@@ -2,6 +2,7 @@
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import ResellerEmailDeliveryStatus from "@/components/admin/ResellerEmailDeliveryStatus.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminResellerApplicationManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminResellerApplicationFilters } from "@/lib/admin-dashboard/reseller-application-filters";
@@ -61,20 +62,19 @@ const skeletonRows = Array.from({ length: 6 });
             ) : data.resellerApplications.map((application) => {
               const isUnread = !application.admin_read_at && application.application_status === "submitted";
               return (
-                <tr data-status={application.application_status}>
+                <tr
+                  data-status={application.application_status}
+                  data-application-id={application.id}
+                  {...(isUnread ? { "data-reseller-unread": "true" } : {})}
+                >
                   <td class="dashboard-table__cell--truncate">
                     <div class="dashboard-table__cell-inner">
                       <span class="dashboard-table__cell-label">{application.name}</span>
-                      {isUnread && (
-                        <form method="post" class="unread-record-form">
-                          <input type="hidden" name="action" value="mark-reseller-application-read" />
-                          <input type="hidden" name="applicationId" value={application.id} />
-                          <button type="submit" class="unread-record-button">
-                            <span class="record-unread-dot" aria-label="Unread"></span>
-                            <span class="sr-only">Mark reseller application as read</span>
-                          </button>
-                        </form>
-                      )}
+                      {
+                        isUnread && (
+                          <span class="record-unread-dot" aria-label="Unread"></span>
+                        )
+                      }
                     </div>
                   </td>
                   <td class="dashboard-table__cell--truncate">{application.email}</td>
@@ -111,16 +111,9 @@ const skeletonRows = Array.from({ length: 6 });
                     </div>
                   </td>
                   <td class="dashboard-table__cell--center">
-                    <StatusBadge
-                      kind="delivery"
+                    <ResellerEmailDeliveryStatus
                       status={application.email_delivery_status}
-                      label={
-                        application.email_delivery_status === "sent"
-                          ? "Sent"
-                          : application.email_delivery_status === "failed"
-                            ? "Failed"
-                            : "Pending"
-                      }
+                      error={application.email_error}
                     />
                   </td>
                 </tr>
@@ -185,7 +178,7 @@ const skeletonRows = Array.from({ length: 6 });
     function normalizeFormQuery() { const params = new URLSearchParams(); const formData = new FormData(activeForm); filterKeys.forEach((key) => { const value = formData.get(key); if (typeof value === "string" && value.trim()) params.set(key, value.trim()); }); return params.toString(); }
     function buildUrl(path: string, targetQuery: string) { return targetQuery ? `${path}?${targetQuery}` : path; }
     function showSkeletonForQuery(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); const cachedQueries = readCache(); if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) return; const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true); if (skeleton) activeTableShell.replaceChildren(skeleton); }
-    function replaceFragment(fragmentHtml: string) { const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html"); const nextTableShell = parsed.querySelector<HTMLElement>("[data-reseller-table-shell]"); if (!nextTableShell) throw new Error("Reseller applications fragment did not include a table."); activeTableShell.innerHTML = nextTableShell.innerHTML; document.dispatchEvent(new Event("dashboard:interactive-table-updated")); }
+    function replaceFragment(fragmentHtml: string) { const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html"); const nextTableShell = parsed.querySelector<HTMLElement>("[data-reseller-table-shell]"); if (!nextTableShell) throw new Error("Reseller applications fragment did not include a table."); activeTableShell.innerHTML = nextTableShell.innerHTML; document.dispatchEvent(new Event("dashboard:interactive-table-updated")); document.dispatchEvent(new Event("dashboard:reseller-applications-table-updated")); }
     async function applyFilters(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); if (targetQuery === currentQuery) return; showSkeletonForQuery(targetQuery); activeFetchController?.abort(); const fetchController = new AbortController(); activeFetchController = fetchController; try { const response = await fetch(buildUrl(fragmentPath, targetQuery), { headers: { "X-Requested-With": "fetch" }, signal: fetchController.signal }); const fragmentHtml = await window.readDashboardFragmentResponse(response); window.history.replaceState({ resellerFilterQuery: targetQuery }, "", buildUrl("/admin/reseller-applications", targetQuery)); replaceFragment(fragmentHtml); activeForm.dataset.currentFilterQuery = targetQuery; writeCache([...readCache(), targetQuery]); } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; window.location.href = buildUrl("/admin/reseller-applications", targetQuery); } finally { if (activeFetchController === fetchController) activeFetchController = undefined; } }
     function submitFilters() { window.clearTimeout(submitTimer); submitTimer = window.setTimeout(() => { void applyFilters(normalizeFormQuery()); }, 120); }
     writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
@@ -196,4 +189,100 @@ const skeletonRows = Array.from({ length: 6 });
   document.addEventListener("DOMContentLoaded", initAdminResellerFilters);
   document.addEventListener("astro:after-swap", initAdminResellerFilters);
   if (document.readyState === "complete" || document.readyState === "interactive") initAdminResellerFilters();
+
+  function initResellerApplicationAutoRead() {
+    const tableShell = document.querySelector<HTMLElement>("[data-reseller-table-shell]");
+    const interactiveTable = tableShell?.closest<HTMLElement>("[data-interactive-table]");
+    if (!tableShell || !interactiveTable) return;
+    if (interactiveTable.dataset.resellerAutoReadInitialized === "true") return;
+    interactiveTable.dataset.resellerAutoReadInitialized = "true";
+
+    const markedApplicationIds = new Set<string>();
+    let markRequestInFlight = false;
+
+    function getVisibleUnreadApplicationIds() {
+      return Array.from(
+        tableShell.querySelectorAll<HTMLTableRowElement>("tr[data-reseller-unread='true']"),
+      )
+        .filter((row) => row.style.display !== "none")
+        .map((row) => row.dataset.applicationId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+        .filter((id) => !markedApplicationIds.has(id));
+    }
+
+    function clearUnreadIndicators(applicationIds: string[]) {
+      applicationIds.forEach((applicationId) => {
+        const row = tableShell.querySelector<HTMLTableRowElement>(
+          `tr[data-application-id="${applicationId}"]`,
+        );
+        if (!row) return;
+        row.removeAttribute("data-reseller-unread");
+        row.querySelector(".record-unread-dot")?.remove();
+      });
+    }
+
+    function adjustUnreadBadgeCount(href: string, delta: number) {
+      const badge = document.querySelector<HTMLElement>(
+        `.dashboard-sidebar a[href="${href}"] .dashboard-sidebar__nav-badge`,
+      );
+      if (!badge) return;
+
+      const nextCount = Math.max(0, Number.parseInt(badge.textContent || "0", 10) + delta);
+      badge.textContent = String(nextCount);
+      badge.hidden = nextCount < 1;
+    }
+
+    async function markVisibleUnreadApplications() {
+      const applicationIds = getVisibleUnreadApplicationIds();
+      if (applicationIds.length === 0 || markRequestInFlight) return;
+
+      applicationIds.forEach((applicationId) => markedApplicationIds.add(applicationId));
+      markRequestInFlight = true;
+
+      try {
+        const response = await fetch("/admin/reseller-applications-mark-read.json", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ applicationIds }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(
+            typeof body.error === "string"
+              ? body.error
+              : "Unable to mark reseller applications as read.",
+          );
+        }
+
+        const markedCount = typeof body.markedCount === "number" ? body.markedCount : applicationIds.length;
+        clearUnreadIndicators(applicationIds);
+        adjustUnreadBadgeCount("/admin/reseller-applications", -markedCount);
+        adjustUnreadBadgeCount("/admin/notifications", -markedCount);
+      } catch {
+        applicationIds.forEach((applicationId) => markedApplicationIds.delete(applicationId));
+      } finally {
+        markRequestInFlight = false;
+      }
+    }
+
+    const scheduleMarkVisibleUnread = () => {
+      window.requestAnimationFrame(() => {
+        void markVisibleUnreadApplications();
+      });
+    };
+
+    interactiveTable.addEventListener("dashboard:interactive-table-page-changed", scheduleMarkVisibleUnread);
+    document.addEventListener("dashboard:reseller-applications-table-updated", scheduleMarkVisibleUnread);
+    document.addEventListener("dashboard:interactive-table-updated", scheduleMarkVisibleUnread);
+    scheduleMarkVisibleUnread();
+  }
+
+  document.addEventListener("DOMContentLoaded", initResellerApplicationAutoRead);
+  document.addEventListener("astro:after-swap", initResellerApplicationAutoRead);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initResellerApplicationAutoRead();
+  }
 </script>

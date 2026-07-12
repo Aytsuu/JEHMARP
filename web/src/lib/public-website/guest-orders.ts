@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 import { getServerEnv } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
 
 const customerSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required.").max(100),
@@ -87,7 +88,10 @@ export async function submitGuestOrder(
   const env = getServerEnv();
   const fetcher = options.fetch ?? fetch;
 
-  await verifyTurnstileToken(fetcher, env.turnstileSecretKey, payload.turnstileToken, options.clientIp);
+  await verifyTurnstileToken(env.turnstileSecretKey, payload.turnstileToken, {
+    fetch: fetcher,
+    clientIp: options.clientIp,
+  });
   await enforceGuestOrderRateLimit(fetcher, {
     redisUrl: env.upstashRedisRestUrl,
     redisToken: env.upstashRedisRestToken,
@@ -106,36 +110,6 @@ export async function submitGuestOrder(
   }
 
   return data;
-}
-
-async function verifyTurnstileToken(
-  fetcher: typeof fetch,
-  secretKey: string | undefined,
-  token: string,
-  clientIp: string | null | undefined,
-): Promise<void> {
-  if (!secretKey) {
-    throw new Error("Verification is not configured.");
-  }
-
-  const body = new FormData();
-
-  body.set("secret", secretKey);
-  body.set("response", token);
-
-  if (clientIp) {
-    body.set("remoteip", clientIp);
-  }
-
-  const response = await fetcher("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    body,
-  });
-  const data = await readJsonResponse(response);
-
-  if (!response.ok || data.success !== true) {
-    throw new Error("Verification failed. Please try again.");
-  }
 }
 
 async function enforceGuestOrderRateLimit(

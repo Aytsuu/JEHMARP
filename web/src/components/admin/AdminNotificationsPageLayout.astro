@@ -1,0 +1,143 @@
+---
+import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import type { AdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import PageAvailabilityNotice from "@/components/dashboard/PageAvailabilityNotice.astro";
+import {
+  getUnreadAdminInquiryIds,
+  getUnreadAdminOrderIds,
+  getUnreadAdminResellerApplicationIds,
+} from "@/lib/admin-dashboard/notifications";
+import { adminDashboardRoutes } from "@/config/navigation";
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { getDashboardPageAvailability } from "@/lib/page-availability";
+
+type Props = {
+  title: string;
+  description: string;
+  heading: string;
+  intro: string;
+  feedback?: AdminActionFeedback;
+  dashboardData?: AdminDashboardData;
+};
+
+const { title, description, heading, intro, feedback, dashboardData } = Astro.props;
+const headingId = `${heading
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "")}-title`;
+const unreadOrderCount = dashboardData ? getUnreadAdminOrderIds(dashboardData).length : 0;
+const unreadInquiryCount = dashboardData ? getUnreadAdminInquiryIds(dashboardData).length : 0;
+const unreadResellerApplicationCount = dashboardData
+  ? getUnreadAdminResellerApplicationIds(dashboardData).length
+  : 0;
+const unreadNotificationCount =
+  unreadOrderCount + unreadInquiryCount + unreadResellerApplicationCount;
+const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
+const isPageReady = pageAvailability.status === "ready";
+---
+
+<DashboardLayout
+  title={title}
+  description={description}
+  navLabel="Admin operations"
+  navItems={adminDashboardRoutes}
+  sidebarUnreadBadges={{
+    "/admin/orders": {
+      count: unreadOrderCount,
+    },
+    "/admin/inquiries": {
+      count: unreadInquiryCount,
+    },
+    "/admin/reseller-applications": {
+      count: unreadResellerApplicationCount,
+    },
+    "/admin/notifications": {
+      count: unreadNotificationCount,
+    },
+  }}
+>
+  <div class="admin-notifications-page" data-admin-notifications-page>
+    <div class="admin-notifications-page__inner">
+      <header class="admin-notifications-page__header">
+        <h1 id={headingId} class="admin-notifications-page__title">{heading}</h1>
+        <p class="admin-notifications-page__intro">{intro}</p>
+      </header>
+
+      {
+        feedback?.status && (
+          <p class="status-message" role="status">
+            {feedback.status}
+          </p>
+        )
+      }
+      {
+        feedback?.error && (
+          <p class="error-message" role="alert">
+            {feedback.error}
+          </p>
+        )
+      }
+
+      <div class="admin-notifications-page__content">
+        {isPageReady ? <slot /> : <PageAvailabilityNotice availability={pageAvailability} />}
+      </div>
+    </div>
+  </div>
+</DashboardLayout>
+
+{
+  feedback?.cleanPath && (
+    <script is:inline define:vars={{ adminFeedbackCleanPath: feedback.cleanPath }}>
+      if (typeof adminFeedbackCleanPath === "string" && window.history.replaceState) {
+        window.history.replaceState(window.history.state, "", adminFeedbackCleanPath);
+      }
+    </script>
+  )
+}
+
+<style>
+  .admin-notifications-page {
+    width: 100%;
+    min-height: 100%;
+    padding: 2rem 1rem 3rem;
+  }
+
+  .admin-notifications-page__inner {
+    width: 100%;
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 2.5rem;
+    background: #ffffff;
+  }
+
+  .admin-notifications-page__header {
+    margin-bottom: 1.75rem;
+  }
+
+  .admin-notifications-page__title {
+    margin: 0;
+    font-size: clamp(1.4rem, 1.9vw, 1.85rem);
+    line-height: 1;
+    font-weight: 700;
+    color: #000000;
+    letter-spacing: -0.025em;
+  }
+
+  .admin-notifications-page__intro {
+    margin: 0.4rem 0 0;
+    max-width: none;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--color-brand-muted-black);
+  }
+
+  .admin-notifications-page__content {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .admin-notifications-page :global(.status-message),
+  .admin-notifications-page :global(.error-message) {
+    margin: 0 0 1rem;
+  }
+</style>

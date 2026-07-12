@@ -311,6 +311,47 @@ export async function markUnreadAdminInquiriesRead(
   }
 }
 
+const viewedResellerApplicationIdsSchema = z
+  .array(uuidSchema)
+  .min(1, "At least one application id is required.")
+  .max(100, "Too many application ids were provided.");
+
+export function parseViewedResellerApplicationIds(value: unknown): string[] {
+  const result = viewedResellerApplicationIdsSchema.safeParse(value);
+
+  if (!result.success) {
+    throw new Error(result.error.issues[0]?.message ?? "Invalid application ids.");
+  }
+
+  return [...new Set(result.data)];
+}
+
+export async function markViewedResellerApplicationsRead(
+  supabase: SupabaseServerClient,
+  applicationIds: string[],
+  adminUserId: string,
+): Promise<{ markedCount: number }> {
+  const uniqueIds = parseViewedResellerApplicationIds(applicationIds);
+
+  if (uniqueIds.length === 0) {
+    return { markedCount: 0 };
+  }
+
+  const { data, error } = await supabase
+    .from("reseller_application")
+    .update(adminReadPayload(adminUserId))
+    .in("id", uniqueIds)
+    .eq("application_status", "submitted")
+    .is("admin_read_at", null)
+    .select("id");
+
+  if (error) {
+    throw new Error("Unable to mark reseller applications as read.");
+  }
+
+  return { markedCount: data?.length ?? 0 };
+}
+
 export async function executeAdminAction(
   supabase: SupabaseServerClient,
   action: AdminAction,

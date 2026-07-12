@@ -97,11 +97,14 @@ describe("reseller application edge workflow helpers", () => {
       from: "JEHMARP <sales@example.com>",
       to: ["owner@example.com"],
       bcc: ["admin@example.com"],
-      subject: "JEHMARP reseller price list",
+      subject: "Your JEHMARP reseller price list",
     });
     expect(payload.html).toContain("Pork Belly");
     expect(payload.html).toContain("PHP 295.00");
-    expect(payload.text).toContain("Pork Belly | pork | kg | PHP 320.00 | PHP 295.00");
+    expect(payload.html).toContain("#661818");
+    expect(payload.html).toContain("Application summary");
+    expect(payload.html).toContain("application-id");
+    expect(payload.text).toContain("Pork Belly | Pork | kg | PHP 320.00 | PHP 295.00");
   });
 
   it("marks delivery failed when Resend is not configured", async () => {
@@ -211,6 +214,7 @@ describe("reseller application edge workflow helpers", () => {
 
     expect(html).toContain("&lt;Owner&gt;");
     expect(html).toContain("&lt;script&gt;");
-    expect(buildPriceListText(application, products)).toContain("Pork Belly");
+    expect(html).toContain("What happens next");
+    expect(buildPriceListText(application, products)).toContain("JEHMARP WHOLESALE");
   });
 });

@@ -4,7 +4,9 @@ import {
   executeAdminAction,
   formatAdminActionFeedback,
   getAllowedNextOrderStatuses,
+  markViewedResellerApplicationsRead,
   parseAdminActionFormData,
+  parseViewedResellerApplicationIds,
 } from "./actions";
 
 const adminUserId = "8bcce9f3-2a1b-43c0-9e51-70667e017111";
@@ -483,6 +485,45 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+});
+
+describe("markViewedResellerApplicationsRead", () => {
+  const applicationId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
+
+  it("deduplicates and validates application ids", () => {
+    expect(
+      parseViewedResellerApplicationIds([
+        applicationId,
+        applicationId,
+      ]),
+    ).toEqual([applicationId]);
+  });
+
+  it("marks only submitted unread reseller applications", async () => {
+    const select = vi.fn(() => Promise.resolve({
+      data: [{ id: applicationId }],
+      error: null,
+    }));
+    const eq = vi.fn(() => ({ is: vi.fn(() => ({ select })) }));
+    const inFilter = vi.fn(() => ({ eq }));
+    const update = vi.fn(() => ({ in: inFilter }));
+    const from = vi.fn(() => ({ update }));
+
+    const result = await markViewedResellerApplicationsRead(
+      { from } as never,
+      [applicationId],
+      adminUserId,
+    );
+
+    expect(result).toEqual({ markedCount: 1 });
+    expect(from).toHaveBeenCalledWith("reseller_application");
+    expect(update).toHaveBeenCalledWith({
+      admin_read_at: expect.any(String),
+      admin_read_by: adminUserId,
+    });
+    expect(inFilter).toHaveBeenCalledWith("id", [applicationId]);
+    expect(eq).toHaveBeenCalledWith("application_status", "submitted");
+  });
 });
 
 describe("executeAdminAction", () => {

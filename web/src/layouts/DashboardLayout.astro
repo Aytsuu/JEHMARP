@@ -825,6 +825,12 @@ const categories: CategoryGroup[] = isAdmin
                   syncDashboardTableBoardColumns(board);
                 });
             });
+
+            container.dispatchEvent(
+              new CustomEvent("dashboard:interactive-table-page-changed", {
+                bubbles: true,
+              }),
+            );
           }
 
           searchInput?.addEventListener("input", () => {

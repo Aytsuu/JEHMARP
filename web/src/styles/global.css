@@ -3941,8 +3941,19 @@
     cursor: help;
   }
 
+  .dashboard-table__delivery-status svg {
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
   .dashboard-table__delivery-status--sent {
     color: #10b981;
+    cursor: default;
   }
 
   .dashboard-table__delivery-status--failed {
@@ -3951,6 +3962,7 @@
 
   .dashboard-table__delivery-status--pending {
     color: #6b7280;
+    cursor: default;
   }
 
   .dashboard-table__image-button {
