@@ -1,4 +1,7 @@
 ---
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
 import {
   formatCurrency,
@@ -18,7 +21,7 @@ const agentOrders = data.orders.filter(
 );
 ---
 
-<section class="admin-summary-grid" aria-label="Agent earnings summary">
+<section class="admin-summary-grid dashboard-page-summary" aria-label="Agent earnings summary">
   <article class="admin-summary-card">
     <h2>Monthly Earnings</h2>
     <p>{formatCurrency(data.summary.monthlyEarnings)}</p>
@@ -40,57 +43,48 @@ const agentOrders = data.orders.filter(
         No agent-submitted or assigned commission orders yet.
       </p>
     ) : (
-      <div data-interactive-table>
+      <div data-interactive-table class="dashboard-interactive-table">
         <div class="table-filters">
-          <div style="flex: 1; min-width: 15rem;">
-            <input type="text" placeholder="Search commissions..." data-search-input style="width: 100%;" />
+          <div class="table-filters__search">
+            <input
+              type="text"
+              placeholder="Search commissions..."
+              data-search-input
+              aria-label="Search commissions"
+            />
           </div>
         </div>
 
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Order</th>
-                <th scope="col">Payment Status</th>
-                <th scope="col">Expected</th>
-                <th scope="col">Earned</th>
-              </tr>
-            </thead>
-            <tbody>
-              {agentOrders.map((order) => (
-                <tr data-status={order.payment_status}>
-                  <td>
-                    {fullName(order.customer)}
-                    <br />
-                    {formatDate(order.created_at)}
-                  </td>
-                  <td>{order.payment_status}</td>
-                  <td>{formatCurrency(orderExpectedCommission(order))}</td>
-                  <td>{formatCurrency(orderEarnedCommission(order))}</td>
+        <div class="dashboard-interactive-table__surface">
+          <DashboardTableBoard>
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <th scope="col">Order</th>
+                  <th scope="col">Payment Status</th>
+                  <th scope="col">Expected</th>
+                  <th scope="col">Earned</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {agentOrders.map((order) => (
+                  <tr data-status={order.payment_status}>
+                    <td>
+                      {fullName(order.customer)}
+                      <br />
+                      {formatDate(order.created_at)}
+                    </td>
+                    <td><StatusBadge kind="payment" status={order.payment_status} /></td>
+                    <td>{formatCurrency(orderExpectedCommission(order))}</td>
+                    <td>{formatCurrency(orderEarnedCommission(order))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DashboardTableBoard>
         </div>
 
-        <div class="table-pagination">
-          <div class="table-pagination__summary">
-            <span data-page-info></span>
-            <label class="table-pagination__limit">
-              <select data-limit-select>
-                <option value="10">10 rows</option>
-                <option value="50">50 rows</option>
-                <option value="100">100 rows</option>
-              </select>
-            </label>
-          </div>
-          <div class="table-pagination__controls">
-            <button type="button" data-pagination-prev class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
-            <div data-pagination-numbers class="table-pagination__numbers"></div>
-            <button type="button" data-pagination-next class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
-          </div>
-        </div>
+        <DashboardTablePagination />
       </div>
     )
   }

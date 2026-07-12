@@ -1,3 +1,4 @@
+import type { AdminActivityFilters } from "./activity-filters";
 import type { AdminDashboardData } from "./data";
 
 export type AdminActivityItem = {
@@ -25,6 +26,28 @@ export function buildAdminActivityItems(
   return items
     .sort((left, right) => timestamp(right.occurredAt) - timestamp(left.occurredAt))
     .slice(0, limit);
+}
+
+export function filterAdminActivityItems(
+  items: AdminActivityItem[],
+  filters: AdminActivityFilters = {},
+): AdminActivityItem[] {
+  if (!filters.search) {
+    return items;
+  }
+
+  const searchTerms = filters.search
+    .toLowerCase()
+    .split(/\s+/)
+    .filter((term) => term.length > 0);
+
+  return items.filter((item) => {
+    const searchText = [item.title, item.detail, item.category]
+      .join(" ")
+      .toLowerCase();
+
+    return searchTerms.every((term) => searchText.includes(term));
+  });
 }
 
 function buildOrderActivity(data: AdminDashboardData): AdminActivityItem[] {

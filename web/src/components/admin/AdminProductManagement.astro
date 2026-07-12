@@ -1,4 +1,8 @@
 ---
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminProductManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminProductFilters } from "@/lib/admin-dashboard/product-filters";
@@ -163,7 +167,7 @@ function formatStockStatus(status: string): string {
     </div>
   </Sheet>
 
-  <div data-interactive-table>
+  <div data-interactive-table class="dashboard-interactive-table">
     <div class="table-filters product-management-toolbar">
       <form
         method="get"
@@ -227,9 +231,9 @@ function formatStockStatus(status: string): string {
       </div>
     </div>
 
-    <div data-product-table-shell>
-      <div class="table-wrap">
-        <table class="product-table-skeleton dashboard-table">
+    <div data-product-table-shell class="dashboard-interactive-table__surface">
+      <DashboardTableBoard>
+        <table class="product-table-skeleton dashboard-table dashboard-table--products">
           <thead>
             <tr>
               <th scope="col" class="dashboard-table__head--image"></th>
@@ -244,11 +248,10 @@ function formatStockStatus(status: string): string {
           <tbody>
             {
               data.products.length === 0 ? (
-                <tr class="empty-row">
-                  <td colspan="7" class="empty-state">
-                    No products match the selected filters.
-                  </td>
-                </tr>
+                <DashboardTableEmptyState
+                  colspan={7}
+                  message="No products match the selected filters."
+                />
               ) : (
                 data.products.map((product) => (
                   <tr data-status={product.is_active ? "active" : "inactive"}>
@@ -639,7 +642,11 @@ function formatStockStatus(status: string): string {
                         data-open-cell-popover
                         data-popover-title={`Edit Status: ${product.name}`}
                       >
-                        <span>{formatStockStatus(product.stock_status)}</span>
+                        <StatusBadge
+                          kind="stock"
+                          status={product.stock_status}
+                          label={formatStockStatus(product.stock_status)}
+                        />
                       </button>
                       <div class="hidden-popover-form-holder">
                         <form
@@ -758,56 +765,16 @@ function formatStockStatus(status: string): string {
             }
           </tbody>
         </table>
-      </div>
+      </DashboardTableBoard>
     </div>
 
-    <div class="table-pagination">
-      <div class="table-pagination__summary">
-        <span data-page-info></span>
-        <label class="table-pagination__limit">
-          <select data-limit-select>
-            <option value="10">10 rows</option>
-            <option value="50">50 rows</option>
-            <option value="100">100 rows</option>
-          </select>
-        </label>
-      </div>
-      <div class="table-pagination__controls">
-        <button type="button" data-pagination-prev class="btn-secondary">
-          <svg
-            class="table-pagination__icon"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg
-          ></button
-        >
-        <div data-pagination-numbers class="table-pagination__numbers"></div>
-        <button type="button" data-pagination-next class="btn-secondary">
-          <svg
-            class="table-pagination__icon"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg
-          ></button
-        >
-      </div>
-    </div>
+    <DashboardTablePagination />
   </div>
 
   <template data-product-filter-skeleton>
-    <div class="table-wrap" aria-busy="true" aria-live="polite">
+    <DashboardTableBoard aria-busy="true" aria-live="polite">
       <table
-        class="product-table-skeleton dashboard-table"
+        class="product-table-skeleton dashboard-table dashboard-table--products"
       >
         <caption class="sr-only">Loading filtered products</caption>
         <thead>
@@ -851,7 +818,7 @@ function formatStockStatus(status: string): string {
           }
         </tbody>
       </table>
-    </div>
+    </DashboardTableBoard>
   </template>
 </section>
 

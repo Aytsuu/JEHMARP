@@ -646,6 +646,49 @@ const categories: CategoryGroup[] = isAdmin
         });
       }
 
+      const boardAlignmentObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
+      function syncDashboardTableBoardColumns(board: HTMLElement) {
+        const table = board.querySelector("table");
+        const tbody = table?.querySelector("tbody");
+        if (!table || !tbody) return;
+
+        board.style.setProperty(
+          "--dashboard-table-sync-width",
+          `${tbody.clientWidth}px`,
+        );
+
+        table.querySelectorAll<HTMLTableCellElement>("th, td").forEach((cell) => {
+          cell.style.removeProperty("width");
+        });
+      }
+
+      function syncDashboardTableBoards(root: ParentNode = document) {
+        root.querySelectorAll<HTMLElement>(".dashboard-table-board").forEach(
+          (board) => {
+            syncDashboardTableBoardColumns(board);
+          },
+        );
+      }
+
+      function initDashboardTableBoardAlignment(root: ParentNode = document) {
+        root.querySelectorAll<HTMLElement>(".dashboard-table-board").forEach(
+          (board) => {
+            syncDashboardTableBoardColumns(board);
+
+            if (boardAlignmentObservers.has(board)) return;
+
+            const observer = new ResizeObserver(() => {
+              syncDashboardTableBoardColumns(board);
+            });
+            observer.observe(board);
+            const tbody = board.querySelector("tbody");
+            if (tbody) observer.observe(tbody);
+            boardAlignmentObservers.set(board, observer);
+          },
+        );
+      }
+
       function initInteractiveTables() {
         const interactiveTables = document.querySelectorAll<HTMLElement>(
           "[data-interactive-table]",
@@ -758,6 +801,14 @@ const categories: CategoryGroup[] = isAdmin
                 numbersContainer.appendChild(btn);
               }
             }
+
+            window.requestAnimationFrame(() => {
+              container
+                .querySelectorAll<HTMLElement>(".dashboard-table-board")
+                .forEach((board) => {
+                  syncDashboardTableBoardColumns(board);
+                });
+            });
           }
 
           searchInput?.addEventListener("input", () => {
@@ -868,6 +919,7 @@ const categories: CategoryGroup[] = isAdmin
         initSidebarUnreadBadges();
         initDrawerSheets();
         initCellPopovers();
+        initDashboardTableBoardAlignment();
         initInteractiveTables();
         initDigitsOnlyInputs();
         initFormSubmissionState();
@@ -877,8 +929,14 @@ const categories: CategoryGroup[] = isAdmin
       document.addEventListener("astro:after-swap", initDashboardFeatures);
       document.addEventListener(
         "dashboard:interactive-table-updated",
-        initInteractiveTables,
+        () => {
+          initInteractiveTables();
+          initDashboardTableBoardAlignment();
+        },
       );
+      window.addEventListener("resize", () => {
+        syncDashboardTableBoards();
+      });
       if (
         document.readyState === "complete" ||
         document.readyState === "interactive"

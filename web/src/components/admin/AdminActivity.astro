@@ -1,74 +1,249 @@
 ---
-import { buildAdminActivityItems } from "@/lib/admin-dashboard/activity";
-
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import { buildAdminActivityItems, filterAdminActivityItems } from "@/lib/admin-dashboard/activity";
+import type { AdminActivityFilters } from "@/lib/admin-dashboard/activity-filters";
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import { formatDateTime } from "@/lib/admin-dashboard/view";
 
 type Props = {
   data: AdminDashboardData;
+  activeFilters: AdminActivityFilters;
+  filterQuery: string;
 };
 
-const { data } = Astro.props;
-const activityItems = buildAdminActivityItems(data);
+const { data, activeFilters, filterQuery } = Astro.props;
+const activityItems = filterAdminActivityItems(
+  buildAdminActivityItems(data),
+  activeFilters,
+);
+const skeletonRows = Array.from({ length: 6 });
+const emptyMessage = activeFilters.search
+  ? "No activity matches the selected filters."
+  : "No admin activity is available yet.";
 ---
 
 <section class="admin-panel" aria-labelledby="admin-activity-title">
-  {
-    activityItems.length > 0 ? (
-      <div data-interactive-table>
-        <div class="table-filters">
-          <div class="table-filters__search">
-            <input
-              type="text"
-              placeholder="Search activity..."
-              data-search-input
-              aria-label="Search activity"
-            />
-          </div>
+  <div data-interactive-table class="dashboard-interactive-table">
+    <div class="table-filters order-management-toolbar">
+      <form
+        method="get"
+        action="/admin/activity"
+        class="order-filter-form"
+        data-activity-filter-form
+        data-current-filter-query={filterQuery}
+        aria-label="Filter activity"
+      >
+        <div class="order-filter-form__field order-filter-form__field--search">
+          <input
+            name="search"
+            type="search"
+            value={activeFilters.search ?? ""}
+            placeholder="Search activity, details, or category..."
+            autocomplete="off"
+            aria-label="Search activity"
+            data-activity-search-input
+          />
         </div>
+      </form>
+      <div class="order-management-toolbar__actions"></div>
+    </div>
 
-        <div class="table-wrap">
-          <table class="dashboard-table">
-            <thead>
-              <tr>
-                <th scope="col">Activity</th>
-                <th scope="col">Details</th>
-                <th scope="col">Category</th>
-                <th scope="col">Time</th>
+    <div data-activity-table-shell class="dashboard-interactive-table__surface">
+      <DashboardTableBoard>
+        <table class="dashboard-table">
+          <thead>
+            <tr>
+              <th scope="col">Activity</th>
+              <th scope="col">Details</th>
+              <th scope="col">Category</th>
+              <th scope="col">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activityItems.length === 0 ? (
+              <DashboardTableEmptyState colspan={4} message={emptyMessage} />
+            ) : activityItems.map((item) => (
+              <tr data-status={item.category}>
+                <td class="dashboard-table__cell--truncate">{item.title}</td>
+                <td class="dashboard-table__cell--truncate">{item.detail}</td>
+                <td><StatusBadge kind="activity" status={item.category} /></td>
+                <td>
+                  <time datetime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {activityItems.map((item) => (
-                <tr data-status={item.category}>
-                  <td class="dashboard-table__cell--truncate">{item.title}</td>
-                  <td class="dashboard-table__cell--truncate">{item.detail}</td>
-                  <td>{item.category}</td>
-                  <td>{item.occurredAt}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
+      </DashboardTableBoard>
+    </div>
 
-        <div class="table-pagination">
-          <div class="table-pagination__summary">
-            <span data-page-info></span>
-            <label class="table-pagination__limit">
-              <select data-limit-select>
-                <option value="10">10 rows</option>
-                <option value="50">50 rows</option>
-                <option value="100">100 rows</option>
-              </select>
-            </label>
-          </div>
-          <div class="table-pagination__controls">
-            <button type="button" data-pagination-prev class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
-            <div data-pagination-numbers class="table-pagination__numbers"></div>
-            <button type="button" data-pagination-next class="btn-secondary"><svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
-          </div>
-        </div>
-      </div>
-    ) : (
-      <p class="empty-state">No admin activity is available yet.</p>
-    )
-  }
+    <DashboardTablePagination />
+  </div>
+
+  <template data-activity-filter-skeleton>
+    <DashboardTableBoard aria-busy="true" aria-live="polite">
+      <table class="product-table-skeleton dashboard-table">
+        <caption class="sr-only">Loading filtered activity</caption>
+        <thead>
+          <tr>
+            <th scope="col">Activity</th>
+            <th scope="col">Details</th>
+            <th scope="col">Category</th>
+            <th scope="col">Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          {skeletonRows.map(() => (
+            <tr>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--wide"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DashboardTableBoard>
+  </template>
 </section>
+
+<script>
+  function initAdminActivityFilters() {
+    const form = document.querySelector<HTMLFormElement>("[data-activity-filter-form]");
+    const tableShell = document.querySelector<HTMLElement>("[data-activity-table-shell]");
+    const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-activity-filter-skeleton]");
+    if (!form || !tableShell || !skeletonTemplate) return;
+    if (form.dataset.activityFilterInitialized === "true") return;
+    form.dataset.activityFilterInitialized = "true";
+
+    const activeForm = form;
+    const activeTableShell = tableShell;
+    const activeSkeletonTemplate = skeletonTemplate;
+    const cacheKey = "admin-activity-filter-cache-v1";
+    const fragmentPath = "/admin/activity-fragment";
+    const filterKeys = ["search"] as const;
+    const searchInput = activeForm.querySelector<HTMLInputElement>("[data-activity-search-input]");
+    let submitTimer: number | undefined;
+    let searchTimer: number | undefined;
+    let activeFetchController: AbortController | undefined;
+
+    function readCache(): string[] {
+      try {
+        const parsed = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
+        return Array.isArray(parsed)
+          ? parsed.filter((value): value is string => typeof value === "string")
+          : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function writeCache(values: string[]) {
+      sessionStorage.setItem(cacheKey, JSON.stringify([...new Set(values)]));
+    }
+
+    function normalizeParams(params: URLSearchParams) {
+      const normalized = new URLSearchParams();
+
+      filterKeys.forEach((key) => {
+        const value = params.get(key)?.trim();
+        if (value) normalized.set(key, value);
+      });
+
+      return normalized.toString();
+    }
+
+    function normalizeFormQuery() {
+      const params = new URLSearchParams();
+      const formData = new FormData(activeForm);
+
+      filterKeys.forEach((key) => {
+        const value = formData.get(key);
+        if (typeof value === "string" && value.trim()) params.set(key, value.trim());
+      });
+
+      return params.toString();
+    }
+
+    function buildUrl(path: string, targetQuery: string) {
+      return targetQuery ? `${path}?${targetQuery}` : path;
+    }
+
+    function showSkeletonForQuery(targetQuery: string) {
+      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
+      const cachedQueries = readCache();
+      if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) return;
+
+      const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
+      if (skeleton) activeTableShell.replaceChildren(skeleton);
+    }
+
+    function replaceFragment(fragmentHtml: string) {
+      const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html");
+      const nextTableShell = parsed.querySelector<HTMLElement>("[data-activity-table-shell]");
+      if (!nextTableShell) throw new Error("Activity fragment did not include a table.");
+
+      activeTableShell.innerHTML = nextTableShell.innerHTML;
+      document.dispatchEvent(new Event("dashboard:interactive-table-updated"));
+    }
+
+    async function applyFilters(targetQuery: string) {
+      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
+      if (targetQuery === currentQuery) return;
+
+      showSkeletonForQuery(targetQuery);
+      activeFetchController?.abort();
+      const fetchController = new AbortController();
+      activeFetchController = fetchController;
+
+      try {
+        const response = await fetch(buildUrl(fragmentPath, targetQuery), {
+          headers: { "X-Requested-With": "fetch" },
+          signal: fetchController.signal,
+        });
+        if (!response.ok) throw new Error(`Activity filters failed with ${response.status}.`);
+
+        const fragmentHtml = await response.text();
+        window.history.replaceState(
+          { activityFilterQuery: targetQuery },
+          "",
+          buildUrl("/admin/activity", targetQuery),
+        );
+        replaceFragment(fragmentHtml);
+        activeForm.dataset.currentFilterQuery = targetQuery;
+        writeCache([...readCache(), targetQuery]);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        window.location.href = buildUrl("/admin/activity", targetQuery);
+      } finally {
+        if (activeFetchController === fetchController) activeFetchController = undefined;
+      }
+    }
+
+    function submitFilters() {
+      window.clearTimeout(submitTimer);
+      submitTimer = window.setTimeout(() => {
+        void applyFilters(normalizeFormQuery());
+      }, 120);
+    }
+
+    writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
+    activeForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      void applyFilters(normalizeFormQuery());
+    });
+    searchInput?.addEventListener("input", () => {
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(submitFilters, 450);
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initAdminActivityFilters);
+  document.addEventListener("astro:after-swap", initAdminActivityFilters);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initAdminActivityFilters();
+  }
+</script>

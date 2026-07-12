@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAdminActivityItems } from "./activity";
+import { buildAdminActivityItems, filterAdminActivityItems } from "./activity";
 
 import type { AdminDashboardData } from "./data";
 
@@ -37,6 +37,31 @@ describe("buildAdminActivityItems", () => {
     expect(activity).toHaveLength(2);
     expect(activity[0]?.title).toBe("New contact inquiry");
     expect(activity[1]?.title).toBe("New reseller application");
+  });
+});
+
+describe("filterAdminActivityItems", () => {
+  it("filters activity by title, detail, and category terms", () => {
+    const activity = buildAdminActivityItems(createAdminDashboardData());
+
+    expect(filterAdminActivityItems(activity, { search: "invoice" })).toEqual([
+      expect.objectContaining({
+        title: "Created invoice",
+        category: "invoice",
+      }),
+    ]);
+    expect(filterAdminActivityItems(activity, { search: "reseller sent" })).toEqual([
+      expect.objectContaining({
+        title: "New reseller application",
+        category: "reseller",
+      }),
+    ]);
+  });
+
+  it("returns all items when no search filter is provided", () => {
+    const activity = buildAdminActivityItems(createAdminDashboardData(), 3);
+
+    expect(filterAdminActivityItems(activity)).toEqual(activity);
   });
 });
 

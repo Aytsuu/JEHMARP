@@ -15,6 +15,16 @@ export function formatDate(value: string | null) {
   return value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(new Date(value)) : "Not set";
 }
 
+export function formatDateTime(value: string | null) {
+  if (!value) return "Not set";
+
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Manila",
+  }).format(new Date(value));
+}
+
 export function orderTotal(order: AdminOrder, quantityKey: "partial_quantity" | "final_quantity") {
   return order.customer_order_item.reduce((total, item) => {
     return total + item[quantityKey] * item.unit_price;
