@@ -268,6 +268,43 @@
     color: #111827;
   }
 
+  .page-shell__title--with-back {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+
+  .route-back-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 999px;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    color: #111827;
+    text-decoration: none;
+    background: #ffffff;
+    flex-shrink: 0;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .route-back-button:hover,
+  .route-back-button:focus-visible {
+    background: #f9fafb;
+    border-color: rgba(17, 24, 39, 0.2);
+  }
+
+  .route-back-button svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
   .page-shell__description {
     @apply mb-0 mt-3;
     max-width: 44rem;

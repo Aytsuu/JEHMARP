@@ -1,5 +1,5 @@
 ---
-import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
@@ -38,14 +38,17 @@ function hasPendingOrders(customerId: string): boolean {
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
-<AdminPageFrame
+<AdminNotificationsPageLayout
   title={`Agent Details - ${agent.display_name} - JEHMARP`}
   description="Admin agent profile details and assigned customer list."
   heading={`Agent Record: ${agent.display_name}`}
-  intro={`Review detailed profile settings and customer assignments for Agent ${agent.display_name}.`}
+  intro={`Review profile settings and customer assignments for ${agent.display_name}.`}
+  backUrl="/admin/agents"
+  backLabel="Back to agents"
   feedback={feedback}
   dashboardData={data}
-  backUrl="/admin/agents"
+  contentMaxWidth="72rem"
+  fullHeight
 >
   <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 100%;">
     <!-- 1. Agent Profile -->
@@ -165,7 +168,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
       )}
     </div>
   </div>
-</AdminPageFrame>
+</AdminNotificationsPageLayout>
 
 <style>
   /* Remove shadows on cards, add matching gray border and border-radius */

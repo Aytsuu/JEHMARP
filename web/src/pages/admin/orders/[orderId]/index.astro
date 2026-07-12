@@ -1,5 +1,6 @@
 ---
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
@@ -304,15 +305,7 @@ const timelineItems = [
 
         <div class="order-summary-top">
           <div class="order-summary-top__main">
-            <a
-              href="/admin/orders"
-              class="icon-button"
-              aria-label="Back to orders"
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="m15 18-6-6 6-6"></path>
-              </svg>
-            </a>
+            <RouteBackButton href="/admin/orders" label="Back to orders" />
 
             <div class="order-title-copy">
               <h1>{orderCode}</h1>
@@ -2417,20 +2410,10 @@ const timelineItems = [
     margin: 0;
   }
 
-  .icon-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 999px;
-    border: 1px solid rgba(17, 24, 39, 0.12);
-    color: #111827;
-    text-decoration: none;
-    background: #ffffff;
+  .order-summary-top__main .route-back-button {
+    flex-shrink: 0;
   }
 
-  .icon-button svg,
   .document-action svg {
     width: 1rem;
     height: 1rem;

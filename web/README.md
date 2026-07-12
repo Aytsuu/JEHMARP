@@ -55,14 +55,11 @@ In development, the app prefers the local Supabase stack automatically and will 
 
 ## Local Supabase Data
 
-Schema history and local-only data are separated:
+Schema history lives in `supabase/migrations/` for local and remote environments.
 
-- `supabase/migrations/` is the shared database history for local and remote environments.
-- `supabase/seeds/` is for local reset data that should not be pushed as production migration history.
+Auth users are not seeded on `supabase db reset`. Create local login accounts in Studio under **Authentication → Users**, then map `public.admin_role` / `public.agent_profile` as needed.
 
-The local Supabase config seeds `./seeds/local-auth-users.sql` on `supabase db reset`, so local admin and agent login setup stays out of migration history.
-
-Do not edit already-applied migration files to change local credentials, test users, or dashboard fixtures. Use a new migration for production-bound database changes, and use seed files for local-only reset data.
+Do not edit already-applied migration files to change local credentials or dashboard fixtures. Use a new migration for production-bound database changes.
 
 ## Commands
 

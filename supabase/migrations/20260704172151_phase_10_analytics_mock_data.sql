@@ -2,32 +2,21 @@ alter table public.invoice disable trigger validate_invoice_status_transition;
 
 do $$
 declare
-  admin_user_id constant uuid := '11111111-1111-1111-1111-111111111111';
-  agent_user_id constant uuid := '22222222-2222-2222-2222-222222222222';
+  admin_user_id uuid;
+  agent_user_id uuid;
   agent_profile_id uuid;
 begin
-  select id
-  into agent_profile_id
-  from public.agent_profile
-  where user_id = agent_user_id
+  select ar.user_id
+  into admin_user_id
+  from public.admin_role ar
+  where ar.status = 'active'
   limit 1;
 
-  if agent_profile_id is null then
-    insert into public.agent_profile (user_id, display_name, status, created_at, updated_at)
-    values (
-      agent_user_id,
-      'JEHMARP Mock Agent',
-      'active',
-      '2026-07-01T00:00:00Z',
-      '2026-07-01T00:00:00Z'
-    )
-    on conflict (user_id) do update
-    set
-      display_name = excluded.display_name,
-      status = excluded.status,
-      updated_at = excluded.updated_at
-    returning id into agent_profile_id;
-  end if;
+  select ap.id, ap.user_id
+  into agent_profile_id, agent_user_id
+  from public.agent_profile ap
+  where ap.status = 'active'
+  limit 1;
 
   delete from public.payment
   where id in (
@@ -218,7 +207,7 @@ begin
       'partial',
       agent_user_id,
       admin_user_id,
-      '2026-07-01T09:30:00Z',
+      case when admin_user_id is not null then timestamptz '2026-07-01T09:30:00Z' else null end,
       '2026-07-01T09:00:00Z',
       '2026-07-01T09:30:00Z'
     ),
@@ -231,7 +220,7 @@ begin
       'paid',
       admin_user_id,
       admin_user_id,
-      '2026-07-02T10:30:00Z',
+      case when admin_user_id is not null then timestamptz '2026-07-02T10:30:00Z' else null end,
       '2026-07-02T10:00:00Z',
       '2026-07-02T12:00:00Z'
     ),
@@ -244,7 +233,7 @@ begin
       'paid',
       agent_user_id,
       admin_user_id,
-      '2026-07-03T11:30:00Z',
+      case when admin_user_id is not null then timestamptz '2026-07-03T11:30:00Z' else null end,
       '2026-07-03T11:00:00Z',
       '2026-07-03T13:00:00Z'
     ),
@@ -257,7 +246,7 @@ begin
       'unpaid',
       agent_user_id,
       admin_user_id,
-      '2026-06-28T10:30:00Z',
+      case when admin_user_id is not null then timestamptz '2026-06-28T10:30:00Z' else null end,
       '2026-06-28T10:00:00Z',
       '2026-06-28T10:30:00Z'
     ),

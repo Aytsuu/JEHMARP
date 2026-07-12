@@ -1,5 +1,5 @@
 ---
-import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
@@ -37,14 +37,17 @@ const assignedAgent = data.agents.find((agent) => agent.id === customer.assigned
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
-<AdminPageFrame
+<AdminNotificationsPageLayout
   title={`Customer Details - ${fullName(customer)} - JEHMARP`}
   description="Admin customer detail record, pending orders, and historical summary."
   heading={`Customer Record: ${fullName(customer)}`}
-  intro={`Review detailed profile contact details, reseller attributes, pending workflow orders, and order history.`}
+  intro="Review profile contact details, reseller attributes, pending workflow orders, and order history."
+  backUrl="/admin/customers"
+  backLabel="Back to customers"
   feedback={feedback}
   dashboardData={data}
-  backUrl="/admin/customers"
+  contentMaxWidth="72rem"
+  fullHeight
 >
   <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 100%;">
     <!-- 1. Customer Profile -->
@@ -239,7 +242,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
       )}
     </div>
   </div>
-</AdminPageFrame>
+</AdminNotificationsPageLayout>
 
 <style>
   /* Remove shadows on cards, add matching gray border and border-radius */
