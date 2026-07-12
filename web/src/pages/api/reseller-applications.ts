@@ -1,5 +1,6 @@
 import type { APIRoute } from "astro";
 
+import { resolveFormReturnPath } from "@/lib/public-website/admin-content-preview";
 import {
   parseResellerApplicationFormData,
   submitResellerApplication,
@@ -10,9 +11,14 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request, redirect }) => {
   const formData = await request.formData();
   const parsed = parseResellerApplicationFormData(formData);
+  const returnPath = resolveFormReturnPath(formData, "/business");
 
   if (!parsed.success) {
-    return redirectWithError(redirect, parsed.errors[0] ?? "Please check your application details.");
+    return redirectWithError(
+      redirect,
+      parsed.errors[0] ?? "Please check your application details.",
+      returnPath,
+    );
   }
 
   try {
@@ -25,11 +31,12 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       reference: applicationId,
     });
 
-    return redirect(`/business?${params.toString()}`, 303);
+    return redirect(`${returnPath}?${params.toString()}`, 303);
   } catch (error) {
     return redirectWithError(
       redirect,
       error instanceof Error ? error.message : "The application could not be submitted. Please try again.",
+      returnPath,
     );
   }
 };
@@ -37,13 +44,14 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 function redirectWithError(
   redirect: Parameters<APIRoute>[0]["redirect"],
   message: string,
+  returnPath: string,
 ): Response {
   const params = new URLSearchParams({
     application: "error",
     message,
   });
 
-  return redirect(`/business?${params.toString()}`, 303);
+  return redirect(`${returnPath}?${params.toString()}`, 303);
 }
 
 function getClientIp(headers: Headers): string | null {

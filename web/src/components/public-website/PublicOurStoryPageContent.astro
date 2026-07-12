@@ -1,0 +1,43 @@
+---
+import {
+  getSectionEntries,
+  getSectionHeading,
+  type PublicPageContent,
+} from "@/lib/public-website/content";
+
+type Props = {
+  content: PublicPageContent;
+};
+
+const { content } = Astro.props;
+const title = content.page?.title ?? "Our Story";
+---
+
+<div class="our-story-container">
+  <h2 class="page-title-brand">OUR STORY</h2>
+  <div class="our-story-content">
+    {
+      content.sections.length > 0 ? (
+        content.sections.map((section) => {
+          const entries = getSectionEntries(section);
+          const heading = getSectionHeading(section);
+          const hasCustomHeading =
+            heading && heading !== "Our Story" && heading !== "Section";
+
+          return (
+            <div class="our-story-section">
+              {hasCustomHeading && (
+                <h3 class="our-story-subheading">{heading}</h3>
+              )}
+              {entries.map(([, value]) => (
+                <p class="our-story-paragraph">{value}</p>
+              ))}
+            </div>
+          );
+        })
+      ) : (
+        <p class="our-story-paragraph">Our story has not been published yet.</p>
+      )
+    }
+  </div>
+</div>

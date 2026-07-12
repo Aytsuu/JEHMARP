@@ -3,14 +3,20 @@ import type {
   PublicFeaturedProduct,
   PublicPageSectionRecord,
 } from "@/lib/public-website/content";
+import { toAdminContentPreviewHref } from "@/lib/public-website/admin-content-preview";
 import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
   sections: PublicPageSectionRecord[];
   featuredProducts: PublicFeaturedProduct[];
+  previewRoot?: string;
 };
 
-const { sections, featuredProducts } = Astro.props;
+const { sections, featuredProducts, previewRoot } = Astro.props;
+
+function linkHref(href: string) {
+  return previewRoot ? toAdminContentPreviewHref(href) : href;
+}
 
 const about = sections.find((section) => section.type === "about");
 const missionVisionCoreValues = sections.find(
@@ -242,7 +248,7 @@ function formatTagline(tagline: string): string {
                 </p>
               )}
             </div>
-            <a href="/our-story" class="tagline-button">
+            <a href={linkHref("/our-story")} class="tagline-button">
               Our Story
             </a>
           </div>
@@ -289,7 +295,7 @@ function formatTagline(tagline: string): string {
                 >
                   Featured products
                 </h2>
-                <a href="/shop" class="featured-products__link">
+                <a href={linkHref("/shop")} class="featured-products__link">
                   Browse all products
                   <svg
                     xmlns="http://www.w3.org/2000/svg"

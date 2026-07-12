@@ -1,0 +1,21 @@
+---
+import type { PublicFeaturedProduct, PublicPageContent } from "@/lib/public-website/content";
+import AdminContentPreviewFrame from "@/components/admin/AdminContentPreviewFrame.astro";
+import PublicHomePage from "@/components/public-website/PublicHomePage.astro";
+import { ADMIN_CONTENT_PREVIEW_ROOT } from "@/lib/public-website/admin-content-preview";
+
+type Props = {
+  homePreview: PublicPageContent;
+  featuredProducts: PublicFeaturedProduct[];
+};
+
+const { homePreview, featuredProducts } = Astro.props;
+---
+
+<AdminContentPreviewFrame activePath="/">
+  <PublicHomePage
+    sections={homePreview.sections}
+    featuredProducts={featuredProducts}
+    previewRoot={ADMIN_CONTENT_PREVIEW_ROOT}
+  />
+</AdminContentPreviewFrame>

@@ -1,0 +1,23 @@
+---
+import SiteFooter from "@/components/SiteFooter.astro";
+import SiteNav from "@/components/SiteNav.astro";
+
+type Props = {
+  activePath?: string;
+  previewRoot?: string;
+};
+
+const { activePath = "/", previewRoot } = Astro.props;
+---
+
+<div class="public-site-preview public-body" data-public-site-preview>
+  <SiteNav
+    activePath={activePath}
+    disableSmartScroll={true}
+    previewRoot={previewRoot}
+  />
+  <main class="public-site-preview__main">
+    <slot />
+  </main>
+  <SiteFooter previewRoot={previewRoot} />
+</div>

@@ -1,7 +1,27 @@
 ---
 import { authRoutes, publicRoutes } from "@/config/navigation";
+import {
+  toAdminContentPreviewHref,
+  toPublicPathFromAdminPreview,
+} from "@/lib/public-website/admin-content-preview";
 
-const pathname = Astro.url.pathname;
+type Props = {
+  activePath?: string;
+  disableSmartScroll?: boolean;
+  previewRoot?: string;
+};
+
+const { activePath, disableSmartScroll = false, previewRoot } = Astro.props;
+const pathname =
+  activePath ??
+  (previewRoot
+    ? toPublicPathFromAdminPreview(Astro.url.pathname)
+    : Astro.url.pathname);
+
+function linkHref(href: string) {
+  return previewRoot ? toAdminContentPreviewHref(href) : href;
+}
+
 const isActive = (href: string) => {
   if (href === "/") {
     return pathname === "/";
@@ -18,7 +38,7 @@ const isActive = (href: string) => {
     </div>
   </div>
   <nav class="site-nav__inner" aria-label="Primary navigation">
-    <a class="site-nav__brand" href="/">
+    <a class="site-nav__brand" href={linkHref("/")}>
       <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
       <span class="site-nav__brand-text">JEHMARP</span>
     </a>
@@ -27,7 +47,7 @@ const isActive = (href: string) => {
         publicRoutes.map((item) => (
           <li>
             <a
-              href={item.href}
+              href={linkHref(item.href)}
               class={isActive(item.href) ? "site-nav__link--active" : ""}
             >
               {item.label}
@@ -44,7 +64,7 @@ const isActive = (href: string) => {
 
           return (
             <li>
-              <a href={item.href} class={buttonClass}>
+              <a href={linkHref(item.href)} class={buttonClass}>
                 {item.label}
               </a>
             </li>
@@ -55,46 +75,43 @@ const isActive = (href: string) => {
   </nav>
 </header>
 
-<script>
-  function initSmartNavbar() {
-    const navbar = document.querySelector<HTMLElement>(".site-nav");
-    if (!navbar) return;
+{!disableSmartScroll && (
+  <script>
+    function initSmartNavbar() {
+      const navbar = document.querySelector<HTMLElement>(".site-nav");
+      if (!navbar) return;
 
-    let lastScrollTop = 0;
-    let navbarHeight = navbar.getBoundingClientRect().height;
+      let lastScrollTop = 0;
+      let navbarHeight = navbar.getBoundingClientRect().height;
 
-    window.addEventListener("resize", () => {
-      navbarHeight = navbar.getBoundingClientRect().height;
-    });
+      window.addEventListener("resize", () => {
+        navbarHeight = navbar.getBoundingClientRect().height;
+      });
 
-    window.addEventListener("scroll", () => {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+      window.addEventListener("scroll", () => {
+        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
-      // If at the initial top most, always show the navbar
-      if (scrollTop <= 0) {
-        navbar.classList.remove("site-nav--hidden");
+        if (scrollTop <= 0) {
+          navbar.classList.remove("site-nav--hidden");
+          lastScrollTop = scrollTop;
+          return;
+        }
+
+        if (scrollTop > lastScrollTop && scrollTop > navbarHeight) {
+          navbar.classList.add("site-nav--hidden");
+        } else if (scrollTop < lastScrollTop) {
+          navbar.classList.remove("site-nav--hidden");
+        }
+
         lastScrollTop = scrollTop;
-        return;
-      }
+      }, { passive: true });
+    }
 
-      // Hide when scrolling down past the navbar height
-      if (scrollTop > lastScrollTop && scrollTop > navbarHeight) {
-        navbar.classList.add("site-nav--hidden");
-      } 
-      // Show when scrolling up
-      else if (scrollTop < lastScrollTop) {
-        navbar.classList.remove("site-nav--hidden");
-      }
+    document.addEventListener("DOMContentLoaded", initSmartNavbar);
+    document.addEventListener("astro:after-swap", initSmartNavbar);
 
-      lastScrollTop = scrollTop;
-    }, { passive: true });
-  }
-
-  // Initialize on load and on astro page transitions
-  document.addEventListener("DOMContentLoaded", initSmartNavbar);
-  document.addEventListener("astro:after-swap", initSmartNavbar);
-  
-  if (document.readyState === "complete" || document.readyState === "interactive") {
-    initSmartNavbar();
-  }
-</script>
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+      initSmartNavbar();
+    }
+  </script>
+)}

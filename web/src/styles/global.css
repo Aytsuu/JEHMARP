@@ -3195,7 +3195,7 @@
   .drawer-sheet__body {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 2rem;
+    padding: 0 2rem;
   }
 
   .drawer-sheet__footer {

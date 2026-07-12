@@ -1,0 +1,26 @@
+---
+import HomePageSections from "@/components/HomePageSections.astro";
+import HomeHero from "@/components/home/HomeHero.astro";
+import type {
+  PublicFeaturedProduct,
+  PublicPageSectionRecord,
+} from "@/lib/public-website/content";
+
+type Props = {
+  sections: PublicPageSectionRecord[];
+  featuredProducts: PublicFeaturedProduct[];
+  previewRoot?: string;
+};
+
+const { sections, featuredProducts, previewRoot } = Astro.props;
+
+const heroSection = sections.find((section) => section.type === "hero");
+const otherSections = sections.filter((section) => section.type !== "hero");
+---
+
+{heroSection && <HomeHero section={heroSection} previewRoot={previewRoot} />}
+<HomePageSections
+  sections={otherSections}
+  featuredProducts={featuredProducts}
+  previewRoot={previewRoot}
+/>

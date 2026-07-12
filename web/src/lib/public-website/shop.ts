@@ -148,7 +148,11 @@ export function buildPagination({
   };
 }
 
-export function buildShopUrl(filters: ShopFilters, page: number): string {
+export function buildShopUrl(
+  filters: ShopFilters,
+  page: number,
+  basePath = "/shop",
+): string {
   const params = new URLSearchParams();
 
   if (filters.category) params.set("category", filters.category);
@@ -160,7 +164,7 @@ export function buildShopUrl(filters: ShopFilters, page: number): string {
 
   const query = params.toString();
 
-  return query ? `/shop?${query}` : "/shop";
+  return query ? `${basePath}?${query}` : basePath;
 }
 
 function getSortConfig(sort: ProductSort) {

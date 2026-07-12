@@ -1,0 +1,52 @@
+---
+import AdminContentPageLayout from "@/components/admin/AdminContentPageLayout.astro";
+import AdminContentPreviewFrame from "@/components/admin/AdminContentPreviewFrame.astro";
+import PageShell from "@/components/PageShell.astro";
+import PublicShopPageContent from "@/components/public-website/PublicShopPageContent.astro";
+import { loadAdminContentPreviewPage } from "@/lib/admin-dashboard/content-preview-page";
+import { getPublicEnv } from "@/lib/env";
+import { ADMIN_CONTENT_PREVIEW_ROOT } from "@/lib/public-website/admin-content-preview";
+import {
+  listPublicProducts,
+  parseShopFilters,
+} from "@/lib/public-website/shop";
+
+export const prerender = false;
+
+const preview = await loadAdminContentPreviewPage(Astro);
+
+if (!preview.ready) {
+  return preview.response;
+}
+
+const shopPath = `${ADMIN_CONTENT_PREVIEW_ROOT}/shop`;
+const filters = parseShopFilters(Astro.url);
+const { products, pagination } = await listPublicProducts(Astro, filters);
+const orderStatus = Astro.url.searchParams.get("order");
+const orderReference = Astro.url.searchParams.get("reference");
+const orderMessage = Astro.url.searchParams.get("message");
+const { turnstileSiteKey } = getPublicEnv();
+---
+
+<AdminContentPageLayout
+  title="Shop Preview - JEHMARP"
+  description="Admin shop page preview."
+  feedback={preview.feedback}
+  dashboardData={preview.dashboardData}
+>
+  <AdminContentPreviewFrame activePath="/shop">
+    <PageShell title="Shop">
+      <PublicShopPageContent
+        filters={filters}
+        products={products}
+        pagination={pagination}
+        orderStatus={orderStatus}
+        orderReference={orderReference}
+        orderMessage={orderMessage}
+        turnstileSiteKey={turnstileSiteKey}
+        shopPath={shopPath}
+        returnPath={shopPath}
+      />
+    </PageShell>
+  </AdminContentPreviewFrame>
+</AdminContentPageLayout>
