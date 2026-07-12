@@ -20,7 +20,6 @@ import {
   fullName,
   orderBalance,
   orderPaymentTotal,
-  orderTotal,
 } from "@/lib/admin-dashboard/view";
 import {
   buildOrderSlipLayout,
@@ -75,7 +74,6 @@ const invoice = order.invoice[0] ?? null;
 const hasSalesInvoice = Boolean(invoice);
 const hasPayments = order.payment.length > 0;
 const canGenerateInvoice = order.order_status === "processing";
-const invoiceTotal = orderTotal(order, "final_quantity");
 const paidTotal = orderPaymentTotal(order);
 const balance = orderBalance(order);
 const canCreatePaymentRecord = hasSalesInvoice && balance > 0;
@@ -1539,7 +1537,7 @@ const backLabel = backHref.startsWith("/admin/customers/")
     );
 
     if (statusSelect instanceof HTMLSelectElement && saveUrl) {
-      let lastSavedStatus = statusSelect.value;
+      const lastSavedStatus = statusSelect.value;
       let isSavingStatus = false;
 
       statusSelect.addEventListener("change", async () => {
@@ -1547,7 +1545,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
           return;
         }
 
-        const nextStatus = statusSelect.value;
         const formData = new FormData(orderStatusForm);
         isSavingStatus = true;
         statusSelect.disabled = true;
@@ -2005,15 +2002,12 @@ const backLabel = backHref.startsWith("/admin/customers/")
               return;
             }
 
-            let isActive = false;
-
             try {
-              isActive = document.queryCommandState(command);
+              const isActive = document.queryCommandState(command);
+              button.classList.toggle("is-active", isActive);
             } catch {
-              isActive = false;
+              button.classList.remove("is-active");
             }
-
-            button.classList.toggle("is-active", isActive);
           });
       };
 

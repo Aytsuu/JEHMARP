@@ -183,8 +183,10 @@ const skeletonRows = Array.from({ length: 6 });
 
   function initResellerApplicationAutoRead() {
     const tableShell = document.querySelector<HTMLElement>("[data-reseller-table-shell]");
-    const interactiveTable = tableShell?.closest<HTMLElement>("[data-interactive-table]");
-    if (!tableShell || !interactiveTable) return;
+    if (!tableShell) return;
+    const activeTableShell = tableShell;
+    const interactiveTable = activeTableShell.closest<HTMLElement>("[data-interactive-table]");
+    if (!interactiveTable) return;
     if (interactiveTable.dataset.resellerAutoReadInitialized === "true") return;
     interactiveTable.dataset.resellerAutoReadInitialized = "true";
 
@@ -193,7 +195,7 @@ const skeletonRows = Array.from({ length: 6 });
 
     function getVisibleUnreadApplicationIds() {
       return Array.from(
-        tableShell.querySelectorAll<HTMLTableRowElement>("tr[data-reseller-unread='true']"),
+        activeTableShell.querySelectorAll<HTMLTableRowElement>("tr[data-reseller-unread='true']"),
       )
         .filter((row) => row.style.display !== "none")
         .map((row) => row.dataset.applicationId)
@@ -203,7 +205,7 @@ const skeletonRows = Array.from({ length: 6 });
 
     function clearUnreadIndicators(applicationIds: string[]) {
       applicationIds.forEach((applicationId) => {
-        const row = tableShell.querySelector<HTMLTableRowElement>(
+        const row = activeTableShell.querySelector<HTMLTableRowElement>(
           `tr[data-application-id="${applicationId}"]`,
         );
         if (!row) return;

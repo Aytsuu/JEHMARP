@@ -17,7 +17,7 @@ const feedback = getContactInquiryFeedback(Astro.url);
     <PublicContactPageContent
       content={content}
       feedback={feedback}
-      turnstileSiteKey={turnstileSiteKey}
+      turnstileSiteKey={turnstileSiteKey ?? null}
     />
   </PageShell>
 </Layout>

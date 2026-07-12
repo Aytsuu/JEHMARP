@@ -2100,6 +2100,8 @@ GRANT ALL ON FUNCTION "public"."compute_payment_total"("target_order_id" "uuid")
 
 GRANT ALL ON TABLE "public"."product" TO "service_role";
 GRANT INSERT,DELETE,UPDATE ON TABLE "public"."product" TO "authenticated";
+REVOKE SELECT ON TABLE "public"."product" FROM "anon";
+REVOKE SELECT ON TABLE "public"."product" FROM "authenticated";
 
 
 
@@ -2362,11 +2364,92 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON FUN
 
 
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "postgres";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TABLES TO "service_role";
 
 
+
+
+
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON FUNCTIONS FROM "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "anon";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "authenticated";
+
+
+
+REVOKE ALL ON ALL TABLES IN SCHEMA "public" FROM "anon";
+REVOKE ALL ON ALL TABLES IN SCHEMA "public" FROM "authenticated";
+REVOKE ALL ON FUNCTION "public"."submit_guest_order"("customer_payload" "jsonb", "item_payload" "jsonb") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."submit_agent_order"("target_customer_id" "uuid", "item_payload" "jsonb", "customer_payload" "jsonb") FROM "anon";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."admin_role" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."agent_profile" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."analytics_agent_daily" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."analytics_daily" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."analytics_product_daily" TO "authenticated";
+GRANT SELECT,DELETE,UPDATE ON TABLE "public"."contact_inquiry" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."customer" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."customer_order" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."customer_order_item" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."customer_order_status_history" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."invoice" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."media_asset" TO "authenticated";
+GRANT INSERT,DELETE,UPDATE ON TABLE "public"."page" TO "authenticated";
+GRANT INSERT,DELETE,UPDATE ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."payment" TO "authenticated";
+GRANT INSERT,DELETE,UPDATE ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."profile" TO "authenticated";
+GRANT SELECT,INSERT,DELETE,UPDATE ON TABLE "public"."reseller_application" TO "authenticated";
+GRANT SELECT("id") ON TABLE "public"."page" TO "anon";
+GRANT SELECT("id") ON TABLE "public"."page" TO "authenticated";
+GRANT SELECT("slug") ON TABLE "public"."page" TO "anon";
+GRANT SELECT("slug") ON TABLE "public"."page" TO "authenticated";
+GRANT SELECT("title") ON TABLE "public"."page" TO "anon";
+GRANT SELECT("title") ON TABLE "public"."page" TO "authenticated";
+GRANT SELECT("status") ON TABLE "public"."page" TO "anon";
+GRANT SELECT("status") ON TABLE "public"."page" TO "authenticated";
+GRANT SELECT("published_at") ON TABLE "public"."page" TO "anon";
+GRANT SELECT("published_at") ON TABLE "public"."page" TO "authenticated";
+GRANT SELECT("created_at") ON TABLE "public"."page" TO "anon";
+GRANT SELECT("created_at") ON TABLE "public"."page" TO "authenticated";
+GRANT SELECT("updated_at") ON TABLE "public"."page" TO "anon";
+GRANT SELECT("updated_at") ON TABLE "public"."page" TO "authenticated";
+GRANT SELECT("id") ON TABLE "public"."page_section" TO "anon";
+GRANT SELECT("id") ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT("page_id") ON TABLE "public"."page_section" TO "anon";
+GRANT SELECT("page_id") ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT("type") ON TABLE "public"."page_section" TO "anon";
+GRANT SELECT("type") ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT("sort_order") ON TABLE "public"."page_section" TO "anon";
+GRANT SELECT("sort_order") ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT("content") ON TABLE "public"."page_section" TO "anon";
+GRANT SELECT("content") ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT("status") ON TABLE "public"."page_section" TO "anon";
+GRANT SELECT("status") ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT("created_at") ON TABLE "public"."page_section" TO "anon";
+GRANT SELECT("created_at") ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT("updated_at") ON TABLE "public"."page_section" TO "anon";
+GRANT SELECT("updated_at") ON TABLE "public"."page_section" TO "authenticated";
+GRANT SELECT("id") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("id") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("name") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("name") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("category") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("category") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("description") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("description") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("unit_label") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("unit_label") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("default_price") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("default_price") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("stock_status") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("stock_status") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("image_path") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("image_path") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("is_active") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("is_active") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("created_at") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("created_at") ON TABLE "public"."product" TO "authenticated";
+GRANT SELECT("updated_at") ON TABLE "public"."product" TO "anon";
+GRANT SELECT("updated_at") ON TABLE "public"."product" TO "authenticated";
 
 
 
@@ -2375,5 +2458,3 @@ VALUES ('product-images', 'product-images', true)
 ON CONFLICT ("id") DO UPDATE SET
   "name" = EXCLUDED."name",
   "public" = EXCLUDED."public";
-
-

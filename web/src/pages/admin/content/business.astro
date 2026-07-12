@@ -31,7 +31,7 @@ const feedback = getResellerApplicationFeedback(Astro.url);
     <PageShell title="Business">
       <PublicBusinessPageContent
         feedback={feedback}
-        turnstileSiteKey={turnstileSiteKey}
+        turnstileSiteKey={turnstileSiteKey ?? null}
         returnPath={businessPath}
       />
     </PageShell>

@@ -43,7 +43,7 @@ const { turnstileSiteKey } = getPublicEnv();
         orderStatus={orderStatus}
         orderReference={orderReference}
         orderMessage={orderMessage}
-        turnstileSiteKey={turnstileSiteKey}
+        turnstileSiteKey={turnstileSiteKey ?? null}
         shopPath={shopPath}
         returnPath={shopPath}
       />

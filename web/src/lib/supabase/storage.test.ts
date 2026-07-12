@@ -1,11 +1,19 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { PRODUCT_IMAGE_BUCKET, isManagedStoragePath, resolvePublicStorageUrl } from "./storage";
-
-vi.stubEnv("PUBLIC_SUPABASE_URL", "https://project.supabase.co");
-vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "publishable-key");
+import {
+  PRODUCT_IMAGE_BUCKET,
+  isManagedStoragePath,
+  resolvePublicStorageUrl,
+} from "./storage";
 
 describe("resolvePublicStorageUrl", () => {
+  beforeEach(() => {
+    vi.stubEnv("PUBLIC_SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "publishable-key");
+    vi.stubEnv("LOCAL_SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("LOCAL_SUPABASE_PUBLISHABLE_KEY", "publishable-key");
+  });
+
   it("builds a public storage url for managed object paths", () => {
     expect(resolvePublicStorageUrl("products/pork belly.png")).toBe(
       `https://project.supabase.co/storage/v1/object/public/${PRODUCT_IMAGE_BUCKET}/products/pork%20belly.png`,
