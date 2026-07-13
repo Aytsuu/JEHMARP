@@ -26,13 +26,14 @@ jobs:
         run: |
           set -euo pipefail
           : "${PRODUCTION_BASE_URL:?PRODUCTION_BASE_URL secret is required}"
+          echo "PRODUCTION_BASE_URL=${PRODUCTION_BASE_URL%/}" >> "$GITHUB_ENV"
 
       - name: Check public pages
         shell: bash
         run: |
           set -euo pipefail
           for path in "/" "/shop" "/contact" "/login"; do
-            status="$(curl -sS -o /dev/null -w "%{http_code}" "${PRODUCTION_BASE_URL}${path}")"
+            status="$(curl -sS -o /dev/null -w "%{http_code}" -L --max-redirs 5 "${PRODUCTION_BASE_URL}${path}")"
             echo "${path}: ${status}"
             if [ "${status}" != "200" ]; then
               exit 1
