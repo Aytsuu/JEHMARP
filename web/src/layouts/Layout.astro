@@ -31,5 +31,21 @@ const {
 			<slot />
 		</main>
 		<SiteFooter />
+		<script>
+			import { initFormSubmissionState } from "@/lib/client/form-submission-state";
+
+			document.addEventListener("DOMContentLoaded", () => {
+				initFormSubmissionState();
+			});
+			document.addEventListener("astro:after-swap", () => {
+				initFormSubmissionState();
+			});
+			if (
+				document.readyState === "complete" ||
+				document.readyState === "interactive"
+			) {
+				initFormSubmissionState();
+			}
+		</script>
 	</body>
 </html>
