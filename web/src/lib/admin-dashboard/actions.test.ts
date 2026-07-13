@@ -1,15 +1,138 @@
 import { describe, expect, it, vi } from "vitest";
 
+const mocks = vi.hoisted(() => ({
+  createSupabaseServerClient: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createSupabaseServerClient: mocks.createSupabaseServerClient,
+}));
+
 import {
   executeAdminAction,
   formatAdminActionFeedback,
   getAllowedNextOrderStatuses,
+  handleAdminDashboardAction,
   markViewedResellerApplicationsRead,
   parseAdminActionFormData,
   parseViewedResellerApplicationIds,
 } from "./actions";
 
 const adminUserId = "8bcce9f3-2a1b-43c0-9e51-70667e017111";
+
+function createActionContext(formData: FormData, headers?: HeadersInit) {
+  const request = {
+    headers: new Headers(headers),
+    formData: vi.fn(async () => formData),
+  } as unknown as Request;
+
+  return {
+    request,
+    cookies: {},
+    redirect: vi.fn((url: string, status: number) => new Response(null, {
+      status,
+      headers: {
+        Location: url,
+      },
+    })),
+  };
+}
+
+function createUpdateClient(error: unknown = null) {
+  const eq = vi.fn(async () => ({ error }));
+  const update = vi.fn(() => ({ eq }));
+  const from = vi.fn(() => ({ update }));
+
+  return {
+    client: { from },
+    from,
+    update,
+    eq,
+  };
+}
+
+function asAdminDashboardContext(context: ReturnType<typeof createActionContext>) {
+  return context as unknown as Parameters<typeof handleAdminDashboardAction>[0];
+}
+
+describe("handleAdminDashboardAction", () => {
+  it("returns JSON for fetch-based admin actions that accept JSON", async () => {
+    const formData = new FormData();
+    formData.set("action", "update-order-status");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("orderStatus", "processing");
+    const db = createUpdateClient();
+    mocks.createSupabaseServerClient.mockReturnValue(db.client);
+    const context = createActionContext(formData, {
+      Accept: "application/json",
+    });
+
+    const response = await handleAdminDashboardAction(
+      asAdminDashboardContext(context),
+      adminUserId,
+      "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      success: true,
+      status: "Order status updated.",
+      redirectPath: "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      action: "update-order-status",
+    });
+    expect(context.redirect).not.toHaveBeenCalled();
+    expect(db.from).toHaveBeenCalledWith("customer_order");
+  });
+
+  it("returns JSON validation errors for fetch-based admin actions", async () => {
+    const formData = new FormData();
+    formData.set("action", "update-order-status");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("orderStatus", "draft");
+    const context = createActionContext(formData, {
+      Accept: "application/json",
+    });
+
+    const response = await handleAdminDashboardAction(
+      asAdminDashboardContext(context),
+      adminUserId,
+      "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body).toEqual({
+      success: false,
+      error: "Order status is not supported.",
+    });
+    expect(context.redirect).not.toHaveBeenCalled();
+  });
+
+  it("keeps redirect responses for regular admin form posts", async () => {
+    const formData = new FormData();
+    formData.set("action", "update-order-status");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("orderStatus", "processing");
+    const db = createUpdateClient();
+    mocks.createSupabaseServerClient.mockReturnValue(db.client);
+    const context = createActionContext(formData, {
+      Accept: "text/html",
+    });
+
+    const response = await handleAdminDashboardAction(
+      asAdminDashboardContext(context),
+      adminUserId,
+      "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    );
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("Location")).toBe(
+      "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?status=Order%20status%20updated.",
+    );
+    expect(context.redirect).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("parseAdminActionFormData", () => {
   it("parses admin-created orders with normalized order items", () => {

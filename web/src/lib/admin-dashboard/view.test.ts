@@ -7,6 +7,7 @@ import {
   orderBalance,
   orderPaymentTotal,
   orderTotal,
+  productDisplayLabel,
 } from "./view";
 
 describe("orderTotal", () => {
@@ -71,5 +72,11 @@ describe("formatDateTime", () => {
   it("formats ISO timestamps for the Philippines timezone", () => {
     expect(formatDateTime("2026-07-11T18:54:27.430254+00:00")).toBe("Jul 12, 2026, 2:54 AM");
     expect(formatDateTime(null)).toBe("Not set");
+  });
+});
+
+describe("productDisplayLabel", () => {
+  it("combines product name and unit for product table display", () => {
+    expect(productDisplayLabel({ name: "Chicken Breast", unit_label: "kg" })).toBe("Chicken Breast (kg)");
   });
 });

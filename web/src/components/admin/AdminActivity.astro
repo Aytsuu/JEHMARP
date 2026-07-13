@@ -111,6 +111,11 @@ const emptyMessage = activeFilters.search
 </section>
 
 <script>
+  import {
+    readDashboardFragmentCache,
+    writeDashboardFragmentCache,
+  } from "@/lib/client/dashboard-fragment-cache";
+
   function initAdminActivityFilters() {
     const form = document.querySelector<HTMLFormElement>("[data-activity-filter-form]");
     const tableShell = document.querySelector<HTMLElement>("[data-activity-table-shell]");
@@ -129,21 +134,6 @@ const emptyMessage = activeFilters.search
     let submitTimer: number | undefined;
     let searchTimer: number | undefined;
     let activeFetchController: AbortController | undefined;
-
-    function readCache(): string[] {
-      try {
-        const parsed = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
-        return Array.isArray(parsed)
-          ? parsed.filter((value): value is string => typeof value === "string")
-          : [];
-      } catch {
-        return [];
-      }
-    }
-
-    function writeCache(values: string[]) {
-      sessionStorage.setItem(cacheKey, JSON.stringify([...new Set(values)]));
-    }
 
     function normalizeParams(params: URLSearchParams) {
       const normalized = new URLSearchParams();
@@ -174,8 +164,8 @@ const emptyMessage = activeFilters.search
 
     function showSkeletonForQuery(targetQuery: string) {
       const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
-      const cachedQueries = readCache();
-      if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) return;
+      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
+      if (targetQuery === currentQuery || cachedFragment) return;
 
       const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
       if (skeleton) activeTableShell.replaceChildren(skeleton);
@@ -193,6 +183,18 @@ const emptyMessage = activeFilters.search
     async function applyFilters(targetQuery: string) {
       const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
       if (targetQuery === currentQuery) return;
+
+      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
+      if (cachedFragment) {
+        window.history.replaceState(
+          { activityFilterQuery: targetQuery },
+          "",
+          buildUrl("/admin/activity", targetQuery),
+        );
+        replaceFragment(cachedFragment);
+        activeForm.dataset.currentFilterQuery = targetQuery;
+        return;
+      }
 
       showSkeletonForQuery(targetQuery);
       activeFetchController?.abort();
@@ -213,7 +215,7 @@ const emptyMessage = activeFilters.search
         );
         replaceFragment(fragmentHtml);
         activeForm.dataset.currentFilterQuery = targetQuery;
-        writeCache([...readCache(), targetQuery]);
+        writeDashboardFragmentCache(cacheKey, targetQuery, fragmentHtml);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         window.location.href = buildUrl("/admin/activity", targetQuery);
@@ -229,7 +231,11 @@ const emptyMessage = activeFilters.search
       }, 120);
     }
 
-    writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
+    writeDashboardFragmentCache(
+      cacheKey,
+      normalizeParams(new URLSearchParams(window.location.search)),
+      activeTableShell.outerHTML,
+    );
     activeForm.addEventListener("submit", (event) => {
       event.preventDefault();
       void applyFilters(normalizeFormQuery());

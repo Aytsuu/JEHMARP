@@ -274,8 +274,19 @@ export async function handleAdminDashboardAction(
 ) {
   const formData = await context.request.formData();
   const parsed = parseAdminActionFormData(formData, adminUserId);
+  const wantsJsonResponse = acceptsJsonResponse(context.request);
 
   if (!parsed.success) {
+    if (wantsJsonResponse) {
+      return Response.json(
+        {
+          success: false,
+          error: parsed.errors.join(" "),
+        },
+        { status: 400 },
+      );
+    }
+
     return context.redirect(`${returnPath}?error=${encodeURIComponent(parsed.errors.join(" "))}`, 303);
   }
 
@@ -283,14 +294,36 @@ export async function handleAdminDashboardAction(
     await executeAdminAction(createSupabaseServerClient(context), parsed.action, adminUserId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Admin action failed.";
+    if (wantsJsonResponse) {
+      return Response.json(
+        {
+          success: false,
+          error: message,
+        },
+        { status: 500 },
+      );
+    }
+
     return context.redirect(`${returnPath}?error=${encodeURIComponent(message)}`, 303);
+  }
+
+  const redirectPath = getActionRedirectPath(parsed.action, returnPath);
+  const message = getActionSuccessMessage(parsed.action);
+
+  if (wantsJsonResponse) {
+    return Response.json({
+      success: true,
+      status: message,
+      redirectPath,
+      action: parsed.action.type,
+    });
   }
 
   return context.redirect(
     withActionFeedback(
-      getActionRedirectPath(parsed.action, returnPath),
+      redirectPath,
       "status",
-      getActionSuccessMessage(parsed.action),
+      message,
     ),
     303,
   );
@@ -1686,6 +1719,10 @@ function getAdminActionFeedbackCleanPath(url: URL) {
 
 function normalizeQueryMessage(value: string | null) {
   return value && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function acceptsJsonResponse(request: Request) {
+  return request.headers.get("Accept")?.includes("application/json") ?? false;
 }
 
 function toSentenceLabel(value: string) {

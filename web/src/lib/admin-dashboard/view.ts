@@ -11,6 +11,10 @@ export function formatCurrency(value: number) {
   }).format(value);
 }
 
+export function productDisplayLabel(product: { name: string; unit_label: string }) {
+  return `${product.name} (${product.unit_label})`;
+}
+
 export function formatDate(value: string | null) {
   return value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(new Date(value)) : "Not set";
 }

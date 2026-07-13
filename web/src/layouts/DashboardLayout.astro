@@ -5,6 +5,7 @@ import {
   getPageStatusLabel,
 } from "@/lib/page-availability";
 import Sheet from "@/components/ui/Sheet.astro";
+import { ClientRouter } from "astro:transitions";
 import "@/styles/global.css";
 
 type Props = {
@@ -186,9 +187,22 @@ const categories: CategoryGroup[] = isAdmin
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..1000&display=block"
+    />
+    <ClientRouter fallback="swap" />
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
+    <style is:global>
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation-duration: 1ms;
+      }
+    </style>
   </head>
   <body class="dashboard-body">
     <div class="dashboard-frame">
@@ -238,6 +252,7 @@ const categories: CategoryGroup[] = isAdmin
                               class="dashboard-sidebar__logout-form"
                               method="post"
                               action={item.href}
+                              data-astro-reload
                               style="margin: 0; padding: 0;"
                             >
                               <button type="submit">
@@ -252,7 +267,14 @@ const categories: CategoryGroup[] = isAdmin
                               </button>
                             </form>
                           ) : (
-                            <a href={item.href} class={isCurrent ? "active" : ""}>
+                            <a
+                              href={item.href}
+                              class={isCurrent ? "active" : ""}
+                              data-dashboard-nav-link
+                              data-astro-prefetch={
+                                item.label === "Dashboard" ? "load" : "hover"
+                              }
+                            >
                               <span class="dashboard-sidebar__nav-link-content">
                                 <span
                                   class="nav-icon-wrapper"
@@ -367,6 +389,9 @@ const categories: CategoryGroup[] = isAdmin
     </script>
 
     <script>
+      import { initOrderDetailTabs } from "@/lib/client/order-detail-tabs";
+      import { initOrderStatusAutoSave } from "@/lib/client/order-status-auto-save";
+
       function initSidebarUnreadBadges() {
         const badges = document.querySelectorAll<HTMLElement>(
           "[data-sidebar-unread-badge]",
@@ -901,10 +926,83 @@ const categories: CategoryGroup[] = isAdmin
         });
       }
 
+      function clearDashboardFragmentCaches() {
+        try {
+          Object.keys(sessionStorage)
+            .filter((key) => key.startsWith("dashboard-fragment-cache:"))
+            .forEach((key) => {
+              sessionStorage.removeItem(key);
+            });
+        } catch {
+          // sessionStorage can be unavailable in strict browser privacy modes.
+        }
+      }
+
+      function initSidebarNavigationPendingState() {
+        const dashboardWindow = window as Window & {
+          dashboardNavigationPendingInitialized?: boolean;
+        };
+        if (dashboardWindow.dashboardNavigationPendingInitialized) return;
+        dashboardWindow.dashboardNavigationPendingInitialized = true;
+
+        function clearPendingState() {
+          document.body.classList.remove("dashboard-route-pending");
+          document
+            .querySelectorAll<HTMLElement>("[data-dashboard-nav-pending]")
+            .forEach((link) => {
+              delete link.dataset.dashboardNavPending;
+              link.removeAttribute("aria-busy");
+            });
+        }
+
+        function isPrimaryNavigationClick(event: MouseEvent) {
+          return (
+            event.button === 0 &&
+            !event.metaKey &&
+            !event.ctrlKey &&
+            !event.shiftKey &&
+            !event.altKey
+          );
+        }
+
+        document.addEventListener("click", (event) => {
+          if (!isPrimaryNavigationClick(event)) return;
+
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+
+          const link = target.closest<HTMLAnchorElement>(
+            "[data-dashboard-nav-link]",
+          );
+          if (!link) return;
+          if (link.target && link.target !== "_self") return;
+
+          const nextUrl = new URL(link.href, window.location.href);
+          if (nextUrl.origin !== window.location.origin) return;
+          if (
+            nextUrl.pathname === window.location.pathname &&
+            nextUrl.search === window.location.search
+          ) {
+            return;
+          }
+
+          clearPendingState();
+          document.body.classList.add("dashboard-route-pending");
+          link.dataset.dashboardNavPending = "true";
+          link.setAttribute("aria-busy", "true");
+        });
+
+        document.addEventListener("astro:after-swap", clearPendingState);
+        document.addEventListener("astro:page-load", clearPendingState);
+        window.addEventListener("pageshow", clearPendingState);
+      }
+
       function initFormSubmissionState() {
-        const body = document.body;
-        if (body.dataset.formSubmissionStateInitialized === "true") return;
-        body.dataset.formSubmissionStateInitialized = "true";
+        const dashboardWindow = window as Window & {
+          dashboardFormSubmissionStateInitialized?: boolean;
+        };
+        if (dashboardWindow.dashboardFormSubmissionStateInitialized) return;
+        dashboardWindow.dashboardFormSubmissionStateInitialized = true;
 
         document.addEventListener("submit", (event) => {
           const form = event.target;
@@ -918,6 +1016,7 @@ const categories: CategoryGroup[] = isAdmin
           }
 
           form.dataset.isSubmitting = "true";
+          clearDashboardFragmentCaches();
 
           const submitButtons = Array.from(
             form.querySelectorAll<HTMLButtonElement>('button[type="submit"]'),
@@ -926,7 +1025,10 @@ const categories: CategoryGroup[] = isAdmin
             ? event.submitter
             : null;
 
-          submitButtons.forEach((button) => {
+          const buttonsToDisable = new Set(submitButtons);
+          if (submitter) buttonsToDisable.add(submitter);
+
+          buttonsToDisable.forEach((button) => {
             button.disabled = true;
           });
 
@@ -937,7 +1039,21 @@ const categories: CategoryGroup[] = isAdmin
         }, true);
       }
 
+      function initDashboardPostFormReloadOptOut() {
+        document.querySelectorAll<HTMLFormElement>("form").forEach((form) => {
+          if ((form.getAttribute("method") || "get").toLowerCase() !== "post") {
+            return;
+          }
+
+          if (form.dataset.astroClientSubmit === "true") return;
+
+          form.setAttribute("data-astro-reload", "");
+        });
+      }
+
       function initDashboardFeatures() {
+        initDashboardPostFormReloadOptOut();
+        initSidebarNavigationPendingState();
         initSidebarUnreadBadges();
         initDrawerSheets();
         initCellPopovers();
@@ -945,6 +1061,8 @@ const categories: CategoryGroup[] = isAdmin
         initInteractiveTables();
         initDigitsOnlyInputs();
         initFormSubmissionState();
+        initOrderDetailTabs();
+        initOrderStatusAutoSave();
       }
 
       document.addEventListener("DOMContentLoaded", initDashboardFeatures);

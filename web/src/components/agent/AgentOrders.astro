@@ -1,4 +1,5 @@
 ---
+import Sheet from "@/components/ui/Sheet.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
@@ -22,11 +23,33 @@ const hasAssignedCustomers = data.customers.length > 0;
 ---
 
 <section class="admin-panel" aria-labelledby="agent-orders-title">
-  <div class="hidden-create-form-holder" style="display: none;">
-    <form method="post" class="admin-form" aria-labelledby="agent-order-form-title" data-agent-order-form data-can-submit-order={String(canSubmitOrder)}>
+  <Sheet id="agent-create-order-sheet" width="42rem">
+    <div slot="header" class="order-create-sheet__header-copy">
+      <h3 class="drawer-sheet__title" data-sheet-title>Submit Order</h3>
+      <p class="order-create-sheet__header-description">
+        Select an assigned customer or enter customer details, then add products for admin review.
+      </p>
+    </div>
+    <form
+      id="agent-create-order-form"
+      method="post"
+      class="order-create-form"
+      aria-labelledby="agent-order-form-title"
+      data-agent-order-form
+      data-can-submit-order={String(canSubmitOrder)}
+    >
       <input type="hidden" name="action" value="create-agent-order" />
-      <h3 id="agent-order-form-title">New agent order</h3>
+      <h3 id="agent-order-form-title" class="sr-only">New agent order</h3>
 
+      {!canSubmitOrder && (
+        <p class="empty-state">
+          No active products are available for order submission.
+        </p>
+      )}
+
+      <section class="order-create-section">
+        <h3 class="order-create-section__title">Customer</h3>
+        <div class="order-create-section__body">
         <div class="admin-form-grid">
           <label class="field-row" data-existing-customer-field>
             <span>Customer</span>
@@ -47,9 +70,16 @@ const hasAssignedCustomers = data.customers.length > 0;
             </select>
           </label>
         </div>
+        </div>
+      </section>
 
-        <fieldset class="fieldset-block" data-customer-details-fields disabled={!canSubmitOrder}>
-          <legend>Customer details</legend>
+        <fieldset
+          class="order-create-section fieldset-block"
+          data-customer-details-fields
+          disabled={!canSubmitOrder}
+        >
+          <legend class="order-create-section__title">Customer details</legend>
+          <div class="order-create-section__body">
           <div class="admin-form-grid">
             <label class="field-row"><span>First name</span><input name="firstName" required data-customer-first-name /></label>
             <label class="field-row"><span>Last name</span><input name="lastName" required data-customer-last-name /></label>
@@ -57,9 +87,15 @@ const hasAssignedCustomers = data.customers.length > 0;
             <label class="field-row"><span>Email</span><input name="email" type="email" data-customer-email /></label>
           </div>
           <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
+          </div>
         </fieldset>
 
-        <div class="table-wrap">
+        <section class="order-create-section">
+          <div class="order-create-section__header">
+            <h3 class="order-create-section__title">Order items</h3>
+          </div>
+          <div class="order-create-section__body">
+        <div class="table-wrap order-create-form__items-table">
           <table>
             <caption>Order items</caption>
             <thead>
@@ -138,10 +174,27 @@ const hasAssignedCustomers = data.customers.length > 0;
           </tr>
         </template>
 
-        <button type="button" data-add-agent-order-item disabled={!canSubmitOrder}>Add item</button>
-        <button type="submit" disabled={!canSubmitOrder}>Submit for review</button>
-      </form>
+        <button
+          type="button"
+          class="order-create-form__add-item"
+          data-add-agent-order-item
+          disabled={!canSubmitOrder}
+        >
+          <span>Add item</span>
+        </button>
+          </div>
+        </section>
+    </form>
+    <div slot="footer" class="order-create-sheet__footer">
+      <button
+        type="submit"
+        form="agent-create-order-form"
+        disabled={!canSubmitOrder}
+      >
+        Submit for review
+      </button>
     </div>
+  </Sheet>
 </section>
 
 <section class="admin-panel" aria-labelledby="agent-order-list-title">
@@ -150,8 +203,8 @@ const hasAssignedCustomers = data.customers.length > 0;
     <p class="empty-state">No accessible orders yet.</p>
   ) : (
     <div data-interactive-table class="dashboard-interactive-table">
-      <div class="table-filters">
-        <div class="table-filters__search">
+      <div class="table-filters order-management-toolbar">
+        <div class="table-filters__search order-filter-form__field order-filter-form__field--search">
           <input
             type="text"
             placeholder="Search orders..."
@@ -164,6 +217,7 @@ const hasAssignedCustomers = data.customers.length > 0;
             type="button"
             class="btn-table-manage order-management-toolbar__create"
             data-open-create-sheet
+            data-sheet-target="#agent-create-order-sheet"
             disabled={!canSubmitOrder}
           >
             Submit Order
@@ -217,76 +271,88 @@ const hasAssignedCustomers = data.customers.length > 0;
 </section>
 
 <script>
-  const orderItems = document.querySelector("[data-agent-order-items]");
-  const orderItemTemplate = document.querySelector<HTMLTemplateElement>("[data-agent-order-item-template]");
-  const addOrderItemButton = document.querySelector<HTMLButtonElement>("[data-add-agent-order-item]");
-  const orderForm = document.querySelector<HTMLElement>("[data-agent-order-form]");
-  const existingCustomerField = document.querySelector<HTMLElement>("[data-existing-customer-field]");
-  const existingCustomerSelect = existingCustomerField?.querySelector<HTMLSelectElement>("select[name='customerId']");
-  const customerDetailsFields = document.querySelector<HTMLFieldSetElement>("[data-customer-details-fields]");
-  const firstNameInput = document.querySelector<HTMLInputElement>("input[data-customer-first-name]");
-  const lastNameInput = document.querySelector<HTMLInputElement>("input[data-customer-last-name]");
-  const phoneNumberInput = document.querySelector<HTMLInputElement>("input[data-customer-phone-number]");
-  const emailInput = document.querySelector<HTMLInputElement>("input[data-customer-email]");
-  const addressTextarea = document.querySelector<HTMLTextAreaElement>("textarea[data-customer-address]");
-  const canSubmitOrder = orderForm?.dataset.canSubmitOrder === "true";
+  function initAgentOrderForm() {
+    const orderForm = document.querySelector<HTMLElement>("[data-agent-order-form]");
+    if (!orderForm || orderForm.dataset.agentOrderFormInitialized === "true") return;
+    orderForm.dataset.agentOrderFormInitialized = "true";
 
-  function refreshOrderItemRowNumbers() {
-    if (!orderItems) return;
+    const orderItems = document.querySelector("[data-agent-order-items]");
+    const orderItemTemplate = document.querySelector<HTMLTemplateElement>("[data-agent-order-item-template]");
+    const addOrderItemButton = document.querySelector<HTMLButtonElement>("[data-add-agent-order-item]");
+    const existingCustomerField = document.querySelector<HTMLElement>("[data-existing-customer-field]");
+    const existingCustomerSelect = existingCustomerField?.querySelector<HTMLSelectElement>("select[name='customerId']");
+    const customerDetailsFields = document.querySelector<HTMLFieldSetElement>("[data-customer-details-fields]");
+    const firstNameInput = document.querySelector<HTMLInputElement>("input[data-customer-first-name]");
+    const lastNameInput = document.querySelector<HTMLInputElement>("input[data-customer-last-name]");
+    const phoneNumberInput = document.querySelector<HTMLInputElement>("input[data-customer-phone-number]");
+    const emailInput = document.querySelector<HTMLInputElement>("input[data-customer-email]");
+    const addressTextarea = document.querySelector<HTMLTextAreaElement>("textarea[data-customer-address]");
+    const canSubmitOrder = orderForm.dataset.canSubmitOrder === "true";
 
-    orderItems.querySelectorAll("[data-agent-order-item-row]").forEach((row, index) => {
-      row.querySelectorAll("[data-row-number]").forEach((label) => {
-        label.textContent = String(index + 1);
+    function refreshOrderItemRowNumbers() {
+      if (!orderItems) return;
+
+      orderItems.querySelectorAll("[data-agent-order-item-row]").forEach((row, index) => {
+        row.querySelectorAll("[data-row-number]").forEach((label) => {
+          label.textContent = String(index + 1);
+        });
       });
+    }
+
+    addOrderItemButton?.addEventListener("click", () => {
+      const templateRow = orderItemTemplate?.content.firstElementChild;
+
+      if (!orderItems || !templateRow) return;
+
+      orderItems.append(templateRow.cloneNode(true));
+      refreshOrderItemRowNumbers();
     });
-  }
 
-  addOrderItemButton?.addEventListener("click", () => {
-    const templateRow = orderItemTemplate?.content.firstElementChild;
+    orderItems?.addEventListener("click", (event) => {
+      const target = event.target;
 
-    if (!orderItems || !templateRow) return;
+      if (!(target instanceof HTMLElement) || !target.matches("[data-remove-agent-order-item]")) return;
 
-    orderItems.append(templateRow.cloneNode(true));
-    refreshOrderItemRowNumbers();
-  });
+      target.closest("[data-agent-order-item-row]")?.remove();
+      refreshOrderItemRowNumbers();
+    });
 
-  orderItems?.addEventListener("click", (event) => {
-    const target = event.target;
+    function getSelectedCustomerOption() {
+      if (!existingCustomerSelect?.value) return undefined;
 
-    if (!(target instanceof HTMLElement) || !target.matches("[data-remove-agent-order-item]")) return;
-
-    target.closest("[data-agent-order-item-row]")?.remove();
-    refreshOrderItemRowNumbers();
-  });
-
-  function getSelectedCustomerOption() {
-    if (!existingCustomerSelect?.value) return undefined;
-
-    return existingCustomerSelect.selectedOptions[0];
-  }
-
-  function fillCustomerFields(customer: HTMLOptionElement | undefined) {
-    if (firstNameInput) firstNameInput.value = customer?.dataset.customerFirstName ?? "";
-    if (lastNameInput) lastNameInput.value = customer?.dataset.customerLastName ?? "";
-    if (phoneNumberInput) phoneNumberInput.value = customer?.dataset.customerPhoneNumber ?? "";
-    if (emailInput) emailInput.value = customer?.dataset.customerEmail ?? "";
-    if (addressTextarea) addressTextarea.value = customer?.dataset.customerAddress ?? "";
-  }
-
-  function refreshCustomerFields() {
-    const selectedCustomer = getSelectedCustomerOption();
-
-    if (selectedCustomer) {
-      fillCustomerFields(selectedCustomer);
-    } else if (document.activeElement === existingCustomerSelect) {
-      fillCustomerFields(undefined);
+      return existingCustomerSelect.selectedOptions[0];
     }
 
-    if (customerDetailsFields) {
-      customerDetailsFields.disabled = Boolean(selectedCustomer) || !canSubmitOrder;
+    function fillCustomerFields(customer: HTMLOptionElement | undefined) {
+      if (firstNameInput) firstNameInput.value = customer?.dataset.customerFirstName ?? "";
+      if (lastNameInput) lastNameInput.value = customer?.dataset.customerLastName ?? "";
+      if (phoneNumberInput) phoneNumberInput.value = customer?.dataset.customerPhoneNumber ?? "";
+      if (emailInput) emailInput.value = customer?.dataset.customerEmail ?? "";
+      if (addressTextarea) addressTextarea.value = customer?.dataset.customerAddress ?? "";
     }
+
+    function refreshCustomerFields() {
+      const selectedCustomer = getSelectedCustomerOption();
+
+      if (selectedCustomer) {
+        fillCustomerFields(selectedCustomer);
+      } else if (document.activeElement === existingCustomerSelect) {
+        fillCustomerFields(undefined);
+      }
+
+      if (customerDetailsFields) {
+        customerDetailsFields.disabled = Boolean(selectedCustomer) || !canSubmitOrder;
+      }
+    }
+
+    existingCustomerSelect?.addEventListener("change", refreshCustomerFields);
+    refreshCustomerFields();
+    refreshOrderItemRowNumbers();
   }
 
-  existingCustomerSelect?.addEventListener("change", refreshCustomerFields);
-  refreshCustomerFields();
+  document.addEventListener("DOMContentLoaded", initAgentOrderForm);
+  document.addEventListener("astro:after-swap", initAgentOrderForm);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initAgentOrderForm();
+  }
 </script>

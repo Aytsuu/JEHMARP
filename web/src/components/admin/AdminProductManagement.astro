@@ -9,6 +9,7 @@ import type { AdminProductFilters } from "@/lib/admin-dashboard/product-filters"
 import {
   escapeTextareaValue,
   formatCurrency,
+  productDisplayLabel,
 } from "@/lib/admin-dashboard/view";
 import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
@@ -236,8 +237,9 @@ function formatStockStatus(status: string): string {
         <table class="product-table-skeleton dashboard-table dashboard-table--products">
           <thead>
             <tr>
-              <th scope="col" class="dashboard-table__head--image"></th>
-              <th scope="col">Name</th>
+              <th scope="col" class="dashboard-table__cell--product">
+                Product
+              </th>
               <th scope="col">Description</th>
               <th scope="col">Pricing</th>
               <th scope="col">Status</th>
@@ -249,19 +251,19 @@ function formatStockStatus(status: string): string {
             {
               data.products.length === 0 ? (
                 <DashboardTableEmptyState
-                  colspan={7}
+                  colspan={6}
                   message="No products match the selected filters."
                 />
               ) : (
                 data.products.map((product) => (
                   <tr data-status={product.is_active ? "active" : "inactive"}>
-                    {/* 1. Image Cell (Editable Popover) */}
-                    <td class="dashboard-table__cell--image">
+                    {/* 1. Product Cell (Editable Product Popover) */}
+                    <td class="dashboard-table__cell--product">
                       <button
                         type="button"
-                        class="table-cell-trigger dashboard-table__image-button"
+                        class="table-cell-trigger dashboard-table__product-summary dashboard-table__product-button"
                         data-open-cell-popover
-                        data-popover-title={`Edit Image: ${product.name}`}
+                        data-popover-title={`Edit Product: ${product.name}`}
                       >
                         {product.image_path ? (
                           <img
@@ -269,12 +271,15 @@ function formatStockStatus(status: string): string {
                               resolvePublicStorageUrl(product.image_path) ??
                               product.image_path
                             }
-                            alt={product.name}
+                            alt=""
                             class="dashboard-table__image-thumb"
                           />
                         ) : (
                           <div class="dashboard-table__image-placeholder" />
                         )}
+                        <span title={productDisplayLabel(product)}>
+                          {productDisplayLabel(product)}
+                        </span>
                       </button>
                       <div
                         class="hidden-popover-form-holder"
@@ -294,22 +299,6 @@ function formatStockStatus(status: string): string {
                             type="hidden"
                             name="productId"
                             value={product.id}
-                          />
-
-                          <input
-                            type="hidden"
-                            name="name"
-                            value={product.name}
-                          />
-                          <input
-                            type="hidden"
-                            name="category"
-                            value={product.category}
-                          />
-                          <input
-                            type="hidden"
-                            name="unitLabel"
-                            value={product.unit_label}
                           />
                           <input
                             type="hidden"
@@ -342,73 +331,9 @@ function formatStockStatus(status: string): string {
                                 name="imageFile"
                                 type="file"
                                 accept="image/*"
-                                required
                               />
                             </>
                           </label>
-                          <div class="button-row">
-                            <button type="submit">Save image</button>
-                          </div>
-                        </form>
-                      </div>
-                    </td>
-
-                    {/* 2. Name Cell (Editable Popover) */}
-                    <td class="dashboard-table__cell--truncate">
-                      <button
-                        type="button"
-                        class="table-cell-trigger"
-                        data-open-cell-popover
-                        data-popover-title={`Edit Name & Category: ${product.name}`}
-                      >
-                        <span>
-                          {product.name} ({product.unit_label})
-                        </span>
-                      </button>
-                      <div
-                        class="hidden-popover-form-holder"
-                        style="display: none;"
-                      >
-                        <form
-                          method="post"
-                          enctype="multipart/form-data"
-                          class="admin-table-form"
-                        >
-                          <input
-                            type="hidden"
-                            name="action"
-                            value="save-product"
-                          />
-                          <input
-                            type="hidden"
-                            name="productId"
-                            value={product.id}
-                          />
-
-                          <input
-                            type="hidden"
-                            name="description"
-                            value={product.description ?? ""}
-                          />
-                          <input
-                            type="hidden"
-                            name="defaultPrice"
-                            value={product.default_price}
-                          />
-                          <input
-                            type="hidden"
-                            name="resellerPrice"
-                            value={product.reseller_price}
-                          />
-                          <input
-                            type="hidden"
-                            name="stockStatus"
-                            value={product.stock_status}
-                          />
-                          {product.is_active && (
-                            <input type="hidden" name="isActive" value="on" />
-                          )}
-
                           <label>
                             <>
                               <span>Name</span>
@@ -446,13 +371,13 @@ function formatStockStatus(status: string): string {
                             </select>
                           </label>
                           <div class="button-row">
-                            <button type="submit">Save product name</button>
+                            <button type="submit">Save product</button>
                           </div>
                         </form>
                       </div>
                     </td>
 
-                    {/* 3. Description Cell (Editable Popover) */}
+                    {/* 2. Description Cell (Editable Popover) */}
                     <td class="dashboard-table__cell--truncate">
                       <button
                         type="button"
@@ -542,7 +467,7 @@ function formatStockStatus(status: string): string {
                       </div>
                     </td>
 
-                    {/* 4. Pricing Cell (Editable Popover) */}
+                    {/* 3. Pricing Cell (Editable Popover) */}
                     <td>
                       <button
                         type="button"
@@ -634,7 +559,7 @@ function formatStockStatus(status: string): string {
                       </div>
                     </td>
 
-                    {/* 5. Status Cell (Editable Popover) */}
+                    {/* 4. Status Cell (Editable Popover) */}
                     <td>
                       <button
                         type="button"
@@ -719,7 +644,7 @@ function formatStockStatus(status: string): string {
                       </div>
                     </td>
 
-                    {/* 6. Date Created Cell (Static) */}
+                    {/* 5. Date Created Cell (Static) */}
                     <td>
                       {new Date(product.created_at).toLocaleDateString(
                         "en-US",
@@ -731,7 +656,7 @@ function formatStockStatus(status: string): string {
                       )}
                     </td>
 
-                    {/* 7. Action Cell (Static Form) */}
+                    {/* 6. Action Cell (Static Form) */}
                     <td>
                       {product.is_active ? (
                         <form method="post" style="margin: 0;">
@@ -779,8 +704,9 @@ function formatStockStatus(status: string): string {
         <caption class="sr-only">Loading filtered products</caption>
         <thead>
           <tr>
-            <th scope="col" class="dashboard-table__head--image"></th>
-            <th scope="col">Name</th>
+            <th scope="col" class="dashboard-table__cell--product">
+              Product
+            </th>
             <th scope="col">Description</th>
             <th scope="col">Pricing</th>
             <th scope="col">Status</th>
@@ -792,11 +718,11 @@ function formatStockStatus(status: string): string {
           {
             skeletonRows.map(() => (
               <tr>
-                <td>
-                  <span class="table-skeleton-block table-skeleton-block--image" />
-                </td>
-                <td>
-                  <span class="table-skeleton-block" />
+                <td class="dashboard-table__cell--product">
+                  <div class="dashboard-table__product-skeleton">
+                    <span class="table-skeleton-block table-skeleton-block--image" />
+                    <span class="table-skeleton-block" />
+                  </div>
                 </td>
                 <td>
                   <span class="table-skeleton-block table-skeleton-block--wide" />
@@ -823,6 +749,11 @@ function formatStockStatus(status: string): string {
 </section>
 
 <script>
+  import {
+    readDashboardFragmentCache,
+    writeDashboardFragmentCache,
+  } from "@/lib/client/dashboard-fragment-cache";
+
   function initAdminProductFilters() {
     const form = document.querySelector<HTMLFormElement>(
       "[data-product-filter-form]",
@@ -852,21 +783,6 @@ function formatStockStatus(status: string): string {
     let submitTimer: number | undefined;
     let searchTimer: number | undefined;
     let activeFetchController: AbortController | undefined;
-
-    function readCache(): string[] {
-      try {
-        const parsed = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
-        return Array.isArray(parsed)
-          ? parsed.filter((value): value is string => typeof value === "string")
-          : [];
-      } catch {
-        return [];
-      }
-    }
-
-    function writeCache(values: string[]) {
-      sessionStorage.setItem(cacheKey, JSON.stringify([...new Set(values)]));
-    }
 
     function normalizeParams(params: URLSearchParams) {
       const normalized = new URLSearchParams();
@@ -908,9 +824,9 @@ function formatStockStatus(status: string): string {
       const currentQuery = normalizeParams(
         new URLSearchParams(window.location.search),
       );
-      const cachedQueries = readCache();
+      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
 
-      if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) {
+      if (targetQuery === currentQuery || cachedFragment) {
         return;
       }
 
@@ -948,6 +864,21 @@ function formatStockStatus(status: string): string {
         return;
       }
 
+      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
+      if (cachedFragment) {
+        if (updateHistory) {
+          window.history.replaceState(
+            { productFilterQuery: targetQuery },
+            "",
+            buildUrl("/admin/products", targetQuery),
+          );
+        }
+
+        replaceProductsFragment(cachedFragment);
+        activeForm.dataset.currentFilterQuery = targetQuery;
+        return;
+      }
+
       showSkeletonForQuery(targetQuery);
       activeFetchController?.abort();
 
@@ -973,7 +904,7 @@ function formatStockStatus(status: string): string {
 
         replaceProductsFragment(fragmentHtml);
         activeForm.dataset.currentFilterQuery = targetQuery;
-        writeCache([...readCache(), targetQuery]);
+        writeDashboardFragmentCache(cacheKey, targetQuery, fragmentHtml);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
@@ -987,10 +918,11 @@ function formatStockStatus(status: string): string {
       }
     }
 
-    writeCache([
-      ...readCache(),
+    writeDashboardFragmentCache(
+      cacheKey,
       normalizeParams(new URLSearchParams(window.location.search)),
-    ]);
+      activeTableShell.outerHTML,
+    );
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();

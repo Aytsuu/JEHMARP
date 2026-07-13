@@ -107,7 +107,7 @@ describe("parseServerEnv", () => {
     });
 
     expect(env).toEqual({
-      supabaseUrl: "http://127.0.0.1:54321",
+      supabaseUrl: "http://127.0.0.1:55421",
       supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
       supabaseServerKey: "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz",
     });
@@ -142,7 +142,7 @@ describe("parsePublicEnv", () => {
     vi.stubEnv("PUBLIC_TURNSTILE_SITE_KEY", "");
 
     expect(getPublicEnv()).toEqual({
-      supabaseUrl: "http://127.0.0.1:54321",
+      supabaseUrl: "http://127.0.0.1:55421",
       supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
     });
   });
@@ -165,7 +165,7 @@ describe("parsePublicEnv", () => {
     });
 
     expect(env).toEqual({
-      supabaseUrl: "http://127.0.0.1:54321",
+      supabaseUrl: "http://127.0.0.1:55421",
       supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
     });
   });

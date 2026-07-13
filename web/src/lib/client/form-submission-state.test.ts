@@ -111,4 +111,51 @@ describe("initFormSubmissionState", () => {
 
     addEventListenerSpy.mockRestore();
   });
+
+  it("does not install another submit listener after the body is swapped", () => {
+    const testDocument = createTestDocument(`
+      <form method="post">
+        <button type="submit">First body</button>
+      </form>
+    `);
+    const addEventListenerSpy = vi.spyOn(testDocument, "addEventListener");
+
+    initFormSubmissionState(testDocument);
+
+    const nextBody = testDocument.createElement("body");
+    nextBody.innerHTML = `
+      <form method="post">
+        <button type="submit">Second body</button>
+      </form>
+    `;
+    testDocument.documentElement.replaceChild(nextBody, testDocument.body);
+
+    initFormSubmissionState(testDocument);
+
+    const form = testDocument.querySelector("form")!;
+    const button = form.querySelector("button")!;
+    const event = submitForm(form, button);
+
+    expect(addEventListenerSpy).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(false);
+    expect(button.disabled).toBe(true);
+
+    addEventListenerSpy.mockRestore();
+  });
+
+  it("disables an external submitter that targets the form by id", () => {
+    const testDocument = createTestDocument(`
+      <form id="create-form" method="post"></form>
+      <button type="submit" form="create-form">Create</button>
+    `);
+    const form = testDocument.querySelector("form")!;
+    const button = testDocument.querySelector("button")!;
+
+    initFormSubmissionState(testDocument);
+    const event = submitForm(form, button);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(button.disabled).toBe(true);
+    expect(button.classList.contains("form-submit-button--loading")).toBe(true);
+  });
 });

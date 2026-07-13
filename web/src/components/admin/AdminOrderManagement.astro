@@ -475,6 +475,11 @@ const skeletonRows = Array.from({ length: 6 });
 </section>
 
 <script>
+  import {
+    readDashboardFragmentCache,
+    writeDashboardFragmentCache,
+  } from "@/lib/client/dashboard-fragment-cache";
+
   function initCreateOrderSheet() {
     const form = document.querySelector<HTMLFormElement>("#create-order-form");
     if (!form || form.dataset.orderSheetInitialized === "true") return;
@@ -762,21 +767,6 @@ const skeletonRows = Array.from({ length: 6 });
     let searchTimer: number | undefined;
     let activeFetchController: AbortController | undefined;
 
-    function readCache(): string[] {
-      try {
-        const parsed = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
-        return Array.isArray(parsed)
-          ? parsed.filter((value): value is string => typeof value === "string")
-          : [];
-      } catch {
-        return [];
-      }
-    }
-
-    function writeCache(values: string[]) {
-      sessionStorage.setItem(cacheKey, JSON.stringify([...new Set(values)]));
-    }
-
     function normalizeParams(params: URLSearchParams) {
       const normalized = new URLSearchParams();
 
@@ -808,9 +798,9 @@ const skeletonRows = Array.from({ length: 6 });
 
     function showSkeletonForQuery(targetQuery: string) {
       const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
-      const cachedQueries = readCache();
+      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
 
-      if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) {
+      if (targetQuery === currentQuery || cachedFragment) {
         return;
       }
 
@@ -839,6 +829,18 @@ const skeletonRows = Array.from({ length: 6 });
         return;
       }
 
+      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
+      if (cachedFragment) {
+        window.history.replaceState(
+          { orderFilterQuery: targetQuery },
+          "",
+          buildUrl("/admin/orders", targetQuery),
+        );
+        replaceOrdersFragment(cachedFragment);
+        activeForm.dataset.currentFilterQuery = targetQuery;
+        return;
+      }
+
       showSkeletonForQuery(targetQuery);
       activeFetchController?.abort();
 
@@ -861,7 +863,7 @@ const skeletonRows = Array.from({ length: 6 });
         );
         replaceOrdersFragment(fragmentHtml);
         activeForm.dataset.currentFilterQuery = targetQuery;
-        writeCache([...readCache(), targetQuery]);
+        writeDashboardFragmentCache(cacheKey, targetQuery, fragmentHtml);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           return;
@@ -882,7 +884,11 @@ const skeletonRows = Array.from({ length: 6 });
       }, 120);
     }
 
-    writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
+    writeDashboardFragmentCache(
+      cacheKey,
+      normalizeParams(new URLSearchParams(window.location.search)),
+      activeTableShell.outerHTML,
+    );
 
     activeForm.addEventListener("submit", (event) => {
       event.preventDefault();

@@ -27,6 +27,10 @@ import {
   getDocumentColumnTemplate,
 } from "@/lib/order-documents/layout";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import {
+  getOrderStatusBadgeLabel,
+  getOrderStatusOptionLabel,
+} from "@/lib/order-status-display";
 
 export const prerender = false;
 
@@ -42,11 +46,25 @@ if (!orderId) {
   return Astro.redirect("/admin/orders", 302);
 }
 
+const orderDetailTabIds = [
+  "order-slip",
+  "sales-invoice",
+  "commission",
+  "payment-record",
+  "notes",
+] as const;
+const requestedOrderDetailTab = Astro.url.searchParams.get("tab");
+
 if (Astro.request.method === "POST") {
   return handleAdminDashboardAction(
     Astro,
     adminRoute.userId,
-    `/admin/orders/${orderId}`,
+    requestedOrderDetailTab &&
+      orderDetailTabIds.includes(
+        requestedOrderDetailTab as (typeof orderDetailTabIds)[number],
+      )
+      ? `/admin/orders/${orderId}?tab=${encodeURIComponent(requestedOrderDetailTab)}`
+      : `/admin/orders/${orderId}`,
   );
 }
 
@@ -79,6 +97,17 @@ const balance = orderBalance(order);
 const canCreatePaymentRecord = hasSalesInvoice && balance > 0;
 const canEditInvoiceQuantities = hasSalesInvoice && !hasPayments;
 const hasCommissionTab = Boolean(order.customer?.assigned_agent ?? order.agent);
+const availableOrderDetailTabs = orderDetailTabIds.filter(
+  (tab) => tab !== "commission" || hasCommissionTab,
+);
+const activeOrderDetailTab =
+  requestedOrderDetailTab &&
+  availableOrderDetailTabs.includes(
+    requestedOrderDetailTab as (typeof availableOrderDetailTabs)[number],
+  )
+    ? requestedOrderDetailTab
+    : "order-slip";
+const isOrderDetailTabActive = (tab: string) => tab === activeOrderDetailTab;
 const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
 const orderSlipPdfHref = `/admin/orders/${order.id}/order-slip.pdf`;
 const salesInvoicePdfHref = `/admin/orders/${order.id}/sales-invoice.pdf`;
@@ -115,13 +144,10 @@ const availableStatuses = [order.order_status, ...nextStatuses].filter(
   (value, index, values) => values.indexOf(value) === index,
 );
 const canChangeOrderStatus = availableStatuses.length > 1;
-const orderStatusOptionLabel = (status: (typeof availableStatuses)[number]) => {
-  if (order.order_status === "closed" && status === "processing") {
-    return "Open";
-  }
-
-  return autoCapitalize(status);
-};
+const orderStatusBadgeLabel = (status: (typeof availableStatuses)[number]) =>
+  getOrderStatusBadgeLabel(status);
+const orderStatusOptionLabel = (status: (typeof availableStatuses)[number]) =>
+  getOrderStatusOptionLabel(order.order_status, status);
 
 const commissionItemTotal = (quantity: number, unitPrice: number) =>
   quantity * unitPrice;
@@ -335,17 +361,18 @@ const backLabel = backHref.startsWith("/admin/customers/")
                     data-order-status-trigger
                     data-open-cell-popover
                     data-popover-title={`Update status: ${orderCode}`}
-                    aria-label={`Order status: ${orderStatusOptionLabel(order.order_status)}. Click to update.`}
+                    aria-label={`Order status: ${orderStatusBadgeLabel(order.order_status)}. Click to update.`}
                   >
                     <StatusBadge
                       kind="order"
                       status={order.order_status}
-                      label={orderStatusOptionLabel(order.order_status)}
+                      label={orderStatusBadgeLabel(order.order_status)}
                     />
                   </button>
                   <div class="hidden-popover-form-holder">
                     <form
                       method="post"
+                      action={`/admin/orders/${order.id}`}
                       class="order-status-popover-form"
                       data-order-status-form
                     >
@@ -375,7 +402,7 @@ const backLabel = backHref.startsWith("/admin/customers/")
                 <StatusBadge
                   kind="order"
                   status={order.order_status}
-                  label={orderStatusOptionLabel(order.order_status)}
+                  label={orderStatusBadgeLabel(order.order_status)}
                 />
               )
             }
@@ -575,25 +602,31 @@ const backLabel = backHref.startsWith("/admin/customers/")
       </div>
     </aside>
 
-    <section class="order-detail-main">
+    <section class="order-detail-main" data-order-detail-tabs>
       <div class="order-tabs" role="tablist" aria-label="Order detail sections">
         <button
           type="button"
-          class="order-tab is-active"
+          class:list={[
+            "order-tab",
+            isOrderDetailTabActive("order-slip") && "is-active",
+          ]}
           data-order-detail-tab-trigger
           data-tab-target="order-slip"
           role="tab"
-          aria-selected="true"
+          aria-selected={isOrderDetailTabActive("order-slip") ? "true" : "false"}
         >
           Order Slip
         </button>
         <button
           type="button"
-          class="order-tab"
+          class:list={[
+            "order-tab",
+            isOrderDetailTabActive("sales-invoice") && "is-active",
+          ]}
           data-order-detail-tab-trigger
           data-tab-target="sales-invoice"
           role="tab"
-          aria-selected="false"
+          aria-selected={isOrderDetailTabActive("sales-invoice") ? "true" : "false"}
         >
           Sales Invoice
         </button>
@@ -601,11 +634,14 @@ const backLabel = backHref.startsWith("/admin/customers/")
           hasCommissionTab && (
             <button
               type="button"
-              class="order-tab"
+              class:list={[
+                "order-tab",
+                isOrderDetailTabActive("commission") && "is-active",
+              ]}
               data-order-detail-tab-trigger
               data-tab-target="commission"
               role="tab"
-              aria-selected="false"
+              aria-selected={isOrderDetailTabActive("commission") ? "true" : "false"}
             >
               Commission
             </button>
@@ -613,21 +649,27 @@ const backLabel = backHref.startsWith("/admin/customers/")
         }
         <button
           type="button"
-          class="order-tab"
+          class:list={[
+            "order-tab",
+            isOrderDetailTabActive("payment-record") && "is-active",
+          ]}
           data-order-detail-tab-trigger
           data-tab-target="payment-record"
           role="tab"
-          aria-selected="false"
+          aria-selected={isOrderDetailTabActive("payment-record") ? "true" : "false"}
         >
           Payment Record
         </button>
         <button
           type="button"
-          class="order-tab"
+          class:list={[
+            "order-tab",
+            isOrderDetailTabActive("notes") && "is-active",
+          ]}
           data-order-detail-tab-trigger
           data-tab-target="notes"
           role="tab"
-          aria-selected="false"
+          aria-selected={isOrderDetailTabActive("notes") ? "true" : "false"}
         >
           Notes
         </button>
@@ -635,9 +677,13 @@ const backLabel = backHref.startsWith("/admin/customers/")
 
       <div class="order-tab-panels">
         <section
-          class="order-tab-panel order-tab-panel--document document-preview--pdf-like document-preview--rounded-sm is-active"
+          class:list={[
+            "order-tab-panel order-tab-panel--document document-preview--pdf-like document-preview--rounded-sm",
+            isOrderDetailTabActive("order-slip") && "is-active",
+          ]}
           data-order-detail-tab-panel="order-slip"
           role="tabpanel"
+          hidden={!isOrderDetailTabActive("order-slip")}
         >
           <div class="document-preview-scroll">
           <header class="pdf-preview-header">
@@ -766,10 +812,11 @@ const backLabel = backHref.startsWith("/admin/customers/")
             "order-tab-panel",
             hasSalesInvoice &&
               "order-tab-panel--document document-preview--pdf-like document-preview--rounded-sm",
+            isOrderDetailTabActive("sales-invoice") && "is-active",
           ]}
           data-order-detail-tab-panel="sales-invoice"
           role="tabpanel"
-          hidden
+          hidden={!isOrderDetailTabActive("sales-invoice")}
         >
           {
             !hasSalesInvoice ? (
@@ -948,10 +995,13 @@ const backLabel = backHref.startsWith("/admin/customers/")
         {
           hasCommissionTab && (
             <section
-              class="order-tab-panel"
+              class:list={[
+                "order-tab-panel",
+                isOrderDetailTabActive("commission") && "is-active",
+              ]}
               data-order-detail-tab-panel="commission"
               role="tabpanel"
-              hidden
+              hidden={!isOrderDetailTabActive("commission")}
             >
               <div class="metrics-grid">
                 <div class="metric-card">
@@ -1059,10 +1109,13 @@ const backLabel = backHref.startsWith("/admin/customers/")
         }
 
         <section
-          class="order-tab-panel"
+          class:list={[
+            "order-tab-panel",
+            isOrderDetailTabActive("payment-record") && "is-active",
+          ]}
           data-order-detail-tab-panel="payment-record"
           role="tabpanel"
-          hidden
+          hidden={!isOrderDetailTabActive("payment-record")}
         >
           <div class="metrics-grid">
             <div class="metric-card">
@@ -1210,10 +1263,13 @@ const backLabel = backHref.startsWith("/admin/customers/")
         </section>
 
         <section
-          class="order-tab-panel order-tab-panel--notes"
+          class:list={[
+            "order-tab-panel order-tab-panel--notes",
+            isOrderDetailTabActive("notes") && "is-active",
+          ]}
           data-order-detail-tab-panel="notes"
           role="tabpanel"
-          hidden
+          hidden={!isOrderDetailTabActive("notes")}
         >
           <div
             class="order-notes-panel"
@@ -1496,88 +1552,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
 </AdminPageFrame>
 
 <script is:inline>
-  const tabTriggers = Array.from(
-    document.querySelectorAll("[data-order-detail-tab-trigger]"),
-  );
-  const tabPanels = Array.from(
-    document.querySelectorAll("[data-order-detail-tab-panel]"),
-  );
-
-  const setActiveTab = (target) => {
-    tabTriggers.forEach((trigger) => {
-      const isActive = trigger.dataset.tabTarget === target;
-      trigger.classList.toggle("is-active", isActive);
-      trigger.setAttribute("aria-selected", isActive ? "true" : "false");
-    });
-
-    tabPanels.forEach((panel) => {
-      const isActive = panel.dataset.orderDetailTabPanel === target;
-      panel.classList.toggle("is-active", isActive);
-      panel.hidden = !isActive;
-    });
-  };
-
-  tabTriggers.forEach((trigger) => {
-    trigger.addEventListener("click", () => {
-      const target = trigger.dataset.tabTarget;
-      if (target) setActiveTab(target);
-    });
-  });
-
-  const orderStatusPanel = document.querySelector("[data-order-status-panel]");
-  const orderStatusForm = document.querySelector("[data-order-status-form]");
-
-  if (
-    orderStatusPanel instanceof HTMLElement &&
-    orderStatusForm instanceof HTMLFormElement
-  ) {
-    const saveUrl = orderStatusPanel.dataset.saveUrl;
-    const statusSelect = orderStatusForm.querySelector(
-      'select[name="orderStatus"]',
-    );
-
-    if (statusSelect instanceof HTMLSelectElement && saveUrl) {
-      const lastSavedStatus = statusSelect.value;
-      let isSavingStatus = false;
-
-      statusSelect.addEventListener("change", async () => {
-        if (isSavingStatus || statusSelect.value === lastSavedStatus) {
-          return;
-        }
-
-        const formData = new FormData(orderStatusForm);
-        isSavingStatus = true;
-        statusSelect.disabled = true;
-
-        try {
-          const response = await fetch(saveUrl, {
-            method: "POST",
-            body: formData,
-            credentials: "same-origin",
-            headers: {
-              Accept: "text/html",
-            },
-          });
-
-          const resultUrl = new URL(response.url);
-          const error = resultUrl.searchParams.get("error");
-
-          if (error) {
-            statusSelect.value = lastSavedStatus;
-            return;
-          }
-
-          window.location.reload();
-        } catch {
-          statusSelect.value = lastSavedStatus;
-        } finally {
-          isSavingStatus = false;
-          statusSelect.disabled = false;
-        }
-      });
-    }
-  }
-
   const paymentToggleButton = document.querySelector(
     "[data-toggle-payment-form]",
   );
@@ -2341,6 +2315,11 @@ const backLabel = backHref.startsWith("/admin/customers/")
     padding: 0 0.85rem;
     font: inherit;
     font-weight: 600;
+  }
+
+  .order-status-popover-form[data-order-status-saving="true"] select {
+    cursor: wait;
+    opacity: 0.68;
   }
 
   .order-party-cards {
