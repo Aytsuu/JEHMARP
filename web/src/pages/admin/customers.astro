@@ -1,7 +1,10 @@
 ---
 import AdminCustomerManagement from "@/components/admin/AdminCustomerManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import {
+  formatAdminActionFeedback,
+  handleAdminDashboardAction,
+} from "@/lib/admin-dashboard/actions";
 import {
   loadAdminCustomerManagementData,
   loadAdminDashboardData,
@@ -10,6 +13,10 @@ import {
   parseAdminCustomerFilters,
   serializeAdminCustomerFilters,
 } from "@/lib/admin-dashboard/customer-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -20,11 +27,19 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
+if (Astro.request.method === "POST") {
+  return handleAdminDashboardAction(Astro, adminRoute.userId, "/admin/customers");
+}
+
 const customerFilters = parseAdminCustomerFilters(Astro.url);
-const customerFilterQuery = serializeAdminCustomerFilters(customerFilters);
+const customerPagination = parseAdminPagination(Astro.url);
+const customerFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminCustomerFilters(customerFilters),
+  customerPagination,
+);
 const [dashboardData, data] = await Promise.all([
   loadAdminDashboardData(),
-  loadAdminCustomerManagementData(customerFilters),
+  loadAdminCustomerManagementData(customerFilters, customerPagination),
 ]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---

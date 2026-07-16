@@ -1,6 +1,6 @@
 import type { APIContext } from "astro";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { throwLoadError } from "@/lib/load-error";
 
 export const PRODUCT_PUBLIC_COLUMNS = [
@@ -80,10 +80,10 @@ export function parseShopFilters(url: URL): ShopFilters {
 }
 
 export async function listPublicProducts(
-  context: Pick<APIContext, "cookies" | "request">,
+  _context: Pick<APIContext, "cookies" | "request">,
   filters: ShopFilters,
 ): Promise<ProductListResult> {
-  const supabase = createSupabaseServerClient(context);
+  const supabase = createSupabasePublicClient();
   const from = (filters.page - 1) * filters.pageSize;
   const to = from + filters.pageSize - 1;
   const sort = getSortConfig(filters.sort);

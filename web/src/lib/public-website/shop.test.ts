@@ -1,10 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  createSupabasePublicClient: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/public", () => ({
+  createSupabasePublicClient: mocks.createSupabasePublicClient,
+}));
 
 import {
   PRODUCT_PUBLIC_COLUMNS,
   buildPagination,
+  listPublicProducts,
   parseShopFilters,
 } from "./shop";
+
+beforeEach(() => {
+  mocks.createSupabasePublicClient.mockReset();
+});
 
 describe("parseShopFilters", () => {
   it("parses supported category, stock, price, sorting, and page filters", () => {
@@ -69,6 +82,51 @@ describe("buildPagination", () => {
       totalPages: 1,
       previousPage: undefined,
       nextPage: undefined,
+    });
+  });
+});
+
+describe("listPublicProducts", () => {
+  it("uses the non-auth public Supabase client for public shop reads", async () => {
+    const range = vi.fn(async () => ({
+      data: [],
+      error: null,
+      count: 0,
+    }));
+    const order = vi.fn(() => ({ range }));
+    const eq = vi.fn(() => ({ order, eq, gte, lte }));
+    const gte = vi.fn(() => ({ order, eq, gte, lte }));
+    const lte = vi.fn(() => ({ order, eq, gte, lte }));
+    const select = vi.fn(() => ({ eq, order, gte, lte }));
+    const from = vi.fn(() => ({ select }));
+    mocks.createSupabasePublicClient.mockReturnValue({ from });
+
+    const result = await listPublicProducts(
+      {
+        cookies: {},
+        request: new Request("https://example.test/shop"),
+      } as never,
+      {
+        sort: "name_asc",
+        page: 1,
+        pageSize: 12,
+      },
+    );
+
+    expect(mocks.createSupabasePublicClient).toHaveBeenCalledTimes(1);
+    expect(from).toHaveBeenCalledWith("product");
+    expect(select).toHaveBeenCalledWith(PRODUCT_PUBLIC_COLUMNS, {
+      count: "exact",
+    });
+    expect(result).toEqual({
+      products: [],
+      pagination: {
+        count: 0,
+        currentPage: 1,
+        totalPages: 1,
+        previousPage: undefined,
+        nextPage: undefined,
+      },
     });
   });
 });

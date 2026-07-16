@@ -1,28 +1,42 @@
 import type { APIContext } from "astro";
+import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 
-import { parseContactNumber, parseEmailAddress } from "@/lib/formatters";
+import { parseContactNumber } from "@/lib/formatters";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PRODUCT_IMAGE_BUCKET, isManagedStoragePath } from "@/lib/supabase/storage";
 
+import {
+  defaultProductCategories,
+  defaultProductUnitLabels,
+  normalizeProductOptionValue,
+  productOtherOptionValue,
+} from "./product-options";
+
 const uuidSchema = z.uuid();
 const pageStatuses = ["draft", "published", "archived"] as const;
-const productCategories = ["pork", "chicken", "egg"] as const;
-const productUnitLabels = ["kg", "tray"] as const;
+const productCategories = defaultProductCategories;
+const productUnitLabels = defaultProductUnitLabels;
+const productAmountTypes = ["value", "percentage"] as const;
 const stockStatuses = ["in_stock", "limited", "out_of_stock"] as const;
 const orderStatuses = ["pending", "processing", "closed"] as const;
 const inquiryStatuses = ["new", "reviewing", "responded", "closed", "spam"] as const;
 const resellerApplicationStatuses = ["submitted", "contacted", "closed"] as const;
+const registrationLinkDurations = ["30m", "1h", "3h", "12h", "1d"] as const;
+const paymentCustomerTypes = ["regular", "wholesale", "reseller"] as const;
 
 export type PageStatus = (typeof pageStatuses)[number];
-export type ProductCategory = (typeof productCategories)[number];
-export type ProductUnitLabel = (typeof productUnitLabels)[number];
+export type ProductCategory = string;
+export type ProductUnitLabel = string;
+export type ProductAmountType = (typeof productAmountTypes)[number];
 export type StockStatus = (typeof stockStatuses)[number];
 export type OrderStatus = (typeof orderStatuses)[number];
 export type InvoiceStatus = "draft" | "issued" | "partially_paid" | "paid";
 export type InquiryStatus = (typeof inquiryStatuses)[number];
 export type ResellerApplicationStatus = (typeof resellerApplicationStatuses)[number];
+export type RegistrationLinkDuration = (typeof registrationLinkDurations)[number];
+export type PaymentCustomerType = (typeof paymentCustomerTypes)[number];
 type OrderPaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 
 type AdminDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect">;
@@ -35,7 +49,7 @@ export type AdminActionFeedback = {
   cleanPath?: string;
 };
 
-const maxProductImageBytes = 5 * 1024 * 1024;
+const maxProductImageBytes = 2 * 1024 * 1024;
 
 type CustomerFormPayload = {
   first_name: string;
@@ -45,6 +59,7 @@ type CustomerFormPayload = {
   address: string;
   assigned_agent_id: string | null;
   is_reseller: boolean;
+  credit_limit: number;
   created_by?: string;
   updated_at: string;
 };
@@ -84,15 +99,15 @@ export type AdminAction =
         unit_label: ProductUnitLabel;
         default_price: number;
         reseller_price: number;
+        reseller_deduction_type: ProductAmountType;
+        reseller_deduction_value: number;
+        agent_commission_type: ProductAmountType;
+        agent_commission_value: number;
         stock_status: StockStatus;
         image_file: ProductImageFile | null;
         is_active: boolean;
         updated_at?: string;
       };
-    }
-  | {
-      type: "deactivate-product";
-      productId: string;
     }
   | {
       type: "save-customer";
@@ -102,17 +117,27 @@ export type AdminAction =
   | {
       type: "create-agent";
       payload: {
-        email: string;
-        contact: string;
-        password: string;
+        employee_id: string | null;
+        first_name: string;
+        last_name: string;
         display_name: string;
+        email: string | null;
+        contact: string;
+        password: string | null;
         status: "active" | "inactive" | "suspended";
       };
+    }
+  | {
+      type: "promote-customer-to-agent";
+      customerId: string;
     }
   | {
       type: "update-agent";
       agentId: string;
       payload: {
+        employee_id: string | null;
+        first_name: string;
+        last_name: string;
         display_name: string;
         status: "active" | "inactive" | "suspended";
         updated_at: string;
@@ -134,6 +159,7 @@ export type AdminAction =
         source: "admin_manual";
         order_status: OrderStatus;
         payment_status: "unpaid";
+        release_date?: string | null;
         submitted_by: string;
         updated_at: string;
       };
@@ -143,6 +169,14 @@ export type AdminAction =
         final_quantity: number;
         add_details: string | null;
       }[];
+      payment?: {
+        amount: number;
+        payment_method: string;
+        payment_date: string;
+        recorded_by: string;
+        reference_number: string | null;
+        notes: string | null;
+      } | null;
     }
   | {
       type: "update-order-status";
@@ -178,7 +212,17 @@ export type AdminAction =
       };
     }
   | {
+      type: "update-agent-order-commission";
+      agentOrderItemId: string;
+      payload: {
+        agent_commission_amount: number;
+        agent_commission_updated_by: string;
+        agent_commission_updated_at: string;
+      };
+    }
+  | {
       type: "record-payment";
+      customerType: PaymentCustomerType;
       payload: {
         order_id: string;
         amount: number;
@@ -242,6 +286,42 @@ export type AdminAction =
       payload: {
         final_quantity: number;
       };
+    }
+  | {
+      type: "apply-customer-payment";
+      payload: {
+        customer_id: string;
+        amount: number;
+        payment_method: string;
+        payment_date: string;
+        recorded_by: string;
+        reference_number: string | null;
+        notes: string | null;
+      };
+    }
+  | {
+      type: "create-customer-registration-link";
+      payload: {
+        agent_ids: string[];
+        duration: RegistrationLinkDuration;
+        base_url: string;
+        created_by: string;
+      };
+    }
+  | {
+      type: "add-order-item";
+      orderId: string;
+      payload: {
+        order_id: string;
+        product_id: string;
+        partial_quantity: number;
+        final_quantity: number;
+        add_details: string | null;
+      };
+    }
+  | {
+      type: "remove-order-item";
+      orderItemId: string;
     }
   | {
       type: "update-order-item-quantity";
@@ -348,14 +428,25 @@ export async function markUnreadAdminOrdersRead(
   context: Pick<APIContext, "cookies" | "request">,
   adminUserId: string,
 ) {
-  const { error } = await createSupabaseServerClient(context)
-    .from("customer_order")
-    .update(adminReadPayload(adminUserId))
-    .eq("order_status", "pending")
-    .neq("source", "admin_manual")
-    .is("admin_read_at", null);
+  const supabase = createSupabaseServerClient(context);
+  const payload = adminReadPayload(adminUserId);
+  const results = await Promise.all([
+    supabase
+      .from("customer_order")
+      .update(payload)
+      .eq("order_status", "pending")
+      .neq("source", "admin_manual")
+      .is("admin_read_at", null),
+    supabase
+      .from("agent_order")
+      .update(payload)
+      .in("order_status", ["pending_customers", "pending_order"])
+      .is("admin_read_at", null),
+  ]);
 
-  if (error) {
+  const failedResult = results.find((result) => result.error);
+
+  if (failedResult?.error) {
     throw new Error("Unable to mark orders as read.");
   }
 }
@@ -431,18 +522,14 @@ export async function executeAdminAction(
     case "save-product":
       await executeProductSave(action);
       return;
-    case "deactivate-product": {
-      const { error } = await supabase.rpc("deactivate_product", {
-        target_product_id: action.productId,
-      });
-      if (error) throw new Error("Unable to deactivate product.");
-      return;
-    }
     case "save-customer":
-      await executeTableUpsert(supabase, "customer", action.customerId, action.payload);
+      await executeCustomerSave(supabase, action);
       return;
     case "create-agent":
       await executeAgentCreate(action.payload);
+      return;
+    case "promote-customer-to-agent":
+      await executeCustomerPromotionToAgent(action.customerId);
       return;
     case "update-agent":
       await executeTableUpdate(supabase, "agent_profile", action.agentId, action.payload);
@@ -463,17 +550,42 @@ export async function executeAdminAction(
       await assertOrderItemCommissionPayable(supabase, action.orderItemId, action.payload.agent_commission_paid);
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
+    case "update-agent-order-commission":
+      await assertAgentOrderItemCommissionEditable(supabase, action.agentOrderItemId);
+      await executeTableUpdate(supabase, "agent_order_item", action.agentOrderItemId, action.payload);
+      return;
     case "update-invoice-item-quantity":
       await assertOrderItemInvoiceQuantityEditable(supabase, action.orderItemId);
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
+    case "add-order-item":
+      await assertOrderProductsEditable(supabase, action.orderId);
+      await executeTableInsert(supabase, "customer_order_item", action.payload);
+      return;
+    case "remove-order-item":
+      await assertOrderProductsEditableByItemId(supabase, action.orderItemId, {
+        requireMultipleItems: true,
+      });
+      await executeTableDelete(supabase, "customer_order_item", action.orderItemId);
+      return;
     case "update-order-item-quantity":
+      await assertOrderProductsEditableByItemId(supabase, action.orderItemId);
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
       return;
     case "record-payment":
       await assertOrderHasSalesInvoice(supabase, action.payload.order_id);
+      assertPaymentAmountWithinBalance(
+        action.payload.amount,
+        await applyPaymentCustomerTypePricing(supabase, action.payload.order_id, action.customerType),
+      );
       await executeTableInsert(supabase, "payment", action.payload);
       await markAdminRecordRead(supabase, "customer_order", action.payload.order_id, adminReadPayload(action.payload.recorded_by));
+      return;
+    case "apply-customer-payment":
+      await executeCustomerPaymentDistribution(action.payload);
+      return;
+    case "create-customer-registration-link":
+      await executeCustomerRegistrationLinkCreate(action.payload);
       return;
     case "save-invoice":
       await assertOrderCanGenerateInvoice(supabase, action.payload.order_id);
@@ -576,17 +688,60 @@ function parseAdminActionFormDataOrThrow(
         },
       });
     }
-    case "save-product":
+    case "save-product": {
+      const productId = optionalUuid(formData, "productId");
+      const defaultPrice = nonNegativeNumber(formData, "defaultPrice");
+      const resellerDeductionType = enumValue(
+        formData,
+        "resellerDeductionType",
+        productAmountTypes,
+      );
+      const resellerDeductionValue = productAmountValue(
+        formData,
+        "resellerDeductionValue",
+        resellerDeductionType,
+        "Reseller deduction",
+      );
+      const agentCommissionType = enumValue(
+        formData,
+        "agentCommissionType",
+        productAmountTypes,
+      );
+      const agentCommissionValue = productAmountValue(
+        formData,
+        "agentCommissionValue",
+        agentCommissionType,
+        "Agent commission",
+      );
+
       return success({
         type: "save-product",
-        productId: optionalUuid(formData, "productId"),
+        productId,
         payload: {
           name: requiredString(formData, "name"),
-          category: enumValue(formData, "category", productCategories),
+          category: productOptionValue(
+            formData,
+            "category",
+            "categoryOther",
+            "Category",
+          ),
           description: optionalString(formData, "description"),
-          unit_label: enumValue(formData, "unitLabel", productUnitLabels),
-          default_price: nonNegativeNumber(formData, "defaultPrice"),
-          reseller_price: nonNegativeNumber(formData, "resellerPrice"),
+          unit_label: productOptionValue(
+            formData,
+            "unitLabel",
+            "unitLabelOther",
+            "Unit label",
+          ),
+          default_price: defaultPrice,
+          reseller_price: calculateResellerPrice(
+            defaultPrice,
+            resellerDeductionType,
+            resellerDeductionValue,
+          ),
+          reseller_deduction_type: resellerDeductionType,
+          reseller_deduction_value: resellerDeductionValue,
+          agent_commission_type: agentCommissionType,
+          agent_commission_value: agentCommissionValue,
           stock_status: enumValue(formData, "stockStatus", stockStatuses),
           image_file: requiredProductImage(
             formData,
@@ -598,11 +753,7 @@ function parseAdminActionFormDataOrThrow(
           is_active: formData.get("isActive") === "on",
         },
       });
-    case "deactivate-product":
-      return success({
-        type: "deactivate-product",
-        productId: uuidSchema.parse(requiredString(formData, "productId")),
-      });
+    }
     case "save-customer": {
       const customerId = optionalUuid(formData, "customerId");
       return success({
@@ -616,12 +767,17 @@ function parseAdminActionFormDataOrThrow(
         type: "create-agent",
         payload: parseCreateAgentPayload(formData),
       });
+    case "promote-customer-to-agent":
+      return success({
+        type: "promote-customer-to-agent",
+        customerId: uuidSchema.parse(requiredString(formData, "customerId")),
+      });
     case "update-agent":
       return success({
         type: "update-agent",
         agentId: uuidSchema.parse(requiredString(formData, "agentId")),
         payload: {
-          display_name: requiredString(formData, "displayName"),
+          ...parseAgentProfilePayload(formData),
           status: enumValue(formData, "status", ["active", "inactive", "suspended"] as const),
           updated_at: new Date().toISOString(),
         },
@@ -645,10 +801,12 @@ function parseAdminActionFormDataOrThrow(
           source: "admin_manual",
           order_status: "processing",
           payment_status: "unpaid",
+          release_date: optionalDateString(formData, "releaseDate"),
           submitted_by: adminUserId,
           updated_at: new Date().toISOString(),
         },
         items: parseOrderItems(formData),
+        payment: parseCreateOrderPaymentPayload(formData, adminUserId),
       });
     }
     case "update-order-status": {
@@ -699,6 +857,16 @@ function parseAdminActionFormDataOrThrow(
             },
       });
     }
+    case "update-agent-order-commission":
+      return success({
+        type: "update-agent-order-commission",
+        agentOrderItemId: uuidSchema.parse(requiredString(formData, "agentOrderItemId")),
+        payload: {
+          agent_commission_amount: nonNegativeNumber(formData, "amount"),
+          agent_commission_updated_by: adminUserId,
+          agent_commission_updated_at: new Date().toISOString(),
+        },
+      });
     case "update-invoice-item-quantity":
       return success({
         type: "update-invoice-item-quantity",
@@ -706,6 +874,27 @@ function parseAdminActionFormDataOrThrow(
         payload: {
           final_quantity: positiveNumber(formData, "quantity"),
         },
+      });
+    case "add-order-item": {
+      const quantity = positiveNumber(formData, "quantity");
+      const orderId = uuidSchema.parse(requiredString(formData, "orderId"));
+
+      return success({
+        type: "add-order-item",
+        orderId,
+        payload: {
+          order_id: orderId,
+          product_id: uuidSchema.parse(requiredString(formData, "productId")),
+          partial_quantity: quantity,
+          final_quantity: quantity,
+          add_details: optionalString(formData, "addDetails"),
+        },
+      });
+    }
+    case "remove-order-item":
+      return success({
+        type: "remove-order-item",
+        orderItemId: uuidSchema.parse(requiredString(formData, "orderItemId")),
       });
     case "update-order-item-quantity":
       return success({
@@ -718,6 +907,7 @@ function parseAdminActionFormDataOrThrow(
     case "record-payment":
       return success({
         type: "record-payment",
+        customerType: enumValue(formData, "customerType", paymentCustomerTypes),
         payload: {
           order_id: uuidSchema.parse(requiredString(formData, "orderId")),
           amount: positiveNumber(formData, "amount"),
@@ -726,6 +916,29 @@ function parseAdminActionFormDataOrThrow(
           recorded_by: adminUserId,
           reference_number: optionalString(formData, "referenceNumber"),
           notes: optionalString(formData, "notes"),
+        },
+      });
+    case "apply-customer-payment":
+      return success({
+        type: "apply-customer-payment",
+        payload: {
+          customer_id: uuidSchema.parse(requiredString(formData, "customerId")),
+          amount: positiveNumber(formData, "amount"),
+          payment_method: requiredString(formData, "paymentMethod"),
+          payment_date: dateString(formData, "paymentDate"),
+          recorded_by: adminUserId,
+          reference_number: optionalString(formData, "referenceNumber"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+    case "create-customer-registration-link":
+      return success({
+        type: "create-customer-registration-link",
+        payload: {
+          agent_ids: requiredUuidList(formData, "agentId"),
+          duration: enumValue(formData, "duration", registrationLinkDurations),
+          base_url: requiredUrlOrigin(formData, "baseUrl"),
+          created_by: adminUserId,
         },
       });
     case "save-invoice":
@@ -792,35 +1005,43 @@ async function executeAgentCreate(
   await assertAgentEmailIsAvailable(adminClient, payload.email);
   await assertAgentContactIsAvailable(adminClient, payload.contact);
 
-  const { data, error } = await adminClient.auth.admin.createUser({
-    email: payload.email,
-    password: payload.password,
-    email_confirm: true,
-    user_metadata: {
-      display_name: payload.display_name,
-    },
-  });
+  let userId: string | null = null;
 
-  if (error || !data.user) {
-    if (error?.message?.toLowerCase().includes("already")) {
-      throw new Error("Email already exists for another account.");
+  if (payload.email) {
+    const { data, error } = await adminClient.auth.admin.createUser({
+      email: payload.email,
+      password: payload.password ?? undefined,
+      email_confirm: true,
+    });
+
+    if (error || !data.user) {
+      if (error?.message?.toLowerCase().includes("already")) {
+        throw new Error("Email already exists for another account.");
+      }
+
+      throw new Error("Unable to create agent auth account.");
     }
 
-    throw new Error("Unable to create agent auth account.");
+    userId = data.user.id;
   }
 
   const { error: profileError } = await adminClient.from("agent_profile").insert({
-    user_id: data.user.id,
+    user_id: userId,
+    employee_id: payload.employee_id,
+    first_name: payload.first_name,
+    last_name: payload.last_name,
     display_name: payload.display_name,
     contact: payload.contact,
     status: payload.status,
   });
 
   if (profileError) {
-    await adminClient.auth.admin.deleteUser(data.user.id);
+    if (userId) {
+      await adminClient.auth.admin.deleteUser(userId);
+    }
 
     if (profileError.code === "23505") {
-      throw new Error("Contact number already exists for another agent.");
+      throw new Error("Contact number or employee ID already exists for another agent.");
     }
 
     throw new Error("Unable to create agent profile.");
@@ -829,8 +1050,10 @@ async function executeAgentCreate(
 
 async function assertAgentEmailIsAvailable(
   adminClient: SupabaseAdminClient,
-  email: string,
+  email: string | null,
 ) {
+  if (!email) return;
+
   const normalizedEmail = email.trim().toLowerCase();
   const { data, error } = await adminClient.auth.admin.listUsers({
     page: 1,
@@ -895,6 +1118,10 @@ async function executeProductSave(action: Extract<AdminAction, { type: "save-pro
       unit_label: action.payload.unit_label,
       default_price: action.payload.default_price,
       reseller_price: action.payload.reseller_price,
+      reseller_deduction_type: action.payload.reseller_deduction_type,
+      reseller_deduction_value: action.payload.reseller_deduction_value,
+      agent_commission_type: action.payload.agent_commission_type,
+      agent_commission_value: action.payload.agent_commission_value,
       stock_status: action.payload.stock_status,
       image_path: uploadedImagePath ?? existingImagePath,
       is_active: action.payload.is_active,
@@ -943,16 +1170,35 @@ async function executeOrderCreate(
     .from("customer_order_item")
     .insert(action.items.map((item) => ({ ...item, order_id: orderId })));
 
-  if (!itemError) return;
-
-  const { error: cleanupError } = await supabase.from("customer_order").delete().eq("id", orderId);
-
-  if (cleanupError) {
-    throw new Error("Unable to create order items. The order was created but cleanup failed.");
+  if (itemError) {
+    await cleanupCreatedOrder(supabase, orderId, customer.createdCustomerId, "Unable to create order items");
+    throw new Error("Unable to create order items.");
   }
 
-  await cleanupCreatedOrderCustomer(supabase, customer.createdCustomerId);
-  throw new Error("Unable to create order items.");
+  if (!action.payment) return;
+
+  const { error: paymentError } = await supabase
+    .from("payment")
+    .insert({
+      ...action.payment,
+      order_id: orderId,
+    });
+
+  if (!paymentError) return;
+
+  await cleanupCreatedOrder(supabase, orderId, customer.createdCustomerId, "Unable to create payment record");
+  throw new Error("Unable to create payment record.");
+}
+
+async function executeCustomerSave(
+  supabase: SupabaseServerClient,
+  action: Extract<AdminAction, { type: "save-customer" }>,
+) {
+  if (!action.customerId) {
+    await assertCustomerContactIsAvailable(supabase, action.payload);
+  }
+
+  await executeTableUpsert(supabase, "customer", action.customerId, action.payload);
 }
 
 async function resolveOrderCustomer(
@@ -1106,6 +1352,118 @@ async function assertOrderHasSalesInvoice(
   }
 }
 
+async function applyPaymentCustomerTypePricing(
+  supabase: SupabaseServerClient,
+  orderId: string,
+  customerType: PaymentCustomerType,
+) {
+  const targetPriceType = customerType === "reseller" ? "reseller" : "retail";
+  const { data: payments, error: paymentError } = await supabase
+    .from("payment")
+    .select("id, amount")
+    .eq("order_id", orderId);
+
+  if (paymentError) {
+    throw new Error("Unable to verify existing payments before updating customer type pricing.");
+  }
+
+  const { data: items, error: itemError } = await supabase
+    .from("customer_order_item")
+    .select(`
+      id,
+      final_quantity,
+      price_type,
+      unit_price,
+      product:product_id (
+        default_price,
+        reseller_price
+      )
+    `)
+    .eq("order_id", orderId);
+
+  if (itemError) {
+    throw new Error("Unable to load order item prices.");
+  }
+
+  type PaymentPricingItemRow = {
+    id?: unknown;
+    final_quantity?: unknown;
+    price_type?: unknown;
+    product?: { default_price?: unknown; reseller_price?: unknown } | Array<{ default_price?: unknown; reseller_price?: unknown }> | null;
+  };
+
+  const normalizedItems = ((items ?? []) as PaymentPricingItemRow[]).map((item) => {
+    const product = Array.isArray(item.product)
+      ? item.product[0] as { default_price?: unknown; reseller_price?: unknown } | undefined
+      : item.product;
+    const defaultPrice = Number(product?.default_price);
+    const resellerPrice = Number(product?.reseller_price);
+    const finalQuantity = Number(item.final_quantity);
+    const unitPrice = targetPriceType === "reseller" ? resellerPrice : defaultPrice;
+
+    if (
+      typeof item.id !== "string" ||
+      !Number.isFinite(finalQuantity) ||
+      !Number.isFinite(defaultPrice) ||
+      !Number.isFinite(resellerPrice)
+    ) {
+      throw new Error("Order item product pricing is incomplete.");
+    }
+
+    return {
+      id: item.id,
+      finalQuantity,
+      priceType: typeof item.price_type === "string" ? item.price_type : "",
+      unitPrice,
+    };
+  });
+
+  if ((payments ?? []).length > 0) {
+    const hasPricingChange = normalizedItems.some((item) => item.priceType !== targetPriceType);
+
+    if (hasPricingChange) {
+      throw new Error("Customer type pricing can only be changed before a payment record exists.");
+    }
+
+    return calculatePaymentBalance(normalizedItems, payments ?? []);
+  }
+
+  await Promise.all(normalizedItems.map(async (item) => {
+    const { error } = await supabase
+      .from("customer_order_item")
+      .update({
+        price_type: targetPriceType,
+        unit_price: item.unitPrice,
+      })
+      .eq("id", item.id);
+
+    if (error) {
+      throw new Error("Unable to update order item pricing.");
+    }
+  }));
+
+  return calculatePaymentBalance(normalizedItems, payments ?? []);
+}
+
+function assertPaymentAmountWithinBalance(amount: number, balance: number) {
+  if (!Number.isFinite(balance) || amount > balance + 0.005) {
+    throw new Error("Payment amount cannot exceed the remaining balance.");
+  }
+}
+
+function calculatePaymentBalance(
+  items: Array<{ finalQuantity: number; unitPrice: number }>,
+  payments: Array<{ amount?: unknown }>,
+) {
+  const orderTotal = items.reduce((total, item) => total + item.finalQuantity * item.unitPrice, 0);
+  const paidTotal = payments.reduce((total, payment) => {
+    const amount = Number(payment.amount ?? 0);
+    return total + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+
+  return Math.max(roundCurrency(orderTotal - paidTotal), 0);
+}
+
 async function assertOrderItemInvoiceQuantityEditable(
   supabase: SupabaseServerClient,
   orderItemId: string,
@@ -1139,6 +1497,204 @@ async function assertOrderItemInvoiceQuantityEditable(
 
   if (payment?.id) {
     throw new Error("Invoice quantities cannot be edited after a payment record has been created.");
+  }
+}
+
+async function executeCustomerPromotionToAgent(customerId: string) {
+  const adminClient = createSupabaseAdminClient();
+  const { data: customer, error: customerError } = await adminClient
+    .from("customer")
+    .select("id, first_name, last_name, phone_number, email")
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (customerError) {
+    throw new Error("Unable to load customer for promotion.");
+  }
+
+  if (!customer) {
+    throw new Error("Customer was not found.");
+  }
+
+  const { data: existingAgent, error: existingAgentError } = await adminClient
+    .from("agent_profile")
+    .select("id")
+    .eq("customer_id", customerId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingAgentError) {
+    throw new Error("Unable to verify existing customer agent profile.");
+  }
+
+  if (existingAgent?.id) {
+    throw new Error("This customer is already linked to an agent profile.");
+  }
+
+  await assertAgentContactIsAvailable(adminClient, String(customer.phone_number));
+
+  const firstName = String(customer.first_name ?? "").trim();
+  const lastName = String(customer.last_name ?? "").trim();
+  const { error: profileError } = await adminClient.from("agent_profile").insert({
+    user_id: null,
+    customer_id: customerId,
+    employee_id: null,
+    first_name: firstName,
+    last_name: lastName,
+    display_name: `${firstName} ${lastName}`.trim(),
+    contact: String(customer.phone_number),
+    status: "active",
+  });
+
+  if (profileError) {
+    if (profileError.code === "23505") {
+      throw new Error("This customer is already linked to an agent or uses contact details owned by another agent.");
+    }
+
+    throw new Error("Unable to promote customer to agent.");
+  }
+}
+
+async function executeCustomerPaymentDistribution(
+  payload: Extract<AdminAction, { type: "apply-customer-payment" }>["payload"],
+) {
+  const adminClient = createSupabaseAdminClient();
+  const { error } = await adminClient.rpc("apply_customer_payment_distribution", {
+    target_customer_id: payload.customer_id,
+    payment_amount: payload.amount,
+    payment_method_value: payload.payment_method,
+    payment_date_value: payload.payment_date,
+    recorded_by_value: payload.recorded_by,
+    reference_number_value: payload.reference_number,
+    notes_value: payload.notes,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Unable to distribute customer payment.");
+  }
+}
+
+async function executeCustomerRegistrationLinkCreate(
+  payload: Extract<AdminAction, { type: "create-customer-registration-link" }>["payload"],
+) {
+  const adminClient = createSupabaseAdminClient();
+  const { data: agents, error: agentError } = await adminClient
+    .from("agent_profile")
+    .select("id")
+    .in("id", payload.agent_ids)
+    .eq("status", "active");
+
+  if (agentError) {
+    throw new Error("Unable to validate registration link agents.");
+  }
+
+  const activeAgentIds = new Set((agents ?? []).map((agent) => String(agent.id)));
+
+  if (activeAgentIds.size !== payload.agent_ids.length) {
+    throw new Error("Registration links can only be sent to active agents.");
+  }
+
+  const token = createRegistrationToken();
+  const { data: link, error: linkError } = await adminClient
+    .from("customer_registration_link")
+    .insert({
+      token,
+      token_hash: hashRegistrationToken(token),
+      expires_at: new Date(Date.now() + registrationDurationSeconds(payload.duration) * 1000).toISOString(),
+      created_by: payload.created_by,
+    })
+    .select("id")
+    .single();
+
+  if (linkError || !link?.id) {
+    throw new Error("Unable to create customer registration link.");
+  }
+
+  const { error: linkAgentError } = await adminClient
+    .from("customer_registration_link_agent")
+    .insert(payload.agent_ids.map((agentId) => ({
+      link_id: String(link.id),
+      agent_id: agentId,
+    })));
+
+  if (linkAgentError) {
+    await adminClient.from("customer_registration_link").delete().eq("id", String(link.id));
+    throw new Error("Unable to notify selected agents about the registration link.");
+  }
+}
+
+async function assertOrderProductsEditableByItemId(
+  supabase: SupabaseServerClient,
+  orderItemId: string,
+  options: { requireMultipleItems?: boolean } = {},
+) {
+  const { data: orderItem, error: orderItemError } = await supabase
+    .from("customer_order_item")
+    .select("order_id")
+    .eq("id", orderItemId)
+    .maybeSingle();
+
+  if (orderItemError) {
+    throw new Error("Unable to verify order products before updating them.");
+  }
+
+  const orderId = typeof orderItem?.order_id === "string" ? orderItem.order_id : null;
+
+  if (!orderId) {
+    throw new Error("Order item was not found.");
+  }
+
+  await assertOrderProductsEditable(supabase, orderId, options);
+}
+
+async function assertOrderProductsEditable(
+  supabase: SupabaseServerClient,
+  orderId: string,
+  options: { requireMultipleItems?: boolean } = {},
+) {
+  const { data: invoice, error: invoiceError } = await supabase
+    .from("invoice")
+    .select("id")
+    .eq("order_id", orderId)
+    .limit(1)
+    .maybeSingle();
+
+  if (invoiceError) {
+    throw new Error("Unable to verify invoices before updating order products.");
+  }
+
+  if (invoice?.id) {
+    throw new Error("Order products cannot be edited after a sales invoice has been created.");
+  }
+
+  const { data: payment, error: paymentError } = await supabase
+    .from("payment")
+    .select("id")
+    .eq("order_id", orderId)
+    .limit(1)
+    .maybeSingle();
+
+  if (paymentError) {
+    throw new Error("Unable to verify payments before updating order products.");
+  }
+
+  if (payment?.id) {
+    throw new Error("Order products cannot be edited after a payment record has been created.");
+  }
+
+  if (options.requireMultipleItems) {
+    const { data: orderItems, error: orderItemsError } = await supabase
+      .from("customer_order_item")
+      .select("id")
+      .eq("order_id", orderId);
+
+    if (orderItemsError) {
+      throw new Error("Unable to verify order item count before removing a product.");
+    }
+
+    if ((orderItems ?? []).length <= 1) {
+      throw new Error("Order must keep at least one product.");
+    }
   }
 }
 
@@ -1230,6 +1786,42 @@ async function assertOrderItemCommissionPayable(
   }
 }
 
+async function assertAgentOrderItemCommissionEditable(
+  supabase: SupabaseServerClient,
+  agentOrderItemId: string,
+) {
+  const { data: agentOrderItem, error: agentOrderItemError } = await supabase
+    .from("agent_order_item")
+    .select("id, agent_order_id")
+    .eq("id", agentOrderItemId)
+    .maybeSingle();
+
+  if (agentOrderItemError) {
+    throw new Error("Unable to verify agent order commission status.");
+  }
+
+  if (!agentOrderItem || typeof agentOrderItem.agent_order_id !== "string") {
+    throw new Error("Agent order item was not found.");
+  }
+
+  const { data: customerOrders, error: customerOrdersError } = await supabase
+    .from("customer_order")
+    .select("id, payment_status")
+    .eq("agent_order_id", agentOrderItem.agent_order_id);
+
+  if (customerOrdersError) {
+    throw new Error("Unable to verify agent order payments before updating commission.");
+  }
+
+  const linkedCustomerOrders = customerOrders ?? [];
+  const isFullyPaid = linkedCustomerOrders.length > 0 &&
+    linkedCustomerOrders.every((order) => order.payment_status === "paid");
+
+  if (isFullyPaid) {
+    throw new Error("Agent order commission cannot be edited after all customer orders are fully paid.");
+  }
+}
+
 function roundCurrency(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -1241,6 +1833,21 @@ async function cleanupCreatedOrderCustomer(
   if (!customerId) return;
 
   await supabase.from("customer").delete().eq("id", customerId);
+}
+
+async function cleanupCreatedOrder(
+  supabase: SupabaseServerClient,
+  orderId: string,
+  createdCustomerId: string | null,
+  failureLabel: string,
+) {
+  const { error: cleanupError } = await supabase.from("customer_order").delete().eq("id", orderId);
+
+  if (cleanupError) {
+    throw new Error(`${failureLabel}. The order was created but cleanup failed.`);
+  }
+
+  await cleanupCreatedOrderCustomer(supabase, createdCustomerId);
 }
 
 async function executeTableUpsert(
@@ -1274,6 +1881,15 @@ async function executeTableUpdate(
 ) {
   const { error } = await supabase.from(table).update(payload).eq("id", id);
   if (error) throw new Error(`Unable to update ${table.replaceAll("_", " ")}.`);
+}
+
+async function executeTableDelete(
+  supabase: SupabaseServerClient,
+  table: string,
+  id: string,
+) {
+  const { error } = await supabase.from(table).delete().eq("id", id);
+  if (error) throw new Error(`Unable to delete ${table.replaceAll("_", " ")}.`);
 }
 
 type AdminReadableTable =
@@ -1431,13 +2047,37 @@ function optionalString(formData: FormData, key: string) {
 function optionalEmail(formData: FormData, key: string) {
   const value = optionalString(formData, key);
 
-  return value ? z.email().parse(value.toLowerCase()) : null;
+  return value ? z.email("Enter a valid email address.").parse(value.toLowerCase()) : null;
 }
 
 function optionalUuid(formData: FormData, key: string) {
   const value = optionalString(formData, key);
 
   return value ? uuidSchema.parse(value) : undefined;
+}
+
+function requiredUuidList(formData: FormData, key: string) {
+  const values = formData
+    .getAll(key)
+    .map((value) => normalizeFormDataEntry(value))
+    .filter((value) => value.length > 0);
+
+  if (values.length === 0) {
+    throw new Error(`${toSentenceLabel(key)} is required.`);
+  }
+
+  return [...new Set(values.map((value) => uuidSchema.parse(value)))];
+}
+
+function requiredUrlOrigin(formData: FormData, key: string) {
+  const value = requiredString(formData, key);
+  const url = new URL(value);
+
+  if (!["http:", "https:"].includes(url.protocol)) {
+    throw new Error(`${toSentenceLabel(key)} must be a valid website URL.`);
+  }
+
+  return url.origin;
 }
 
 function optionalAdminReturnPath(formData: FormData, key: string) {
@@ -1471,6 +2111,60 @@ function enumValue<T extends string>(
   return found;
 }
 
+function productOptionValue(
+  formData: FormData,
+  key: string,
+  otherKey: string,
+  label: string,
+) {
+  const selectedValue = requiredString(formData, key);
+  const rawValue = selectedValue === productOtherOptionValue
+    ? requiredString(formData, otherKey)
+    : selectedValue;
+  const normalizedValue = normalizeProductOptionValue(rawValue);
+
+  if (!normalizedValue) {
+    throw new Error(`${label} is required.`);
+  }
+
+  if (normalizedValue.length > 60) {
+    throw new Error(`${label} must be 60 characters or fewer.`);
+  }
+
+  return normalizedValue;
+}
+
+function productAmountValue(
+  formData: FormData,
+  key: string,
+  type: ProductAmountType,
+  label: string,
+) {
+  const value = nonNegativeNumber(formData, key);
+
+  if (type === "percentage" && value > 100) {
+    throw new Error(`${label} percentage cannot exceed 100.`);
+  }
+
+  return value;
+}
+
+function calculateResellerPrice(
+  defaultPrice: number,
+  deductionType: ProductAmountType,
+  deductionValue: number,
+) {
+  const resellerPrice = deductionType === "percentage"
+    ? defaultPrice * (1 - deductionValue / 100)
+    : defaultPrice - deductionValue;
+
+  if (resellerPrice < 0) {
+    throw new Error("Reseller deduction cannot exceed the default price.");
+  }
+
+  return roundCurrency(resellerPrice);
+}
+
 function nonNegativeInteger(formData: FormData, key: string) {
   const value = Number(requiredString(formData, key));
 
@@ -1483,6 +2177,22 @@ function nonNegativeInteger(formData: FormData, key: string) {
 
 function nonNegativeNumber(formData: FormData, key: string) {
   const value = Number(requiredString(formData, key));
+
+  if (!Number.isFinite(value) || value < 0) {
+    throw new Error(`${toSentenceLabel(key)} must be a non-negative number.`);
+  }
+
+  return value;
+}
+
+function optionalNonNegativeNumber(formData: FormData, key: string, fallback: number) {
+  const rawValue = optionalString(formData, key);
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const value = Number(rawValue);
 
   if (!Number.isFinite(value) || value < 0) {
     throw new Error(`${toSentenceLabel(key)} must be a non-negative number.`);
@@ -1511,6 +2221,44 @@ function dateString(formData: FormData, key: string) {
   return value;
 }
 
+function optionalDateString(formData: FormData, key: string) {
+  const value = optionalString(formData, key);
+
+  if (!value) return null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${toSentenceLabel(key)} must be a date.`);
+  }
+
+  return value;
+}
+
+function parseCreateOrderPaymentPayload(
+  formData: FormData,
+  adminUserId: string,
+): Extract<AdminAction, { type: "create-order" }>["payment"] {
+  const amountText = optionalString(formData, "downpaymentAmount");
+
+  if (!amountText) {
+    return null;
+  }
+
+  const amount = Number(amountText);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Downpayment amount must be greater than zero.");
+  }
+
+  return {
+    amount,
+    payment_method: requiredString(formData, "downpaymentMethod"),
+    payment_date: dateString(formData, "downpaymentDate"),
+    recorded_by: adminUserId,
+    reference_number: optionalString(formData, "downpaymentReferenceNumber"),
+    notes: optionalString(formData, "downpaymentNotes"),
+  };
+}
+
 function parseOrderItems(formData: FormData) {
   const productIds = formData.getAll("productId");
   const quantities = formData.getAll("quantity");
@@ -1530,17 +2278,32 @@ function parseOrderItems(formData: FormData) {
 function parseCreateAgentPayload(
   formData: FormData,
 ): Extract<AdminAction, { type: "create-agent" }>["payload"] {
-  const email = parseEmailAddress(requiredString(formData, "email"));
+  const email = optionalEmail(formData, "email");
   const contact = parseContactNumber(requiredString(formData, "contact"));
+  const password = email
+    ? z.string().min(8, "Password must be at least 8 characters.").parse(
+        requiredString(formData, "password"),
+      )
+    : optionalString(formData, "password");
 
   return {
+    ...parseAgentProfilePayload(formData),
     email,
     contact,
-    password: z.string().min(8, "Password must be at least 8 characters.").parse(
-      requiredString(formData, "password"),
-    ),
-    display_name: requiredString(formData, "displayName"),
+    password,
     status: "active",
+  };
+}
+
+function parseAgentProfilePayload(formData: FormData) {
+  const firstName = requiredString(formData, "firstName");
+  const lastName = requiredString(formData, "lastName");
+
+  return {
+    employee_id: optionalString(formData, "employeeId"),
+    first_name: firstName,
+    last_name: lastName,
+    display_name: `${firstName} ${lastName}`.trim(),
   };
 }
 
@@ -1557,6 +2320,7 @@ function parseCustomerFormPayload(
     address: requiredString(formData, "address"),
     assigned_agent_id: optionalUuid(formData, "assignedAgentId") ?? null,
     is_reseller: formData.get("isReseller") === "on",
+    credit_limit: optionalNonNegativeNumber(formData, "creditLimit", 1000),
     created_by: options.isNew ? adminUserId : undefined,
     updated_at: new Date().toISOString(),
   };
@@ -1619,7 +2383,7 @@ function requiredProductImage(
   }
 
   if (value.size > maxProductImageBytes) {
-    throw new Error("Product image must be 5 MB or smaller.");
+    throw new Error("Product image must be 2 MB or smaller.");
   }
 
   return value as ProductImageFile;
@@ -1653,12 +2417,12 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Page section saved.";
     case "save-product":
       return "Product saved.";
-    case "deactivate-product":
-      return "Product deactivated.";
     case "save-customer":
       return "Customer saved.";
     case "create-agent":
       return "Agent account created.";
+    case "promote-customer-to-agent":
+      return "Customer promoted to agent.";
     case "update-agent":
       return "Agent updated.";
     case "create-order":
@@ -1671,12 +2435,22 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Order marked as read.";
     case "update-commission":
       return "Commission updated.";
+    case "update-agent-order-commission":
+      return "Commission updated.";
     case "update-invoice-item-quantity":
       return "Quantity updated.";
+    case "add-order-item":
+      return "Order product added.";
+    case "remove-order-item":
+      return "Order product removed.";
     case "update-order-item-quantity":
       return "Quantity updated.";
     case "record-payment":
       return "Payment recorded.";
+    case "apply-customer-payment":
+      return "Customer payment distributed.";
+    case "create-customer-registration-link":
+      return "Registration link created and sent to selected agents.";
     case "save-invoice":
       return "Invoice saved.";
     case "update-inquiry":
@@ -1762,5 +2536,28 @@ function inferFileExtension(file: ProductImageFile) {
       return "svg";
     default:
       return "bin";
+  }
+}
+
+function createRegistrationToken() {
+  return randomBytes(32).toString("base64url");
+}
+
+function hashRegistrationToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function registrationDurationSeconds(duration: RegistrationLinkDuration) {
+  switch (duration) {
+    case "30m":
+      return 30 * 60;
+    case "1h":
+      return 60 * 60;
+    case "3h":
+      return 3 * 60 * 60;
+    case "12h":
+      return 12 * 60 * 60;
+    case "1d":
+      return 24 * 60 * 60;
   }
 }

@@ -7,13 +7,11 @@ import {
 
 const agentUserId = "22222222-2222-2222-2222-222222222222";
 const agentId = "64568f81-108b-42bd-b926-7e825dad67c6";
-const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
 
 describe("parseAgentActionFormData", () => {
-  it("parses an agent-submitted order for a selected customer", () => {
+  it("parses a product-first agent order without customer details", () => {
     const formData = new FormData();
     formData.set("action", "create-agent-order");
-    formData.set("customerId", customerId);
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "2");
     formData.append("addDetails", "  Slice thin  ");
@@ -21,16 +19,12 @@ describe("parseAgentActionFormData", () => {
     formData.append("quantity", "  ");
     formData.append("addDetails", "  ");
 
-    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set([customerId]))).toEqual({
+    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
       success: true,
       action: {
         type: "create-agent-order",
         agentId,
         payload: {
-          customer: {
-            type: "existing",
-            customerId,
-          },
           items: [
             {
               productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -43,10 +37,10 @@ describe("parseAgentActionFormData", () => {
     });
   });
 
-  it("parses an agent-submitted order for a new customer", () => {
+  it("ignores customer fields when parsing product-first agent orders", () => {
     const formData = new FormData();
     formData.set("action", "create-agent-order");
-    formData.set("customerId", "");
+    formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
     formData.set("firstName", "  Liza  ");
     formData.set("lastName", "Reyes");
     formData.set("phoneNumber", " 09171234567 ");
@@ -62,16 +56,6 @@ describe("parseAgentActionFormData", () => {
         type: "create-agent-order",
         agentId,
         payload: {
-          customer: {
-            type: "new",
-            payload: {
-              firstName: "Liza",
-              lastName: "Reyes",
-              phoneNumber: "09171234567",
-              email: null,
-              address: "Stall 4",
-            },
-          },
           items: [
             {
               productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -84,29 +68,14 @@ describe("parseAgentActionFormData", () => {
     });
   });
 
-  it("rejects agent order creation for unassigned customers", () => {
-    const formData = new FormData();
-    formData.set("action", "create-agent-order");
-    formData.set("customerId", customerId);
-    formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
-    formData.append("quantity", "2");
-    formData.append("addDetails", "");
-
-    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
-      success: false,
-      errors: ["Selected customer is not assigned to this agent."],
-    });
-  });
-
   it("rejects agent orders without at least one item", () => {
     const formData = new FormData();
     formData.set("action", "create-agent-order");
-    formData.set("customerId", customerId);
     formData.append("productId", "");
     formData.append("quantity", "");
     formData.append("addDetails", "");
 
-    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set([customerId]))).toEqual({
+    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
       success: false,
       errors: ["At least one order item is required."],
     });
@@ -114,7 +83,7 @@ describe("parseAgentActionFormData", () => {
 });
 
 describe("executeAgentAction", () => {
-  it("submits agent orders through the trusted RPC instead of direct table inserts", async () => {
+  it("submits product-first agent orders through the trusted RPC", async () => {
     const rpc = vi.fn(() => Promise.resolve({
       data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       error: null,
@@ -124,53 +93,6 @@ describe("executeAgentAction", () => {
       type: "create-agent-order",
       agentId,
       payload: {
-        customer: {
-          type: "existing",
-          customerId,
-        },
-        items: [
-          {
-            productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
-            quantity: 2,
-            addDetails: null,
-          },
-        ],
-      },
-    });
-
-    expect(rpc).toHaveBeenCalledWith("submit_agent_order", {
-      target_customer_id: customerId,
-      item_payload: [
-        {
-          productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
-          quantity: 2,
-          addDetails: null,
-        },
-      ],
-      customer_payload: null,
-    });
-  });
-
-  it("submits new customer orders through the trusted RPC with customer details", async () => {
-    const rpc = vi.fn(() => Promise.resolve({
-      data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-      error: null,
-    }));
-
-    await executeAgentAction({ rpc } as never, {
-      type: "create-agent-order",
-      agentId,
-      payload: {
-        customer: {
-          type: "new",
-          payload: {
-            firstName: "Liza",
-            lastName: "Reyes",
-            phoneNumber: "09171234567",
-            email: null,
-            address: "Stall 4",
-          },
-        },
         items: [
           {
             productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -190,13 +112,7 @@ describe("executeAgentAction", () => {
           addDetails: null,
         },
       ],
-      customer_payload: {
-        firstName: "Liza",
-        lastName: "Reyes",
-        phoneNumber: "09171234567",
-        email: null,
-        address: "Stall 4",
-      },
+      customer_payload: null,
     });
   });
 
@@ -210,10 +126,6 @@ describe("executeAgentAction", () => {
       type: "create-agent-order",
       agentId,
       payload: {
-        customer: {
-          type: "existing",
-          customerId,
-        },
         items: [
           {
             productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",

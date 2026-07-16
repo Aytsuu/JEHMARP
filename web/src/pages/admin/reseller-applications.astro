@@ -13,6 +13,10 @@ import {
   parseAdminResellerApplicationFilters,
   serializeAdminResellerApplicationFilters,
 } from "@/lib/admin-dashboard/reseller-application-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -24,11 +28,18 @@ if (!adminRoute.ready) {
 }
 
 const resellerApplicationFilters = parseAdminResellerApplicationFilters(Astro.url);
+const resellerApplicationPagination = parseAdminPagination(Astro.url);
 const resellerApplicationFilterQuery =
-  serializeAdminResellerApplicationFilters(resellerApplicationFilters);
+  mergeAdminPaginationQuery(
+    serializeAdminResellerApplicationFilters(resellerApplicationFilters),
+    resellerApplicationPagination,
+  );
 const [dashboardData, data] = await Promise.all([
   loadAdminDashboardData(),
-  loadAdminResellerApplicationManagementData(resellerApplicationFilters),
+  loadAdminResellerApplicationManagementData(
+    resellerApplicationFilters,
+    resellerApplicationPagination,
+  ),
 ]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---

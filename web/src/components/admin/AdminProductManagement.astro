@@ -9,8 +9,10 @@ import type { AdminProductFilters } from "@/lib/admin-dashboard/product-filters"
 import {
   escapeTextareaValue,
   formatCurrency,
+  productAgentCommissionLabel,
   productDisplayLabel,
 } from "@/lib/admin-dashboard/view";
+import { productOtherOptionValue } from "@/lib/admin-dashboard/product-options";
 import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
@@ -70,24 +72,55 @@ function formatStockStatus(status: string): string {
         >
         <label class="field-row">
           <span>Unit label</span>
-          <select name="unitLabel" required>
+          <select
+            name="unitLabel"
+            required
+            data-product-other-option-select
+            data-product-other-option-target="create-unit-other"
+          >
             {
               productUnitLabels.map((unitLabel) => (
                 <option value={unitLabel}>{unitLabel}</option>
               ))
             }
+            <option value={productOtherOptionValue}>Other</option>
           </select>
         </label>
+        <label
+          class="field-row product-other-option-field"
+          hidden
+          data-product-other-option-field="create-unit-other"
+          ><span>Other unit label</span><input
+            name="unitLabelOther"
+            data-product-other-option-input
+          /></label
+        >
         <label class="field-row">
           <span>Category</span>
-          <select name="category" required data-create-product-category>
+          <select
+            name="category"
+            required
+            data-create-product-category
+            data-product-other-option-select
+            data-product-other-option-target="create-category-other"
+          >
             {
               productCategories.map((category) => (
                 <option value={category}>{category}</option>
               ))
             }
+            <option value={productOtherOptionValue}>Other</option>
           </select>
         </label>
+        <label
+          class="field-row product-other-option-field"
+          hidden
+          data-product-other-option-field="create-category-other"
+          ><span>Other category</span><input
+            name="categoryOther"
+            data-product-other-option-input
+          /></label
+        >
         <label class="field-row"
           ><span>Default price</span><input
             name="defaultPrice"
@@ -97,14 +130,67 @@ function formatStockStatus(status: string): string {
             required
           /></label
         >
-        <label class="field-row"
-          ><span>Reseller price</span><input
-            name="resellerPrice"
-            type="number"
-            min="0"
-            step="0.01"
+        <label class="field-row">
+          <span>Reseller deduction type</span>
+          <select
+            name="resellerDeductionType"
             required
-          /></label
+            data-product-amount-type-select
+            data-product-amount-target="create-reseller-deduction"
+          >
+            <option value="value">Value</option>
+            <option value="percentage">Percentage</option>
+          </select>
+        </label>
+        <label class="field-row"
+          ><span>Reseller deduction</span>
+          <span
+            class="product-amount-input"
+            data-product-amount-field="create-reseller-deduction"
+          >
+            <input
+              name="resellerDeductionValue"
+              type="number"
+              min="0"
+              step="0.01"
+              value="0"
+              required
+            />
+            <span class="product-amount-input__suffix" aria-hidden="true"
+              >₱</span
+            >
+          </span></label
+        >
+        <label class="field-row">
+          <span>Agent commission type</span>
+          <select
+            name="agentCommissionType"
+            required
+            data-product-amount-type-select
+            data-product-amount-target="create-agent-commission"
+          >
+            <option value="value">Value</option>
+            <option value="percentage">Percentage</option>
+          </select>
+        </label>
+        <label class="field-row"
+          ><span>Agent commission</span>
+          <span
+            class="product-amount-input"
+            data-product-amount-field="create-agent-commission"
+          >
+            <input
+              name="agentCommissionValue"
+              type="number"
+              min="0"
+              step="0.01"
+              value="0"
+              required
+            />
+            <span class="product-amount-input__suffix" aria-hidden="true"
+              >₱</span
+            >
+          </span></label
         >
         <label class="field-row">
           <span>Stock status</span>
@@ -129,6 +215,7 @@ function formatStockStatus(status: string): string {
               name="imageFile"
               type="file"
               accept="image/*"
+              data-max-size-bytes="2097152"
               required
               data-product-image-input
             />
@@ -168,7 +255,11 @@ function formatStockStatus(status: string): string {
     </div>
   </Sheet>
 
-  <div data-interactive-table class="dashboard-interactive-table">
+  <div
+    data-interactive-table
+    data-server-pagination="true"
+    class="dashboard-interactive-table"
+  >
     <div class="table-filters product-management-toolbar">
       <form
         method="get"
@@ -242,6 +333,7 @@ function formatStockStatus(status: string): string {
               </th>
               <th scope="col">Description</th>
               <th scope="col">Pricing</th>
+              <th scope="col">Commission</th>
               <th scope="col">Status</th>
               <th scope="col">Date Created</th>
               <th scope="col">Action</th>
@@ -251,7 +343,7 @@ function formatStockStatus(status: string): string {
             {
               data.products.length === 0 ? (
                 <DashboardTableEmptyState
-                  colspan={6}
+                  colspan={7}
                   message="No products match the selected filters."
                 />
               ) : (
@@ -312,8 +404,23 @@ function formatStockStatus(status: string): string {
                           />
                           <input
                             type="hidden"
-                            name="resellerPrice"
-                            value={product.reseller_price}
+                            name="resellerDeductionType"
+                            value={product.reseller_deduction_type}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerDeductionValue"
+                            value={product.reseller_deduction_value}
+                          />
+                          <input
+                            type="hidden"
+                            name="agentCommissionType"
+                            value={product.agent_commission_type}
+                          />
+                          <input
+                            type="hidden"
+                            name="agentCommissionValue"
+                            value={product.agent_commission_value}
                           />
                           <input
                             type="hidden"
@@ -331,6 +438,7 @@ function formatStockStatus(status: string): string {
                                 name="imageFile"
                                 type="file"
                                 accept="image/*"
+                                data-max-size-bytes="2097152"
                               />
                             </>
                           </label>
@@ -346,7 +454,12 @@ function formatStockStatus(status: string): string {
                           </label>
                           <label>
                             <span>Category</span>
-                            <select name="category" required>
+                            <select
+                              name="category"
+                              required
+                              data-product-other-option-select
+                              data-product-other-option-target={`product-${product.id}-category-other`}
+                            >
                               {productCategories.map((category) => (
                                 <option
                                   value={category}
@@ -355,11 +468,29 @@ function formatStockStatus(status: string): string {
                                   {category}
                                 </option>
                               ))}
+                              <option value={productOtherOptionValue}>
+                                Other
+                              </option>
                             </select>
+                          </label>
+                          <label
+                            hidden
+                            data-product-other-option-field={`product-${product.id}-category-other`}
+                          >
+                            <span>Other category</span>
+                            <input
+                              name="categoryOther"
+                              data-product-other-option-input
+                            />
                           </label>
                           <label>
                             <span>Unit label</span>
-                            <select name="unitLabel" required>
+                            <select
+                              name="unitLabel"
+                              required
+                              data-product-other-option-select
+                              data-product-other-option-target={`product-${product.id}-unit-other`}
+                            >
                               {productUnitLabels.map((unitLabel) => (
                                 <option
                                   value={unitLabel}
@@ -368,7 +499,20 @@ function formatStockStatus(status: string): string {
                                   {unitLabel}
                                 </option>
                               ))}
+                              <option value={productOtherOptionValue}>
+                                Other
+                              </option>
                             </select>
+                          </label>
+                          <label
+                            hidden
+                            data-product-other-option-field={`product-${product.id}-unit-other`}
+                          >
+                            <span>Other unit label</span>
+                            <input
+                              name="unitLabelOther"
+                              data-product-other-option-input
+                            />
                           </label>
                           <div class="button-row">
                             <button type="submit">Save product</button>
@@ -437,8 +581,23 @@ function formatStockStatus(status: string): string {
                           />
                           <input
                             type="hidden"
-                            name="resellerPrice"
-                            value={product.reseller_price}
+                            name="resellerDeductionType"
+                            value={product.reseller_deduction_type}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerDeductionValue"
+                            value={product.reseller_deduction_value}
+                          />
+                          <input
+                            type="hidden"
+                            name="agentCommissionType"
+                            value={product.agent_commission_type}
+                          />
+                          <input
+                            type="hidden"
+                            name="agentCommissionValue"
+                            value={product.agent_commission_value}
                           />
                           <input
                             type="hidden"
@@ -511,15 +670,108 @@ function formatStockStatus(status: string): string {
                           </label>
                           <label>
                             <>
-                              <span>Reseller price</span>
-                              <input
-                                name="resellerPrice"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={product.reseller_price}
+                              <span>Reseller deduction type</span>
+                              <select
+                                name="resellerDeductionType"
                                 required
-                              />
+                                data-product-amount-type-select
+                                data-product-amount-target={`product-${product.id}-reseller-deduction`}
+                              >
+                                <option
+                                  value="value"
+                                  selected={product.reseller_deduction_type ===
+                                    "value"}
+                                >
+                                  Value
+                                </option>
+                                <option
+                                  value="percentage"
+                                  selected={product.reseller_deduction_type ===
+                                    "percentage"}
+                                >
+                                  Percentage
+                                </option>
+                              </select>
+                            </>
+                          </label>
+                          <label>
+                            <>
+                              <span>Reseller deduction</span>
+                              <span
+                                class="product-amount-input"
+                                data-product-amount-field={`product-${product.id}-reseller-deduction`}
+                              >
+                                <input
+                                  name="resellerDeductionValue"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={product.reseller_deduction_value}
+                                  required
+                                />
+                                <span
+                                  class="product-amount-input__suffix"
+                                  aria-hidden="true"
+                                >
+                                  {product.reseller_deduction_type ===
+                                  "percentage"
+                                    ? "%"
+                                    : "₱"}
+                                </span>
+                              </span>
+                            </>
+                          </label>
+                          <label>
+                            <>
+                              <span>Agent commission type</span>
+                              <select
+                                name="agentCommissionType"
+                                required
+                                data-product-amount-type-select
+                                data-product-amount-target={`product-${product.id}-agent-commission`}
+                              >
+                                <option
+                                  value="value"
+                                  selected={product.agent_commission_type ===
+                                    "value"}
+                                >
+                                  Value
+                                </option>
+                                <option
+                                  value="percentage"
+                                  selected={product.agent_commission_type ===
+                                    "percentage"}
+                                >
+                                  Percentage
+                                </option>
+                              </select>
+                            </>
+                          </label>
+                          <label>
+                            <>
+                              <span>Agent commission</span>
+                              <span
+                                class="product-amount-input"
+                                data-product-amount-field={`product-${product.id}-agent-commission`}
+                              >
+                                <input
+                                  name="agentCommissionValue"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={product.agent_commission_value}
+                                  required
+                                />
+                                <span
+                                  class="product-amount-input__suffix"
+                                  aria-hidden="true"
+                                >
+                                  {product.agent_commission_type ===
+                                  "percentage"
+                                    ? "%"
+                                    : "₱"}
+                                </span>
+                              </span>
                             </>
                           </label>
 
@@ -557,6 +809,12 @@ function formatStockStatus(status: string): string {
                           </div>
                         </form>
                       </div>
+                    </td>
+
+                    <td>
+                      <span title={productAgentCommissionLabel(product)}>
+                        {productAgentCommissionLabel(product)}
+                      </span>
                     </td>
 
                     {/* 4. Status Cell (Editable Popover) */}
@@ -628,8 +886,23 @@ function formatStockStatus(status: string): string {
                           />
                           <input
                             type="hidden"
-                            name="resellerPrice"
-                            value={product.reseller_price}
+                            name="resellerDeductionType"
+                            value={product.reseller_deduction_type}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerDeductionValue"
+                            value={product.reseller_deduction_value}
+                          />
+                          <input
+                            type="hidden"
+                            name="agentCommissionType"
+                            value={product.agent_commission_type}
+                          />
+                          <input
+                            type="hidden"
+                            name="agentCommissionValue"
+                            value={product.agent_commission_value}
                           />
                           <input
                             type="hidden"
@@ -656,34 +929,7 @@ function formatStockStatus(status: string): string {
                       )}
                     </td>
 
-                    {/* 6. Action Cell (Static Form) */}
-                    <td>
-                      {product.is_active ? (
-                        <form method="post" style="margin: 0;">
-                          <input
-                            type="hidden"
-                            name="action"
-                            value="deactivate-product"
-                          />
-                          <input
-                            type="hidden"
-                            name="productId"
-                            value={product.id}
-                          />
-                          <button
-                            type="submit"
-                            class="btn-table-manage"
-                            style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block;"
-                          >
-                            Deactivate
-                          </button>
-                        </form>
-                      ) : (
-                        <span style="color: #9ca3af; font-style: italic; font-size: 0.85rem;">
-                          None
-                        </span>
-                      )}
-                    </td>
+                    <td></td>
                   </tr>
                 ))
               )
@@ -693,7 +939,7 @@ function formatStockStatus(status: string): string {
       </DashboardTableBoard>
     </div>
 
-    <DashboardTablePagination />
+    <DashboardTablePagination pagination={data.pagination} />
   </div>
 
   <template data-product-filter-skeleton>
@@ -707,11 +953,12 @@ function formatStockStatus(status: string): string {
             <th scope="col" class="dashboard-table__cell--product">
               Product
             </th>
-            <th scope="col">Description</th>
-            <th scope="col">Pricing</th>
-            <th scope="col">Status</th>
-            <th scope="col">Date Created</th>
-            <th scope="col">Action</th>
+              <th scope="col">Description</th>
+              <th scope="col">Pricing</th>
+              <th scope="col">Commission</th>
+              <th scope="col">Status</th>
+              <th scope="col">Date Created</th>
+              <th scope="col">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -726,6 +973,9 @@ function formatStockStatus(status: string): string {
                 </td>
                 <td>
                   <span class="table-skeleton-block table-skeleton-block--wide" />
+                </td>
+                <td>
+                  <span class="table-skeleton-block" />
                 </td>
                 <td>
                   <span class="table-skeleton-block" />
@@ -772,7 +1022,7 @@ function formatStockStatus(status: string): string {
     const activeTableShell = tableShell;
     const activeSkeletonTemplate = skeletonTemplate;
 
-    const cacheKey = "admin-products-filter-cache-v1";
+    const cacheKey = "admin-products-filter-cache-v2";
     const fragmentPath = "/admin/products-fragment";
     const filterKeys = ["search", "category", "stockStatus"] as const;
     const autoSubmitFields =
@@ -784,6 +1034,24 @@ function formatStockStatus(status: string): string {
     let searchTimer: number | undefined;
     let activeFetchController: AbortController | undefined;
 
+    function applyPaginationParams(
+      params: URLSearchParams,
+      page: number,
+      pageSize: number,
+    ) {
+      if (page > 1) {
+        params.set("page", String(page));
+      } else {
+        params.delete("page");
+      }
+
+      if (pageSize !== 10) {
+        params.set("pageSize", String(pageSize));
+      } else {
+        params.delete("pageSize");
+      }
+    }
+
     function normalizeParams(params: URLSearchParams) {
       const normalized = new URLSearchParams();
 
@@ -792,10 +1060,27 @@ function formatStockStatus(status: string): string {
         if (value) normalized.set(key, value);
       });
 
+      const page = Number(params.get("page") ?? "1");
+      const pageSize = Number(params.get("pageSize") ?? "10");
+      applyPaginationParams(
+        normalized,
+        Number.isInteger(page) && page > 0 ? page : 1,
+        [10, 50, 100].includes(pageSize) ? pageSize : 10,
+      );
+
       return normalized.toString();
     }
 
-    function normalizeFormQuery() {
+    function currentPageSize() {
+      const limitSelect = document.querySelector<HTMLSelectElement>(
+        "[data-product-table-shell] ~ .dashboard-interactive-table__footer [data-limit-select]",
+      );
+      const value = Number(limitSelect?.value ?? "10");
+
+      return [10, 50, 100].includes(value) ? value : 10;
+    }
+
+    function normalizeFormQuery(options: { page?: number; pageSize?: number } = {}) {
       const params = new URLSearchParams();
       const formData = new FormData(activeForm);
 
@@ -805,6 +1090,12 @@ function formatStockStatus(status: string): string {
           params.set(key, value.trim());
         }
       });
+
+      applyPaginationParams(
+        params,
+        options.page ?? 1,
+        options.pageSize ?? currentPageSize(),
+      );
 
       return params.toString();
     }
@@ -847,8 +1138,49 @@ function formatStockStatus(status: string): string {
         throw new Error("Products fragment did not include a product table.");
       }
 
+      const nextFooter = parsed.querySelector<HTMLElement>(
+        "[data-server-pagination-footer]",
+      );
+      const currentFooter = activeTableShell.parentElement?.querySelector<HTMLElement>(
+        "[data-server-pagination-footer]",
+      );
+
       activeTableShell.innerHTML = nextTableShell.innerHTML;
+      if (nextFooter && currentFooter) {
+        currentFooter.innerHTML = nextFooter.innerHTML;
+        Object.entries(nextFooter.dataset).forEach(([key, value]) => {
+          currentFooter.dataset[key] = value;
+        });
+      }
+
+      bindPaginationControls();
       document.dispatchEvent(new Event("dashboard:interactive-table-updated"));
+    }
+
+    function bindPaginationControls() {
+      const footer = activeTableShell.parentElement?.querySelector<HTMLElement>(
+        "[data-server-pagination-footer]",
+      );
+      if (!footer) return;
+
+      const limitSelect = footer.querySelector<HTMLSelectElement>("[data-limit-select]");
+      limitSelect?.addEventListener("change", () => {
+        const pageSize = Number(limitSelect.value);
+        void applyFilters(normalizeFormQuery({
+          page: 1,
+          pageSize: [10, 50, 100].includes(pageSize) ? pageSize : 10,
+        }));
+      }, { once: true });
+
+      footer.querySelectorAll<HTMLButtonElement>("[data-page]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const page = Number(button.dataset.page ?? "1");
+          void applyFilters(normalizeFormQuery({
+            page: Number.isInteger(page) && page > 0 ? page : 1,
+            pageSize: currentPageSize(),
+          }));
+        }, { once: true });
+      });
     }
 
     async function applyFilters(
@@ -937,6 +1269,8 @@ function formatStockStatus(status: string): string {
       window.clearTimeout(searchTimer);
       searchTimer = window.setTimeout(submitFilters, 450);
     });
+
+    bindPaginationControls();
   }
 
   document.addEventListener("DOMContentLoaded", initAdminProductFilters);
@@ -1024,6 +1358,118 @@ function formatStockStatus(status: string): string {
     document.readyState === "interactive"
   ) {
     initCreateProductImagePicker();
+  }
+
+  function syncProductOtherOptionField(select: HTMLSelectElement) {
+    const target = select.dataset.productOtherOptionTarget;
+    const form = select.closest("form");
+    if (!target || !form) return;
+
+    const fields = Array.from(
+      form.querySelectorAll<HTMLElement>("[data-product-other-option-field]"),
+    );
+    const field = fields.find(
+      (candidate) => candidate.dataset.productOtherOptionField === target,
+    );
+    if (!field) return;
+
+    const input = field.querySelector<HTMLInputElement>(
+      "[data-product-other-option-input]",
+    );
+    const isOtherSelected = select.value === "__other";
+
+    field.hidden = !isOtherSelected;
+    if (input) {
+      input.required = isOtherSelected;
+      if (!isOtherSelected) input.value = "";
+    }
+  }
+
+  function initProductOtherOptionFields() {
+    document
+      .querySelectorAll<HTMLSelectElement>("[data-product-other-option-select]")
+      .forEach(syncProductOtherOptionField);
+
+    if (document.documentElement.dataset.productOtherOptionHandler === "true") {
+      return;
+    }
+
+    document.documentElement.dataset.productOtherOptionHandler = "true";
+    document.addEventListener("change", (event) => {
+      const select = event.target;
+      if (
+        select instanceof HTMLSelectElement &&
+        select.matches("[data-product-other-option-select]")
+      ) {
+        syncProductOtherOptionField(select);
+      }
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initProductOtherOptionFields);
+  document.addEventListener("astro:after-swap", initProductOtherOptionFields);
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    initProductOtherOptionFields();
+  }
+
+  function syncProductAmountSuffix(select: HTMLSelectElement) {
+    const target = select.dataset.productAmountTarget;
+    const form = select.closest("form");
+    if (!target || !form) return;
+
+    const fields = Array.from(
+      form.querySelectorAll<HTMLElement>("[data-product-amount-field]"),
+    );
+    const field = fields.find(
+      (candidate) => candidate.dataset.productAmountField === target,
+    );
+    if (!field) return;
+
+    const suffix = field.querySelector<HTMLElement>(
+      ".product-amount-input__suffix",
+    );
+    if (!suffix) return;
+
+    const isPercentage = select.value === "percentage";
+    suffix.textContent = isPercentage ? "%" : "₱";
+    field.dataset.amountType = isPercentage ? "percentage" : "value";
+  }
+
+  function initProductAmountSuffixes() {
+    document
+      .querySelectorAll<HTMLSelectElement>("[data-product-amount-type-select]")
+      .forEach(syncProductAmountSuffix);
+
+    if (document.documentElement.dataset.productAmountSuffixHandler === "true") {
+      return;
+    }
+
+    document.documentElement.dataset.productAmountSuffixHandler = "true";
+    document.addEventListener("change", (event) => {
+      const select = event.target;
+      if (
+        select instanceof HTMLSelectElement &&
+        select.matches("[data-product-amount-type-select]")
+      ) {
+        syncProductAmountSuffix(select);
+      }
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initProductAmountSuffixes);
+  document.addEventListener("astro:after-swap", initProductAmountSuffixes);
+  document.addEventListener(
+    "dashboard:interactive-table-updated",
+    initProductAmountSuffixes,
+  );
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    initProductAmountSuffixes();
   }
 
   function initCreateProductCategorySuggestion() {

@@ -6,6 +6,10 @@ import {
   parseAdminInquiryFilters,
   serializeAdminInquiryFilters,
 } from "@/lib/admin-dashboard/inquiry-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -17,8 +21,12 @@ if (!adminRoute.ready) {
 }
 
 const inquiryFilters = parseAdminInquiryFilters(Astro.url);
-const inquiryFilterQuery = serializeAdminInquiryFilters(inquiryFilters);
-const data = await loadAdminInquiryManagementData(inquiryFilters);
+const inquiryPagination = parseAdminPagination(Astro.url);
+const inquiryFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminInquiryFilters(inquiryFilters),
+  inquiryPagination,
+);
+const data = await loadAdminInquiryManagementData(inquiryFilters, inquiryPagination);
 ---
 
 <AdminInquiryManagement

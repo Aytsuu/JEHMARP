@@ -1,0 +1,39 @@
+---
+import AdminSalesManagement from "@/components/admin/AdminSalesManagement.astro";
+import { loadAdminSalesManagementData } from "@/lib/admin-dashboard/data";
+import {
+  parseAdminOrderFilters,
+  serializeAdminOrderFilters,
+} from "@/lib/admin-dashboard/order-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const salesFilters = parseAdminOrderFilters(Astro.url);
+const visibleSalesFilters = {
+  search: salesFilters.search,
+  source: salesFilters.source,
+};
+const salesPagination = parseAdminPagination(Astro.url);
+const salesFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminOrderFilters(visibleSalesFilters),
+  salesPagination,
+);
+const data = await loadAdminSalesManagementData(visibleSalesFilters, salesPagination);
+---
+
+<AdminSalesManagement
+  data={data}
+  activeFilters={visibleSalesFilters}
+  filterQuery={salesFilterQuery}
+/>

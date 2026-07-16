@@ -10,6 +10,10 @@ import {
   parseAdminAgentFilters,
   serializeAdminAgentFilters,
 } from "@/lib/admin-dashboard/agent-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -21,10 +25,14 @@ if (!adminRoute.ready) {
 }
 
 const agentFilters = parseAdminAgentFilters(Astro.url);
-const agentFilterQuery = serializeAdminAgentFilters(agentFilters);
+const agentPagination = parseAdminPagination(Astro.url);
+const agentFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminAgentFilters(agentFilters),
+  agentPagination,
+);
 const [dashboardData, data] = await Promise.all([
   loadAdminDashboardData(),
-  loadAdminAgentManagementData(agentFilters),
+  loadAdminAgentManagementData(agentFilters, agentPagination),
 ]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---

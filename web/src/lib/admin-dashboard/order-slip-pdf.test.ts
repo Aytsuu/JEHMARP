@@ -49,6 +49,8 @@ describe("buildOrderSlipPdf", () => {
             name: "Pork Belly",
             unit_label: "kg",
             default_price: 125,
+            agent_commission_type: "value",
+            agent_commission_value: 0,
           },
         },
       ],

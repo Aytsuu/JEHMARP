@@ -3,22 +3,31 @@ import { getOrderStatuses } from "./actions";
 
 export const orderSources = ["guest_shop", "agent_submitted", "admin_manual"] as const;
 export const paymentStatuses = ["unpaid", "partial", "paid", "refunded"] as const;
+export const agentOrderStatuses = ["pending_customers", "pending_order", "processing", "closed"] as const;
 
 export type AdminOrderSource = (typeof orderSources)[number];
 export type AdminPaymentStatus = (typeof paymentStatuses)[number];
+export type AdminOrderStatusFilter = OrderStatus | (typeof agentOrderStatuses)[number];
 
 export type AdminOrderFilters = {
   search?: string;
   source?: AdminOrderSource;
-  orderStatus?: OrderStatus;
+  orderStatus?: AdminOrderStatusFilter;
   paymentStatus?: AdminPaymentStatus;
 };
+
+export function getAdminOrderStatusFilters(): AdminOrderStatusFilter[] {
+  return [...new Set<AdminOrderStatusFilter>([
+    ...getOrderStatuses(),
+    ...agentOrderStatuses,
+  ])];
+}
 
 export function parseAdminOrderFilters(url: URL): AdminOrderFilters {
   return {
     ...optionalSearchFilter(url.searchParams.get("search")),
     ...optionalFilter("source", url.searchParams.get("source"), orderSources),
-    ...optionalFilter("orderStatus", url.searchParams.get("orderStatus"), getOrderStatuses()),
+    ...optionalFilter("orderStatus", url.searchParams.get("orderStatus"), getAdminOrderStatusFilters()),
     ...optionalFilter("paymentStatus", url.searchParams.get("paymentStatus"), paymentStatuses),
   };
 }

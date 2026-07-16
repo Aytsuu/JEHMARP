@@ -21,7 +21,7 @@ const skeletonRows = Array.from({ length: 6 });
 ---
 
 <section class="admin-panel" aria-labelledby="admin-reseller-applications-title">
-  <div data-interactive-table class="dashboard-interactive-table">
+  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table">
     <div class="table-filters order-management-toolbar">
       <form method="get" action="/admin/reseller-applications" class="order-filter-form" data-reseller-filter-form data-current-filter-query={filterQuery} aria-label="Filter reseller applications">
         <div class="order-filter-form__field order-filter-form__field--search">
@@ -114,7 +114,7 @@ const skeletonRows = Array.from({ length: 6 });
         </table>
       </DashboardTableBoard>
     </div>
-    <DashboardTablePagination />
+    <DashboardTablePagination pagination={data.pagination} />
   </div>
   <template data-reseller-filter-skeleton>
     <DashboardTableBoard aria-busy="true" aria-live="polite">
@@ -150,35 +150,21 @@ const skeletonRows = Array.from({ length: 6 });
 </section>
 
 <script>
-  import {
-    readDashboardFragmentCache,
-    writeDashboardFragmentCache,
-  } from "@/lib/client/dashboard-fragment-cache";
+  import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
 
   function initAdminResellerFilters() {
-    const form = document.querySelector<HTMLFormElement>("[data-reseller-filter-form]");
-    const tableShell = document.querySelector<HTMLElement>("[data-reseller-table-shell]");
-    const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-reseller-filter-skeleton]");
-    if (!form || !tableShell || !skeletonTemplate) return;
-    if (form.dataset.resellerFilterInitialized === "true") return;
-    form.dataset.resellerFilterInitialized = "true";
-    const activeForm = form, activeTableShell = tableShell, activeSkeletonTemplate = skeletonTemplate;
-    const cacheKey = "admin-reseller-filter-cache-v1", fragmentPath = "/admin/reseller-applications-fragment";
-    const filterKeys = ["search", "status"] as const;
-    const autoSubmitFields = activeForm.querySelectorAll<HTMLSelectElement>("select");
-    const searchInput = activeForm.querySelector<HTMLInputElement>("[data-reseller-search-input]");
-    let submitTimer: number | undefined, searchTimer: number | undefined, activeFetchController: AbortController | undefined;
-    function normalizeParams(params: URLSearchParams) { const normalized = new URLSearchParams(); filterKeys.forEach((key) => { const value = params.get(key)?.trim(); if (value) normalized.set(key, value); }); return normalized.toString(); }
-    function normalizeFormQuery() { const params = new URLSearchParams(); const formData = new FormData(activeForm); filterKeys.forEach((key) => { const value = formData.get(key); if (typeof value === "string" && value.trim()) params.set(key, value.trim()); }); return params.toString(); }
-    function buildUrl(path: string, targetQuery: string) { return targetQuery ? `${path}?${targetQuery}` : path; }
-    function showSkeletonForQuery(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery); if (targetQuery === currentQuery || cachedFragment) return; const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true); if (skeleton) activeTableShell.replaceChildren(skeleton); }
-    function replaceFragment(fragmentHtml: string) { const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html"); const nextTableShell = parsed.querySelector<HTMLElement>("[data-reseller-table-shell]"); if (!nextTableShell) throw new Error("Reseller applications fragment did not include a table."); activeTableShell.innerHTML = nextTableShell.innerHTML; document.dispatchEvent(new Event("dashboard:interactive-table-updated")); document.dispatchEvent(new Event("dashboard:reseller-applications-table-updated")); }
-    async function applyFilters(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); if (targetQuery === currentQuery) return; const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery); if (cachedFragment) { window.history.replaceState({ resellerFilterQuery: targetQuery }, "", buildUrl("/admin/reseller-applications", targetQuery)); replaceFragment(cachedFragment); activeForm.dataset.currentFilterQuery = targetQuery; return; } showSkeletonForQuery(targetQuery); activeFetchController?.abort(); const fetchController = new AbortController(); activeFetchController = fetchController; try { const response = await fetch(buildUrl(fragmentPath, targetQuery), { headers: { "X-Requested-With": "fetch" }, signal: fetchController.signal }); const fragmentHtml = await window.readDashboardFragmentResponse(response); window.history.replaceState({ resellerFilterQuery: targetQuery }, "", buildUrl("/admin/reseller-applications", targetQuery)); replaceFragment(fragmentHtml); activeForm.dataset.currentFilterQuery = targetQuery; writeDashboardFragmentCache(cacheKey, targetQuery, fragmentHtml); } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; window.location.href = buildUrl("/admin/reseller-applications", targetQuery); } finally { if (activeFetchController === fetchController) activeFetchController = undefined; } }
-    function submitFilters() { window.clearTimeout(submitTimer); submitTimer = window.setTimeout(() => { void applyFilters(normalizeFormQuery()); }, 120); }
-    writeDashboardFragmentCache(cacheKey, normalizeParams(new URLSearchParams(window.location.search)), activeTableShell.outerHTML);
-    activeForm.addEventListener("submit", (event) => { event.preventDefault(); void applyFilters(normalizeFormQuery()); });
-    autoSubmitFields.forEach((field) => field.addEventListener("change", submitFilters));
-    searchInput?.addEventListener("input", () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(submitFilters, 450); });
+    initDashboardFragmentTable({
+      cacheKey: "admin-reseller-filter-cache-v2",
+      fragmentPath: "/admin/reseller-applications-fragment",
+      pagePath: "/admin/reseller-applications",
+      formSelector: "[data-reseller-filter-form]",
+      tableShellSelector: "[data-reseller-table-shell]",
+      skeletonTemplateSelector: "[data-reseller-filter-skeleton]",
+      filterKeys: ["search", "status"],
+      searchInputSelector: "[data-reseller-search-input]",
+      historyStateKey: "resellerFilterQuery",
+      updatedEvents: ["dashboard:reseller-applications-table-updated"],
+    });
   }
   document.addEventListener("DOMContentLoaded", initAdminResellerFilters);
   document.addEventListener("astro:after-swap", initAdminResellerFilters);

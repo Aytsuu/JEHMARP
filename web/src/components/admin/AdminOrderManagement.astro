@@ -7,14 +7,12 @@ import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astr
 import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
-import { getOrderStatuses } from "@/lib/admin-dashboard/actions";
 import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
-import { orderSources, paymentStatuses } from "@/lib/admin-dashboard/order-filters";
+import { getAdminOrderStatusFilters, orderSources, paymentStatuses } from "@/lib/admin-dashboard/order-filters";
 import {
   formatCurrency,
   formatDate,
   fullName,
-  orderTotal,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 
@@ -45,9 +43,13 @@ const customerOptions = data.customers.map((customer) => ({
   customer,
   label: fullName(customer),
   paymentNotice: customerPaymentNoticeMap.get(customer.id) ?? "",
+  balance: data.customerBalances[customer.id] ?? 0,
+  creditLimit: customer.credit_limit,
+  creditExceeded: customer.credit_limit_exceeded,
 }));
-const orderStatuses = getOrderStatuses();
+const orderStatuses = getAdminOrderStatusFilters();
 const skeletonRows = Array.from({ length: 6 });
+const orderRows = data.orderRows;
 ---
 
 <section id="admin-orders" class="admin-panel" aria-labelledby="admin-orders-title">
@@ -118,7 +120,7 @@ const skeletonRows = Array.from({ length: 6 });
             </label>
           </div>
           <template data-customer-option-template>
-            {customerOptions.map(({ customer, label, paymentNotice }) => (
+            {customerOptions.map(({ customer, label, paymentNotice, balance, creditLimit, creditExceeded }) => (
               <button
                 type="button"
                 class="order-customer-picker__option"
@@ -132,6 +134,9 @@ const skeletonRows = Array.from({ length: 6 });
                 data-customer-assigned-agent-id={customer.assigned_agent_id ?? ""}
                 data-customer-is-reseller={String(customer.is_reseller)}
                 data-customer-payment-notice={paymentNotice}
+                data-customer-balance={balance}
+                data-customer-credit-limit={creditLimit}
+                data-customer-credit-exceeded={String(creditExceeded)}
               >
                 {label}
               </button>
@@ -151,7 +156,7 @@ const skeletonRows = Array.from({ length: 6 });
             <label class="field-row"><span>Phone number</span><input name="phoneNumber" required data-customer-phone-number /></label>
             <label class="field-row"><span>Email</span><input name="email" type="email" data-customer-email /></label>
             <label class="field-row">
-              <span>Assigned customer agent</span>
+              <span>Agent</span>
               <select name="assignedAgentId" data-customer-assigned-agent-id>
                 <option value="">None</option>
                 {data.agents.map((agent) => (
@@ -165,6 +170,24 @@ const skeletonRows = Array.from({ length: 6 });
             </label>
           </div>
           <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
+        </div>
+      </section>
+
+      <section class="order-create-section">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Release and payment</h3>
+        </div>
+        <div class="order-create-section__body">
+          <div class="admin-form-grid order-create-form__payment-grid">
+            <label class="field-row">
+              <span>Release date</span>
+              <input name="releaseDate" type="date" data-release-date />
+            </label>
+            <div class="order-create-form__total" aria-live="polite">
+              <span>Total value</span>
+              <strong data-order-total-value>{formatCurrency(0)}</strong>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -208,7 +231,12 @@ const skeletonRows = Array.from({ length: 6 });
                   <select name="productId" required disabled={activeProducts.length === 0} data-order-product-select>
                     <option value="">Select product</option>
                     {activeProducts.map((product) => (
-                      <option value={product.id} data-product-name={product.name}>
+                      <option
+                        value={product.id}
+                        data-product-name={product.name}
+                        data-product-retail-price={product.default_price}
+                        data-product-reseller-price={product.reseller_price}
+                      >
                         {product.name} - retail {formatCurrency(product.default_price)} / reseller {formatCurrency(product.reseller_price)} per {product.unit_label}
                       </option>
                     ))}
@@ -305,7 +333,12 @@ const skeletonRows = Array.from({ length: 6 });
                 <select name="productId" required disabled={activeProducts.length === 0} data-order-product-select>
                   <option value="">Select product</option>
                   {activeProducts.map((product) => (
-                    <option value={product.id} data-product-name={product.name}>
+                    <option
+                      value={product.id}
+                      data-product-name={product.name}
+                      data-product-retail-price={product.default_price}
+                      data-product-reseller-price={product.reseller_price}
+                    >
                       {product.name} - retail {formatCurrency(product.default_price)} / reseller {formatCurrency(product.reseller_price)} per {product.unit_label}
                     </option>
                   ))}
@@ -323,13 +356,43 @@ const skeletonRows = Array.from({ length: 6 });
           </div>
         </details>
       </template>
+
+      <section class="order-create-section">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Downpayment</h3>
+        </div>
+        <div class="order-create-section__body">
+          <div class="admin-form-grid order-create-form__payment-grid">
+            <label class="field-row">
+              <span>Amount received</span>
+              <input name="downpaymentAmount" type="number" min="0.01" step="0.01" data-downpayment-amount />
+            </label>
+            <label class="field-row">
+              <span>Payment method</span>
+              <input name="downpaymentMethod" value="Cash" data-downpayment-method />
+            </label>
+            <label class="field-row">
+              <span>Payment date</span>
+              <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
+            </label>
+            <label class="field-row">
+              <span>Reference</span>
+              <input name="downpaymentReferenceNumber" data-downpayment-reference />
+            </label>
+          </div>
+          <label class="field-row">
+            <span>Payment notes</span>
+            <textarea name="downpaymentNotes" rows="2" data-downpayment-notes></textarea>
+          </label>
+        </div>
+      </section>
     </form>
     <div slot="footer" class="order-create-sheet__footer">
       <button type="submit" form="create-order-form" disabled={!canCreateOrder}>Create order</button>
     </div>
   </Sheet>
 
-  <div data-interactive-table class="dashboard-interactive-table">
+  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table">
     <div class="table-filters order-management-toolbar">
       <form
         method="get"
@@ -408,27 +471,43 @@ const skeletonRows = Array.from({ length: 6 });
             </tr>
           </thead>
           <tbody>
-            {data.orders.length === 0 ? (
+            {orderRows.length === 0 ? (
               <DashboardTableEmptyState
                 colspan={7}
                 message="No orders match the selected filters."
               />
-            ) : data.orders.map((order) => {
-              const invoice = order.invoice[0];
-              const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
-
+            ) : orderRows.map((order) => {
               return (
-                <tr data-status={order.order_status}>
+                <tr data-status={order.status}>
                   <td class="dashboard-table__cell--truncate">
-                    {order.customer ? fullName(order.customer) : "Guest"}
+                    <span class="order-customer-cell">
+                      <span class="order-customer-cell__name">{order.customer_label}</span>
+                    {order.linked_customer_count !== null && (
+                      <span
+                        class="order-customer-count"
+                        tabindex="0"
+                        aria-label={`${order.linked_customer_count} linked customer orders in this agent order`}
+                        title="Linked customer orders in this agent order"
+                        data-tooltip="Linked customer orders in this agent order"
+                      >
+                        {order.linked_customer_count}
+                      </span>
+                    )}
+                    </span>
                   </td>
                   <td>{formatDate(order.created_at)}</td>
-                  <td>{formatOrderSource(order.source)}</td>
-                  <td><StatusBadge kind="order" status={order.order_status} /></td>
-                  <td><StatusBadge kind="payment" status={order.payment_status} /></td>
-                  <td>{formatCurrency(total)}</td>
+                  <td>{order.source_label}</td>
+                  <td><StatusBadge kind="order" status={order.status} label={autoCapitalize(order.status)} /></td>
                   <td>
-                    <ViewButton href={`/admin/orders/${order.id}`} />
+                    {order.payment_status ? (
+                      <StatusBadge kind="payment" status={order.payment_status} />
+                    ) : (
+                      <span class="dashboard-table__muted-line">N/A</span>
+                    )}
+                  </td>
+                  <td>{formatCurrency(order.total_amount)}</td>
+                  <td>
+                    <ViewButton href={order.href} />
                   </td>
                 </tr>
               );
@@ -438,7 +517,7 @@ const skeletonRows = Array.from({ length: 6 });
       </DashboardTableBoard>
     </div>
 
-    <DashboardTablePagination />
+    <DashboardTablePagination pagination={data.pagination} />
   </div>
 
   <template data-order-filter-skeleton>
@@ -475,15 +554,13 @@ const skeletonRows = Array.from({ length: 6 });
 </section>
 
 <script>
-  import {
-    readDashboardFragmentCache,
-    writeDashboardFragmentCache,
-  } from "@/lib/client/dashboard-fragment-cache";
+  import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
 
   function initCreateOrderSheet() {
     const form = document.querySelector<HTMLFormElement>("#create-order-form");
     if (!form || form.dataset.orderSheetInitialized === "true") return;
     form.dataset.orderSheetInitialized = "true";
+    const orderForm = form;
 
     const orderItems = form.querySelector<HTMLElement>("[data-order-items]");
     const orderItemTemplate = form.querySelector<HTMLTemplateElement>("[data-order-item-template]");
@@ -497,6 +574,9 @@ const skeletonRows = Array.from({ length: 6 });
     const customerOptionsEmpty = form.querySelector<HTMLElement>("[data-customer-options-empty]");
     const customerOptionTemplate = form.querySelector<HTMLTemplateElement>("[data-customer-option-template]");
     const customerOrderNotice = form.querySelector<HTMLElement>("[data-customer-order-notice]");
+    const orderTotalValue = form.querySelector<HTMLElement>("[data-order-total-value]");
+    const releaseDateInput = form.querySelector<HTMLInputElement>("[data-release-date]");
+    const downpaymentAmountInput = form.querySelector<HTMLInputElement>("[data-downpayment-amount]");
     const newCustomerFields = form.querySelector<HTMLElement>("[data-new-customer-fields]");
     const firstNameInput = form.querySelector<HTMLInputElement>("input[data-customer-first-name]");
     const lastNameInput = form.querySelector<HTMLInputElement>("input[data-customer-last-name]");
@@ -583,6 +663,12 @@ const skeletonRows = Array.from({ length: 6 });
       );
     }
 
+    function getSelectedCustomer() {
+      return getRenderedCustomerOptions().find(
+        (option) => option.dataset.customerLabel === customerSearch?.value,
+      );
+    }
+
     function fillCustomerFields(customer: HTMLElement | undefined) {
       if (firstNameInput) firstNameInput.value = customer?.dataset.customerFirstName ?? "";
       if (lastNameInput) lastNameInput.value = customer?.dataset.customerLastName ?? "";
@@ -597,15 +683,39 @@ const skeletonRows = Array.from({ length: 6 });
       if (!customerOrderNotice) return;
 
       const paymentNotice = customer?.dataset.customerPaymentNotice;
+      const customerBalance = Number(customer?.dataset.customerBalance ?? 0);
+      const creditLimit = Number(customer?.dataset.customerCreditLimit ?? 1000);
+      const creditLimitExceeded = customer?.dataset.customerCreditExceeded === "true";
+      const balanceLabel = Number.isFinite(customerBalance) && customerBalance > 0
+        ? ` Overall balance: ${formatCompactCurrencyForClient(customerBalance)}.`
+        : "";
+      const creditLabel = Number.isFinite(creditLimit)
+        ? ` Credit limit: ${formatCompactCurrencyForClient(creditLimit)}.`
+        : "";
+
+      if (creditLimitExceeded) {
+        customerOrderNotice.textContent = `This customer has exceeded their credit limit.${balanceLabel}${creditLabel}`;
+        customerOrderNotice.dataset.noticeKind = "unpaid";
+        customerOrderNotice.hidden = false;
+        return;
+      }
+
       if (paymentNotice === "unpaid") {
-        customerOrderNotice.textContent = "This customer currently has an unpaid order.";
+        customerOrderNotice.textContent = `This customer currently has an unpaid order.${balanceLabel}${creditLabel}`;
         customerOrderNotice.dataset.noticeKind = "unpaid";
         customerOrderNotice.hidden = false;
         return;
       }
 
       if (paymentNotice === "partial") {
-        customerOrderNotice.textContent = "This customer currently has a partially paid order.";
+        customerOrderNotice.textContent = `This customer currently has a partially paid order.${balanceLabel}${creditLabel}`;
+        customerOrderNotice.dataset.noticeKind = "partial";
+        customerOrderNotice.hidden = false;
+        return;
+      }
+
+      if (customerBalance > 0) {
+        customerOrderNotice.textContent = `Overall balance: ${formatCompactCurrencyForClient(customerBalance)}.${creditLabel}`;
         customerOrderNotice.dataset.noticeKind = "partial";
         customerOrderNotice.hidden = false;
         return;
@@ -617,9 +727,7 @@ const skeletonRows = Array.from({ length: 6 });
     }
 
     function refreshCustomerMode() {
-      const selectedCustomer = getRenderedCustomerOptions().find(
-        (option) => option.dataset.customerLabel === customerSearch?.value,
-      );
+      const selectedCustomer = getSelectedCustomer();
       const selectedCustomerId = selectedCustomer?.dataset.customerId ?? "";
 
       if (customerIdInput) {
@@ -637,7 +745,154 @@ const skeletonRows = Array.from({ length: 6 });
         field.disabled = selectedCustomerId.length > 0;
       });
       newCustomerFields?.toggleAttribute("data-disabled", selectedCustomerId.length > 0);
+      updateOrderTotal();
     }
+
+    function selectedCustomerIsReseller() {
+      const selectedCustomer = getSelectedCustomer();
+
+      if (selectedCustomer) {
+        return selectedCustomer.dataset.customerIsReseller === "true";
+      }
+
+      return isResellerCheckbox?.checked ?? false;
+    }
+
+    function calculateOrderTotal() {
+      return Array.from(orderForm.querySelectorAll<HTMLElement>("[data-order-item-row]")).reduce((total, row) => {
+        const select = row.querySelector<HTMLSelectElement>("[data-order-product-select]");
+        const quantityInput = row.querySelector<HTMLInputElement>("input[name='quantity']");
+        const selectedOption = select?.selectedOptions?.[0];
+        const quantity = Number(quantityInput?.value ?? 0);
+        const unitPrice = Number(
+          selectedCustomerIsReseller()
+            ? selectedOption?.dataset.productResellerPrice
+            : selectedOption?.dataset.productRetailPrice,
+        );
+
+        if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) return total;
+
+        return total + quantity * unitPrice;
+      }, 0);
+    }
+
+    function updateOrderTotal() {
+      if (!orderTotalValue) return;
+      orderTotalValue.textContent = formatCurrencyForClient(calculateOrderTotal());
+    }
+
+    function formatCurrencyForClient(value: number) {
+      return new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+      }).format(value);
+    }
+
+    function formatCompactCurrencyForClient(value: number) {
+      const normalizedValue = Number.isFinite(value) ? value : 0;
+      const absoluteValue = Math.abs(normalizedValue);
+      const sign = normalizedValue < 0 ? "-" : "";
+      const currencySymbol = new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        maximumFractionDigits: 0,
+      }).formatToParts(0).find((part) => part.type === "currency")?.value ?? "PHP";
+
+      if (absoluteValue >= 1000) {
+        const compactValue = new Intl.NumberFormat("en-PH", {
+          maximumFractionDigits: 1,
+          minimumFractionDigits: 0,
+        }).format(absoluteValue / 1000);
+
+        return `${sign}${currencySymbol}${compactValue}k`;
+      }
+
+      return new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        maximumFractionDigits: 0,
+      }).format(normalizedValue);
+    }
+
+    function daysUntilReleaseDate() {
+      if (!releaseDateInput?.value) return null;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const releaseDate = new Date(`${releaseDateInput.value}T00:00:00`);
+      const difference = Math.round((releaseDate.getTime() - today.getTime()) / 86_400_000);
+
+      return Number.isFinite(difference) ? difference : null;
+    }
+
+    function shouldConfirmCreditLimit() {
+      const selectedCustomer = getSelectedCustomer();
+      if (!selectedCustomer) return null;
+
+      const currentBalance = Number(selectedCustomer.dataset.customerBalance ?? 0);
+      const creditLimit = Number(selectedCustomer.dataset.customerCreditLimit ?? 1000);
+      const orderTotal = calculateOrderTotal();
+      const downpaymentAmount = Number(downpaymentAmountInput?.value ?? 0);
+      const addedBalance = Math.max(orderTotal - (Number.isFinite(downpaymentAmount) ? downpaymentAmount : 0), 0);
+      const projectedBalance = currentBalance + addedBalance;
+
+      if (
+        !Number.isFinite(currentBalance) ||
+        !Number.isFinite(creditLimit) ||
+        !Number.isFinite(orderTotal) ||
+        projectedBalance <= 0 ||
+        projectedBalance < creditLimit
+      ) {
+        return null;
+      }
+
+      return {
+        currentBalance,
+        creditLimit,
+        addedBalance,
+        projectedBalance,
+      };
+    }
+
+    form.addEventListener("submit", (event) => {
+      const downpaymentAmount = Number(downpaymentAmountInput?.value ?? 0);
+      const releaseDays = daysUntilReleaseDate();
+
+      if (
+        (!Number.isFinite(downpaymentAmount) || downpaymentAmount <= 0) &&
+        releaseDays !== null &&
+        releaseDays >= 1 &&
+        releaseDays <= 2
+      ) {
+        const shouldProceed = window.confirm(
+          "The release date is 1-2 days away and no downpayment has been recorded. Proceed with this order?",
+        );
+
+        if (!shouldProceed) {
+          event.preventDefault();
+          return;
+        }
+      }
+
+      const creditLimitWarning = shouldConfirmCreditLimit();
+
+      if (creditLimitWarning) {
+        const shouldProceed = window.confirm(
+          [
+            "This order will exceed the customer's credit limit.",
+            `Current balance: ${formatCompactCurrencyForClient(creditLimitWarning.currentBalance)}.`,
+            `New unpaid amount: ${formatCompactCurrencyForClient(creditLimitWarning.addedBalance)}.`,
+            `Projected balance: ${formatCompactCurrencyForClient(creditLimitWarning.projectedBalance)}.`,
+            `Credit limit: ${formatCompactCurrencyForClient(creditLimitWarning.creditLimit)}.`,
+            "Proceed with this order?",
+          ].join("\n"),
+        );
+
+        if (!shouldProceed) {
+          event.preventDefault();
+        }
+      }
+    });
 
     function updateOrderItemTitle(scope: ParentNode) {
       const title = scope.querySelector<HTMLElement>("[data-order-item-title]");
@@ -649,7 +904,12 @@ const skeletonRows = Array.from({ length: 6 });
 
     function bindOrderItem(scope: ParentNode) {
       const select = scope.querySelector<HTMLSelectElement>("[data-order-product-select]");
-      select?.addEventListener("change", () => updateOrderItemTitle(scope));
+      const quantityInput = scope.querySelector<HTMLInputElement>("input[name='quantity']");
+      select?.addEventListener("change", () => {
+        updateOrderItemTitle(scope);
+        updateOrderTotal();
+      });
+      quantityInput?.addEventListener("input", updateOrderTotal);
       updateOrderItemTitle(scope);
     }
 
@@ -672,6 +932,8 @@ const skeletonRows = Array.from({ length: 6 });
       if (clonedItem instanceof HTMLDetailsElement) {
         clonedItem.open = true;
       }
+
+      updateOrderTotal();
     });
 
     orderItems?.addEventListener("click", (event) => {
@@ -685,7 +947,10 @@ const skeletonRows = Array.from({ length: 6 });
       event.preventDefault();
       event.stopPropagation();
       removeButton.closest(".order-item-accordion")?.remove();
+      updateOrderTotal();
     });
+
+    isResellerCheckbox?.addEventListener("change", updateOrderTotal);
 
     customerSearch?.addEventListener("input", () => {
       window.clearTimeout(customerSearchTimer);
@@ -739,6 +1004,7 @@ const skeletonRows = Array.from({ length: 6 });
     renderCustomerOptions(customerSearch?.value ?? "");
     setCustomerPickerOpen(false);
     refreshCustomerMode();
+    updateOrderTotal();
   }
 
   document.addEventListener("DOMContentLoaded", initCreateOrderSheet);
@@ -748,160 +1014,16 @@ const skeletonRows = Array.from({ length: 6 });
   }
 
   function initAdminOrderFilters() {
-    const form = document.querySelector<HTMLFormElement>("[data-order-filter-form]");
-    const tableShell = document.querySelector<HTMLElement>("[data-order-table-shell]");
-    const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-order-filter-skeleton]");
-    if (!form || !tableShell || !skeletonTemplate) return;
-    if (form.dataset.orderFilterInitialized === "true") return;
-    form.dataset.orderFilterInitialized = "true";
-
-    const activeForm = form;
-    const activeTableShell = tableShell;
-    const activeSkeletonTemplate = skeletonTemplate;
-    const cacheKey = "admin-orders-filter-cache-v1";
-    const fragmentPath = "/admin/orders-fragment";
-    const filterKeys = ["search", "source", "orderStatus", "paymentStatus"] as const;
-    const autoSubmitFields = activeForm.querySelectorAll<HTMLSelectElement>("select");
-    const searchInput = activeForm.querySelector<HTMLInputElement>("[data-order-search-input]");
-    let submitTimer: number | undefined;
-    let searchTimer: number | undefined;
-    let activeFetchController: AbortController | undefined;
-
-    function normalizeParams(params: URLSearchParams) {
-      const normalized = new URLSearchParams();
-
-      filterKeys.forEach((key) => {
-        const value = params.get(key)?.trim();
-        if (value) normalized.set(key, value);
-      });
-
-      return normalized.toString();
-    }
-
-    function normalizeFormQuery() {
-      const params = new URLSearchParams();
-      const formData = new FormData(activeForm);
-
-      filterKeys.forEach((key) => {
-        const value = formData.get(key);
-        if (typeof value === "string" && value.trim()) {
-          params.set(key, value.trim());
-        }
-      });
-
-      return params.toString();
-    }
-
-    function buildUrl(path: string, targetQuery: string) {
-      return targetQuery ? `${path}?${targetQuery}` : path;
-    }
-
-    function showSkeletonForQuery(targetQuery: string) {
-      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
-      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
-
-      if (targetQuery === currentQuery || cachedFragment) {
-        return;
-      }
-
-      const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
-      if (!skeleton) return;
-
-      activeTableShell.replaceChildren(skeleton);
-    }
-
-    function replaceOrdersFragment(fragmentHtml: string) {
-      const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html");
-      const nextTableShell = parsed.querySelector<HTMLElement>("[data-order-table-shell]");
-
-      if (!nextTableShell) {
-        throw new Error("Orders fragment did not include an order table.");
-      }
-
-      activeTableShell.innerHTML = nextTableShell.innerHTML;
-      document.dispatchEvent(new Event("dashboard:interactive-table-updated"));
-    }
-
-    async function applyFilters(targetQuery: string) {
-      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
-
-      if (targetQuery === currentQuery) {
-        return;
-      }
-
-      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
-      if (cachedFragment) {
-        window.history.replaceState(
-          { orderFilterQuery: targetQuery },
-          "",
-          buildUrl("/admin/orders", targetQuery),
-        );
-        replaceOrdersFragment(cachedFragment);
-        activeForm.dataset.currentFilterQuery = targetQuery;
-        return;
-      }
-
-      showSkeletonForQuery(targetQuery);
-      activeFetchController?.abort();
-
-      const fetchController = new AbortController();
-      activeFetchController = fetchController;
-
-      try {
-        const response = await fetch(buildUrl(fragmentPath, targetQuery), {
-          headers: {
-            "X-Requested-With": "fetch",
-          },
-          signal: fetchController.signal,
-        });
-
-        const fragmentHtml = await window.readDashboardFragmentResponse(response);
-        window.history.replaceState(
-          { orderFilterQuery: targetQuery },
-          "",
-          buildUrl("/admin/orders", targetQuery),
-        );
-        replaceOrdersFragment(fragmentHtml);
-        activeForm.dataset.currentFilterQuery = targetQuery;
-        writeDashboardFragmentCache(cacheKey, targetQuery, fragmentHtml);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        window.location.href = buildUrl("/admin/orders", targetQuery);
-      } finally {
-        if (activeFetchController === fetchController) {
-          activeFetchController = undefined;
-        }
-      }
-    }
-
-    function submitFilters() {
-      window.clearTimeout(submitTimer);
-      submitTimer = window.setTimeout(() => {
-        void applyFilters(normalizeFormQuery());
-      }, 120);
-    }
-
-    writeDashboardFragmentCache(
-      cacheKey,
-      normalizeParams(new URLSearchParams(window.location.search)),
-      activeTableShell.outerHTML,
-    );
-
-    activeForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      void applyFilters(normalizeFormQuery());
-    });
-
-    autoSubmitFields.forEach((field) => {
-      field.addEventListener("change", submitFilters);
-    });
-
-    searchInput?.addEventListener("input", () => {
-      window.clearTimeout(searchTimer);
-      searchTimer = window.setTimeout(submitFilters, 450);
+    initDashboardFragmentTable({
+      cacheKey: "admin-orders-filter-cache-v2",
+      fragmentPath: "/admin/orders-fragment",
+      pagePath: "/admin/orders",
+      formSelector: "[data-order-filter-form]",
+      tableShellSelector: "[data-order-table-shell]",
+      skeletonTemplateSelector: "[data-order-filter-skeleton]",
+      filterKeys: ["search", "source", "orderStatus", "paymentStatus"],
+      searchInputSelector: "[data-order-search-input]",
+      historyStateKey: "orderFilterQuery",
     });
   }
 
@@ -911,3 +1033,35 @@ const skeletonRows = Array.from({ length: 6 });
     initAdminOrderFilters();
   }
 </script>
+
+<style>
+  .order-create-form__payment-grid {
+    align-items: end;
+  }
+
+  .order-create-form__total {
+    display: flex;
+    min-height: 4.4rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: #f9fafb;
+    padding: 0.75rem 1rem;
+  }
+
+  .order-create-form__total span {
+    color: #6b7280;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .order-create-form__total strong {
+    color: #111827;
+    font-size: 1.15rem;
+    letter-spacing: 0;
+  }
+</style>

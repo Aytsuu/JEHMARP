@@ -3,16 +3,26 @@ import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import AdminProductManagement from "@/components/admin/AdminProductManagement.astro";
 import {
   formatAdminActionFeedback,
-  getProductCategories,
-  getProductUnitLabels,
   getStockStatuses,
 } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  loadAdminDashboardData,
+  loadAdminProductManagementData,
+  loadAdminProductOptionData,
+} from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import {
+  buildProductCategoryOptions,
+  buildProductUnitOptions,
+} from "@/lib/admin-dashboard/product-options";
 import {
   parseAdminProductFilters,
   serializeAdminProductFilters,
 } from "@/lib/admin-dashboard/product-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 
 export const prerender = false;
 
@@ -23,25 +33,33 @@ if (!adminRoute.ready) {
 }
 
 const productFilters = parseAdminProductFilters(Astro.url);
-const productFilterQuery = serializeAdminProductFilters(productFilters);
-const data = await loadAdminDashboardData({
-  productFilters,
-});
+const productPagination = parseAdminPagination(Astro.url);
+const productFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminProductFilters(productFilters),
+  productPagination,
+);
+const [dashboardData, data, productOptionData] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminProductManagementData(productFilters, productPagination),
+  loadAdminProductOptionData(),
+]);
 const feedback = formatAdminActionFeedback(Astro.url);
+const productCategories = buildProductCategoryOptions(productOptionData.products);
+const productUnitLabels = buildProductUnitOptions(productOptionData.products);
 ---
 
 <AdminPageFrame
   title="Admin Products - JEHMARP"
   description="Admin product management."
   heading="Product Management"
-  intro="Create products, manage public and reseller pricing, update stock status, and deactivate products safely."
+  intro="Create products, manage reseller pricing, commissions, and stock status."
   feedback={feedback}
-  dashboardData={data}
+  dashboardData={dashboardData}
 >
   <AdminProductManagement
     data={data}
-    productCategories={getProductCategories()}
-    productUnitLabels={getProductUnitLabels()}
+    productCategories={productCategories}
+    productUnitLabels={productUnitLabels}
     stockStatuses={getStockStatuses()}
     activeFilters={productFilters}
     filterQuery={productFilterQuery}

@@ -6,12 +6,12 @@ import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
 import ViewButton from "@/components/ViewButton.astro";
 import {
+  agentOrderPaymentStatus,
+  agentOrderTotal,
   formatCurrency,
   formatDate,
-  fullName,
-  orderTotal,
 } from "@/lib/agent-dashboard/view";
-import { formatOrderSource } from "@/lib/formatters";
+import { autoCapitalize } from "@/lib/formatters";
 
 type Props = {
   data: AgentDashboardData;
@@ -19,7 +19,6 @@ type Props = {
 
 const { data } = Astro.props;
 const canSubmitOrder = data.products.length > 0;
-const hasAssignedCustomers = data.customers.length > 0;
 ---
 
 <section class="admin-panel" aria-labelledby="agent-orders-title">
@@ -27,7 +26,7 @@ const hasAssignedCustomers = data.customers.length > 0;
     <div slot="header" class="order-create-sheet__header-copy">
       <h3 class="drawer-sheet__title" data-sheet-title>Submit Order</h3>
       <p class="order-create-sheet__header-description">
-        Select an assigned customer or enter customer details, then add products for admin review.
+        Add the products for admin review. Customer records can be attached after distribution.
       </p>
     </div>
     <form
@@ -46,49 +45,6 @@ const hasAssignedCustomers = data.customers.length > 0;
           No active products are available for order submission.
         </p>
       )}
-
-      <section class="order-create-section">
-        <h3 class="order-create-section__title">Customer</h3>
-        <div class="order-create-section__body">
-        <div class="admin-form-grid">
-          <label class="field-row" data-existing-customer-field>
-            <span>Customer</span>
-            <select name="customerId" disabled={!canSubmitOrder || !hasAssignedCustomers}>
-              <option value="">Select customer</option>
-              {data.customers.map((customer) => (
-                <option
-                  value={customer.id}
-                  data-customer-first-name={customer.first_name}
-                  data-customer-last-name={customer.last_name}
-                  data-customer-phone-number={customer.phone_number}
-                  data-customer-email={customer.email ?? ""}
-                  data-customer-address={customer.address}
-                >
-                  {fullName(customer)} - {customer.phone_number}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        </div>
-      </section>
-
-        <fieldset
-          class="order-create-section fieldset-block"
-          data-customer-details-fields
-          disabled={!canSubmitOrder}
-        >
-          <legend class="order-create-section__title">Customer details</legend>
-          <div class="order-create-section__body">
-          <div class="admin-form-grid">
-            <label class="field-row"><span>First name</span><input name="firstName" required data-customer-first-name /></label>
-            <label class="field-row"><span>Last name</span><input name="lastName" required data-customer-last-name /></label>
-            <label class="field-row"><span>Phone number</span><input name="phoneNumber" required data-customer-phone-number /></label>
-            <label class="field-row"><span>Email</span><input name="email" type="email" data-customer-email /></label>
-          </div>
-          <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
-          </div>
-        </fieldset>
 
         <section class="order-create-section">
           <div class="order-create-section__header">
@@ -199,8 +155,8 @@ const hasAssignedCustomers = data.customers.length > 0;
 
 <section class="admin-panel" aria-labelledby="agent-order-list-title">
 
-  {data.orders.length === 0 ? (
-    <p class="empty-state">No accessible orders yet.</p>
+  {data.agentOrders.length === 0 ? (
+    <p class="empty-state">No agent orders yet.</p>
   ) : (
     <div data-interactive-table class="dashboard-interactive-table">
       <div class="table-filters order-management-toolbar">
@@ -230,32 +186,35 @@ const hasAssignedCustomers = data.customers.length > 0;
           <table class="dashboard-table">
             <thead>
               <tr>
-                <th scope="col">Customer</th>
+                <th scope="col">Agent Order</th>
                 <th scope="col">Date</th>
-                <th scope="col">Source</th>
                 <th scope="col">Order Status</th>
                 <th scope="col">Payment Status</th>
+                <th scope="col">Customers</th>
+                <th scope="col">Products</th>
                 <th scope="col">Order Total</th>
                 <th scope="col">Action</th>
               </tr>
             </thead>
             <tbody>
-              {data.orders.map((order) => {
-                const invoice = order.invoice.length > 0;
-                const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+              {data.agentOrders.map((order) => {
+                const productSummary = order.agent_order_item
+                  .map((item) => `${item.product?.name ?? "Missing product"} (${item.quantity} ${item.product?.unit_label ?? ""})`)
+                  .join(", ");
 
                 return (
                   <tr data-status={order.order_status}>
                     <td class="dashboard-table__cell--truncate">
-                      {order.customer ? fullName(order.customer) : "Guest"}
+                      #{order.id.slice(0, 8)}
                     </td>
                     <td>{formatDate(order.created_at)}</td>
-                    <td>{formatOrderSource(order.source)}</td>
-                    <td><StatusBadge kind="order" status={order.order_status} /></td>
-                    <td><StatusBadge kind="payment" status={order.payment_status} /></td>
-                    <td>{formatCurrency(total)}</td>
+                    <td><StatusBadge kind="order" status={order.order_status} label={autoCapitalize(order.order_status)} /></td>
+                    <td><StatusBadge kind="payment" status={agentOrderPaymentStatus(order)} /></td>
+                    <td>{order.customer_order.length}</td>
+                    <td class="dashboard-table__cell--truncate">{productSummary || "No products"}</td>
+                    <td>{formatCurrency(agentOrderTotal(order))}</td>
                     <td>
-                      <ViewButton href={`/agent/orders/${order.id}`} />
+                      <ViewButton href={`/agent/agent-orders/${order.id}`} />
                     </td>
                   </tr>
                 );
@@ -279,15 +238,6 @@ const hasAssignedCustomers = data.customers.length > 0;
     const orderItems = document.querySelector("[data-agent-order-items]");
     const orderItemTemplate = document.querySelector<HTMLTemplateElement>("[data-agent-order-item-template]");
     const addOrderItemButton = document.querySelector<HTMLButtonElement>("[data-add-agent-order-item]");
-    const existingCustomerField = document.querySelector<HTMLElement>("[data-existing-customer-field]");
-    const existingCustomerSelect = existingCustomerField?.querySelector<HTMLSelectElement>("select[name='customerId']");
-    const customerDetailsFields = document.querySelector<HTMLFieldSetElement>("[data-customer-details-fields]");
-    const firstNameInput = document.querySelector<HTMLInputElement>("input[data-customer-first-name]");
-    const lastNameInput = document.querySelector<HTMLInputElement>("input[data-customer-last-name]");
-    const phoneNumberInput = document.querySelector<HTMLInputElement>("input[data-customer-phone-number]");
-    const emailInput = document.querySelector<HTMLInputElement>("input[data-customer-email]");
-    const addressTextarea = document.querySelector<HTMLTextAreaElement>("textarea[data-customer-address]");
-    const canSubmitOrder = orderForm.dataset.canSubmitOrder === "true";
 
     function refreshOrderItemRowNumbers() {
       if (!orderItems) return;
@@ -317,36 +267,6 @@ const hasAssignedCustomers = data.customers.length > 0;
       refreshOrderItemRowNumbers();
     });
 
-    function getSelectedCustomerOption() {
-      if (!existingCustomerSelect?.value) return undefined;
-
-      return existingCustomerSelect.selectedOptions[0];
-    }
-
-    function fillCustomerFields(customer: HTMLOptionElement | undefined) {
-      if (firstNameInput) firstNameInput.value = customer?.dataset.customerFirstName ?? "";
-      if (lastNameInput) lastNameInput.value = customer?.dataset.customerLastName ?? "";
-      if (phoneNumberInput) phoneNumberInput.value = customer?.dataset.customerPhoneNumber ?? "";
-      if (emailInput) emailInput.value = customer?.dataset.customerEmail ?? "";
-      if (addressTextarea) addressTextarea.value = customer?.dataset.customerAddress ?? "";
-    }
-
-    function refreshCustomerFields() {
-      const selectedCustomer = getSelectedCustomerOption();
-
-      if (selectedCustomer) {
-        fillCustomerFields(selectedCustomer);
-      } else if (document.activeElement === existingCustomerSelect) {
-        fillCustomerFields(undefined);
-      }
-
-      if (customerDetailsFields) {
-        customerDetailsFields.disabled = Boolean(selectedCustomer) || !canSubmitOrder;
-      }
-    }
-
-    existingCustomerSelect?.addEventListener("change", refreshCustomerFields);
-    refreshCustomerFields();
     refreshOrderItemRowNumbers();
   }
 

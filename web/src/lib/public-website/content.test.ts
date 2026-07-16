@@ -1,6 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { getSectionEntries, getSectionHeading } from "./content";
+const mocks = vi.hoisted(() => ({
+  createSupabasePublicClient: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/public", () => ({
+  createSupabasePublicClient: mocks.createSupabasePublicClient,
+}));
+
+import {
+  getFeaturedPublicProducts,
+  getSectionEntries,
+  getSectionHeading,
+} from "./content";
+
+beforeEach(() => {
+  mocks.createSupabasePublicClient.mockReset();
+});
 
 describe("public content helpers", () => {
   it("uses explicit section heading content when present", () => {
@@ -37,6 +53,47 @@ describe("public content helpers", () => {
     ).toEqual([
       ["Summary", "Local farm supply"],
       ["Sort Order", "2"],
+    ]);
+  });
+});
+
+describe("public product content loading", () => {
+  it("uses the non-auth public Supabase client for component-safe reads", async () => {
+    const limit = vi.fn(async () => ({
+      data: [
+        {
+          id: "product-1",
+          name: "Chicken Breast",
+          description: null,
+          image_path: null,
+        },
+      ],
+      error: null,
+    }));
+    const order = vi.fn(() => ({ limit }));
+    const eq = vi.fn(() => ({ order }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
+    mocks.createSupabasePublicClient.mockReturnValue({ from });
+
+    const products = await getFeaturedPublicProducts(
+      {
+        cookies: {},
+        request: new Request("https://example.test"),
+      } as never,
+      1,
+    );
+
+    expect(mocks.createSupabasePublicClient).toHaveBeenCalledTimes(1);
+    expect(from).toHaveBeenCalledWith("product");
+    expect(limit).toHaveBeenCalledWith(1);
+    expect(products).toEqual([
+      {
+        id: "product-1",
+        name: "Chicken Breast",
+        description: null,
+        image_path: null,
+      },
     ]);
   });
 });

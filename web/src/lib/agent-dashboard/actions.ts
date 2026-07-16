@@ -15,28 +15,11 @@ type AgentOrderItemPayload = {
   addDetails: string | null;
 };
 
-type NewAgentCustomerPayload = {
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-  email: string | null;
-  address: string;
-};
-
 export type AgentAction =
   | {
       type: "create-agent-order";
       agentId: string;
       payload: {
-        customer:
-          | {
-              type: "existing";
-              customerId: string;
-            }
-          | {
-              type: "new";
-              payload: NewAgentCustomerPayload;
-            };
         items: AgentOrderItemPayload[];
       };
     };
@@ -57,8 +40,10 @@ export function parseAgentActionFormData(
   formData: FormData,
   _agentUserId: string,
   agentId: string,
-  assignedCustomerIds: ReadonlySet<string>,
+  _assignedCustomerIds: ReadonlySet<string>,
 ): AgentActionParseResult {
+  void _assignedCustomerIds;
+
   try {
     const action = requiredString(formData, "action");
 
@@ -66,15 +51,12 @@ export function parseAgentActionFormData(
       throw new Error("Unknown agent action.");
     }
 
-    const customer = parseOrderCustomer(formData, assignedCustomerIds);
-
     return {
       success: true,
       action: {
         type: "create-agent-order",
         agentId,
         payload: {
-          customer,
           items: parseOrderItems(formData),
         },
       },
@@ -126,11 +108,10 @@ export async function executeAgentAction(
 ): Promise<void> {
   switch (action.type) {
     case "create-agent-order": {
-      const customer = action.payload.customer;
       const { data, error } = await supabase.rpc("submit_agent_order", {
-        target_customer_id: customer.type === "existing" ? customer.customerId : null,
+        target_customer_id: null,
         item_payload: action.payload.items,
-        customer_payload: customer.type === "new" ? customer.payload : null,
+        customer_payload: null,
       });
 
       if (error || typeof data !== "string") {
@@ -163,37 +144,6 @@ function parseOrderItems(formData: FormData) {
   }
 
   return parsedItems;
-}
-
-function parseOrderCustomer(
-  formData: FormData,
-  assignedCustomerIds: ReadonlySet<string>,
-): AgentAction["payload"]["customer"] {
-  const selectedCustomerId = optionalString(formData, "customerId");
-
-  if (selectedCustomerId) {
-    const customerId = uuidSchema.parse(selectedCustomerId);
-
-    if (!assignedCustomerIds.has(customerId)) {
-      throw new Error("Selected customer is not assigned to this agent.");
-    }
-
-    return {
-      type: "existing",
-      customerId,
-    };
-  }
-
-  return {
-    type: "new",
-    payload: {
-      firstName: requiredString(formData, "firstName"),
-      lastName: requiredString(formData, "lastName"),
-      phoneNumber: requiredString(formData, "phoneNumber"),
-      email: optionalEmail(formData, "email"),
-      address: requiredString(formData, "address"),
-    },
-  };
 }
 
 function parseOrderItem(
@@ -236,18 +186,6 @@ function requiredString(formData: FormData, key: string) {
   }
 
   return value;
-}
-
-function optionalString(formData: FormData, key: string) {
-  const value = String(formData.get(key) ?? "").trim();
-
-  return value.length > 0 ? value : null;
-}
-
-function optionalEmail(formData: FormData, key: string) {
-  const value = optionalString(formData, key);
-
-  return value ? z.email().parse(value) : null;
 }
 
 function normalizeFormDataEntry(value: FormDataEntryValue | undefined) {

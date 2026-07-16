@@ -14,6 +14,7 @@ import {
 } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import {
+  defaultProductCommissionAmount,
   formatCurrency,
   formatDate,
   formatDateTime,
@@ -47,10 +48,12 @@ if (!orderId) {
 }
 
 const orderDetailTabIds = [
+  "products",
   "order-slip",
   "sales-invoice",
   "commission",
   "payment-record",
+  "timeline",
   "notes",
 ] as const;
 const requestedOrderDetailTab = Astro.url.searchParams.get("tab");
@@ -91,10 +94,25 @@ const feedback =
 const invoice = order.invoice[0] ?? null;
 const hasSalesInvoice = Boolean(invoice);
 const hasPayments = order.payment.length > 0;
+const canEditOrderProducts = !hasSalesInvoice && !hasPayments;
 const canGenerateInvoice = order.order_status === "processing";
 const paidTotal = orderPaymentTotal(order);
 const balance = orderBalance(order);
 const canCreatePaymentRecord = hasSalesInvoice && balance > 0;
+type PaymentFormCustomerType = "regular" | "wholesale" | "reseller";
+const paymentCustomerType: PaymentFormCustomerType = (() => {
+  if (
+    order.customer?.is_reseller ||
+    order.customer_order_item.every((item) => item.price_type === "reseller")
+  ) {
+    return "reseller";
+  }
+
+  return "regular";
+})();
+const paymentOrderTotal = order.customer_order_item.reduce((total, item) => {
+  return total + item.final_quantity * item.unit_price;
+}, 0);
 const canEditInvoiceQuantities = hasSalesInvoice && !hasPayments;
 const hasCommissionTab = Boolean(order.customer?.assigned_agent ?? order.agent);
 const availableOrderDetailTabs = orderDetailTabIds.filter(
@@ -106,7 +124,7 @@ const activeOrderDetailTab =
     requestedOrderDetailTab as (typeof availableOrderDetailTabs)[number],
   )
     ? requestedOrderDetailTab
-    : "order-slip";
+    : "products";
 const isOrderDetailTabActive = (tab: string) => tab === activeOrderDetailTab;
 const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
 const orderSlipPdfHref = `/admin/orders/${order.id}/order-slip.pdf`;
@@ -274,6 +292,17 @@ const agentDisplayName =
 const agentPhone =
   order.customer?.assigned_agent?.contact ?? "No contact number";
 const agentEmail = order.customer?.assigned_agent?.email ?? "No email address";
+const orderedProductIds = new Set(
+  order.customer_order_item.map((item) => item.product_id),
+);
+const addableProducts = dashboardData.products.filter(
+  (product) => product.is_active && !orderedProductIds.has(product.id),
+);
+const orderProductEditLockReason = hasSalesInvoice
+  ? "Order products are locked after a sales invoice has been created."
+  : hasPayments
+    ? "Order products are locked after a payment record has been created."
+    : null;
 
 const timelineItems = [
   ...order.payment.map((payment) => ({
@@ -570,40 +599,23 @@ const backLabel = backHref.startsWith("/admin/customers/")
         </div>
       </div>
 
-      <div class="order-sidebar-main">
-        <article class="order-activity-card">
-          <header class="order-activity-card__header">
-            <h2>Timeline</h2>
-          </header>
-
-          <div class="order-activity-card__body">
-            {
-              timelineItems.length === 0 ? (
-                <p class="empty-copy">No timeline events yet.</p>
-              ) : (
-                <ol class="activity-timeline">
-                  {timelineItems.map((item) => (
-                    <li>
-                      <span class="activity-dot" aria-hidden="true" />
-                      <div class="activity-copy">
-                        <p class="activity-title">{item.title}</p>
-                        <p class="activity-meta">{item.meta}</p>
-                        <time datetime={item.timestamp}>
-                          {formatDateTime(item.timestamp)}
-                        </time>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )
-            }
-          </div>
-        </article>
-      </div>
     </aside>
 
     <section class="order-detail-main" data-order-detail-tabs>
       <div class="order-tabs" role="tablist" aria-label="Order detail sections">
+        <button
+          type="button"
+          class:list={[
+            "order-tab",
+            isOrderDetailTabActive("products") && "is-active",
+          ]}
+          data-order-detail-tab-trigger
+          data-tab-target="products"
+          role="tab"
+          aria-selected={isOrderDetailTabActive("products") ? "true" : "false"}
+        >
+          Products
+        </button>
         <button
           type="button"
           class:list={[
@@ -664,6 +676,19 @@ const backLabel = backHref.startsWith("/admin/customers/")
           type="button"
           class:list={[
             "order-tab",
+            isOrderDetailTabActive("timeline") && "is-active",
+          ]}
+          data-order-detail-tab-trigger
+          data-tab-target="timeline"
+          role="tab"
+          aria-selected={isOrderDetailTabActive("timeline") ? "true" : "false"}
+        >
+          Timeline
+        </button>
+        <button
+          type="button"
+          class:list={[
+            "order-tab",
             isOrderDetailTabActive("notes") && "is-active",
           ]}
           data-order-detail-tab-trigger
@@ -676,6 +701,168 @@ const backLabel = backHref.startsWith("/admin/customers/")
       </div>
 
       <div class="order-tab-panels">
+        <section
+          class:list={[
+            "order-tab-panel",
+            isOrderDetailTabActive("products") && "is-active",
+          ]}
+          data-order-detail-tab-panel="products"
+          role="tabpanel"
+          hidden={!isOrderDetailTabActive("products")}
+        >
+          <div class="order-products-panel">
+            <div class="order-products-panel__header">
+              <div>
+                <h3 class="order-products-panel__title">Order Products</h3>
+                <p class="order-products-panel__copy">
+                  Finalize products and order slip quantities before opening or printing the order slip.
+                </p>
+              </div>
+              {
+                orderProductEditLockReason ? (
+                  <p class="order-products-panel__lock">
+                    {orderProductEditLockReason}
+                  </p>
+                ) : null
+              }
+            </div>
+
+            <div class="order-products-table" role="table">
+              <div class="order-products-table__head" role="row">
+                <span role="columnheader">Product</span>
+                <span role="columnheader">Order Qty</span>
+                <span role="columnheader">Unit Price</span>
+                <span role="columnheader">Subtotal</span>
+                <span role="columnheader">Details</span>
+                <span role="columnheader">Action</span>
+              </div>
+              {order.customer_order_item.map((item) => {
+                const itemSubtotal = item.partial_quantity * item.unit_price;
+                const canRemoveOrderProduct =
+                  canEditOrderProducts && order.customer_order_item.length > 1;
+
+                return (
+                  <div class="order-products-table__row" role="row">
+                    <span role="cell">
+                      <strong>
+                        {item.product?.name ?? "Missing product"}
+                      </strong>
+                      <small>{item.product?.unit_label ?? "unit"}</small>
+                    </span>
+                    <span role="cell">
+                      <form method="post" class="order-product-quantity-form">
+                        <input
+                          type="hidden"
+                          name="action"
+                          value="update-order-item-quantity"
+                        />
+                        <input
+                          type="hidden"
+                          name="orderItemId"
+                          value={item.id}
+                        />
+                        <input
+                          type="number"
+                          name="quantity"
+                          min="0.001"
+                          step="0.001"
+                          value={item.partial_quantity}
+                          disabled={!canEditOrderProducts}
+                          required
+                        />
+                        <button
+                          type="submit"
+                          disabled={!canEditOrderProducts}
+                        >
+                          Save
+                        </button>
+                      </form>
+                    </span>
+                    <span role="cell">{formatCurrency(item.unit_price)}</span>
+                    <span role="cell">{formatCurrency(itemSubtotal)}</span>
+                    <span role="cell">{item.add_details ?? "None"}</span>
+                    <span role="cell">
+                      <form method="post" class="order-product-remove-form">
+                        <input
+                          type="hidden"
+                          name="action"
+                          value="remove-order-item"
+                        />
+                        <input
+                          type="hidden"
+                          name="orderItemId"
+                          value={item.id}
+                        />
+                        <button
+                          type="submit"
+                          class="order-product-remove-form__button"
+                          disabled={!canRemoveOrderProduct}
+                        >
+                          Remove
+                        </button>
+                      </form>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <form method="post" class="order-product-add-form">
+              <input type="hidden" name="action" value="add-order-item" />
+              <input type="hidden" name="orderId" value={order.id} />
+              <label>
+                <span>Product</span>
+                <select
+                  name="productId"
+                  disabled={!canEditOrderProducts || addableProducts.length === 0}
+                  required
+                >
+                  <option value="">Select product</option>
+                  {addableProducts.map((product) => (
+                    <option value={product.id}>
+                      {product.name} - {formatCurrency(
+                        order.customer?.is_reseller
+                          ? product.reseller_price
+                          : product.default_price,
+                      )} / {product.unit_label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>Quantity</span>
+                <input
+                  type="number"
+                  name="quantity"
+                  min="0.001"
+                  step="0.001"
+                  disabled={!canEditOrderProducts || addableProducts.length === 0}
+                  required
+                />
+              </label>
+              <label>
+                <span>Details</span>
+                <input
+                  type="text"
+                  name="addDetails"
+                  disabled={!canEditOrderProducts || addableProducts.length === 0}
+                />
+              </label>
+              <button
+                type="submit"
+                class="primary-panel-button primary-panel-button--compact"
+                disabled={!canEditOrderProducts || addableProducts.length === 0}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path>
+                </svg>
+                <span>Add Product</span>
+              </button>
+            </form>
+          </div>
+        </section>
+
         <section
           class:list={[
             "order-tab-panel order-tab-panel--document document-preview--pdf-like document-preview--rounded-sm",
@@ -1050,57 +1237,68 @@ const backLabel = backHref.startsWith("/admin/customers/")
                       paidCheckboxDisabled,
                       availableCoverageForItem,
                       payabilityNotice,
-                    }) => (
-                      <div
-                        class:list={[
-                          "commission-row",
-                          item.agent_commission_paid && "is-paid",
-                        ]}
-                        data-commission-row
-                        data-order-item-id={item.id}
-                        data-item-total={itemTotalAmount}
-                        data-available-coverage={availableCoverageForItem}
-                        data-has-payments={hasPayments ? "true" : "false"}
-                      >
-                        <div class="commission-row__content">
-                          <input
-                            type="checkbox"
-                            class="commission-row__paid"
-                            checked={item.agent_commission_paid}
-                            disabled={paidCheckboxDisabled}
-                            aria-label={`Mark commission paid for ${item.product?.name ?? "item"}`}
-                          />
-                          <div class="commission-row__details">
-                            <span class="commission-row__label">
-                              <span class="commission-row__product">
-                                {item.product?.name ?? "Missing product"}
+                    }) => {
+                      const defaultCommission = defaultProductCommissionAmount({
+                        product: item.product,
+                        quantity: item.partial_quantity,
+                        unitPrice: item.unit_price,
+                      });
+
+                      return (
+                        <div
+                          class:list={[
+                            "commission-row",
+                            item.agent_commission_paid && "is-paid",
+                          ]}
+                          data-commission-row
+                          data-order-item-id={item.id}
+                          data-item-total={itemTotalAmount}
+                          data-available-coverage={availableCoverageForItem}
+                          data-has-payments={hasPayments ? "true" : "false"}
+                        >
+                          <div class="commission-row__content">
+                            <input
+                              type="checkbox"
+                              class="commission-row__paid"
+                              checked={item.agent_commission_paid}
+                              disabled={paidCheckboxDisabled}
+                              aria-label={`Mark commission paid for ${item.product?.name ?? "item"}`}
+                            />
+                            <div class="commission-row__details">
+                              <span class="commission-row__label">
+                                <span class="commission-row__product">
+                                  {item.product?.name ?? "Missing product"}
+                                </span>
+                                <span class="commission-row__separator">-</span>
+                                <span class="commission-row__total">
+                                  {formatCurrency(itemTotalAmount)}
+                                </span>
                               </span>
-                              <span class="commission-row__separator">-</span>
-                              <span class="commission-row__total">
-                                {formatCurrency(itemTotalAmount)}
+                              <span class="commission-row__default">
+                                Default {formatCurrency(defaultCommission)}
                               </span>
-                            </span>
-                            <p
-                              class:list={[
-                                "commission-row__notice",
-                                `commission-row__notice--${payabilityNotice.tone}`,
-                              ]}
-                            >
-                              {payabilityNotice.message}
-                            </p>
+                              <p
+                                class:list={[
+                                  "commission-row__notice",
+                                  `commission-row__notice--${payabilityNotice.tone}`,
+                                ]}
+                              >
+                                {payabilityNotice.message}
+                              </p>
+                            </div>
+                            <input
+                              type="number"
+                              class="commission-row__amount"
+                              min="0"
+                              step="0.01"
+                              value={item.agent_commission_amount}
+                              aria-label={`Commission for ${item.product?.name ?? "item"}`}
+                            />
                           </div>
-                          <input
-                            type="number"
-                            class="commission-row__amount"
-                            min="0"
-                            step="0.01"
-                            value={item.agent_commission_amount}
-                            aria-label={`Commission for ${item.product?.name ?? "item"}`}
-                          />
+                          <p class="commission-row__error" hidden />
                         </div>
-                        <p class="commission-row__error" hidden />
-                      </div>
-                    ),
+                      );
+                    },
                   )}
                 </div>
               </div>
@@ -1117,17 +1315,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
           role="tabpanel"
           hidden={!isOrderDetailTabActive("payment-record")}
         >
-          <div class="metrics-grid">
-            <div class="metric-card">
-              <span>Total Paid</span>
-              <strong>{formatCurrency(paidTotal)}</strong>
-            </div>
-            <div class="metric-card">
-              <span>Remaining Balance</span>
-              <strong>{formatCurrency(balance)}</strong>
-            </div>
-          </div>
-
           <div class="payment-panel">
             <div class="payment-panel__header">
               <div class="payment-panel__intro">
@@ -1157,8 +1344,47 @@ const backLabel = backHref.startsWith("/admin/customers/")
             <form method="post" class="payment-form" data-payment-form hidden>
               <input type="hidden" name="action" value="record-payment" />
               <input type="hidden" name="orderId" value={order.id} />
+              {hasPayments && <input type="hidden" name="customerType" value={paymentCustomerType} />}
+              <input type="hidden" data-payment-paid-total value={paidTotal} />
+              <div data-payment-pricing-items hidden>
+                {order.customer_order_item.map((item) => (
+                  <span
+                    data-payment-pricing-item
+                    data-final-quantity={item.final_quantity}
+                    data-default-price={item.product?.default_price ?? item.unit_price}
+                    data-reseller-price={item.product?.reseller_price ?? item.unit_price}
+                  ></span>
+                ))}
+              </div>
+
+              <div class="payment-form__summary">
+                <div class="payment-form__summary-card">
+                  <span>Total Value</span>
+                  <strong data-payment-total-value>{formatCurrency(paymentOrderTotal)}</strong>
+                </div>
+                <div class="payment-form__summary-card">
+                  <span>Total Paid</span>
+                  <strong>{formatCurrency(paidTotal)}</strong>
+                </div>
+                <div class="payment-form__summary-card">
+                  <span>Remaining Balance</span>
+                  <strong data-payment-balance-value>{formatCurrency(balance)}</strong>
+                </div>
+              </div>
 
               <div class="payment-form__grid">
+                <label>
+                  <span>Customer Type</span>
+                  <select
+                    name="customerType"
+                    data-payment-customer-type
+                    disabled={hasPayments}
+                  >
+                    <option value="regular" selected={paymentCustomerType === "regular"}>Regular</option>
+                    <option value="wholesale">Wholesale</option>
+                    <option value="reseller" selected={paymentCustomerType === "reseller"}>Reseller</option>
+                  </select>
+                </label>
                 <label>
                   <span>Amount</span>
                   <input
@@ -1167,6 +1393,8 @@ const backLabel = backHref.startsWith("/admin/customers/")
                     min="0.01"
                     step="0.01"
                     max={balance > 0 ? balance : undefined}
+                    value={balance > 0 ? balance.toFixed(2) : undefined}
+                    data-payment-amount
                     required
                   />
                 </label>
@@ -1259,6 +1487,40 @@ const backLabel = backHref.startsWith("/admin/customers/")
                 </div>
               )
             }
+          </div>
+        </section>
+
+        <section
+          class:list={[
+            "order-tab-panel",
+            isOrderDetailTabActive("timeline") && "is-active",
+          ]}
+          data-order-detail-tab-panel="timeline"
+          role="tabpanel"
+          hidden={!isOrderDetailTabActive("timeline")}
+        >
+          <div class="order-timeline-panel">
+            <div class="order-timeline-panel__header">
+              <h3 class="order-timeline-panel__title">Timeline</h3>
+            </div>
+            <div class="order-timeline-table" role="table">
+              <div class="order-timeline-table__head" role="row">
+                <span role="columnheader">Event</span>
+                <span role="columnheader">Details</span>
+                <span role="columnheader">Date</span>
+              </div>
+              {timelineItems.map((item) => (
+                <div class="order-timeline-table__row" role="row">
+                  <span role="cell">
+                    <strong>{item.title}</strong>
+                  </span>
+                  <span role="cell">{item.meta}</span>
+                  <time role="cell" datetime={item.timestamp}>
+                    {formatDateTime(item.timestamp)}
+                  </time>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -1552,18 +1814,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
 </AdminPageFrame>
 
 <script is:inline>
-  const paymentToggleButton = document.querySelector(
-    "[data-toggle-payment-form]",
-  );
-  const paymentForm = document.querySelector("[data-payment-form]");
-
-  if (paymentToggleButton && paymentForm) {
-    paymentToggleButton.addEventListener("click", () => {
-      const shouldOpen = paymentForm.hasAttribute("hidden");
-      paymentForm.toggleAttribute("hidden", !shouldOpen);
-    });
-  }
-
   const commissionEditor = document.querySelector("[data-commission-editor]");
 
   if (commissionEditor instanceof HTMLElement) {
@@ -2473,6 +2723,7 @@ const backLabel = backHref.startsWith("/admin/customers/")
 
   .stack-card select,
   .stack-card input,
+  .payment-form select,
   .payment-form input {
     min-height: 2.75rem;
     border-radius: 0.8rem;
@@ -2744,6 +2995,187 @@ const backLabel = backHref.startsWith("/admin/customers/")
     flex-direction: column;
   }
 
+  .order-products-panel,
+  .order-timeline-panel {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .order-products-panel__header,
+  .order-timeline-panel__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .order-products-panel__title,
+  .order-timeline-panel__title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .order-products-panel__copy,
+  .order-products-panel__lock {
+    margin: 0.35rem 0 0;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: rgba(17, 24, 39, 0.62);
+  }
+
+  .order-products-panel__lock {
+    max-width: 22rem;
+    margin-top: 0;
+    color: #991b1b;
+    text-align: right;
+  }
+
+  .order-products-table,
+  .order-timeline-table {
+    display: grid;
+    overflow: hidden;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .order-products-table__head,
+  .order-products-table__row,
+  .order-timeline-table__head,
+  .order-timeline-table__row {
+    display: grid;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .order-products-table__head,
+  .order-products-table__row {
+    grid-template-columns:
+      minmax(10rem, 1.4fr)
+      minmax(11rem, 1.1fr)
+      minmax(7rem, 0.7fr)
+      minmax(7rem, 0.7fr)
+      minmax(8rem, 1fr)
+      minmax(6rem, 0.6fr);
+  }
+
+  .order-timeline-table__head,
+  .order-timeline-table__row {
+    grid-template-columns:
+      minmax(10rem, 1fr)
+      minmax(12rem, 1.3fr)
+      minmax(11rem, 0.8fr);
+  }
+
+  .order-products-table__head,
+  .order-timeline-table__head {
+    background: #f8fafc;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .order-products-table__row,
+  .order-timeline-table__row {
+    border-top: 1px solid rgba(17, 24, 39, 0.08);
+    color: #111827;
+    font-size: 0.9rem;
+  }
+
+  .order-products-table__row strong,
+  .order-timeline-table__row strong {
+    display: block;
+    font-size: 0.92rem;
+  }
+
+  .order-products-table__row small {
+    display: block;
+    margin-top: 0.2rem;
+    color: rgba(17, 24, 39, 0.55);
+  }
+
+  .order-product-quantity-form {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 1fr) auto;
+    gap: 0.4rem;
+  }
+
+  .order-product-quantity-form input,
+  .order-product-add-form input,
+  .order-product-add-form select {
+    min-height: 2.35rem;
+    width: 100%;
+    border: 1px solid rgba(17, 24, 39, 0.14);
+    border-radius: 0.5rem;
+    background: #ffffff;
+    padding: 0.45rem 0.65rem;
+    font: inherit;
+  }
+
+  .order-product-quantity-form button,
+  .order-product-remove-form__button {
+    min-height: 2.35rem;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    border-radius: 0.5rem;
+    background: #111827;
+    color: #ffffff;
+    padding: 0.45rem 0.65rem;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .order-product-remove-form__button {
+    width: 100%;
+    background: #ffffff;
+    color: #991b1b;
+    border-color: rgba(153, 27, 27, 0.22);
+  }
+
+  .order-product-quantity-form button:disabled,
+  .order-product-remove-form__button:disabled,
+  .order-product-add-form :disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .order-product-add-form {
+    display: grid;
+    grid-template-columns:
+      minmax(12rem, 1.4fr)
+      minmax(7rem, 0.6fr)
+      minmax(10rem, 1fr)
+      auto;
+    align-items: end;
+    gap: 0.75rem;
+    padding: 1rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .order-product-add-form label {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0;
+  }
+
+  .order-product-add-form label span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
   .document-preview-scroll {
     flex: 1;
     min-height: 0;
@@ -2993,6 +3425,13 @@ const backLabel = backHref.startsWith("/admin/customers/")
 
   .commission-row__notice {
     margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .commission-row__default {
+    display: block;
+    color: rgba(17, 24, 39, 0.55);
     font-size: 0.78rem;
     line-height: 1.35;
   }
@@ -3389,6 +3828,39 @@ const backLabel = backHref.startsWith("/admin/customers/")
     border-bottom: 1px solid rgba(17, 24, 39, 0.08);
   }
 
+  .payment-form__summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .payment-form__summary-card {
+    display: flex;
+    min-height: 4.35rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 1px solid rgba(17, 24, 39, 0.1);
+    border-radius: 0.65rem;
+    background: #f9fafb;
+    padding: 0.75rem 0.9rem;
+  }
+
+  .payment-form__summary-card span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .payment-form__summary-card strong {
+    color: #111827;
+    font-size: 1.05rem;
+    letter-spacing: 0;
+  }
+
   .payment-form__grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3408,7 +3880,7 @@ const backLabel = backHref.startsWith("/admin/customers/")
     font-size: 0.78rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
   }
 
   .payment-form__notes {
@@ -3649,6 +4121,7 @@ const backLabel = backHref.startsWith("/admin/customers/")
 
     .document-party-grid,
     .metrics-grid,
+    .payment-form__summary,
     .stack-card-grid,
     .document-meta-grid {
       grid-template-columns: 1fr;
@@ -3690,6 +4163,35 @@ const backLabel = backHref.startsWith("/admin/customers/")
     .invoice-quantity-form input,
     .order-status-popover-form select {
       width: 100%;
+    }
+
+    .order-products-panel__header,
+    .order-timeline-panel__header {
+      display: grid;
+    }
+
+    .order-products-panel__lock {
+      max-width: none;
+      text-align: left;
+    }
+
+    .order-products-table,
+    .order-timeline-table {
+      overflow-x: auto;
+    }
+
+    .order-products-table__head,
+    .order-products-table__row {
+      min-width: 58rem;
+    }
+
+    .order-timeline-table__head,
+    .order-timeline-table__row {
+      min-width: 42rem;
+    }
+
+    .order-product-add-form {
+      grid-template-columns: 1fr;
     }
   }
 </style>

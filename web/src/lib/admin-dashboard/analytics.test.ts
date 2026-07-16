@@ -130,6 +130,9 @@ function createAnalyticsData(): AdminDashboardData {
     agents: [{
       id: "agent-id",
       user_id: "22222222-2222-2222-2222-222222222222",
+      employee_id: null,
+      first_name: "JEHMARP",
+      last_name: "Agent",
       display_name: "JEHMARP Agent",
       status: "active",
       email: null,
@@ -142,6 +145,7 @@ function createAnalyticsData(): AdminDashboardData {
       customer("customer-two", "Ben", "Buyer", "agent-id"),
       customer("customer-three", "Cat", "Buyer", null),
     ],
+    agentOrders: [],
     orders: [
       order({
         id: "order-1",
@@ -226,6 +230,10 @@ function product(id: string, name: string, category: "pork" | "chicken" | "egg")
     unit_label: "kg",
     default_price: 100,
     reseller_price: 90,
+    reseller_deduction_type: "value" as const,
+    reseller_deduction_value: 10,
+    agent_commission_type: "value" as const,
+    agent_commission_value: 0,
     stock_status: "in_stock" as const,
     image_path: null,
     is_active: true,
@@ -249,6 +257,8 @@ function customer(
     address: "123 Road",
     assigned_agent_id: assignedAgentId,
     is_reseller: false,
+    credit_limit: 1000,
+    credit_limit_exceeded: false,
     created_at: "2026-07-01T00:00:00.000Z",
     updated_at: "2026-07-01T00:00:00.000Z",
   };
@@ -345,6 +355,8 @@ function item(
       name: productName,
       unit_label: "kg",
       default_price: unitPrice,
+      agent_commission_type: "value",
+      agent_commission_value: 0,
     },
   };
 }

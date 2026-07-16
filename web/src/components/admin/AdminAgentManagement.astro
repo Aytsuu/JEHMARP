@@ -26,13 +26,16 @@ const skeletonRows = Array.from({ length: 6 });
     <div slot="header" class="agent-create-sheet__header-copy">
       <h3 class="drawer-sheet__title" data-sheet-title>Create Agent</h3>
       <p class="agent-create-sheet__header-description">
-        Add the agent's login details, contact number, and display name. New accounts are created as active.
+        Add the agent's profile details. Email and temporary password are only needed when the agent should be able to log in.
       </p>
     </div>
     <form id="create-agent-form" method="post" class="admin-form agent-create-form" aria-label="Create agent">
       <input type="hidden" name="action" value="create-agent" />
       <div class="admin-form-grid agent-create-form__grid">
-        <label class="field-row"><span>Email</span><input name="email" type="email" required autocomplete="email" /></label>
+        <label class="field-row"><span>Employee ID</span><input name="employeeId" autocomplete="off" /></label>
+        <label class="field-row"><span>First name</span><input name="firstName" required autocomplete="given-name" /></label>
+        <label class="field-row"><span>Last name</span><input name="lastName" required autocomplete="family-name" /></label>
+        <label class="field-row"><span>Email</span><input name="email" type="email" autocomplete="email" /></label>
         <label class="field-row">
           <span>Contact number</span>
           <input
@@ -47,8 +50,7 @@ const skeletonRows = Array.from({ length: 6 });
             data-digits-only
           />
         </label>
-        <label class="field-row"><span>Temporary password</span><input name="password" type="password" minlength="8" required /></label>
-        <label class="field-row"><span>Display name</span><input name="displayName" required /></label>
+        <label class="field-row"><span>Temporary password</span><input name="password" type="password" minlength="8" autocomplete="new-password" /></label>
       </div>
     </form>
     <div slot="footer" class="agent-create-sheet__footer">
@@ -56,7 +58,7 @@ const skeletonRows = Array.from({ length: 6 });
     </div>
   </Sheet>
 
-  <div data-interactive-table class="dashboard-interactive-table">
+  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table">
     <div class="table-filters order-management-toolbar">
       <form
         method="get"
@@ -105,6 +107,7 @@ const skeletonRows = Array.from({ length: 6 });
           <thead>
             <tr>
               <th scope="col">Agent</th>
+              <th scope="col">Employee ID</th>
               <th scope="col">Email</th>
               <th scope="col">Contact</th>
               <th scope="col">Status</th>
@@ -115,7 +118,7 @@ const skeletonRows = Array.from({ length: 6 });
           <tbody>
             {data.agents.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={6}
+                colspan={7}
                 message="No agents match the selected filters."
               />
             ) : data.agents.map((agent) => (
@@ -125,7 +128,7 @@ const skeletonRows = Array.from({ length: 6 });
                     type="button"
                     class="table-cell-trigger"
                     data-open-cell-popover
-                    data-popover-title={`Edit Display Name: ${agent.display_name}`}
+                    data-popover-title={`Edit Agent: ${agent.display_name}`}
                   >
                     <span>{agent.display_name}</span>
                   </button>
@@ -134,10 +137,15 @@ const skeletonRows = Array.from({ length: 6 });
                       <input type="hidden" name="action" value="update-agent" />
                       <input type="hidden" name="agentId" value={agent.id} />
                       <input type="hidden" name="status" value={agent.status} />
-                      <label><span>Display name</span><input name="displayName" value={agent.display_name} required /></label>
+                      <label><span>Employee ID</span><input name="employeeId" value={agent.employee_id ?? ""} /></label>
+                      <label><span>First name</span><input name="firstName" value={agent.first_name} required /></label>
+                      <label><span>Last name</span><input name="lastName" value={agent.last_name} required /></label>
                       <button type="submit">Save</button>
                     </form>
                   </div>
+                </td>
+                <td class="dashboard-table__cell--truncate">
+                  <span>{agent.employee_id ?? "No employee ID"}</span>
                 </td>
                 <td class="dashboard-table__cell--truncate">
                   <span>{agent.email ?? "No email"}</span>
@@ -158,7 +166,9 @@ const skeletonRows = Array.from({ length: 6 });
                     <form method="post" class="admin-table-form">
                       <input type="hidden" name="action" value="update-agent" />
                       <input type="hidden" name="agentId" value={agent.id} />
-                      <input type="hidden" name="displayName" value={agent.display_name} />
+                      <input type="hidden" name="employeeId" value={agent.employee_id ?? ""} />
+                      <input type="hidden" name="firstName" value={agent.first_name} />
+                      <input type="hidden" name="lastName" value={agent.last_name} />
                       <label>
                         <span>Status</span>
                         <select name="status" required>
@@ -182,55 +192,35 @@ const skeletonRows = Array.from({ length: 6 });
       </DashboardTableBoard>
     </div>
 
-    <DashboardTablePagination />
+    <DashboardTablePagination pagination={data.pagination} />
   </div>
 
   <template data-agent-filter-skeleton>
     <DashboardTableBoard aria-busy="true" aria-live="polite">
       <table class="product-table-skeleton dashboard-table">
         <caption class="sr-only">Loading filtered agents</caption>
-        <thead><tr><th scope="col">Agent</th><th scope="col">Email</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Date Created</th><th scope="col">Action</th></tr></thead>
-        <tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody>
+        <thead><tr><th scope="col">Agent</th><th scope="col">Employee ID</th><th scope="col">Email</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Date Created</th><th scope="col">Action</th></tr></thead>
+        <tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody>
       </table>
     </DashboardTableBoard>
   </template>
 </section>
 
 <script>
-  import {
-    readDashboardFragmentCache,
-    writeDashboardFragmentCache,
-  } from "@/lib/client/dashboard-fragment-cache";
+  import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
 
   function initAdminAgentFilters() {
-    const form = document.querySelector<HTMLFormElement>("[data-agent-filter-form]");
-    const tableShell = document.querySelector<HTMLElement>("[data-agent-table-shell]");
-    const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-agent-filter-skeleton]");
-    if (!form || !tableShell || !skeletonTemplate) return;
-    if (form.dataset.agentFilterInitialized === "true") return;
-    form.dataset.agentFilterInitialized = "true";
-    const activeForm = form;
-    const activeTableShell = tableShell;
-    const activeSkeletonTemplate = skeletonTemplate;
-    const cacheKey = "admin-agents-filter-cache-v1";
-    const fragmentPath = "/admin/agents-fragment";
-    const filterKeys = ["search", "status"] as const;
-    const autoSubmitFields = activeForm.querySelectorAll<HTMLSelectElement>("select");
-    const searchInput = activeForm.querySelector<HTMLInputElement>("[data-agent-search-input]");
-    let submitTimer: number | undefined;
-    let searchTimer: number | undefined;
-    let activeFetchController: AbortController | undefined;
-    function normalizeParams(params: URLSearchParams) { const normalized = new URLSearchParams(); filterKeys.forEach((key) => { const value = params.get(key)?.trim(); if (value) normalized.set(key, value); }); return normalized.toString(); }
-    function normalizeFormQuery() { const params = new URLSearchParams(); const formData = new FormData(activeForm); filterKeys.forEach((key) => { const value = formData.get(key); if (typeof value === "string" && value.trim()) params.set(key, value.trim()); }); return params.toString(); }
-    function buildUrl(path: string, targetQuery: string) { return targetQuery ? `${path}?${targetQuery}` : path; }
-    function showSkeletonForQuery(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery); if (targetQuery === currentQuery || cachedFragment) return; const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true); if (skeleton) activeTableShell.replaceChildren(skeleton); }
-    function replaceAgentFragment(fragmentHtml: string) { const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html"); const nextTableShell = parsed.querySelector<HTMLElement>("[data-agent-table-shell]"); if (!nextTableShell) throw new Error("Agents fragment did not include an agent table."); activeTableShell.innerHTML = nextTableShell.innerHTML; document.dispatchEvent(new Event("dashboard:interactive-table-updated")); }
-    async function applyFilters(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); if (targetQuery === currentQuery) return; const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery); if (cachedFragment) { window.history.replaceState({ agentFilterQuery: targetQuery }, "", buildUrl("/admin/agents", targetQuery)); replaceAgentFragment(cachedFragment); activeForm.dataset.currentFilterQuery = targetQuery; return; } showSkeletonForQuery(targetQuery); activeFetchController?.abort(); const fetchController = new AbortController(); activeFetchController = fetchController; try { const response = await fetch(buildUrl(fragmentPath, targetQuery), { headers: { "X-Requested-With": "fetch" }, signal: fetchController.signal }); const fragmentHtml = await window.readDashboardFragmentResponse(response); window.history.replaceState({ agentFilterQuery: targetQuery }, "", buildUrl("/admin/agents", targetQuery)); replaceAgentFragment(fragmentHtml); activeForm.dataset.currentFilterQuery = targetQuery; writeDashboardFragmentCache(cacheKey, targetQuery, fragmentHtml); } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; window.location.href = buildUrl("/admin/agents", targetQuery); } finally { if (activeFetchController === fetchController) activeFetchController = undefined; } }
-    function submitFilters() { window.clearTimeout(submitTimer); submitTimer = window.setTimeout(() => { void applyFilters(normalizeFormQuery()); }, 120); }
-    writeDashboardFragmentCache(cacheKey, normalizeParams(new URLSearchParams(window.location.search)), activeTableShell.outerHTML);
-    activeForm.addEventListener("submit", (event) => { event.preventDefault(); void applyFilters(normalizeFormQuery()); });
-    autoSubmitFields.forEach((field) => field.addEventListener("change", submitFilters));
-    searchInput?.addEventListener("input", () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(submitFilters, 450); });
+    initDashboardFragmentTable({
+      cacheKey: "admin-agents-filter-cache-v2",
+      fragmentPath: "/admin/agents-fragment",
+      pagePath: "/admin/agents",
+      formSelector: "[data-agent-filter-form]",
+      tableShellSelector: "[data-agent-table-shell]",
+      skeletonTemplateSelector: "[data-agent-filter-skeleton]",
+      filterKeys: ["search", "status"],
+      searchInputSelector: "[data-agent-search-input]",
+      historyStateKey: "agentFilterQuery",
+    });
   }
   document.addEventListener("DOMContentLoaded", initAdminAgentFilters);
   document.addEventListener("astro:after-swap", initAdminAgentFilters);

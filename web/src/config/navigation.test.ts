@@ -29,6 +29,7 @@ describe("dashboard routes", () => {
       { label: "Customers", href: "/admin/customers" },
       { label: "Agents", href: "/admin/agents" },
       { label: "Orders", href: "/admin/orders" },
+      { label: "Sales", href: "/admin/sales" },
       { label: "Invoices", href: "/admin/invoices" },
       { label: "Inquiries", href: "/admin/inquiries" },
       { label: "Reseller Applications", href: "/admin/reseller-applications" },

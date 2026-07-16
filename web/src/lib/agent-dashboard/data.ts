@@ -10,6 +10,7 @@ type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 
 const agentOrderSelect = `
   id,
+  agent_order_id,
   customer_id,
   agent_id,
   source,
@@ -69,6 +70,99 @@ const agentOrderSelect = `
     to_status,
     changed_at,
     notes
+  )
+`;
+
+const agentOrderClusterSelect = `
+  id,
+  agent_id,
+  order_status,
+  notes,
+  submitted_by,
+  admin_read_at,
+  admin_read_by,
+  created_at,
+  updated_at,
+  agent_order_item (
+    id,
+    product_id,
+    quantity,
+    add_details,
+    agent_commission_amount,
+    agent_commission_updated_by,
+    agent_commission_updated_at,
+    created_at,
+    updated_at,
+    product:product_id (
+      id,
+      name,
+      unit_label,
+      default_price
+    )
+  ),
+  customer_order (
+    id,
+    agent_order_id,
+    customer_id,
+    agent_id,
+    source,
+    order_status,
+    payment_status,
+    approved_at,
+    created_at,
+    updated_at,
+    customer:customer_id (
+      id,
+      first_name,
+      last_name,
+      phone_number,
+      email,
+      address,
+      is_reseller
+    ),
+    customer_order_item (
+      id,
+      product_id,
+      partial_quantity,
+      final_quantity,
+      unit_price,
+      price_type,
+      add_details,
+      agent_commission_amount,
+      agent_commission_paid,
+      product:product_id (
+        id,
+        name,
+        unit_label,
+        default_price
+      )
+    ),
+    payment (
+      id,
+      amount,
+      payment_method,
+      payment_date,
+      reference_number,
+      notes,
+      created_at
+    ),
+    invoice (
+      id,
+      order_id,
+      invoice_number,
+      status,
+      issued_at,
+      due_at,
+      created_at,
+      updated_at
+    ),
+    customer_order_status_history (
+      id,
+      from_status,
+      to_status,
+      changed_at,
+      notes
+    )
   )
 `;
 
@@ -151,8 +245,28 @@ export type AgentOrderStatusHistory = {
   notes: string | null;
 };
 
+export type AgentOrderClusterStatus =
+  | "pending_customers"
+  | "pending_order"
+  | "processing"
+  | "closed";
+
+export type AgentOrderClusterItem = {
+  id: string;
+  product_id: string;
+  quantity: number;
+  add_details: string | null;
+  agent_commission_amount: number;
+  agent_commission_updated_by: string | null;
+  agent_commission_updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+  product: Pick<AgentProduct, "id" | "name" | "unit_label" | "default_price"> | null;
+};
+
 export type AgentOrder = {
   id: string;
+  agent_order_id?: string | null;
   customer_id: string;
   agent_id: string | null;
   source: "guest_shop" | "agent_submitted" | "admin_manual";
@@ -166,6 +280,28 @@ export type AgentOrder = {
   payment: AgentPayment[];
   invoice: AgentInvoice[];
   customer_order_status_history: AgentOrderStatusHistory[];
+};
+
+export type AgentOrderCluster = {
+  id: string;
+  agent_id: string;
+  order_status: AgentOrderClusterStatus;
+  notes: string | null;
+  submitted_by: string | null;
+  admin_read_at?: string | null;
+  admin_read_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  agent_order_item: AgentOrderClusterItem[];
+  customer_order: AgentOrder[];
+};
+
+export type AgentCustomerRegistrationLink = {
+  id: string;
+  token: string;
+  expires_at: string;
+  created_at: string;
+  use_count: number;
 };
 
 export type AgentPaymentSummary = Record<AgentOrder["payment_status"], number>;
@@ -183,6 +319,8 @@ export type AgentDashboardData = {
   agent: AgentProfile;
   customers: AgentCustomer[];
   products: AgentProduct[];
+  agentOrders: AgentOrderCluster[];
+  registrationLinks: AgentCustomerRegistrationLink[];
   orders: AgentOrder[];
   summary: AgentDashboardSummary;
   paymentSummary: AgentPaymentSummary;
@@ -194,9 +332,11 @@ export async function loadAgentDashboardData(
 ): Promise<AgentDashboardData> {
   const supabase = createSupabaseServerClient(context);
   const agent = await loadAgentProfile(supabase, userId);
-  const [customers, products, orders] = await Promise.all([
+  const [customers, products, agentOrders, registrationLinks, orders] = await Promise.all([
     loadAssignedCustomers(supabase),
     loadActiveProducts(supabase),
+    loadAccessibleAgentOrders(supabase),
+    loadAgentRegistrationLinks(supabase),
     loadAccessibleOrders(supabase),
   ]);
 
@@ -204,8 +344,10 @@ export async function loadAgentDashboardData(
     agent,
     customers,
     products,
+    agentOrders,
+    registrationLinks,
     orders,
-    summary: buildAgentSummary({ agent, customers, orders }),
+    summary: buildAgentSummary({ agent, customers, agentOrders, orders }),
     paymentSummary: buildAgentPaymentSummary(orders),
   };
 }
@@ -282,6 +424,32 @@ async function loadAccessibleOrders(supabase: SupabaseServerClient) {
   return ((data ?? []) as unknown[]).map(normalizeAgentOrder);
 }
 
+async function loadAccessibleAgentOrders(supabase: SupabaseServerClient) {
+  const { data, error } = await supabase
+    .from("agent_order")
+    .select(agentOrderClusterSelect)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) throwLoadError("Unable to load agent orders.");
+
+  return ((data ?? []) as unknown[]).map(normalizeAgentOrderCluster);
+}
+
+async function loadAgentRegistrationLinks(supabase: SupabaseServerClient) {
+  const { data, error } = await supabase
+    .from("customer_registration_link")
+    .select("id, token, expires_at, created_at, use_count")
+    .is("revoked_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (error) throwLoadError("Unable to load customer registration links.");
+
+  return (data ?? []) as AgentCustomerRegistrationLink[];
+}
+
 function normalizeAgentOrder(order: unknown): AgentOrder {
   const agentOrder = order as AgentOrder;
 
@@ -292,6 +460,18 @@ function normalizeAgentOrder(order: unknown): AgentOrder {
     invoice: normalizeRelationArray(agentOrder.invoice),
     customer_order_status_history: Array.isArray(agentOrder.customer_order_status_history)
       ? agentOrder.customer_order_status_history
+      : [],
+  };
+}
+
+function normalizeAgentOrderCluster(order: unknown): AgentOrderCluster {
+  const agentOrder = order as AgentOrderCluster;
+
+  return {
+    ...agentOrder,
+    agent_order_item: Array.isArray(agentOrder.agent_order_item) ? agentOrder.agent_order_item : [],
+    customer_order: Array.isArray(agentOrder.customer_order)
+      ? agentOrder.customer_order.map(normalizeAgentOrder)
       : [],
   };
 }

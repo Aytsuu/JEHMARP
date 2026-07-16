@@ -1,0 +1,256 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import ViewButton from "@/components/ViewButton.astro";
+import {
+  formatAdminActionFeedback,
+  handleAdminDashboardAction,
+} from "@/lib/admin-dashboard/actions";
+import {
+  loadAdminAgentOrder,
+  loadAdminDashboardData,
+} from "@/lib/admin-dashboard/data";
+import {
+  agentOrderPaymentStatus,
+  agentOrderTotal,
+  defaultProductCommissionAmount,
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderTotal,
+} from "@/lib/admin-dashboard/view";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const { agentOrderId } = Astro.params;
+
+if (!agentOrderId) {
+  return Astro.redirect("/admin/orders", 302);
+}
+
+if (Astro.request.method === "POST") {
+  return handleAdminDashboardAction(
+    Astro,
+    adminRoute.userId,
+    `/admin/agent-orders/${agentOrderId}`,
+  );
+}
+
+const [dashboardData, agentOrder] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminAgentOrder(agentOrderId),
+]);
+
+if (!agentOrder) {
+  return Astro.redirect("/admin/orders", 302);
+}
+
+const feedback = formatAdminActionFeedback(Astro.url);
+const agentOrderPaymentState = agentOrderPaymentStatus(agentOrder);
+const isCommissionLocked = agentOrderPaymentState === "paid";
+---
+
+<AdminPageFrame
+  title={`Agent Order #${agentOrder.id.slice(0, 8)} - JEHMARP`}
+  description="Admin agent order cluster details."
+  heading="Agent Order"
+  intro={`Review products and customer orders under Agent Order #${agentOrder.id.slice(0, 8)}.`}
+  feedback={feedback}
+  dashboardData={dashboardData}
+  backUrl="/admin/orders"
+  backLabel="Back to orders"
+>
+  <div class="dashboard-detail-stack">
+    <div class="content-section">
+      <h3>Agent Order Information</h3>
+
+      <div class="dashboard-detail-grid dashboard-detail-grid--compact">
+        <div class="detail-field">
+          <span class="detail-field-label">Agent</span>
+          <div class="detail-field-value">
+            {agentOrder.agent?.display_name ?? "Unassigned agent"}
+          </div>
+        </div>
+
+        <div class="detail-field">
+          <span class="detail-field-label">Order Status</span>
+          <div class="detail-field-value">
+            <StatusBadge kind="order" status={agentOrder.order_status} label={autoCapitalize(agentOrder.order_status)} />
+          </div>
+        </div>
+
+        <div class="detail-field">
+          <span class="detail-field-label">Submitted</span>
+          <div class="detail-field-value">
+            {formatDate(agentOrder.created_at)}
+          </div>
+        </div>
+
+        <div class="detail-field">
+          <span class="detail-field-label">Payment Status</span>
+          <div class="detail-field-value">
+            <StatusBadge kind="payment" status={agentOrderPaymentState} />
+          </div>
+        </div>
+
+        <div class="detail-field">
+          <span class="detail-field-label">Estimated Total</span>
+          <div class="detail-field-value">
+            {formatCurrency(agentOrderTotal(agentOrder))}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="content-section">
+      <h3>Products</h3>
+      <DashboardTableBoard>
+        <table class="dashboard-table">
+          <thead>
+            <tr>
+              <th scope="col">Product</th>
+              <th scope="col">Quantity</th>
+              <th scope="col">Details</th>
+              <th scope="col">Estimated Total</th>
+              <th scope="col">Commission</th>
+            </tr>
+          </thead>
+          <tbody>
+            {agentOrder.agent_order_item.map((item) => {
+              const unitPrice = item.product?.default_price ?? 0;
+              const defaultCommission = defaultProductCommissionAmount({
+                product: item.product,
+                quantity: item.quantity,
+                unitPrice,
+              });
+
+              return (
+                <tr>
+                  <td>
+                    {item.product?.name ?? "Missing product"}
+                    <span class="dashboard-table__muted-line">
+                      {formatCurrency(unitPrice)} / {item.product?.unit_label ?? "unit"}
+                    </span>
+                  </td>
+                  <td>{item.quantity} {item.product?.unit_label ?? ""}</td>
+                  <td>{item.add_details ?? "N/A"}</td>
+                  <td>{formatCurrency(item.quantity * unitPrice)}</td>
+                  <td>
+                    <form method="post" class="agent-order-commission-form">
+                      <input type="hidden" name="action" value="update-agent-order-commission" />
+                      <input type="hidden" name="agentOrderItemId" value={item.id} />
+                      <label class="sr-only" for={`agent-order-commission-${item.id}`}>
+                        Commission for {item.product?.name ?? "item"}
+                      </label>
+                      <input
+                        id={`agent-order-commission-${item.id}`}
+                        type="number"
+                        name="amount"
+                        min="0"
+                        step="0.01"
+                        value={item.agent_commission_amount}
+                        disabled={isCommissionLocked}
+                      />
+                      <button type="submit" disabled={isCommissionLocked}>Save</button>
+                    </form>
+                    <span class="dashboard-table__muted-line">
+                      Default {formatCurrency(defaultCommission)}
+                      {isCommissionLocked ? " - locked after full payment" : ""}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </DashboardTableBoard>
+    </div>
+
+    <div class="content-section">
+      <h3>Customer Orders</h3>
+      {agentOrder.customer_order.length === 0 ? (
+        <p class="empty-state">No customer orders have been attached yet.</p>
+      ) : (
+        <DashboardTableBoard>
+          <table class="dashboard-table">
+            <thead>
+              <tr>
+                <th scope="col">Customer</th>
+                <th scope="col">Date</th>
+                <th scope="col">Source</th>
+                <th scope="col">Order Status</th>
+                <th scope="col">Payment Status</th>
+                <th scope="col">Order Total</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {agentOrder.customer_order.map((order) => {
+                const invoice = order.invoice[0];
+                const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+
+                return (
+                  <tr>
+                    <td>{order.customer ? fullName(order.customer) : "Guest"}</td>
+                    <td>{formatDate(order.created_at)}</td>
+                    <td>{formatOrderSource(order.source)}</td>
+                    <td><StatusBadge kind="order" status={order.order_status} /></td>
+                    <td><StatusBadge kind="payment" status={order.payment_status} /></td>
+                    <td>{formatCurrency(total)}</td>
+                    <td><ViewButton href={`/admin/orders/${order.id}`} /></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </DashboardTableBoard>
+      )}
+    </div>
+  </div>
+</AdminPageFrame>
+
+<style>
+  .agent-order-commission-form {
+    display: grid;
+    grid-template-columns: minmax(6rem, 1fr) auto;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .agent-order-commission-form input {
+    min-height: 2.35rem;
+    width: 100%;
+    border: 1px solid rgba(17, 24, 39, 0.14);
+    border-radius: 0.5rem;
+    background: #ffffff;
+    padding: 0.45rem 0.65rem;
+    font: inherit;
+  }
+
+  .agent-order-commission-form button {
+    min-height: 2.35rem;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    border-radius: 0.5rem;
+    background: #111827;
+    color: #ffffff;
+    padding: 0.45rem 0.65rem;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .agent-order-commission-form :disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+</style>

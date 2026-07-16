@@ -1,10 +1,14 @@
 ---
 import AdminActivity from "@/components/admin/AdminActivity.astro";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { loadAdminActivityManagementData } from "@/lib/admin-dashboard/data";
 import {
   parseAdminActivityFilters,
   serializeAdminActivityFilters,
 } from "@/lib/admin-dashboard/activity-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -16,8 +20,12 @@ if (!adminRoute.ready) {
 }
 
 const activityFilters = parseAdminActivityFilters(Astro.url);
-const activityFilterQuery = serializeAdminActivityFilters(activityFilters);
-const data = await loadAdminDashboardData();
+const activityPagination = parseAdminPagination(Astro.url);
+const activityFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminActivityFilters(activityFilters),
+  activityPagination,
+);
+const data = await loadAdminActivityManagementData(activityFilters, activityPagination);
 ---
 
 <AdminActivity

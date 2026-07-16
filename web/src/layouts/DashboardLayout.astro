@@ -62,6 +62,11 @@ const categories: CategoryGroup[] = isAdmin
             icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>`,
           },
           {
+            label: "Sales",
+            href: "/admin/sales",
+            icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"></path><path d="m7 14 3-3 4 4 5-7"></path></svg>`,
+          },
+          {
             label: "Invoices",
             href: "/admin/invoices",
             icon: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>`,
@@ -191,7 +196,7 @@ const categories: CategoryGroup[] = isAdmin
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..1000&display=block"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
     />
     <ClientRouter fallback="swap" />
     <meta name="description" content={description} />
@@ -390,6 +395,7 @@ const categories: CategoryGroup[] = isAdmin
 
     <script>
       import { initOrderDetailTabs } from "@/lib/client/order-detail-tabs";
+      import { initOrderPaymentFormToggle } from "@/lib/client/order-payment-form";
       import { initOrderStatusAutoSave } from "@/lib/client/order-status-auto-save";
 
       function initSidebarUnreadBadges() {
@@ -735,6 +741,10 @@ const categories: CategoryGroup[] = isAdmin
           "[data-interactive-table]",
         );
         interactiveTables.forEach((container) => {
+          if (container.dataset.serverPagination === "true") {
+            return;
+          }
+
           const tableGeneration = String(
             Number(container.dataset.interactiveTableGeneration || "0") + 1,
           );
@@ -1062,6 +1072,7 @@ const categories: CategoryGroup[] = isAdmin
         initDigitsOnlyInputs();
         initFormSubmissionState();
         initOrderDetailTabs();
+        initOrderPaymentFormToggle();
         initOrderStatusAutoSave();
       }
 

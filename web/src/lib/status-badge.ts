@@ -16,6 +16,8 @@ export type StatusBadgeKind =
 const statusBadgeVariants: Record<StatusBadgeKind, Record<string, StatusBadgeVariant>> = {
   order: {
     pending: "warning",
+    pending_customers: "warning",
+    pending_order: "warning",
     processing: "info",
     closed: "success",
   },
