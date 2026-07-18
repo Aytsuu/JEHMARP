@@ -1,0 +1,23 @@
+{
+    "$schema": "./node_modules/wrangler/config-schema.json",
+    "name": "jehmarp",
+    "main": "@astrojs/cloudflare/entrypoints/server",
+    "compatibility_date": "2026-07-18",
+    "compatibility_flags": [
+        "nodejs_compat",
+        "global_fetch_strictly_public"
+    ],
+    "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS"
+    },
+    "kv_namespaces": [
+        {
+            "binding": "SESSION",
+            "id": "661b6b65c2e34b6e84351040e6a6721a"
+        }
+    ],
+    "observability": {
+        "enabled": true
+    }
+}

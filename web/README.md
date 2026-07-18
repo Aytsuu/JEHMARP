@@ -79,24 +79,28 @@ All commands are run from the root of the web project:
 | `npm run test:coverage` | Runs Vitest with coverage |
 | `npm run preview` | Previews the built site locally |
 | `npm run astro -- --help` | Shows Astro CLI help |
+| `npx wrangler deploy --dry-run` | Validates the Cloudflare Worker deployment without publishing |
+| `npx wrangler deploy` | Deploys the server-rendered app to Cloudflare Workers |
 
 ## Deployment
 
-The project is configured for server-rendered Astro output on Vercel through `@astrojs/vercel`.
+The project is configured for server-rendered Astro output on Cloudflare Workers
+through `@astrojs/cloudflare`. It is not a static Cloudflare Pages app; deploying
+only a Pages output directory will not serve `/` correctly.
 
 Recommended deployment settings:
 
 | Setting | Value |
 | :-- | :-- |
-| Framework Preset | `Astro` |
 | Root Directory | `web` |
 | Install Command | `npm install` |
 | Build Command | `npm run build` |
+| Deploy Command | `npx wrangler deploy` |
 
 Deployment steps:
 
-1. Link the repository to a Vercel project with `web/` as the root directory.
-2. Add every required environment variable from `.env.example` to the Vercel project.
+1. Run all deployment commands from `web/`.
+2. Add every required environment variable from `.env.example` to the Cloudflare Worker.
 3. Keep `SUPABASE_SECRET_KEY`, `TURNSTILE_SECRET_KEY`, `RESEND_API_KEY`, and `UPSTASH_REDIS_REST_TOKEN` server-only.
 4. Deploy after `npm run test`, `npm run check`, `npm run lint`, and `npm run build` pass locally.
 5. Verify the public forms, admin login, agent login, and dashboard routes on the deployed site.
