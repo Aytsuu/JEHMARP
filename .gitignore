@@ -151,3 +151,8 @@ vite.config.ts.timestamp-*
 contexts
 .mcp.json
 /AGENTS.md
+
+# deployment
+dist
+.astro
+.wrangler
