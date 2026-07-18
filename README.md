@@ -35,25 +35,30 @@ RESELLER_ADMIN_EMAIL=
 for the reseller application email workflow. The remaining variables are required
 for the current public form and dashboard protections.
 
-## Vercel Deployment
+## Cloudflare Deployment
 
-Deploy the Astro app from the `web/` directory, not the repository root.
+Deploy the Astro app from the `web/` directory, not the repository root. This
+project uses server-rendered Astro routes, so the supported Cloudflare target is
+Cloudflare Workers with static assets, not a static Cloudflare Pages deployment.
 
-Recommended Vercel project settings:
+Recommended Cloudflare settings:
 
 | Setting | Value |
 | :-- | :-- |
-| Framework Preset | `Astro` |
-| Root Directory | `web` |
 | Install Command | `npm install` |
 | Build Command | `npm run build` |
+| Deploy Command | `npx wrangler deploy` |
 
 Recommended deployment checklist:
 
-1. Set the Vercel root directory to `web`.
+1. Run all commands from `web/`.
 2. Configure all required environment variables before the first production deploy.
 3. Apply Supabase migrations to the linked project before deploying the app.
 4. Verify that Turnstile, Upstash Redis, and Resend credentials are production values.
 5. Run `npm run test`, `npm run check`, `npm run lint`, and `npm run build` from `web/`.
+6. Run `npx wrangler deploy` to publish the Cloudflare Worker.
 
-The project uses `@astrojs/vercel` for server-rendered Astro routes on Vercel.
+The project uses `@astrojs/cloudflare` for server-rendered Astro routes on
+Cloudflare Workers. Cloudflare Pages static output will not serve this app
+correctly because the root page and API routes are rendered by the server
+adapter.
