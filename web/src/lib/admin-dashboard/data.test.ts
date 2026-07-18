@@ -181,7 +181,7 @@ describe("loadAdminDashboardData", () => {
       source_label: "Shop",
       payment_status: "partial",
       total_amount: "1200.00",
-      href: "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      href: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       linked_customer_count: null,
     };
     const orderBuilder = createQueryBuilder();
@@ -232,7 +232,7 @@ describe("loadAdminDashboardData", () => {
       order_total: "1200.00",
       paid_total: "1200.00",
       balance: "0.00",
-      href: "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      href: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
     };
     const rpc = vi.fn(() => Promise.resolve({
       data: [{ records: [salesRow], total_rows: "1" }],

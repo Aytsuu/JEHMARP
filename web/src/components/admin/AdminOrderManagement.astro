@@ -178,16 +178,10 @@ const orderRows = data.orderRows;
           <h3 class="order-create-section__title">Release and payment</h3>
         </div>
         <div class="order-create-section__body">
-          <div class="admin-form-grid order-create-form__payment-grid">
-            <label class="field-row">
-              <span>Release date</span>
-              <input name="releaseDate" type="date" data-release-date />
-            </label>
-            <div class="order-create-form__total" aria-live="polite">
-              <span>Total value</span>
-              <strong data-order-total-value>{formatCurrency(0)}</strong>
-            </div>
-          </div>
+          <label class="field-row">
+            <span>Release date</span>
+            <input name="releaseDate" type="date" data-release-date />
+          </label>
         </div>
       </section>
 
@@ -369,7 +363,18 @@ const orderRows = data.orderRows;
             </label>
             <label class="field-row">
               <span>Payment method</span>
-              <input name="downpaymentMethod" value="Cash" data-downpayment-method />
+              <select name="downpaymentMethod" data-downpayment-method>
+                <option value="Cash">Cash</option>
+                <option value="Check">Check</option>
+              </select>
+            </label>
+            <label class="field-row">
+              <span>Payment terms</span>
+              <select name="downpaymentTerms" data-downpayment-terms>
+                <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Gcash">Gcash</option>
+              </select>
             </label>
             <label class="field-row">
               <span>Payment date</span>
@@ -388,6 +393,10 @@ const orderRows = data.orderRows;
       </section>
     </form>
     <div slot="footer" class="order-create-sheet__footer">
+      <div class="order-create-sheet__footer-total" aria-live="polite">
+        <span>Total amount</span>
+        <strong data-order-total-value>{formatCurrency(0)}</strong>
+      </div>
       <button type="submit" form="create-order-form" disabled={!canCreateOrder}>Create order</button>
     </div>
   </Sheet>
@@ -574,7 +583,9 @@ const orderRows = data.orderRows;
     const customerOptionsEmpty = form.querySelector<HTMLElement>("[data-customer-options-empty]");
     const customerOptionTemplate = form.querySelector<HTMLTemplateElement>("[data-customer-option-template]");
     const customerOrderNotice = form.querySelector<HTMLElement>("[data-customer-order-notice]");
-    const orderTotalValue = form.querySelector<HTMLElement>("[data-order-total-value]");
+    const orderTotalValues = Array.from(
+      document.querySelectorAll<HTMLElement>("#create-order-sheet [data-order-total-value]"),
+    );
     const releaseDateInput = form.querySelector<HTMLInputElement>("[data-release-date]");
     const downpaymentAmountInput = form.querySelector<HTMLInputElement>("[data-downpayment-amount]");
     const newCustomerFields = form.querySelector<HTMLElement>("[data-new-customer-fields]");
@@ -777,8 +788,10 @@ const orderRows = data.orderRows;
     }
 
     function updateOrderTotal() {
-      if (!orderTotalValue) return;
-      orderTotalValue.textContent = formatCurrencyForClient(calculateOrderTotal());
+      const formatted = formatCurrencyForClient(calculateOrderTotal());
+      orderTotalValues.forEach((node) => {
+        node.textContent = formatted;
+      });
     }
 
     function formatCurrencyForClient(value: number) {
@@ -1035,33 +1048,33 @@ const orderRows = data.orderRows;
 </script>
 
 <style>
-  .order-create-form__payment-grid {
-    align-items: end;
+  .order-create-sheet__footer {
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1rem;
   }
 
-  .order-create-form__total {
+  .order-create-sheet__footer-total {
     display: flex;
-    min-height: 4.4rem;
+    min-width: 10rem;
     flex-direction: column;
     justify-content: center;
-    gap: 0.35rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    background: #f9fafb;
-    padding: 0.75rem 1rem;
+    gap: 0.25rem;
+    margin-right: auto;
   }
 
-  .order-create-form__total span {
+  .order-create-sheet__footer-total span {
     color: #6b7280;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 800;
     letter-spacing: 0;
     text-transform: uppercase;
   }
 
-  .order-create-form__total strong {
+  .order-create-sheet__footer-total strong {
     color: #111827;
-    font-size: 1.15rem;
+    font-size: 1.1rem;
     letter-spacing: 0;
+    white-space: nowrap;
   }
 </style>

@@ -72,7 +72,7 @@ function getPanel(tab: string) {
 
 describe("initOrderDetailTabs", () => {
   beforeEach(() => {
-    window.history.replaceState(null, "", "/admin/orders/order-1");
+    window.history.replaceState(null, "", "/admin/orders/customer/order-1");
     document.body.innerHTML = "";
   });
 
@@ -80,7 +80,7 @@ describe("initOrderDetailTabs", () => {
     window.history.replaceState(
       null,
       "",
-      "/admin/orders/order-1?tab=sales-invoice",
+      "/admin/orders/customer/order-1?tab=sales-invoice",
     );
     renderTabs();
 
@@ -114,7 +114,7 @@ describe("initOrderDetailTabs", () => {
     window.history.replaceState(
       null,
       "",
-      "/admin/orders/order-1?status=Saved",
+      "/admin/orders/customer/order-1?status=Saved",
     );
     renderTabs();
 

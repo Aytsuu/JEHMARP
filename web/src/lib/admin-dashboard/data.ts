@@ -99,10 +99,30 @@ const adminOrderSelect = `
     id,
     amount,
     payment_method,
+    payment_terms,
     payment_date,
     reference_number,
     notes,
     created_at
+  ),
+  agent_received_payment (
+    id,
+    order_id,
+    agent_id,
+    amount,
+    payment_method,
+    payment_terms,
+    payment_date,
+    reference_number,
+    notes,
+    status,
+    confirmed_at,
+    created_at,
+    updated_at,
+    agent:agent_id (
+      id,
+      display_name
+    )
   ),
   invoice (
     id,
@@ -231,10 +251,30 @@ const adminAgentOrderSelect = `
       id,
       amount,
       payment_method,
+      payment_terms,
       payment_date,
       reference_number,
       notes,
       created_at
+    ),
+    agent_received_payment (
+      id,
+      order_id,
+      agent_id,
+      amount,
+      payment_method,
+      payment_terms,
+      payment_date,
+      reference_number,
+      notes,
+      status,
+      confirmed_at,
+      created_at,
+      updated_at,
+      agent:agent_id (
+        id,
+        display_name
+      )
     ),
     invoice (
       id,
@@ -352,6 +392,7 @@ export type AdminPayment = {
   id: string;
   amount: number;
   payment_method: string;
+  payment_terms: string;
   payment_date: string;
   reference_number: string | null;
   notes: string | null;
@@ -375,6 +416,23 @@ export type AdminOrderStatusHistory = {
   to_status: OrderStatus;
   changed_at: string;
   notes: string | null;
+};
+
+export type AdminAgentReceivedPayment = {
+  id: string;
+  order_id: string;
+  agent_id: string;
+  amount: number;
+  payment_method: string;
+  payment_terms: string;
+  payment_date: string;
+  reference_number: string | null;
+  notes: string | null;
+  status: "pending_admin_confirmation" | "confirmed" | "rejected";
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  agent: Pick<AdminAgent, "id" | "display_name"> | null;
 };
 
 export type AdminAgentOrderStatus =
@@ -415,6 +473,7 @@ export type AdminOrder = {
   agent: Pick<AdminAgent, "id" | "display_name" | "email" | "contact"> | null;
   customer_order_item: AdminOrderItem[];
   payment: AdminPayment[];
+  agent_received_payment?: AdminAgentReceivedPayment[];
   invoice: AdminInvoice[];
   customer_order_status_history: AdminOrderStatusHistory[];
 };
@@ -1514,6 +1573,9 @@ function normalizeAdminOrder(order: unknown): AdminOrder {
     ...adminOrder,
     customer_order_item: Array.isArray(adminOrder.customer_order_item) ? adminOrder.customer_order_item : [],
     payment: Array.isArray(adminOrder.payment) ? adminOrder.payment : [],
+    agent_received_payment: Array.isArray(adminOrder.agent_received_payment)
+      ? adminOrder.agent_received_payment
+      : [],
     invoice: normalizeRelationArray(adminOrder.invoice),
     customer_order_status_history: Array.isArray(adminOrder.customer_order_status_history)
       ? adminOrder.customer_order_status_history

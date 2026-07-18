@@ -104,6 +104,7 @@ export function buildOrderSlipLayout(order: DocumentOrder): OrderSlipLayout {
 
 export function buildSalesInvoiceLayout(order: DocumentOrder): SalesInvoiceLayout {
   const invoice = order.invoice[0];
+  const payment = order.payment?.[0] ?? null;
 
   return {
     brandLines: getBrandLines(),
@@ -130,13 +131,17 @@ export function buildSalesInvoiceLayout(order: DocumentOrder): SalesInvoiceLayou
     paymentHeading: "Payment Terms (For Order Confirmation)",
     paymentLines: [
       "Mode of Payment (/)",
-      "( ) Cash   ( ) Check",
-      "( ) Cash on Delivery (COD)  ( ) Bank Transfer   ( ) Gcash",
+      `${paymentCheckbox(payment?.payment_method === "Cash")} Cash   ${paymentCheckbox(payment?.payment_method === "Check")} Check`,
+      `${paymentCheckbox(payment?.payment_terms === "Cash on Delivery (COD)")} Cash on Delivery (COD)  ${paymentCheckbox(payment?.payment_terms === "Bank Transfer")} Bank Transfer   ${paymentCheckbox(payment?.payment_terms === "Gcash")} Gcash`,
     ],
     issuerHeading: "Issued by:",
     issuerName: defaultSellerName,
     issuerSubline: "Owner / Authorized Representative",
   };
+}
+
+function paymentCheckbox(checked: boolean) {
+  return checked ? "(✓)" : "( )";
 }
 
 export function getDocumentColumnTemplate(columns: DocumentTableColumn[]) {

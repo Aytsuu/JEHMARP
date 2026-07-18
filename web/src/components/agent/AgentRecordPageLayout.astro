@@ -1,14 +1,9 @@
 ---
-import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
-import type { AdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
 import PageAvailabilityNotice from "@/components/dashboard/PageAvailabilityNotice.astro";
 import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
-import {
-  getUnreadAdminInquiryIds,
-  getUnreadAdminOrderIds,
-  getUnreadAdminResellerApplicationIds,
-} from "@/lib/admin-dashboard/notifications";
-import { adminDashboardRoutes } from "@/config/navigation";
+import { getAgentUnreadNotificationIds } from "@/lib/agent-dashboard/notifications";
+import { agentDashboardRoutes } from "@/config/navigation";
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
 import { getDashboardPageAvailability } from "@/lib/page-availability";
 
@@ -19,8 +14,12 @@ type Props = {
   intro?: string;
   backUrl?: string;
   backLabel?: string;
-  feedback?: AdminActionFeedback;
-  dashboardData?: AdminDashboardData;
+  feedback?: {
+    status?: string;
+    error?: string;
+    cleanPath?: string;
+  };
+  dashboardData?: AgentDashboardData;
   contentMaxWidth?: string;
   fullHeight?: boolean;
 };
@@ -41,13 +40,7 @@ const headingId = `${heading
   .toLowerCase()
   .replace(/[^a-z0-9]+/g, "-")
   .replace(/^-|-$/g, "")}-title`;
-const unreadOrderCount = dashboardData ? getUnreadAdminOrderIds(dashboardData).length : 0;
-const unreadInquiryCount = dashboardData ? getUnreadAdminInquiryIds(dashboardData).length : 0;
-const unreadResellerApplicationCount = dashboardData
-  ? getUnreadAdminResellerApplicationIds(dashboardData).length
-  : 0;
-const unreadNotificationCount =
-  unreadOrderCount + unreadInquiryCount + unreadResellerApplicationCount;
+const notificationIds = dashboardData ? getAgentUnreadNotificationIds(dashboardData) : [];
 const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
 const isPageReady = pageAvailability.status === "ready";
 const hasHeadingMeta = Astro.slots.has("heading-meta");
@@ -57,20 +50,12 @@ const hasHeadingAside = Astro.slots.has("heading-aside");
 <DashboardLayout
   title={title}
   description={description}
-  navLabel="Admin operations"
-  navItems={adminDashboardRoutes}
+  navLabel="Agent operations"
+  navItems={agentDashboardRoutes}
   sidebarUnreadBadges={{
-    "/admin/orders": {
-      count: unreadOrderCount,
-    },
-    "/admin/inquiries": {
-      count: unreadInquiryCount,
-    },
-    "/admin/reseller-applications": {
-      count: unreadResellerApplicationCount,
-    },
-    "/admin/notifications": {
-      count: unreadNotificationCount,
+    "/agent/notifications": {
+      ids: notificationIds,
+      storageKey: "agent-read-notifications",
     },
   }}
 >
@@ -80,7 +65,7 @@ const hasHeadingAside = Astro.slots.has("heading-aside");
       fullHeight && "admin-notifications-page--full-height",
     ]}
     data-admin-record-page={fullHeight || undefined}
-    data-admin-notifications-page
+    data-agent-record-page
   >
     <div
       class="admin-notifications-page__inner"
@@ -146,9 +131,9 @@ const hasHeadingAside = Astro.slots.has("heading-aside");
 
 {
   feedback?.cleanPath && (
-    <script is:inline define:vars={{ adminFeedbackCleanPath: feedback.cleanPath }}>
-      if (typeof adminFeedbackCleanPath === "string" && window.history.replaceState) {
-        window.history.replaceState(window.history.state, "", adminFeedbackCleanPath);
+    <script is:inline define:vars={{ agentFeedbackCleanPath: feedback.cleanPath }}>
+      if (typeof agentFeedbackCleanPath === "string" && window.history.replaceState) {
+        window.history.replaceState(window.history.state, "", agentFeedbackCleanPath);
       }
     </script>
   )
@@ -300,11 +285,6 @@ const hasHeadingAside = Astro.slots.has("heading-aside");
     color: var(--color-brand-muted-black);
   }
 
-  .admin-notifications-page__heading-meta :global(.record-meta__item--wide) {
-    flex: 1 1 100%;
-    align-items: flex-start;
-  }
-
   .admin-notifications-page__heading-meta :global(.record-meta__icon) {
     width: 0.95rem;
     height: 0.95rem;
@@ -315,10 +295,6 @@ const hasHeadingAside = Astro.slots.has("heading-aside");
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
-  }
-
-  .admin-notifications-page__heading-meta :global(.record-meta__item--wide .record-meta__icon) {
-    margin-top: 0.15rem;
   }
 
   .admin-notifications-page__heading-meta :global(.record-meta__text) {

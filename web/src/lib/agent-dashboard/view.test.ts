@@ -78,6 +78,7 @@ function createOrder(overrides: Partial<AgentOrder> = {}): AgentOrder {
         id: "f31976e6-b478-41b6-9b85-9b830154f962",
         amount: 187.5,
         payment_method: "cash",
+        payment_terms: "Cash on Delivery (COD)",
         payment_date: "2026-07-03",
         reference_number: null,
         notes: null,

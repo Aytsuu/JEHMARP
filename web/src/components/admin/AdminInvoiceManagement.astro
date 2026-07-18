@@ -79,8 +79,8 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
                 message="No invoices match the selected filters."
               />
             ) : data.invoiceRows.map((invoice) => {
-              const salesInvoicePdfHref = `/admin/orders/${invoice.order_id}/sales-invoice.pdf`;
-              const orderDetailsHref = `/admin/orders/${invoice.order_id}`;
+              const salesInvoicePdfHref = `/admin/orders/customer/${invoice.order_id}/sales-invoice.pdf`;
+              const orderDetailsHref = `/admin/orders/customer/${invoice.order_id}`;
 
               return (
                 <tr data-status={invoice.payment_status}>

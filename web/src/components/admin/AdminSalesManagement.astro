@@ -74,7 +74,7 @@ const skeletonRows = Array.from({ length: 6 });
               />
             ) : data.salesRows.map((sale) => {
               const salesInvoicePdfHref = sale.invoice_number
-                ? `/admin/orders/${sale.id}/sales-invoice.pdf`
+                ? `/admin/orders/customer/${sale.id}/sales-invoice.pdf`
                 : undefined;
 
               return (

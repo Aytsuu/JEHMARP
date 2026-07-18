@@ -25,6 +25,8 @@ const inquiryStatuses = ["new", "reviewing", "responded", "closed", "spam"] as c
 const resellerApplicationStatuses = ["submitted", "contacted", "closed"] as const;
 const registrationLinkDurations = ["30m", "1h", "3h", "12h", "1d"] as const;
 const paymentCustomerTypes = ["regular", "wholesale", "reseller"] as const;
+const paymentMethods = ["Cash", "Check"] as const;
+const paymentTermsOptions = ["Cash on Delivery (COD)", "Bank Transfer", "Gcash"] as const;
 
 export type PageStatus = (typeof pageStatuses)[number];
 export type ProductCategory = string;
@@ -37,6 +39,8 @@ export type InquiryStatus = (typeof inquiryStatuses)[number];
 export type ResellerApplicationStatus = (typeof resellerApplicationStatuses)[number];
 export type RegistrationLinkDuration = (typeof registrationLinkDurations)[number];
 export type PaymentCustomerType = (typeof paymentCustomerTypes)[number];
+export type PaymentMethod = (typeof paymentMethods)[number];
+export type PaymentTerms = (typeof paymentTermsOptions)[number];
 type OrderPaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 
 type AdminDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect">;
@@ -171,7 +175,8 @@ export type AdminAction =
       }[];
       payment?: {
         amount: number;
-        payment_method: string;
+        payment_method: PaymentMethod;
+        payment_terms: PaymentTerms;
         payment_date: string;
         recorded_by: string;
         reference_number: string | null;
@@ -226,12 +231,23 @@ export type AdminAction =
       payload: {
         order_id: string;
         amount: number;
-        payment_method: string;
+        payment_method: PaymentMethod;
+        payment_terms: PaymentTerms;
         payment_date: string;
         recorded_by: string;
         reference_number: string | null;
         notes: string | null;
       };
+    }
+  | {
+      type: "confirm-agent-payment";
+      agentPaymentId: string;
+      recordedBy: string;
+    }
+  | {
+      type: "confirm-agent-payments";
+      agentPaymentIds: string[];
+      recordedBy: string;
     }
   | {
       type: "save-invoice";
@@ -292,7 +308,8 @@ export type AdminAction =
       payload: {
         customer_id: string;
         amount: number;
-        payment_method: string;
+        payment_method: PaymentMethod;
+        payment_terms: PaymentTerms;
         payment_date: string;
         recorded_by: string;
         reference_number: string | null;
@@ -580,6 +597,12 @@ export async function executeAdminAction(
       );
       await executeTableInsert(supabase, "payment", action.payload);
       await markAdminRecordRead(supabase, "customer_order", action.payload.order_id, adminReadPayload(action.payload.recorded_by));
+      return;
+    case "confirm-agent-payment":
+      await executeAgentPaymentConfirmation(supabase, action);
+      return;
+    case "confirm-agent-payments":
+      await executeAgentPaymentConfirmations(supabase, action);
       return;
     case "apply-customer-payment":
       await executeCustomerPaymentDistribution(action.payload);
@@ -911,12 +934,25 @@ function parseAdminActionFormDataOrThrow(
         payload: {
           order_id: uuidSchema.parse(requiredString(formData, "orderId")),
           amount: positiveNumber(formData, "amount"),
-          payment_method: requiredString(formData, "paymentMethod"),
+          payment_method: enumValue(formData, "paymentMethod", paymentMethods),
+          payment_terms: enumValue(formData, "paymentTerms", paymentTermsOptions),
           payment_date: dateString(formData, "paymentDate"),
           recorded_by: adminUserId,
           reference_number: optionalString(formData, "referenceNumber"),
           notes: optionalString(formData, "notes"),
         },
+      });
+    case "confirm-agent-payment":
+      return success({
+        type: "confirm-agent-payment",
+        agentPaymentId: uuidSchema.parse(requiredString(formData, "agentPaymentId")),
+        recordedBy: adminUserId,
+      });
+    case "confirm-agent-payments":
+      return success({
+        type: "confirm-agent-payments",
+        agentPaymentIds: requiredUuidList(formData, "agentPaymentId"),
+        recordedBy: adminUserId,
       });
     case "apply-customer-payment":
       return success({
@@ -924,7 +960,8 @@ function parseAdminActionFormDataOrThrow(
         payload: {
           customer_id: uuidSchema.parse(requiredString(formData, "customerId")),
           amount: positiveNumber(formData, "amount"),
-          payment_method: requiredString(formData, "paymentMethod"),
+          payment_method: enumValue(formData, "paymentMethod", paymentMethods),
+          payment_terms: enumValue(formData, "paymentTerms", paymentTermsOptions),
           payment_date: dateString(formData, "paymentDate"),
           recorded_by: adminUserId,
           reference_number: optionalString(formData, "referenceNumber"),
@@ -1184,10 +1221,62 @@ async function executeOrderCreate(
       order_id: orderId,
     });
 
-  if (!paymentError) return;
+  if (!paymentError) {
+    try {
+      await createSalesInvoiceForFullyPaidCreatedOrder(supabase, orderId, action.payment.amount);
+      return;
+    } catch (error) {
+      await cleanupCreatedOrder(
+        supabase,
+        orderId,
+        customer.createdCustomerId,
+        error instanceof Error ? error.message : "Unable to create sales invoice",
+      );
+      throw error;
+    }
+  }
 
   await cleanupCreatedOrder(supabase, orderId, customer.createdCustomerId, "Unable to create payment record");
   throw new Error("Unable to create payment record.");
+}
+
+async function createSalesInvoiceForFullyPaidCreatedOrder(
+  supabase: SupabaseServerClient,
+  orderId: string,
+  paidAmount: number,
+) {
+  const { data: items, error: itemTotalError } = await supabase
+    .from("customer_order_item")
+    .select("final_quantity, unit_price")
+    .eq("order_id", orderId);
+
+  if (itemTotalError) {
+    throw new Error("Unable to verify created order total before creating sales invoice.");
+  }
+
+  const orderTotal = (items ?? []).reduce((total, item) => {
+    const finalQuantity = Number(item.final_quantity ?? 0);
+    const unitPrice = Number(item.unit_price ?? 0);
+
+    return total + finalQuantity * unitPrice;
+  }, 0);
+
+  if (orderTotal <= 0 || roundCurrency(paidAmount) < roundCurrency(orderTotal)) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const { error: invoiceError } = await supabase.from("invoice").insert({
+    order_id: orderId,
+    status: "issued",
+    issued_at: now,
+    due_at: null,
+    updated_at: now,
+  });
+
+  if (invoiceError) {
+    throw new Error("Unable to create sales invoice.");
+  }
 }
 
 async function executeCustomerSave(
@@ -1357,6 +1446,29 @@ async function applyPaymentCustomerTypePricing(
   orderId: string,
   customerType: PaymentCustomerType,
 ) {
+  const { data: order, error: orderError } = await supabase
+    .from("customer_order")
+    .select("customer:customer_id ( is_reseller )")
+    .eq("id", orderId)
+    .maybeSingle();
+
+  if (orderError) {
+    throw new Error("Unable to verify customer type before recording payment.");
+  }
+
+  type PaymentPricingOrderRow = {
+    customer?: { is_reseller?: unknown } | Array<{ is_reseller?: unknown }> | null;
+  };
+  const joinedCustomer = (order as PaymentPricingOrderRow | null)?.customer;
+  const orderCustomer = Array.isArray(joinedCustomer)
+    ? joinedCustomer[0]
+    : joinedCustomer;
+  const isResellerCustomer = orderCustomer?.is_reseller === true;
+
+  if (isResellerCustomer && customerType !== "reseller") {
+    throw new Error("Reseller customer payments must use reseller pricing.");
+  }
+
   const targetPriceType = customerType === "reseller" ? "reseller" : "retail";
   const { data: payments, error: paymentError } = await supabase
     .from("payment")
@@ -1371,13 +1483,10 @@ async function applyPaymentCustomerTypePricing(
     .from("customer_order_item")
     .select(`
       id,
+      product_id,
       final_quantity,
       price_type,
-      unit_price,
-      product:product_id (
-        default_price,
-        reseller_price
-      )
+      unit_price
     `)
     .eq("order_id", orderId);
 
@@ -1387,15 +1496,46 @@ async function applyPaymentCustomerTypePricing(
 
   type PaymentPricingItemRow = {
     id?: unknown;
+    product_id?: unknown;
     final_quantity?: unknown;
     price_type?: unknown;
-    product?: { default_price?: unknown; reseller_price?: unknown } | Array<{ default_price?: unknown; reseller_price?: unknown }> | null;
   };
 
-  const normalizedItems = ((items ?? []) as PaymentPricingItemRow[]).map((item) => {
-    const product = Array.isArray(item.product)
-      ? item.product[0] as { default_price?: unknown; reseller_price?: unknown } | undefined
-      : item.product;
+  const itemRows = (items ?? []) as PaymentPricingItemRow[];
+  const productIds = [...new Set(itemRows.flatMap((item) => (
+    typeof item.product_id === "string" ? [item.product_id] : []
+  )))];
+
+  if (itemRows.length === 0 || productIds.length === 0) {
+    throw new Error("Order item product pricing is incomplete.");
+  }
+
+  const pricingClient = createSupabaseAdminClient();
+  const { data: products, error: productError } = await pricingClient
+    .from("product")
+    .select("id, default_price, reseller_price")
+    .in("id", productIds);
+
+  if (productError) {
+    throw new Error("Unable to load product prices for payment.");
+  }
+
+  type PaymentPricingProductRow = {
+    id?: unknown;
+    default_price?: unknown;
+    reseller_price?: unknown;
+  };
+
+  const productPriceById = new Map(
+    ((products ?? []) as PaymentPricingProductRow[]).flatMap((product) => (
+      typeof product.id === "string" ? [[product.id, product]] : []
+    )),
+  );
+
+  const normalizedItems = itemRows.map((item) => {
+    const product = typeof item.product_id === "string"
+      ? productPriceById.get(item.product_id)
+      : undefined;
     const defaultPrice = Number(product?.default_price);
     const resellerPrice = Number(product?.reseller_price);
     const finalQuantity = Number(item.final_quantity);
@@ -1403,6 +1543,7 @@ async function applyPaymentCustomerTypePricing(
 
     if (
       typeof item.id !== "string" ||
+      typeof item.product_id !== "string" ||
       !Number.isFinite(finalQuantity) ||
       !Number.isFinite(defaultPrice) ||
       !Number.isFinite(resellerPrice)
@@ -1563,6 +1704,7 @@ async function executeCustomerPaymentDistribution(
     target_customer_id: payload.customer_id,
     payment_amount: payload.amount,
     payment_method_value: payload.payment_method,
+    payment_terms_value: payload.payment_terms,
     payment_date_value: payload.payment_date,
     recorded_by_value: payload.recorded_by,
     reference_number_value: payload.reference_number,
@@ -1571,6 +1713,33 @@ async function executeCustomerPaymentDistribution(
 
   if (error) {
     throw new Error(error.message || "Unable to distribute customer payment.");
+  }
+}
+
+async function executeAgentPaymentConfirmation(
+  supabase: SupabaseServerClient,
+  action: Extract<AdminAction, { type: "confirm-agent-payment" }>,
+) {
+  const { data, error } = await supabase.rpc("confirm_agent_received_payment", {
+    agent_payment_id: action.agentPaymentId,
+    recorded_by_value: action.recordedBy,
+  });
+
+  if (error || typeof data !== "string") {
+    throw new Error("Unable to confirm agent received payment.");
+  }
+}
+
+async function executeAgentPaymentConfirmations(
+  supabase: SupabaseServerClient,
+  action: Extract<AdminAction, { type: "confirm-agent-payments" }>,
+) {
+  for (const agentPaymentId of action.agentPaymentIds) {
+    await executeAgentPaymentConfirmation(supabase, {
+      type: "confirm-agent-payment",
+      agentPaymentId,
+      recordedBy: action.recordedBy,
+    });
   }
 }
 
@@ -2251,7 +2420,8 @@ function parseCreateOrderPaymentPayload(
 
   return {
     amount,
-    payment_method: requiredString(formData, "downpaymentMethod"),
+    payment_method: enumValue(formData, "downpaymentMethod", paymentMethods),
+    payment_terms: enumValue(formData, "downpaymentTerms", paymentTermsOptions),
     payment_date: dateString(formData, "downpaymentDate"),
     recorded_by: adminUserId,
     reference_number: optionalString(formData, "downpaymentReferenceNumber"),
@@ -2447,6 +2617,10 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Quantity updated.";
     case "record-payment":
       return "Payment recorded.";
+    case "confirm-agent-payment":
+      return "Agent received payment confirmed.";
+    case "confirm-agent-payments":
+      return "Agent received payments confirmed.";
     case "apply-customer-payment":
       return "Customer payment distributed.";
     case "create-customer-registration-link":

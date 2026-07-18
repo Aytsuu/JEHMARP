@@ -213,7 +213,20 @@ const backLabel = backUrl.startsWith("/admin/agents/")
             </label>
             <label>
               <span>Payment method</span>
-              <input name="paymentMethod" value="Cash" required />
+              <select name="paymentMethod" required>
+                <option value="">Select method</option>
+                <option value="Cash" selected>Cash</option>
+                <option value="Check">Check</option>
+              </select>
+            </label>
+            <label>
+              <span>Payment terms</span>
+              <select name="paymentTerms" required>
+                <option value="">Select payment terms</option>
+                <option value="Cash on Delivery (COD)" selected>Cash on Delivery (COD)</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Gcash">Gcash</option>
+              </select>
             </label>
             <label>
               <span>Payment date</span>
@@ -264,7 +277,7 @@ const backLabel = backUrl.startsWith("/admin/agents/")
                         </td>
                         <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                           <ViewButton
-                            href={`/admin/orders/${order.id}?returnTo=${customerReturnTo}`}
+                            href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`}
                           />
                         </td>
                       </tr>
@@ -323,7 +336,7 @@ const backLabel = backUrl.startsWith("/admin/agents/")
                         </td>
                         <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                           <ViewButton
-                            href={`/admin/orders/${order.id}?returnTo=${customerReturnTo}`}
+                            href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`}
                           />
                         </td>
                       </tr>

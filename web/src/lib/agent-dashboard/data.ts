@@ -49,10 +49,26 @@ const agentOrderSelect = `
     id,
     amount,
     payment_method,
+    payment_terms,
     payment_date,
     reference_number,
     notes,
     created_at
+  ),
+  agent_received_payment (
+    id,
+    order_id,
+    agent_id,
+    amount,
+    payment_method,
+    payment_terms,
+    payment_date,
+    reference_number,
+    notes,
+    status,
+    confirmed_at,
+    created_at,
+    updated_at
   ),
   invoice (
     id,
@@ -141,10 +157,26 @@ const agentOrderClusterSelect = `
       id,
       amount,
       payment_method,
+      payment_terms,
       payment_date,
       reference_number,
       notes,
       created_at
+    ),
+    agent_received_payment (
+      id,
+      order_id,
+      agent_id,
+      amount,
+      payment_method,
+      payment_terms,
+      payment_date,
+      reference_number,
+      notes,
+      status,
+      confirmed_at,
+      created_at,
+      updated_at
     ),
     invoice (
       id,
@@ -220,6 +252,7 @@ export type AgentPayment = {
   id: string;
   amount: number;
   payment_method: string;
+  payment_terms: string;
   payment_date: string;
   reference_number: string | null;
   notes: string | null;
@@ -243,6 +276,22 @@ export type AgentOrderStatusHistory = {
   to_status: OrderStatus;
   changed_at: string;
   notes: string | null;
+};
+
+export type AgentReceivedPayment = {
+  id: string;
+  order_id: string;
+  agent_id: string;
+  amount: number;
+  payment_method: string;
+  payment_terms: string;
+  payment_date: string;
+  reference_number: string | null;
+  notes: string | null;
+  status: "pending_admin_confirmation" | "confirmed" | "rejected";
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type AgentOrderClusterStatus =
@@ -278,6 +327,7 @@ export type AgentOrder = {
   customer: AgentOrderCustomer | null;
   customer_order_item: AgentOrderItem[];
   payment: AgentPayment[];
+  agent_received_payment?: AgentReceivedPayment[];
   invoice: AgentInvoice[];
   customer_order_status_history: AgentOrderStatusHistory[];
 };
@@ -457,6 +507,9 @@ function normalizeAgentOrder(order: unknown): AgentOrder {
     ...agentOrder,
     customer_order_item: Array.isArray(agentOrder.customer_order_item) ? agentOrder.customer_order_item : [],
     payment: Array.isArray(agentOrder.payment) ? agentOrder.payment : [],
+    agent_received_payment: Array.isArray(agentOrder.agent_received_payment)
+      ? agentOrder.agent_received_payment
+      : [],
     invoice: normalizeRelationArray(agentOrder.invoice),
     customer_order_status_history: Array.isArray(agentOrder.customer_order_status_history)
       ? agentOrder.customer_order_status_history

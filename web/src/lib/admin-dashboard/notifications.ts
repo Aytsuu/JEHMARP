@@ -85,7 +85,7 @@ function buildAdminActionNotifications(
         title: "Order pending review",
         message: `Order #${order.id.slice(0, 8)} for ${order.customer ? fullName(order.customer) : "Guest"} is awaiting status updates or payment verification.`,
         date: order.created_at,
-        link: `/admin/orders/${order.id}`,
+        link: `/admin/orders/customer/${order.id}`,
         severity: "warning",
         isUnread: !order.admin_read_at,
       });

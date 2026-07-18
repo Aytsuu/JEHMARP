@@ -15,7 +15,7 @@ function createTestDocument(html: string) {
 
 function createOrderStatusDocument() {
   return createTestDocument(`
-    <div data-order-status-panel data-save-url="https://jehmarp.example/admin/orders/order-1">
+    <div data-order-status-panel data-save-url="https://jehmarp.example/admin/orders/customer/order-1">
       <button
         type="button"
         data-order-status-trigger
@@ -25,7 +25,7 @@ function createOrderStatusDocument() {
       </button>
       <form
         method="post"
-        action="https://jehmarp.example/admin/orders/order-1"
+        action="https://jehmarp.example/admin/orders/customer/order-1"
         data-order-status-form
       >
         <input type="hidden" name="action" value="update-order-status" />
@@ -88,7 +88,7 @@ describe("initOrderStatusAutoSave", () => {
       expect(badge.textContent).toBe("Processing");
 
       return createResponse(
-        "https://jehmarp.example/admin/orders/order-1?status=Order%20status%20updated.",
+        "https://jehmarp.example/admin/orders/customer/order-1?status=Order%20status%20updated.",
       );
     });
 
@@ -97,7 +97,7 @@ describe("initOrderStatusAutoSave", () => {
     await flushPromises();
 
     expect(fetcher).toHaveBeenCalledWith(
-      "https://jehmarp.example/admin/orders/order-1",
+      "https://jehmarp.example/admin/orders/customer/order-1",
       expect.objectContaining({
         method: "POST",
         credentials: "same-origin",
@@ -124,7 +124,7 @@ describe("initOrderStatusAutoSave", () => {
     const select = testDocument.querySelector("select")!;
     const badge = testDocument.querySelector(".status-badge")!;
     const fetcher = vi.fn(async () =>
-      createResponse("https://jehmarp.example/admin/orders/order-1"),
+      createResponse("https://jehmarp.example/admin/orders/customer/order-1"),
   );
 
     testDocument.body.appendChild(form);
@@ -142,7 +142,7 @@ describe("initOrderStatusAutoSave", () => {
     const testDocument = createOrderStatusDocument();
     const select = testDocument.querySelector("select")!;
     const fetcher = vi.fn(async () =>
-      createResponse("https://jehmarp.example/admin/orders/order-1"),
+      createResponse("https://jehmarp.example/admin/orders/customer/order-1"),
     );
 
     writeDashboardFragmentCache("orders", "page=1", "<table>cached</table>");
@@ -175,7 +175,7 @@ describe("initOrderStatusAutoSave", () => {
     changeSelect(select, "closed");
     expect(fetcher).toHaveBeenCalledTimes(1);
 
-    resolveFetch(createResponse("https://jehmarp.example/admin/orders/order-1"));
+    resolveFetch(createResponse("https://jehmarp.example/admin/orders/customer/order-1"));
     await flushPromises();
   });
 
@@ -183,7 +183,7 @@ describe("initOrderStatusAutoSave", () => {
     const testDocument = createOrderStatusDocument();
     const select = testDocument.querySelector("select")!;
     const fetcher = vi.fn(async () =>
-      createResponse("https://jehmarp.example/admin/orders/order-1"),
+      createResponse("https://jehmarp.example/admin/orders/customer/order-1"),
     );
 
     initOrderStatusAutoSave({ root: testDocument, fetcher });
@@ -196,13 +196,13 @@ describe("initOrderStatusAutoSave", () => {
 
   it("shows Processing on the badge when reopening a closed order via Open", async () => {
     const testDocument = createTestDocument(`
-      <div data-order-status-panel data-save-url="https://jehmarp.example/admin/orders/order-1">
+      <div data-order-status-panel data-save-url="https://jehmarp.example/admin/orders/customer/order-1">
         <button type="button" data-order-status-trigger aria-label="Order status: Closed. Click to update.">
           <span class="status-badge status-badge--success">Closed</span>
         </button>
         <form
           method="post"
-          action="https://jehmarp.example/admin/orders/order-1"
+          action="https://jehmarp.example/admin/orders/customer/order-1"
           data-order-status-form
         >
           <input type="hidden" name="action" value="update-order-status" />
@@ -217,7 +217,7 @@ describe("initOrderStatusAutoSave", () => {
     const select = testDocument.querySelector("select")!;
     const badge = testDocument.querySelector(".status-badge")!;
     const fetcher = vi.fn(async () =>
-      createResponse("https://jehmarp.example/admin/orders/order-1"),
+      createResponse("https://jehmarp.example/admin/orders/customer/order-1"),
     );
 
     initOrderStatusAutoSave({ root: testDocument, fetcher });

@@ -9,8 +9,10 @@ describe("buildAdminAnalytics", () => {
     const analytics = buildAdminAnalytics(createAnalyticsData(), new Date("2026-07-04T12:00:00.000Z"));
 
     expect(analytics.summary).toEqual({
+      grossSales: 400,
       totalPaidAmount: 310,
       outstandingBalance: 90,
+      pendingOrderPayments: 90,
       orderCount: 3,
       newResellerApplications: 1,
       newContactInquiries: 1,
@@ -45,6 +47,90 @@ describe("buildAdminAnalytics", () => {
       { label: "chicken", quantitySold: 3, grossSales: 270 },
       { label: "pork", quantitySold: 3, grossSales: 130 },
     ]);
+    expect(analytics.weeklyProductOrders.peakDay).toEqual({
+      label: "Saturday",
+      shortLabel: "Sat",
+      date: "2026-07-04",
+      previousDate: "2026-06-27",
+      totalQuantity: 3,
+      previousTotalQuantity: 0,
+      quantityDifference: 3,
+    });
+    expect(analytics.weeklyProductOrders.productSeries).toEqual([
+      { productId: "product-chicken", label: "Chicken Thigh" },
+      { productId: "product-pork", label: "Pork Belly" },
+    ]);
+    expect(analytics.weeklyProductOrders.days.map((day) => ({
+      label: day.label,
+      totalQuantity: day.totalQuantity,
+      previousTotalQuantity: day.previousTotalQuantity,
+      quantityDifference: day.quantityDifference,
+      products: day.products,
+    }))).toEqual([
+      { label: "Monday", totalQuantity: 0, previousTotalQuantity: 0, quantityDifference: 0, products: [] },
+      { label: "Tuesday", totalQuantity: 0, previousTotalQuantity: 0, quantityDifference: 0, products: [] },
+      { label: "Wednesday", totalQuantity: 0, previousTotalQuantity: 0, quantityDifference: 0, products: [] },
+      { label: "Thursday", totalQuantity: 0, previousTotalQuantity: 0, quantityDifference: 0, products: [] },
+      {
+        label: "Friday",
+        totalQuantity: 2,
+        previousTotalQuantity: 0,
+        quantityDifference: 2,
+        products: [
+          {
+            productId: "product-chicken",
+            label: "Chicken Thigh",
+            currentQuantity: 1,
+            previousQuantity: 0,
+            quantityDifference: 1,
+          },
+          {
+            productId: "product-pork",
+            label: "Pork Belly",
+            currentQuantity: 1,
+            previousQuantity: 0,
+            quantityDifference: 1,
+          },
+        ],
+      },
+      {
+        label: "Saturday",
+        totalQuantity: 3,
+        previousTotalQuantity: 0,
+        quantityDifference: 3,
+        products: [
+          {
+            productId: "product-chicken",
+            label: "Chicken Thigh",
+            currentQuantity: 2,
+            previousQuantity: 0,
+            quantityDifference: 2,
+          },
+          {
+            productId: "product-pork",
+            label: "Pork Belly",
+            currentQuantity: 1,
+            previousQuantity: 0,
+            quantityDifference: 1,
+          },
+        ],
+      },
+      {
+        label: "Sunday",
+        totalQuantity: 0,
+        previousTotalQuantity: 1,
+        quantityDifference: -1,
+        products: [
+          {
+            productId: "product-pork",
+            label: "Pork Belly",
+            currentQuantity: 0,
+            previousQuantity: 1,
+            quantityDifference: -1,
+          },
+        ],
+      },
+    ]);
     expect(analytics.salesByAgent).toEqual([
       {
         label: "JEHMARP Agent",
@@ -55,6 +141,24 @@ describe("buildAdminAnalytics", () => {
         expectedCommission: 31.5,
       },
     ]);
+    expect(analytics.pendingCustomerBalances).toEqual([
+      {
+        customerId: "customer-one",
+        customerName: "Assigned Customer",
+        orderCount: 1,
+        unpaidBalance: 90,
+      },
+    ]);
+    expect(analytics.recentOrders[0]).toEqual({
+      id: "order-1",
+      customerName: "Assigned Customer",
+      orderStatus: "processing",
+      paymentStatus: "partial",
+      grossSales: 200,
+      createdAt: "2026-07-04T09:00:00.000Z",
+    });
+    expect(analytics.recentInquiries[0]?.name).toBe("Contact Lead");
+    expect(analytics.recentResellerApplications[0]?.name).toBe("Reseller Lead");
   });
 
   it("keeps closed unpaid orders in outstanding balance totals", () => {
@@ -78,6 +182,15 @@ describe("buildAdminAnalytics", () => {
     const analytics = buildAdminAnalytics(data, new Date("2026-07-04T12:00:00.000Z"));
 
     expect(analytics.summary.outstandingBalance).toBe(590);
+    expect(analytics.summary.pendingOrderPayments).toBe(590);
+    expect(analytics.pendingCustomerBalances).toEqual([
+      {
+        customerId: "customer-one",
+        customerName: "Assigned Customer",
+        orderCount: 2,
+        unpaidBalance: 590,
+      },
+    ]);
     expect(analytics.ordersByStatus.find((item) => item.label === "closed")).toEqual({
       label: "closed",
       count: 2,
@@ -321,6 +434,7 @@ function order(params: {
       id: `${params.id}-payment-${index}`,
       amount,
       payment_method: "cash",
+      payment_terms: "Cash on Delivery (COD)",
       payment_date: params.createdAt.slice(0, 10),
       reference_number: null,
       notes: null,

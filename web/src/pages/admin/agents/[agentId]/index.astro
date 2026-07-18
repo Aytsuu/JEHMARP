@@ -223,7 +223,7 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
                       </span>
                     </td>
                     <td>
-                      <ViewButton href={`/admin/agent-orders/${order.id}?returnTo=${agentReturnTo}`} />
+                      <ViewButton href={`/admin/orders/agent/${order.id}?returnTo=${agentReturnTo}`} />
                     </td>
                   </tr>
                 ))}

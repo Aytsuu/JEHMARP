@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  createSupabaseAdminClient: vi.fn(),
   createSupabaseServerClient: vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient: mocks.createSupabaseAdminClient,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -70,7 +75,7 @@ describe("handleAdminDashboardAction", () => {
     const response = await handleAdminDashboardAction(
       asAdminDashboardContext(context),
       adminUserId,
-      "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
     );
     const body = await response.json();
 
@@ -78,7 +83,7 @@ describe("handleAdminDashboardAction", () => {
     expect(body).toEqual({
       success: true,
       status: "Order status updated.",
-      redirectPath: "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      redirectPath: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       action: "update-order-status",
     });
     expect(context.redirect).not.toHaveBeenCalled();
@@ -97,7 +102,7 @@ describe("handleAdminDashboardAction", () => {
     const response = await handleAdminDashboardAction(
       asAdminDashboardContext(context),
       adminUserId,
-      "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
     );
     const body = await response.json();
 
@@ -123,12 +128,12 @@ describe("handleAdminDashboardAction", () => {
     const response = await handleAdminDashboardAction(
       asAdminDashboardContext(context),
       adminUserId,
-      "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
     );
 
     expect(response.status).toBe(303);
     expect(response.headers.get("Location")).toBe(
-      "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?status=Order%20status%20updated.",
+      "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?status=Order%20status%20updated.",
     );
     expect(context.redirect).toHaveBeenCalledTimes(1);
   });
@@ -206,7 +211,8 @@ describe("parseAdminActionFormData", () => {
     formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
     formData.set("releaseDate", "2026-07-18");
     formData.set("downpaymentAmount", "700");
-    formData.set("downpaymentMethod", "GCash");
+    formData.set("downpaymentMethod", "Cash");
+    formData.set("downpaymentTerms", "Gcash");
     formData.set("downpaymentDate", "2026-07-16");
     formData.set("downpaymentReferenceNumber", "REF-700");
     formData.set("downpaymentNotes", "  Downpayment before release  ");
@@ -223,7 +229,8 @@ describe("parseAdminActionFormData", () => {
         },
         payment: {
           amount: 700,
-          payment_method: "GCash",
+          payment_method: "Cash",
+          payment_terms: "Gcash",
           payment_date: "2026-07-16",
           recorded_by: adminUserId,
           reference_number: "REF-700",
@@ -723,6 +730,7 @@ describe("parseAdminActionFormData", () => {
     formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
     formData.set("amount", "230");
     formData.set("paymentMethod", "Cash");
+    formData.set("paymentTerms", "Bank Transfer");
     formData.set("paymentDate", "2026-07-16");
     formData.set("customerType", "reseller");
 
@@ -735,11 +743,62 @@ describe("parseAdminActionFormData", () => {
           order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
           amount: 230,
           payment_method: "Cash",
+          payment_terms: "Bank Transfer",
           payment_date: "2026-07-16",
           recorded_by: adminUserId,
           reference_number: null,
           notes: null,
         },
+      },
+    });
+  });
+
+  it("rejects unsupported payment method values for payment records", () => {
+    const formData = new FormData();
+    formData.set("action", "record-payment");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("amount", "230");
+    formData.set("paymentMethod", "Gcash");
+    formData.set("paymentTerms", "Gcash");
+    formData.set("paymentDate", "2026-07-16");
+    formData.set("customerType", "regular");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Payment method is not supported."],
+    });
+  });
+
+  it("parses agent received payment confirmation actions", () => {
+    const formData = new FormData();
+    formData.set("action", "confirm-agent-payment");
+    formData.set("agentPaymentId", "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "confirm-agent-payment",
+        agentPaymentId: "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
+        recordedBy: adminUserId,
+      },
+    });
+  });
+
+  it("parses bulk agent received payment confirmation actions", () => {
+    const formData = new FormData();
+    formData.set("action", "confirm-agent-payments");
+    formData.append("agentPaymentId", "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74");
+    formData.append("agentPaymentId", "12468070-4044-4788-8c5d-2c4471f2aef6");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "confirm-agent-payments",
+        agentPaymentIds: [
+          "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
+          "12468070-4044-4788-8c5d-2c4471f2aef6",
+        ],
+        recordedBy: adminUserId,
       },
     });
   });
@@ -769,14 +828,14 @@ describe("parseAdminActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "mark-order-read");
     formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
-    formData.set("returnTo", "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("returnTo", "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
       success: true,
       action: {
         type: "mark-order-read",
         orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-        returnTo: "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        returnTo: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       },
     });
   });
@@ -860,6 +919,212 @@ describe("markViewedResellerApplicationsRead", () => {
 });
 
 describe("executeAdminAction", () => {
+  it("confirms agent received payments through the trusted RPC", async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: "1b1e62e9-8203-4bfd-884e-4f64d4ed5f89",
+      error: null,
+    }));
+
+    await executeAdminAction({ rpc } as never, {
+      type: "confirm-agent-payment",
+      agentPaymentId: "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
+      recordedBy: adminUserId,
+    }, adminUserId);
+
+    expect(rpc).toHaveBeenCalledWith("confirm_agent_received_payment", {
+      agent_payment_id: "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
+      recorded_by_value: adminUserId,
+    });
+  });
+
+  it("surfaces a safe error when agent received payment confirmation fails", async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: null,
+      error: { message: "Only pending agent received payments can be confirmed." },
+    }));
+
+    await expect(executeAdminAction({ rpc } as never, {
+      type: "confirm-agent-payment",
+      agentPaymentId: "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
+      recordedBy: adminUserId,
+    }, adminUserId)).rejects.toThrow("Unable to confirm agent received payment.");
+  });
+
+  it("confirms multiple agent received payments through the trusted RPC", async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: "1b1e62e9-8203-4bfd-884e-4f64d4ed5f89",
+      error: null,
+    }));
+
+    await executeAdminAction({ rpc } as never, {
+      type: "confirm-agent-payments",
+      agentPaymentIds: [
+        "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
+        "12468070-4044-4788-8c5d-2c4471f2aef6",
+      ],
+      recordedBy: adminUserId,
+    }, adminUserId);
+
+    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenNthCalledWith(1, "confirm_agent_received_payment", {
+      agent_payment_id: "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
+      recorded_by_value: adminUserId,
+    });
+    expect(rpc).toHaveBeenNthCalledWith(2, "confirm_agent_received_payment", {
+      agent_payment_id: "12468070-4044-4788-8c5d-2c4471f2aef6",
+      recorded_by_value: adminUserId,
+    });
+  });
+
+  it("rejects non-reseller payment pricing for reseller customers", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const invoiceMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { id: "invoice-1" },
+      error: null,
+    }));
+    const invoiceLimit = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceEq = vi.fn(() => ({ limit: invoiceLimit }));
+    const invoiceSelect = vi.fn(() => ({ eq: invoiceEq }));
+    const orderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { customer: { is_reseller: true } },
+      error: null,
+    }));
+    const orderEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
+    const orderSelect = vi.fn(() => ({ eq: orderEq }));
+    const paymentInsert = vi.fn();
+    const itemUpdate = vi.fn();
+    const from = vi.fn((table: string) => {
+      if (table === "invoice") return { select: invoiceSelect };
+      if (table === "customer_order") return { select: orderSelect };
+      if (table === "payment") return { insert: paymentInsert };
+      if (table === "customer_order_item") return { update: itemUpdate };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "record-payment",
+      customerType: "regular",
+      payload: {
+        order_id: orderId,
+        amount: 100,
+        payment_method: "Cash",
+        payment_terms: "Cash on Delivery (COD)",
+        payment_date: "2026-07-18",
+        recorded_by: adminUserId,
+        reference_number: null,
+        notes: null,
+      },
+    }, adminUserId)).rejects.toThrow("Reseller customer payments must use reseller pricing.");
+
+    expect(orderSelect).toHaveBeenCalledWith("customer:customer_id ( is_reseller )");
+    expect(orderEq).toHaveBeenCalledWith("id", orderId);
+    expect(paymentInsert).not.toHaveBeenCalled();
+    expect(itemUpdate).not.toHaveBeenCalled();
+  });
+
+  it("records payment after loading product prices with a trusted admin client", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const productId = "4f65578f-3f1f-4216-9fc2-013ef06661d1";
+    const orderItemId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
+    const invoiceMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { id: "invoice-1" },
+      error: null,
+    }));
+    const invoiceLimit = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceEq = vi.fn(() => ({ limit: invoiceLimit }));
+    const invoiceSelect = vi.fn(() => ({ eq: invoiceEq }));
+    const orderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { customer: { is_reseller: false } },
+      error: null,
+    }));
+    const orderSelectEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
+    const orderSelect = vi.fn(() => ({ eq: orderSelectEq }));
+    const orderUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const orderUpdate = vi.fn(() => ({ eq: orderUpdateEq }));
+    const paymentSelectEq = vi.fn(() => Promise.resolve({
+      data: [],
+      error: null,
+    }));
+    const paymentSelect = vi.fn(() => ({ eq: paymentSelectEq }));
+    const paymentInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const itemSelectEq = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: orderItemId,
+          product_id: productId,
+          final_quantity: 2,
+          price_type: "retail",
+          unit_price: 100,
+        },
+      ],
+      error: null,
+    }));
+    const itemSelect = vi.fn(() => ({ eq: itemSelectEq }));
+    const itemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const itemUpdate = vi.fn(() => ({ eq: itemUpdateEq }));
+    const productIn = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: productId,
+          default_price: 100,
+          reseller_price: 80,
+        },
+      ],
+      error: null,
+    }));
+    const productSelect = vi.fn(() => ({ in: productIn }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "product") return { select: productSelect };
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+    const from = vi.fn((table: string) => {
+      if (table === "invoice") return { select: invoiceSelect };
+      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "payment") return { select: paymentSelect, insert: paymentInsert };
+      if (table === "customer_order_item") return { select: itemSelect, update: itemUpdate };
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
+
+    await executeAdminAction({ from } as never, {
+      type: "record-payment",
+      customerType: "regular",
+      payload: {
+        order_id: orderId,
+        amount: 100,
+        payment_method: "Cash",
+        payment_terms: "Cash on Delivery (COD)",
+        payment_date: "2026-07-18",
+        recorded_by: adminUserId,
+        reference_number: null,
+        notes: null,
+      },
+    }, adminUserId);
+
+    expect(itemSelect).toHaveBeenCalledWith(expect.stringContaining("product_id"));
+    expect(itemSelect).not.toHaveBeenCalledWith(expect.stringContaining("product:product_id"));
+    expect(from).not.toHaveBeenCalledWith("product");
+    expect(adminFrom).toHaveBeenCalledWith("product");
+    expect(productSelect).toHaveBeenCalledWith("id, default_price, reseller_price");
+    expect(productIn).toHaveBeenCalledWith("id", [productId]);
+    expect(itemUpdate).toHaveBeenCalledWith({
+      price_type: "retail",
+      unit_price: 100,
+    });
+    expect(itemUpdateEq).toHaveBeenCalledWith("id", orderItemId);
+    expect(paymentInsert).toHaveBeenCalledWith({
+      order_id: orderId,
+      amount: 100,
+      payment_method: "Cash",
+      payment_terms: "Cash on Delivery (COD)",
+      payment_date: "2026-07-18",
+      recorded_by: adminUserId,
+      reference_number: null,
+      notes: null,
+    });
+    expect(orderUpdateEq).toHaveBeenCalledWith("id", orderId);
+  });
+
   it("validates and creates a direct customer record", async () => {
     const payload = {
       first_name: "Ana",
@@ -990,6 +1255,83 @@ describe("executeAdminAction", () => {
         add_details: null,
       },
     ]);
+  });
+
+  it("creates a sales invoice when an admin-created order is fully paid on creation", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const orderInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
+      })),
+    }));
+    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const itemSelectEq = vi.fn(() => Promise.resolve({
+      data: [
+        { final_quantity: 2, unit_price: 350 },
+      ],
+      error: null,
+    }));
+    const itemSelect = vi.fn(() => ({ eq: itemSelectEq }));
+    const paymentInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const invoiceInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer_order") return { insert: orderInsert };
+      if (table === "customer_order_item") return { insert: itemInsert, select: itemSelect };
+      if (table === "payment") return { insert: paymentInsert };
+      if (table === "invoice") return { insert: invoiceInsert };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from } as never, {
+      type: "create-order",
+      customer: {
+        type: "existing",
+        customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+      },
+      payload: {
+        agent_id: null,
+        source: "admin_manual",
+        order_status: "processing",
+        payment_status: "unpaid",
+        submitted_by: adminUserId,
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+      items: [
+        {
+          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          partial_quantity: 2,
+          final_quantity: 2,
+          add_details: null,
+        },
+      ],
+      payment: {
+        amount: 700,
+        payment_method: "Cash",
+        payment_terms: "Gcash",
+        payment_date: "2026-07-18",
+        recorded_by: adminUserId,
+        reference_number: null,
+        notes: null,
+      },
+    }, adminUserId);
+
+    expect(paymentInsert).toHaveBeenCalledWith({
+      order_id: orderId,
+      amount: 700,
+      payment_method: "Cash",
+      payment_terms: "Gcash",
+      payment_date: "2026-07-18",
+      recorded_by: adminUserId,
+      reference_number: null,
+      notes: null,
+    });
+    expect(itemSelect).toHaveBeenCalledWith("final_quantity, unit_price");
+    expect(itemSelectEq).toHaveBeenCalledWith("order_id", orderId);
+    expect(invoiceInsert).toHaveBeenCalledWith(expect.objectContaining({
+      order_id: orderId,
+      status: "issued",
+      due_at: null,
+    }));
   });
 
   it("creates a new customer before creating an admin order even when the phone number already exists", async () => {
@@ -1592,13 +1934,13 @@ describe("getAllowedNextOrderStatuses", () => {
 describe("formatAdminActionFeedback", () => {
   it("returns transient feedback with a clean reload URL", () => {
     const url = new URL(
-      "https://jehmarp.example/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?status=Order%20marked%20as%20read.&page=2#error-anchor",
+      "https://jehmarp.example/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?status=Order%20marked%20as%20read.&page=2#error-anchor",
     );
 
     expect(formatAdminActionFeedback(url)).toEqual({
       status: "Order marked as read.",
       error: undefined,
-      cleanPath: "/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?page=2#error-anchor",
+      cleanPath: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?page=2#error-anchor",
     });
   });
 

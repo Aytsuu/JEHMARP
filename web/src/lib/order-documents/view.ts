@@ -20,6 +20,10 @@ export type DocumentOrder = {
     display_name: string;
   } | null;
   customer_order_item: DocumentOrderItem[];
+  payment?: Array<{
+    payment_method: string;
+    payment_terms: string | null;
+  }>;
   invoice: Array<{
     invoice_number: string;
     issued_at: string | null;
