@@ -153,6 +153,5 @@ contexts
 /AGENTS.md
 
 # deployment
-dist
 .astro
 .wrangler
