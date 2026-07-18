@@ -9,10 +9,20 @@ const optionalEmailEnv = z.preprocess(
   z.email().optional(),
 );
 
+const localDevSupabaseDefaults = {
+  url: "http://127.0.0.1:54321",
+  publishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
+  secretKey: "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz",
+} as const;
+
 const publicEnvSchema = z.object({
   PUBLIC_SUPABASE_URL: z.url(),
   PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
   PUBLIC_TURNSTILE_SITE_KEY: optionalStringEnv,
+  LOCAL_SUPABASE_URL: optionalStringEnv,
+  LOCAL_SUPABASE_PUBLISHABLE_KEY: optionalStringEnv,
+  LOCAL_SUPABASE_SECRET_KEY: optionalStringEnv,
+  LOCAL_SUPABASE_SERVICE_ROLE_KEY: optionalStringEnv,
 });
 
 const serverEnvSchema = publicEnvSchema
@@ -53,9 +63,16 @@ export function parsePublicEnv(input: Record<string, unknown>): PublicEnv {
     throw new Error("Invalid public environment configuration");
   }
 
+  const supabaseUrl = shouldUseLocalSupabase(input)
+    ? result.data.LOCAL_SUPABASE_URL ?? localDevSupabaseDefaults.url
+    : result.data.PUBLIC_SUPABASE_URL;
+  const supabasePublishableKey = shouldUseLocalSupabase(input)
+    ? result.data.LOCAL_SUPABASE_PUBLISHABLE_KEY ?? localDevSupabaseDefaults.publishableKey
+    : result.data.PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
   return {
-    supabaseUrl: result.data.PUBLIC_SUPABASE_URL,
-    supabasePublishableKey: result.data.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    supabaseUrl,
+    supabasePublishableKey,
     ...(result.data.PUBLIC_TURNSTILE_SITE_KEY
       ? { turnstileSiteKey: result.data.PUBLIC_TURNSTILE_SITE_KEY }
       : {}),
@@ -73,11 +90,23 @@ export function parseServerEnv(input: Record<string, unknown>): ServerEnv {
     throw new Error("Invalid server environment configuration");
   }
 
+  const useLocalSupabase = shouldUseLocalSupabase(input);
+  const supabaseUrl = useLocalSupabase
+    ? result.data.LOCAL_SUPABASE_URL ?? localDevSupabaseDefaults.url
+    : result.data.PUBLIC_SUPABASE_URL;
+  const supabasePublishableKey = useLocalSupabase
+    ? result.data.LOCAL_SUPABASE_PUBLISHABLE_KEY ?? localDevSupabaseDefaults.publishableKey
+    : result.data.PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const supabaseServerKey = useLocalSupabase
+    ? result.data.LOCAL_SUPABASE_SECRET_KEY
+      ?? result.data.LOCAL_SUPABASE_SERVICE_ROLE_KEY
+      ?? localDevSupabaseDefaults.secretKey
+    : result.data.SUPABASE_SECRET_KEY ?? result.data.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
   return {
-    supabaseUrl: result.data.PUBLIC_SUPABASE_URL,
-    supabasePublishableKey: result.data.PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    supabaseServerKey:
-      result.data.SUPABASE_SECRET_KEY ?? result.data.SUPABASE_SERVICE_ROLE_KEY ?? "",
+    supabaseUrl,
+    supabasePublishableKey,
+    supabaseServerKey,
     ...(result.data.PUBLIC_TURNSTILE_SITE_KEY
       ? { turnstileSiteKey: result.data.PUBLIC_TURNSTILE_SITE_KEY }
       : {}),
@@ -117,4 +146,8 @@ function getProcessEnv(): Record<string, unknown> {
   }
 
   return process.env;
+}
+
+function shouldUseLocalSupabase(input: Record<string, unknown>) {
+  return input.DEV === true || input.NODE_ENV === "development";
 }

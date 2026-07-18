@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getServerEnv } from "@/lib/env";
+import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
 
 const optionalContactEmail = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
@@ -90,6 +91,12 @@ export async function submitContactInquiry(
 ): Promise<string> {
   const env = getServerEnv();
   const fetcher = options.fetch ?? fetch;
+
+  await verifyTurnstileToken(env.turnstileSecretKey, payload.turnstileToken, {
+    fetch: fetcher,
+    clientIp: options.clientIp,
+  });
+
   const headers = new Headers({
     Authorization: `Bearer ${env.supabaseServerKey}`,
     apikey: env.supabaseServerKey,

@@ -1,0 +1,34 @@
+---
+import AdminContentPageLayout from "@/components/admin/AdminContentPageLayout.astro";
+import AdminContentWorkspace from "@/components/admin/AdminContentWorkspace.astro";
+import { loadAdminContentPreviewPage } from "@/lib/admin-dashboard/content-preview-page";
+import {
+  getFeaturedPublicProducts,
+  getPublicPageContent,
+} from "@/lib/public-website/content";
+
+export const prerender = false;
+
+const preview = await loadAdminContentPreviewPage(Astro);
+
+if (!preview.ready) {
+  return preview.response;
+}
+
+const [homePreview, featuredProducts] = await Promise.all([
+  getPublicPageContent(Astro, "home"),
+  getFeaturedPublicProducts(Astro, 4),
+]);
+---
+
+<AdminContentPageLayout
+  title="Landing Page - JEHMARP"
+  description="Admin landing page preview."
+  feedback={preview.feedback}
+  dashboardData={preview.dashboardData}
+>
+  <AdminContentWorkspace
+    homePreview={homePreview}
+    featuredProducts={featuredProducts}
+  />
+</AdminContentPageLayout>

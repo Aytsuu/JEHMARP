@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AdminOrder } from "./data";
 import {
   canManageOrderCommissions,
+  formatDateTime,
   orderBalance,
   orderPaymentTotal,
   orderTotal,
@@ -63,5 +64,12 @@ describe("canManageOrderCommissions", () => {
   it("requires an agent linked directly to the customer order", () => {
     expect(canManageOrderCommissions({ agent_id: null } as AdminOrder)).toBe(false);
     expect(canManageOrderCommissions({ agent_id: "64568f81-108b-42bd-b926-7e825dad67c6" } as AdminOrder)).toBe(true);
+  });
+});
+
+describe("formatDateTime", () => {
+  it("formats ISO timestamps for the Philippines timezone", () => {
+    expect(formatDateTime("2026-07-11T18:54:27.430254+00:00")).toBe("Jul 12, 2026, 2:54 AM");
+    expect(formatDateTime(null)).toBe("Not set");
   });
 });

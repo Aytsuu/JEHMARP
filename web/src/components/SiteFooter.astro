@@ -4,6 +4,17 @@ import {
   getPublicPageContent,
   getSectionEntries,
 } from "@/lib/public-website/content";
+import { toAdminContentPreviewHref } from "@/lib/public-website/admin-content-preview";
+
+type Props = {
+  previewRoot?: string;
+};
+
+const { previewRoot } = Astro.props;
+
+function linkHref(href: string) {
+  return previewRoot ? toAdminContentPreviewHref(href) : href;
+}
 
 const content = await getPublicPageContent(Astro, "contact");
 const detailsSection = content.sections.find(
@@ -85,7 +96,7 @@ function toEmailLink(value: string) {
         <ul class="footer-column__links">
           {publicRoutes.map((item) => (
             <li>
-              <a href={item.href}>{item.label}</a>
+              <a href={linkHref(item.href)}>{item.label}</a>
             </li>
           ))}
         </ul>
@@ -97,7 +108,7 @@ function toEmailLink(value: string) {
         <ul class="footer-column__links">
           {authRoutes.map((item) => (
             <li>
-              <a href={item.href}>{item.label}</a>
+              <a href={linkHref(item.href)}>{item.label}</a>
             </li>
           ))}
         </ul>
@@ -135,14 +146,14 @@ function toEmailLink(value: string) {
                     {phoneLinks.map((item, index) => (
                       <>
                         {index > 0 && <span> / </span>}
-                        <a href={item.href}>{item.label}</a>
+                        <a href={linkHref(item.href)}>{item.label}</a>
                       </>
                     ))}
                   </span>
                 ) : iconType === "email" && emailLink ? (
                   <a href={emailLink.href}>{emailLink.label}</a>
                 ) : iconType === "location" ? (
-                  <a href="/contact">{value}</a>
+                  <a href={linkHref("/contact")}>{value}</a>
                 ) : (
                   <span>{value}</span>
                 )}

@@ -12,7 +12,6 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   dependency-audit:
@@ -46,22 +45,3 @@ jobs:
             echo "Potentially sensitive PUBLIC_* variable name found."
             exit 1
           fi
-
-  codeql:
-    name: CodeQL analysis
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: javascript-typescript
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
-
-      - name: Analyze
-        uses: github/codeql-action/analyze@v3

@@ -1,0 +1,39 @@
+---
+import AdminContentPageLayout from "@/components/admin/AdminContentPageLayout.astro";
+import AdminContentPreviewFrame from "@/components/admin/AdminContentPreviewFrame.astro";
+import PageShell from "@/components/PageShell.astro";
+import PublicBusinessPageContent from "@/components/public-website/PublicBusinessPageContent.astro";
+import { loadAdminContentPreviewPage } from "@/lib/admin-dashboard/content-preview-page";
+import { getPublicEnv } from "@/lib/env";
+import { ADMIN_CONTENT_PREVIEW_ROOT } from "@/lib/public-website/admin-content-preview";
+import { getResellerApplicationFeedback } from "@/lib/public-website/reseller-applications";
+
+export const prerender = false;
+
+const preview = await loadAdminContentPreviewPage(Astro);
+
+if (!preview.ready) {
+  return preview.response;
+}
+
+const businessPath = `${ADMIN_CONTENT_PREVIEW_ROOT}/business`;
+const { turnstileSiteKey } = getPublicEnv();
+const feedback = getResellerApplicationFeedback(Astro.url);
+---
+
+<AdminContentPageLayout
+  title="Business Preview - JEHMARP"
+  description="Admin business page preview."
+  feedback={preview.feedback}
+  dashboardData={preview.dashboardData}
+>
+  <AdminContentPreviewFrame activePath="/business">
+    <PageShell title="Business">
+      <PublicBusinessPageContent
+        feedback={feedback}
+        turnstileSiteKey={turnstileSiteKey ?? null}
+        returnPath={businessPath}
+      />
+    </PageShell>
+  </AdminContentPreviewFrame>
+</AdminContentPageLayout>

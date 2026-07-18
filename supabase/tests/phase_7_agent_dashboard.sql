@@ -9,15 +9,120 @@ grant insert, select on phase_7_result to authenticated;
 
 do $$
 declare
+  agent_user_id constant uuid := '22222222-2222-2222-2222-222222222222';
   agent_profile_id uuid;
+  auth_instance_id uuid;
+  seeded_at timestamptz := now();
 begin
   select id
-  into agent_profile_id
-  from public.agent_profile
-  where user_id = '22222222-2222-2222-2222-222222222222';
+  into auth_instance_id
+  from auth.instances
+  limit 1;
+
+  insert into auth.users (
+    instance_id,
+    id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at
+  )
+  values (
+    auth_instance_id,
+    agent_user_id,
+    'authenticated',
+    'authenticated',
+    'phase7-agent@nmc.test',
+    extensions.crypt('Phase7TestOnly!', extensions.gen_salt('bf')),
+    seeded_at,
+    '{"provider":"email","providers":["email"]}'::jsonb,
+    '{"display_name":"Phase 7 Test Agent"}'::jsonb,
+    seeded_at,
+    seeded_at
+  )
+  on conflict (id) do update
+  set
+    email = excluded.email,
+    encrypted_password = excluded.encrypted_password,
+    email_confirmed_at = excluded.email_confirmed_at,
+    raw_app_meta_data = excluded.raw_app_meta_data,
+    raw_user_meta_data = excluded.raw_user_meta_data,
+    updated_at = excluded.updated_at,
+    deleted_at = null;
+
+  insert into auth.identities (
+    provider_id,
+    user_id,
+    identity_data,
+    provider,
+    last_sign_in_at,
+    created_at,
+    updated_at
+  )
+  values (
+    'phase7-agent@nmc.test',
+    agent_user_id,
+    jsonb_build_object(
+      'sub', agent_user_id::text,
+      'email', 'phase7-agent@nmc.test',
+      'email_verified', true
+    ),
+    'email',
+    seeded_at,
+    seeded_at,
+    seeded_at
+  )
+  on conflict (provider_id, provider) do update
+  set
+    user_id = excluded.user_id,
+    identity_data = excluded.identity_data,
+    updated_at = excluded.updated_at;
+
+  insert into public.profile (id, display_name, created_at, updated_at)
+  values (agent_user_id, 'Phase 7 Test Agent', seeded_at, seeded_at)
+  on conflict (id) do update
+  set
+    display_name = excluded.display_name,
+    updated_at = excluded.updated_at;
+
+  insert into public.agent_profile (
+    user_id,
+    display_name,
+    status,
+    contact,
+    created_at,
+    updated_at
+  )
+  values (
+    agent_user_id,
+    'Phase 7 Test Agent',
+    'active',
+    '09170000007',
+    seeded_at,
+    seeded_at
+  )
+  on conflict (user_id) do update
+  set
+    display_name = excluded.display_name,
+    status = excluded.status,
+    contact = excluded.contact,
+    updated_at = excluded.updated_at
+  returning id into agent_profile_id;
 
   if agent_profile_id is null then
-    raise exception 'Expected seeded agent profile for Phase 7 tests';
+    select id
+    into agent_profile_id
+    from public.agent_profile
+    where user_id = agent_user_id;
+  end if;
+
+  if agent_profile_id is null then
+    raise exception 'Expected Phase 7 test agent profile';
   end if;
 
   insert into public.product (

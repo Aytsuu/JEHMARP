@@ -350,6 +350,22 @@ const categories: CategoryGroup[] = isAdmin
       </div>
     </div>
 
+    <script is:inline>
+      window.readDashboardFragmentResponse = async function readDashboardFragmentResponse(response) {
+        if (response.status === 503) {
+          const redirectUrl = response.headers.get("X-System-Issue-Redirect") || "/system-issue";
+          window.location.assign(redirectUrl);
+          throw new DOMException("Aborted", "AbortError");
+        }
+
+        if (!response.ok) {
+          throw new Error("Request failed with " + response.status + ".");
+        }
+
+        return response.text();
+      };
+    </script>
+
     <script>
       function initSidebarUnreadBadges() {
         const badges = document.querySelectorAll<HTMLElement>(
@@ -518,7 +534,7 @@ const categories: CategoryGroup[] = isAdmin
 
         closeButtons?.forEach((btn) => {
           btn.addEventListener("click", () => {
-            closeDrawer(btn.closest(".drawer-sheet"));
+            closeDrawer(btn.closest<HTMLElement>(".drawer-sheet"));
           });
         });
 
@@ -646,6 +662,49 @@ const categories: CategoryGroup[] = isAdmin
         });
       }
 
+      const boardAlignmentObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
+      function syncDashboardTableBoardColumns(board: HTMLElement) {
+        const table = board.querySelector("table");
+        const tbody = table?.querySelector("tbody");
+        if (!table || !tbody) return;
+
+        board.style.setProperty(
+          "--dashboard-table-sync-width",
+          `${tbody.clientWidth}px`,
+        );
+
+        table.querySelectorAll<HTMLTableCellElement>("th, td").forEach((cell) => {
+          cell.style.removeProperty("width");
+        });
+      }
+
+      function syncDashboardTableBoards(root: ParentNode = document) {
+        root.querySelectorAll<HTMLElement>(".dashboard-table-board").forEach(
+          (board) => {
+            syncDashboardTableBoardColumns(board);
+          },
+        );
+      }
+
+      function initDashboardTableBoardAlignment(root: ParentNode = document) {
+        root.querySelectorAll<HTMLElement>(".dashboard-table-board").forEach(
+          (board) => {
+            syncDashboardTableBoardColumns(board);
+
+            if (boardAlignmentObservers.has(board)) return;
+
+            const observer = new ResizeObserver(() => {
+              syncDashboardTableBoardColumns(board);
+            });
+            observer.observe(board);
+            const tbody = board.querySelector("tbody");
+            if (tbody) observer.observe(tbody);
+            boardAlignmentObservers.set(board, observer);
+          },
+        );
+      }
+
       function initInteractiveTables() {
         const interactiveTables = document.querySelectorAll<HTMLElement>(
           "[data-interactive-table]",
@@ -748,12 +807,9 @@ const categories: CategoryGroup[] = isAdmin
                 const btn = document.createElement("button");
                 btn.type = "button";
                 btn.textContent = String(i);
-                btn.className = i === currentPage ? "btn-active-page" : "";
-                btn.style.padding = "0.25rem 0.65rem";
-                btn.style.minWidth = "2rem";
-                btn.style.border = "none";
-                btn.style.borderRadius = "0.25rem";
-                btn.style.cursor = "pointer";
+                btn.className = i === currentPage
+                  ? "table-pagination__page-button btn-active-page"
+                  : "table-pagination__page-button";
                 btn.addEventListener("click", () => {
                   currentPage = i;
                   updateTable();
@@ -761,6 +817,20 @@ const categories: CategoryGroup[] = isAdmin
                 numbersContainer.appendChild(btn);
               }
             }
+
+            window.requestAnimationFrame(() => {
+              container
+                .querySelectorAll<HTMLElement>(".dashboard-table-board")
+                .forEach((board) => {
+                  syncDashboardTableBoardColumns(board);
+                });
+            });
+
+            container.dispatchEvent(
+              new CustomEvent("dashboard:interactive-table-page-changed", {
+                bubbles: true,
+              }),
+            );
           }
 
           searchInput?.addEventListener("input", () => {
@@ -804,19 +874,91 @@ const categories: CategoryGroup[] = isAdmin
         });
       }
 
+      function initDigitsOnlyInputs() {
+        document.querySelectorAll<HTMLInputElement>("[data-digits-only]").forEach((input) => {
+          if (input.dataset.digitsOnlyInitialized === "true") return;
+          input.dataset.digitsOnlyInitialized = "true";
+
+          const allowedKeys = new Set([
+            "Backspace",
+            "Delete",
+            "Tab",
+            "ArrowLeft",
+            "ArrowRight",
+            "Home",
+            "End",
+          ]);
+
+          input.addEventListener("keydown", (event) => {
+            if (allowedKeys.has(event.key) || event.ctrlKey || event.metaKey) return;
+            if (!/^\d$/.test(event.key)) event.preventDefault();
+          });
+
+          input.addEventListener("input", () => {
+            const digitsOnly = input.value.replace(/\D/g, "");
+            if (input.value !== digitsOnly) input.value = digitsOnly;
+          });
+        });
+      }
+
+      function initFormSubmissionState() {
+        const body = document.body;
+        if (body.dataset.formSubmissionStateInitialized === "true") return;
+        body.dataset.formSubmissionStateInitialized = "true";
+
+        document.addEventListener("submit", (event) => {
+          const form = event.target;
+          if (!(form instanceof HTMLFormElement)) return;
+          if ((form.getAttribute("method") || "get").toLowerCase() !== "post") return;
+          if (form.dataset.skipSubmitState === "true") return;
+
+          if (form.dataset.isSubmitting === "true") {
+            event.preventDefault();
+            return;
+          }
+
+          form.dataset.isSubmitting = "true";
+
+          const submitButtons = Array.from(
+            form.querySelectorAll<HTMLButtonElement>('button[type="submit"]'),
+          );
+          const submitter = event.submitter instanceof HTMLButtonElement
+            ? event.submitter
+            : null;
+
+          submitButtons.forEach((button) => {
+            button.disabled = true;
+          });
+
+          if (submitter) {
+            submitter.classList.add("form-submit-button--loading");
+            submitter.setAttribute("aria-busy", "true");
+          }
+        }, true);
+      }
+
       function initDashboardFeatures() {
         initSidebarUnreadBadges();
         initDrawerSheets();
         initCellPopovers();
+        initDashboardTableBoardAlignment();
         initInteractiveTables();
+        initDigitsOnlyInputs();
+        initFormSubmissionState();
       }
 
       document.addEventListener("DOMContentLoaded", initDashboardFeatures);
       document.addEventListener("astro:after-swap", initDashboardFeatures);
       document.addEventListener(
         "dashboard:interactive-table-updated",
-        initInteractiveTables,
+        () => {
+          initInteractiveTables();
+          initDashboardTableBoardAlignment();
+        },
       );
+      window.addEventListener("resize", () => {
+        syncDashboardTableBoards();
+      });
       if (
         document.readyState === "complete" ||
         document.readyState === "interactive"

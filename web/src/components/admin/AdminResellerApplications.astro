@@ -1,4 +1,9 @@
 ---
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import ResellerEmailDeliveryStatus from "@/components/admin/ResellerEmailDeliveryStatus.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminResellerApplicationManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminResellerApplicationFilters } from "@/lib/admin-dashboard/reseller-application-filters";
 import { selected } from "@/lib/admin-dashboard/view";
@@ -12,66 +17,136 @@ type Props = {
 };
 
 const { data, applicationStatuses, activeFilters, filterQuery } = Astro.props;
-const hasActiveFilters = filterQuery.length > 0;
 const skeletonRows = Array.from({ length: 6 });
 ---
 
 <section class="admin-panel" aria-labelledby="admin-reseller-applications-title">
-  <div data-interactive-table>
+  <div data-interactive-table class="dashboard-interactive-table">
     <div class="table-filters order-management-toolbar">
       <form method="get" action="/admin/reseller-applications" class="order-filter-form" data-reseller-filter-form data-current-filter-query={filterQuery} aria-label="Filter reseller applications">
-        <label class="order-filter-form__field order-filter-form__field--search">
-          <span>Search</span>
-          <input name="search" type="search" value={activeFilters.search ?? ""} placeholder="Search applicant name, email, or contact..." autocomplete="off" data-reseller-search-input />
-        </label>
-        <label class="order-filter-form__field">
-          <span>Status</span>
-          <select name="status">
+        <div class="order-filter-form__field order-filter-form__field--search">
+          <input name="search" type="search" value={activeFilters.search ?? ""} placeholder="Search applicant name, email, or contact..." autocomplete="off" aria-label="Search reseller applications" data-reseller-search-input />
+        </div>
+        <div class="order-filter-form__field">
+          <select name="status" aria-label="Filter by status">
             <option value="">All statuses</option>
             {applicationStatuses.map((status) => (
               <option value={status} selected={activeFilters.status === status}>{autoCapitalize(status)}</option>
             ))}
           </select>
-        </label>
-        <a href="/admin/reseller-applications" class="order-filter-form__reset" data-reseller-filter-reset hidden={!hasActiveFilters}>Clear</a>
+        </div>
       </form>
       <div class="order-management-toolbar__actions">
-        <label class="order-management-toolbar__limit">
-          <span>Show</span>
-          <select data-limit-select><option value="10">10</option><option value="50">50</option><option value="100">100</option></select>
-        </label>
       </div>
     </div>
-    <div data-reseller-table-shell>
-      {data.resellerApplications.length > 0 ? (
-        <div class="table-wrap">
-          <table style="table-layout: fixed; width: 100%;">
-            <thead><tr><th scope="col" style="width: 15%; padding: 1.1rem 0.75rem;">Applicant</th><th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Email</th><th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Contact</th><th scope="col" style="width: 12%; padding: 1.1rem 0.75rem;">Supply Needs</th><th scope="col" style="width: 21%; padding: 1.1rem 0.75rem;">Message</th><th scope="col" style="width: 12%; padding: 1.1rem 0.75rem;">Status</th><th scope="col" style="width: 8%; padding: 1.1rem 0.75rem;"><span class="sr-only">Email Status</span></th></tr></thead>
-            <tbody>
-              {data.resellerApplications.map((application) => {
-                const isUnread = !application.admin_read_at && application.application_status === "submitted";
-                return (
-                  <tr data-status={application.application_status}>
-                    <td style="width: 15%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; overflow: hidden;"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500;">{application.name}</span>{isUnread && (<form method="post" class="unread-record-form" style="margin: 0; display: inline-flex; align-items: center; flex-shrink: 0;"><input type="hidden" name="action" value="mark-reseller-application-read" /><input type="hidden" name="applicationId" value={application.id} /><button type="submit" class="unread-record-button" style="border: none; background: transparent; padding: 0; cursor: pointer; display: inline-flex; align-items: center;"><span class="record-unread-dot" aria-label="Unread" style="width: 8px; height: 8px; background-color: var(--color-brand-red); border-radius: 50%; display: inline-block;"></span><span class="sr-only">Mark reseller application as read</span></button></form>)}</div></td>
-                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{application.email}</td>
-                    <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{application.contact_number}</td>
-                    <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;">{application.expected_quantity_per_week}</td>
-                    <td style="width: 21%; padding: 1.1rem 0.75rem; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title={application.message ?? "No message"}>{application.message ?? "-"}</td>
-                    <td style="width: 12%; padding: 1.1rem 0.75rem; vertical-align: middle;"><button type="button" class="table-cell-trigger" data-open-cell-popover data-popover-title={`Edit Status: ${application.name}`} style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;"><span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">{autoCapitalize(application.application_status)}</span></button><div class="hidden-popover-form-holder" style="display: none;"><form method="post" class="admin-table-form"><input type="hidden" name="action" value="update-reseller-application" /><input type="hidden" name="applicationId" value={application.id} /><label><span>Status</span><select name="applicationStatus" required>{applicationStatuses.map((status) => (<option value={status} selected={selected(application.application_status, status)}>{autoCapitalize(status)}</option>))}</select></label><button type="submit">Save status</button></form></div></td>
-                    <td style="width: 8%; padding: 1.1rem 0.75rem; vertical-align: middle; text-align: center;">{application.email_delivery_status === "sent" ? (<div title="Price list sent to email" style="display: inline-flex; align-items: center; justify-content: center; color: #10b981; cursor: help;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 13V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h9"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="m16 19 2 2 4-4"/></svg></div>) : application.email_delivery_status === "failed" ? (<div title="Failed to send the price list to email" style="display: inline-flex; align-items: center; justify-content: center; color: #ef4444; cursor: help;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10.5V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12c0 1.1.9 2 2 2h12.5"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/><path d="M20 14v4"/><path d="M20 22v.01"/></svg></div>) : (<div title="Sending price list email..." style="display: inline-flex; align-items: center; justify-content: center; color: #6b7280; cursor: help;"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></div>)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p class="empty-state">No reseller applications match the selected filters.</p>
-      )}
+    <div data-reseller-table-shell class="dashboard-interactive-table__surface">
+      <DashboardTableBoard>
+        <table class="dashboard-table">
+          <thead>
+            <tr>
+              <th scope="col">Applicant</th>
+              <th scope="col">Email</th>
+              <th scope="col">Contact</th>
+              <th scope="col">Supply Needs</th>
+              <th scope="col">Message</th>
+              <th scope="col">Status</th>
+              <th scope="col"><span class="sr-only">Email Status</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.resellerApplications.length === 0 ? (
+              <DashboardTableEmptyState
+                colspan={7}
+                message="No reseller applications match the selected filters."
+              />
+            ) : data.resellerApplications.map((application) => {
+              const isUnread = !application.admin_read_at && application.application_status === "submitted";
+              return (
+                <tr
+                  data-status={application.application_status}
+                  data-application-id={application.id}
+                  {...(isUnread ? { "data-reseller-unread": "true" } : {})}
+                >
+                  <td class="dashboard-table__cell--truncate">{application.name}</td>
+                  <td class="dashboard-table__cell--truncate">{application.email}</td>
+                  <td class="dashboard-table__cell--truncate">{application.contact_number}</td>
+                  <td>{application.expected_quantity_per_week}</td>
+                  <td class="dashboard-table__cell--truncate" title={application.message ?? "No message"}>
+                    {application.message ?? "-"}
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      class="table-cell-trigger"
+                      data-open-cell-popover
+                      data-popover-title={`Edit Status: ${application.name}`}
+                    >
+                      <StatusBadge kind="reseller" status={application.application_status} />
+                    </button>
+                    <div class="hidden-popover-form-holder">
+                      <form method="post" class="admin-table-form">
+                        <input type="hidden" name="action" value="update-reseller-application" />
+                        <input type="hidden" name="applicationId" value={application.id} />
+                        <label>
+                          <span>Status</span>
+                          <select name="applicationStatus" required>
+                            {applicationStatuses.map((status) => (
+                              <option value={status} selected={selected(application.application_status, status)}>
+                                {autoCapitalize(status)}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button type="submit">Save status</button>
+                      </form>
+                    </div>
+                  </td>
+                  <td class="dashboard-table__cell--center">
+                    <ResellerEmailDeliveryStatus
+                      status={application.email_delivery_status}
+                      error={application.email_error}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </DashboardTableBoard>
     </div>
-    <div class="table-pagination"><span data-page-info style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"></span><div style="display: flex; gap: 0.25rem; align-items: center;"><button type="button" data-pagination-prev class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&lt;</button><div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div><button type="button" data-pagination-next class="btn-secondary" style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;">&gt;</button></div></div>
+    <DashboardTablePagination />
   </div>
-  <template data-reseller-filter-skeleton><div class="table-wrap" aria-busy="true" aria-live="polite"><table class="product-table-skeleton" style="table-layout: fixed; width: 100%;"><caption class="sr-only">Loading filtered reseller applications</caption><thead><tr><th scope="col">Applicant</th><th scope="col">Email</th><th scope="col">Contact</th><th scope="col">Supply Needs</th><th scope="col">Message</th><th scope="col">Status</th><th scope="col">Email Status</th></tr></thead><tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody></table></div></template>
+  <template data-reseller-filter-skeleton>
+    <DashboardTableBoard aria-busy="true" aria-live="polite">
+      <table class="product-table-skeleton dashboard-table">
+        <caption class="sr-only">Loading filtered reseller applications</caption>
+        <thead>
+          <tr>
+            <th scope="col">Applicant</th>
+            <th scope="col">Email</th>
+            <th scope="col">Contact</th>
+            <th scope="col">Supply Needs</th>
+            <th scope="col">Message</th>
+            <th scope="col">Status</th>
+            <th scope="col">Email Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {skeletonRows.map(() => (
+            <tr>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DashboardTableBoard>
+  </template>
 </section>
 
 <script>
@@ -79,7 +154,6 @@ const skeletonRows = Array.from({ length: 6 });
     const form = document.querySelector<HTMLFormElement>("[data-reseller-filter-form]");
     const tableShell = document.querySelector<HTMLElement>("[data-reseller-table-shell]");
     const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-reseller-filter-skeleton]");
-    const resetLink = document.querySelector<HTMLAnchorElement>("[data-reseller-filter-reset]");
     if (!form || !tableShell || !skeletonTemplate) return;
     if (form.dataset.resellerFilterInitialized === "true") return;
     form.dataset.resellerFilterInitialized = "true";
@@ -95,16 +169,112 @@ const skeletonRows = Array.from({ length: 6 });
     function normalizeFormQuery() { const params = new URLSearchParams(); const formData = new FormData(activeForm); filterKeys.forEach((key) => { const value = formData.get(key); if (typeof value === "string" && value.trim()) params.set(key, value.trim()); }); return params.toString(); }
     function buildUrl(path: string, targetQuery: string) { return targetQuery ? `${path}?${targetQuery}` : path; }
     function showSkeletonForQuery(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); const cachedQueries = readCache(); if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) return; const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true); if (skeleton) activeTableShell.replaceChildren(skeleton); }
-    function replaceFragment(fragmentHtml: string) { const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html"); const nextTableShell = parsed.querySelector<HTMLElement>("[data-reseller-table-shell]"); if (!nextTableShell) throw new Error("Reseller applications fragment did not include a table."); activeTableShell.innerHTML = nextTableShell.innerHTML; document.dispatchEvent(new Event("dashboard:interactive-table-updated")); }
-    async function applyFilters(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); if (targetQuery === currentQuery) return; showSkeletonForQuery(targetQuery); activeFetchController?.abort(); const fetchController = new AbortController(); activeFetchController = fetchController; try { const response = await fetch(buildUrl(fragmentPath, targetQuery), { headers: { "X-Requested-With": "fetch" }, signal: fetchController.signal }); if (!response.ok) throw new Error(`Reseller application filters failed with ${response.status}.`); const fragmentHtml = await response.text(); window.history.replaceState({ resellerFilterQuery: targetQuery }, "", buildUrl("/admin/reseller-applications", targetQuery)); replaceFragment(fragmentHtml); activeForm.dataset.currentFilterQuery = targetQuery; if (resetLink) resetLink.hidden = targetQuery.length === 0; writeCache([...readCache(), targetQuery]); } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; window.location.href = buildUrl("/admin/reseller-applications", targetQuery); } finally { if (activeFetchController === fetchController) activeFetchController = undefined; } }
+    function replaceFragment(fragmentHtml: string) { const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html"); const nextTableShell = parsed.querySelector<HTMLElement>("[data-reseller-table-shell]"); if (!nextTableShell) throw new Error("Reseller applications fragment did not include a table."); activeTableShell.innerHTML = nextTableShell.innerHTML; document.dispatchEvent(new Event("dashboard:interactive-table-updated")); document.dispatchEvent(new Event("dashboard:reseller-applications-table-updated")); }
+    async function applyFilters(targetQuery: string) { const currentQuery = normalizeParams(new URLSearchParams(window.location.search)); if (targetQuery === currentQuery) return; showSkeletonForQuery(targetQuery); activeFetchController?.abort(); const fetchController = new AbortController(); activeFetchController = fetchController; try { const response = await fetch(buildUrl(fragmentPath, targetQuery), { headers: { "X-Requested-With": "fetch" }, signal: fetchController.signal }); const fragmentHtml = await window.readDashboardFragmentResponse(response); window.history.replaceState({ resellerFilterQuery: targetQuery }, "", buildUrl("/admin/reseller-applications", targetQuery)); replaceFragment(fragmentHtml); activeForm.dataset.currentFilterQuery = targetQuery; writeCache([...readCache(), targetQuery]); } catch (error) { if (error instanceof DOMException && error.name === "AbortError") return; window.location.href = buildUrl("/admin/reseller-applications", targetQuery); } finally { if (activeFetchController === fetchController) activeFetchController = undefined; } }
     function submitFilters() { window.clearTimeout(submitTimer); submitTimer = window.setTimeout(() => { void applyFilters(normalizeFormQuery()); }, 120); }
     writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
     activeForm.addEventListener("submit", (event) => { event.preventDefault(); void applyFilters(normalizeFormQuery()); });
     autoSubmitFields.forEach((field) => field.addEventListener("change", submitFilters));
     searchInput?.addEventListener("input", () => { window.clearTimeout(searchTimer); searchTimer = window.setTimeout(submitFilters, 450); });
-    resetLink?.addEventListener("click", (event) => { if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return; event.preventDefault(); void applyFilters(""); });
   }
   document.addEventListener("DOMContentLoaded", initAdminResellerFilters);
   document.addEventListener("astro:after-swap", initAdminResellerFilters);
   if (document.readyState === "complete" || document.readyState === "interactive") initAdminResellerFilters();
+
+  function initResellerApplicationAutoRead() {
+    const tableShell = document.querySelector<HTMLElement>("[data-reseller-table-shell]");
+    if (!tableShell) return;
+    const activeTableShell = tableShell;
+    const interactiveTable = activeTableShell.closest<HTMLElement>("[data-interactive-table]");
+    if (!interactiveTable) return;
+    if (interactiveTable.dataset.resellerAutoReadInitialized === "true") return;
+    interactiveTable.dataset.resellerAutoReadInitialized = "true";
+
+    const markedApplicationIds = new Set<string>();
+    let markRequestInFlight = false;
+
+    function getVisibleUnreadApplicationIds() {
+      return Array.from(
+        activeTableShell.querySelectorAll<HTMLTableRowElement>("tr[data-reseller-unread='true']"),
+      )
+        .filter((row) => row.style.display !== "none")
+        .map((row) => row.dataset.applicationId)
+        .filter((id): id is string => typeof id === "string" && id.length > 0)
+        .filter((id) => !markedApplicationIds.has(id));
+    }
+
+    function clearUnreadIndicators(applicationIds: string[]) {
+      applicationIds.forEach((applicationId) => {
+        const row = activeTableShell.querySelector<HTMLTableRowElement>(
+          `tr[data-application-id="${applicationId}"]`,
+        );
+        if (!row) return;
+        row.removeAttribute("data-reseller-unread");
+      });
+    }
+
+    function adjustUnreadBadgeCount(href: string, delta: number) {
+      const badge = document.querySelector<HTMLElement>(
+        `.dashboard-sidebar a[href="${href}"] .dashboard-sidebar__nav-badge`,
+      );
+      if (!badge) return;
+
+      const nextCount = Math.max(0, Number.parseInt(badge.textContent || "0", 10) + delta);
+      badge.textContent = String(nextCount);
+      badge.hidden = nextCount < 1;
+    }
+
+    async function markVisibleUnreadApplications() {
+      const applicationIds = getVisibleUnreadApplicationIds();
+      if (applicationIds.length === 0 || markRequestInFlight) return;
+
+      applicationIds.forEach((applicationId) => markedApplicationIds.add(applicationId));
+      markRequestInFlight = true;
+
+      try {
+        const response = await fetch("/admin/reseller-applications-mark-read.json", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ applicationIds }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(
+            typeof body.error === "string"
+              ? body.error
+              : "Unable to mark reseller applications as read.",
+          );
+        }
+
+        const markedCount = typeof body.markedCount === "number" ? body.markedCount : applicationIds.length;
+        clearUnreadIndicators(applicationIds);
+        adjustUnreadBadgeCount("/admin/reseller-applications", -markedCount);
+        adjustUnreadBadgeCount("/admin/notifications", -markedCount);
+      } catch {
+        applicationIds.forEach((applicationId) => markedApplicationIds.delete(applicationId));
+      } finally {
+        markRequestInFlight = false;
+      }
+    }
+
+    const scheduleMarkVisibleUnread = () => {
+      window.requestAnimationFrame(() => {
+        void markVisibleUnreadApplications();
+      });
+    };
+
+    interactiveTable.addEventListener("dashboard:interactive-table-page-changed", scheduleMarkVisibleUnread);
+    document.addEventListener("dashboard:reseller-applications-table-updated", scheduleMarkVisibleUnread);
+    document.addEventListener("dashboard:interactive-table-updated", scheduleMarkVisibleUnread);
+    scheduleMarkVisibleUnread();
+  }
+
+  document.addEventListener("DOMContentLoaded", initResellerApplicationAutoRead);
+  document.addEventListener("astro:after-swap", initResellerApplicationAutoRead);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initResellerApplicationAutoRead();
+  }
 </script>

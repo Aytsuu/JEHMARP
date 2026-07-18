@@ -1,4 +1,8 @@
 ---
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminProductManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminProductFilters } from "@/lib/admin-dashboard/product-filters";
@@ -6,6 +10,7 @@ import {
   escapeTextareaValue,
   formatCurrency,
 } from "@/lib/admin-dashboard/view";
+import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
   data: AdminProductManagementData;
@@ -16,25 +21,15 @@ type Props = {
   filterQuery: string;
 };
 
-const { data, productCategories, productUnitLabels, stockStatuses, activeFilters, filterQuery } =
-  Astro.props;
-const hasActiveFilters = filterQuery.length > 0;
+const {
+  data,
+  productCategories,
+  productUnitLabels,
+  stockStatuses,
+  activeFilters,
+  filterQuery,
+} = Astro.props;
 const skeletonRows = Array.from({ length: 6 });
-const priceRangeMin = 0;
-const priceRangeMax = Math.max(
-  1,
-  Math.ceil(data.productPriceRange.max),
-  Math.ceil(activeFilters.maxPrice ?? 0),
-  Math.ceil(activeFilters.minPrice ?? 0),
-);
-const activeMinPrice = Math.min(
-  priceRangeMax,
-  Math.max(priceRangeMin, activeFilters.minPrice ?? priceRangeMin),
-);
-const activeMaxPrice = Math.min(
-  priceRangeMax,
-  Math.max(activeMinPrice, activeFilters.maxPrice ?? priceRangeMax),
-);
 
 function formatStockStatus(status: string): string {
   if (status === "in_stock") return "In Stock";
@@ -66,7 +61,11 @@ function formatStockStatus(status: string): string {
       <input type="hidden" name="isActive" value="on" />
       <div class="admin-form-grid product-create-form__grid">
         <label class="field-row"
-          ><span>Name</span><input name="name" required /></label
+          ><span>Name</span><input
+            name="name"
+            required
+            data-create-product-name
+          /></label
         >
         <label class="field-row">
           <span>Unit label</span>
@@ -80,7 +79,7 @@ function formatStockStatus(status: string): string {
         </label>
         <label class="field-row">
           <span>Category</span>
-          <select name="category" required>
+          <select name="category" required data-create-product-category>
             {
               productCategories.map((category) => (
                 <option value={category}>{category}</option>
@@ -143,7 +142,10 @@ function formatStockStatus(status: string): string {
                 hidden
                 data-product-image-preview
               />
-              <span class="product-image-picker__placeholder" data-product-image-placeholder>
+              <span
+                class="product-image-picker__placeholder"
+                data-product-image-placeholder
+              >
                 Select image
               </span>
             </label>
@@ -165,7 +167,7 @@ function formatStockStatus(status: string): string {
     </div>
   </Sheet>
 
-  <div data-interactive-table>
+  <div data-interactive-table class="dashboard-interactive-table">
     <div class="table-filters product-management-toolbar">
       <form
         method="get"
@@ -175,678 +177,662 @@ function formatStockStatus(status: string): string {
         data-current-filter-query={filterQuery}
         aria-label="Filter products"
       >
-        <label class="product-filter-form__field product-filter-form__field--search">
-          <span>Search</span>
+        <div
+          class="product-filter-form__field product-filter-form__field--search"
+        >
           <input
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
             placeholder="Search products..."
             autocomplete="off"
+            aria-label="Search products"
             data-product-search-input
           />
-        </label>
-        <label class="product-filter-form__field">
-          <span>Status</span>
-          <select name="stockStatus">
+        </div>
+        <div class="product-filter-form__field">
+          <select name="stockStatus" aria-label="Filter by stock status">
             <option value="">All statuses</option>
-            {stockStatuses.map((status) => (
-              <option value={status} selected={activeFilters.stockStatus === status}>
-                {formatStockStatus(status)}
-              </option>
-            ))}
+            {
+              stockStatuses.map((status) => (
+                <option
+                  value={status}
+                  selected={activeFilters.stockStatus === status}
+                >
+                  {formatStockStatus(status)}
+                </option>
+              ))
+            }
           </select>
-        </label>
-        <label class="product-filter-form__field">
-          <span>Category</span>
-          <select name="category">
+        </div>
+        <div class="product-filter-form__field">
+          <select name="category" aria-label="Filter by category">
             <option value="">All categories</option>
-            {productCategories.map((category) => (
-              <option value={category} selected={activeFilters.category === category}>
-                {category}
-              </option>
-            ))}
+            {
+              productCategories.map((category) => (
+                <option
+                  value={category}
+                  selected={activeFilters.category === category}
+                >
+                  {category}
+                </option>
+              ))
+            }
           </select>
-        </label>
-        <fieldset
-          class="product-filter-form__price-range"
-          data-price-range
-          data-price-min={priceRangeMin}
-          data-price-max={priceRangeMax}
-        >
-          <legend>Price range</legend>
-          <input
-            type="hidden"
-            name="minPrice"
-            value={activeFilters.minPrice ?? ""}
-            data-price-min-hidden
-          />
-          <input
-            type="hidden"
-            name="maxPrice"
-            value={activeFilters.maxPrice ?? ""}
-            data-price-max-hidden
-          />
-          <div class="product-filter-form__range-values" aria-live="polite">
-            <span data-price-min-label>{formatCurrency(activeMinPrice)}</span>
-            <span data-price-max-label>{formatCurrency(activeMaxPrice)}</span>
-          </div>
-          <div class="dual-range-slider">
-            <div class="dual-range-slider__track" aria-hidden="true">
-              <span class="dual-range-slider__fill" data-price-range-fill></span>
-            </div>
-            <input
-              type="range"
-              min={priceRangeMin}
-              max={priceRangeMax}
-              step="1"
-              value={activeMinPrice}
-              aria-label="Minimum product price"
-              data-price-min-range
-            />
-            <input
-              type="range"
-              min={priceRangeMin}
-              max={priceRangeMax}
-              step="1"
-              value={activeMaxPrice}
-              aria-label="Maximum product price"
-              data-price-max-range
-            />
-          </div>
-        </fieldset>
-        <a
-          href="/admin/products"
-          class="product-filter-form__reset"
-          data-product-filter-reset
-          hidden={!hasActiveFilters}
-        >
-          Clear
-        </a>
+        </div>
       </form>
       <div class="product-management-toolbar__actions">
-        <label class="product-management-toolbar__limit">
-          <span>Show</span>
-          <select data-limit-select>
-            <option value="10">10</option>
-            <option value="50">50</option>
-            <option value="100">100</option>
-          </select>
-        </label>
         <button
           type="button"
           class="btn-table-manage product-management-toolbar__create"
           data-open-create-sheet
-          data-sheet-target="#create-product-sheet"
-          >Create Product</button
+          data-sheet-target="#create-product-sheet">Create Product</button
         >
       </div>
     </div>
 
-    <div data-product-table-shell>
-      <div class="table-wrap">
-      <table style="table-layout: fixed; width: 100%;">
+    <div data-product-table-shell class="dashboard-interactive-table__surface">
+      <DashboardTableBoard>
+        <table class="product-table-skeleton dashboard-table dashboard-table--products">
+          <thead>
+            <tr>
+              <th scope="col" class="dashboard-table__head--image"></th>
+              <th scope="col">Name</th>
+              <th scope="col">Description</th>
+              <th scope="col">Pricing</th>
+              <th scope="col">Status</th>
+              <th scope="col">Date Created</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              data.products.length === 0 ? (
+                <DashboardTableEmptyState
+                  colspan={7}
+                  message="No products match the selected filters."
+                />
+              ) : (
+                data.products.map((product) => (
+                  <tr data-status={product.is_active ? "active" : "inactive"}>
+                    {/* 1. Image Cell (Editable Popover) */}
+                    <td class="dashboard-table__cell--image">
+                      <button
+                        type="button"
+                        class="table-cell-trigger dashboard-table__image-button"
+                        data-open-cell-popover
+                        data-popover-title={`Edit Image: ${product.name}`}
+                      >
+                        {product.image_path ? (
+                          <img
+                            src={
+                              resolvePublicStorageUrl(product.image_path) ??
+                              product.image_path
+                            }
+                            alt={product.name}
+                            class="dashboard-table__image-thumb"
+                          />
+                        ) : (
+                          <div class="dashboard-table__image-placeholder" />
+                        )}
+                      </button>
+                      <div
+                        class="hidden-popover-form-holder"
+                        style="display: none;"
+                      >
+                        <form
+                          method="post"
+                          enctype="multipart/form-data"
+                          class="admin-table-form"
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="save-product"
+                          />
+                          <input
+                            type="hidden"
+                            name="productId"
+                            value={product.id}
+                          />
+
+                          <input
+                            type="hidden"
+                            name="name"
+                            value={product.name}
+                          />
+                          <input
+                            type="hidden"
+                            name="category"
+                            value={product.category}
+                          />
+                          <input
+                            type="hidden"
+                            name="unitLabel"
+                            value={product.unit_label}
+                          />
+                          <input
+                            type="hidden"
+                            name="description"
+                            value={product.description ?? ""}
+                          />
+                          <input
+                            type="hidden"
+                            name="defaultPrice"
+                            value={product.default_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerPrice"
+                            value={product.reseller_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="stockStatus"
+                            value={product.stock_status}
+                          />
+                          {product.is_active && (
+                            <input type="hidden" name="isActive" value="on" />
+                          )}
+
+                          <label>
+                            <>
+                              <span>Upload new image</span>
+                              <input
+                                name="imageFile"
+                                type="file"
+                                accept="image/*"
+                                required
+                              />
+                            </>
+                          </label>
+                          <div class="button-row">
+                            <button type="submit">Save image</button>
+                          </div>
+                        </form>
+                      </div>
+                    </td>
+
+                    {/* 2. Name Cell (Editable Popover) */}
+                    <td class="dashboard-table__cell--truncate">
+                      <button
+                        type="button"
+                        class="table-cell-trigger"
+                        data-open-cell-popover
+                        data-popover-title={`Edit Name & Category: ${product.name}`}
+                      >
+                        <span>
+                          {product.name} ({product.unit_label})
+                        </span>
+                      </button>
+                      <div
+                        class="hidden-popover-form-holder"
+                        style="display: none;"
+                      >
+                        <form
+                          method="post"
+                          enctype="multipart/form-data"
+                          class="admin-table-form"
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="save-product"
+                          />
+                          <input
+                            type="hidden"
+                            name="productId"
+                            value={product.id}
+                          />
+
+                          <input
+                            type="hidden"
+                            name="description"
+                            value={product.description ?? ""}
+                          />
+                          <input
+                            type="hidden"
+                            name="defaultPrice"
+                            value={product.default_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerPrice"
+                            value={product.reseller_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="stockStatus"
+                            value={product.stock_status}
+                          />
+                          {product.is_active && (
+                            <input type="hidden" name="isActive" value="on" />
+                          )}
+
+                          <label>
+                            <>
+                              <span>Name</span>
+                              <input
+                                name="name"
+                                value={product.name}
+                                required
+                              />
+                            </>
+                          </label>
+                          <label>
+                            <span>Category</span>
+                            <select name="category" required>
+                              {productCategories.map((category) => (
+                                <option
+                                  value={category}
+                                  selected={product.category === category}
+                                >
+                                  {category}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Unit label</span>
+                            <select name="unitLabel" required>
+                              {productUnitLabels.map((unitLabel) => (
+                                <option
+                                  value={unitLabel}
+                                  selected={product.unit_label === unitLabel}
+                                >
+                                  {unitLabel}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <div class="button-row">
+                            <button type="submit">Save product name</button>
+                          </div>
+                        </form>
+                      </div>
+                    </td>
+
+                    {/* 3. Description Cell (Editable Popover) */}
+                    <td class="dashboard-table__cell--truncate">
+                      <button
+                        type="button"
+                        class="table-cell-trigger"
+                        data-open-cell-popover
+                        data-popover-title={`Edit Description: ${product.name}`}
+                      >
+                        {product.description ? (
+                          <span title={product.description}>
+                            {product.description}
+                          </span>
+                        ) : (
+                          <span class="text-gray-400 text-[0.875rem] italic">
+                            No description
+                          </span>
+                        )}
+                      </button>
+                      <div
+                        class="hidden-popover-form-holder"
+                        style="display: none;"
+                      >
+                        <form
+                          method="post"
+                          enctype="multipart/form-data"
+                          class="admin-table-form"
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="save-product"
+                          />
+                          <input
+                            type="hidden"
+                            name="productId"
+                            value={product.id}
+                          />
+
+                          <input
+                            type="hidden"
+                            name="name"
+                            value={product.name}
+                          />
+                          <input
+                            type="hidden"
+                            name="category"
+                            value={product.category}
+                          />
+                          <input
+                            type="hidden"
+                            name="unitLabel"
+                            value={product.unit_label}
+                          />
+                          <input
+                            type="hidden"
+                            name="defaultPrice"
+                            value={product.default_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerPrice"
+                            value={product.reseller_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="stockStatus"
+                            value={product.stock_status}
+                          />
+                          {product.is_active && (
+                            <input type="hidden" name="isActive" value="on" />
+                          )}
+
+                          <label>
+                            <>
+                              <span>Description</span>
+                              <textarea
+                                name="description"
+                                set:html={escapeTextareaValue(
+                                  product.description,
+                                )}
+                              />
+                            </>
+                          </label>
+                          <div class="button-row">
+                            <button type="submit">Save description</button>
+                          </div>
+                        </form>
+                      </div>
+                    </td>
+
+                    {/* 4. Pricing Cell (Editable Popover) */}
+                    <td>
+                      <button
+                        type="button"
+                        class="table-cell-trigger"
+                        data-open-cell-popover
+                        data-popover-title={`Edit Pricing: ${product.name}`}
+                      >
+                        <span>
+                          {formatCurrency(product.default_price)} (
+                          {formatCurrency(product.reseller_price)})
+                        </span>
+                      </button>
+                      <div class="hidden-popover-form-holder">
+                        <form
+                          method="post"
+                          enctype="multipart/form-data"
+                          class="admin-table-form"
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="save-product"
+                          />
+                          <input
+                            type="hidden"
+                            name="productId"
+                            value={product.id}
+                          />
+                          <label>
+                            <>
+                              <span>Default price</span>
+                              <input
+                                name="defaultPrice"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={product.default_price}
+                                required
+                              />
+                            </>
+                          </label>
+                          <label>
+                            <>
+                              <span>Reseller price</span>
+                              <input
+                                name="resellerPrice"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={product.reseller_price}
+                                required
+                              />
+                            </>
+                          </label>
+
+                          <input
+                            type="hidden"
+                            name="name"
+                            value={product.name}
+                          />
+                          <input
+                            type="hidden"
+                            name="category"
+                            value={product.category}
+                          />
+                          <input
+                            type="hidden"
+                            name="unitLabel"
+                            value={product.unit_label}
+                          />
+                          <input
+                            type="hidden"
+                            name="stockStatus"
+                            value={product.stock_status}
+                          />
+                          <input
+                            type="hidden"
+                            name="description"
+                            value={product.description ?? ""}
+                          />
+                          {product.is_active && (
+                            <input type="hidden" name="isActive" value="on" />
+                          )}
+
+                          <div class="button-row">
+                            <button type="submit">Save pricing</button>
+                          </div>
+                        </form>
+                      </div>
+                    </td>
+
+                    {/* 5. Status Cell (Editable Popover) */}
+                    <td>
+                      <button
+                        type="button"
+                        class="table-cell-trigger"
+                        data-open-cell-popover
+                        data-popover-title={`Edit Status: ${product.name}`}
+                      >
+                        <StatusBadge
+                          kind="stock"
+                          status={product.stock_status}
+                          label={formatStockStatus(product.stock_status)}
+                        />
+                      </button>
+                      <div class="hidden-popover-form-holder">
+                        <form
+                          method="post"
+                          enctype="multipart/form-data"
+                          class="admin-table-form"
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="save-product"
+                          />
+                          <input
+                            type="hidden"
+                            name="productId"
+                            value={product.id}
+                          />
+                          <label>
+                            <span>Stock status</span>
+                            <select name="stockStatus" required>
+                              {stockStatuses.map((status) => (
+                                <option
+                                  value={status}
+                                  selected={product.stock_status === status}
+                                >
+                                  {status}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {product.is_active && (
+                            <input type="hidden" name="isActive" value="on" />
+                          )}
+
+                          <input
+                            type="hidden"
+                            name="name"
+                            value={product.name}
+                          />
+                          <input
+                            type="hidden"
+                            name="category"
+                            value={product.category}
+                          />
+                          <input
+                            type="hidden"
+                            name="unitLabel"
+                            value={product.unit_label}
+                          />
+                          <input
+                            type="hidden"
+                            name="defaultPrice"
+                            value={product.default_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerPrice"
+                            value={product.reseller_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="description"
+                            value={product.description ?? ""}
+                          />
+
+                          <div class="button-row">
+                            <button type="submit">Save status</button>
+                          </div>
+                        </form>
+                      </div>
+                    </td>
+
+                    {/* 6. Date Created Cell (Static) */}
+                    <td>
+                      {new Date(product.created_at).toLocaleDateString(
+                        "en-US",
+                        {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        },
+                      )}
+                    </td>
+
+                    {/* 7. Action Cell (Static Form) */}
+                    <td>
+                      {product.is_active ? (
+                        <form method="post" style="margin: 0;">
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="deactivate-product"
+                          />
+                          <input
+                            type="hidden"
+                            name="productId"
+                            value={product.id}
+                          />
+                          <button
+                            type="submit"
+                            class="btn-table-manage"
+                            style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block;"
+                          >
+                            Deactivate
+                          </button>
+                        </form>
+                      ) : (
+                        <span style="color: #9ca3af; font-style: italic; font-size: 0.85rem;">
+                          None
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )
+            }
+          </tbody>
+        </table>
+      </DashboardTableBoard>
+    </div>
+
+    <DashboardTablePagination />
+  </div>
+
+  <template data-product-filter-skeleton>
+    <DashboardTableBoard aria-busy="true" aria-live="polite">
+      <table
+        class="product-table-skeleton dashboard-table dashboard-table--products"
+      >
+        <caption class="sr-only">Loading filtered products</caption>
         <thead>
           <tr>
-            <th scope="col" style="width: 8%;"></th>
-            <th scope="col" style="width: 24%;">Name</th>
-            <th scope="col" style="width: 24%;">Description</th>
-            <th scope="col" style="width: 17%;">Pricing</th>
-            <th scope="col" style="width: 12%;">Status</th>
-            <th scope="col" style="width: 15%;">Date Created</th>
-            <th scope="col" style="width: 10%;">Action</th>
+            <th scope="col" class="dashboard-table__head--image"></th>
+            <th scope="col">Name</th>
+            <th scope="col">Description</th>
+            <th scope="col">Pricing</th>
+            <th scope="col">Status</th>
+            <th scope="col">Date Created</th>
+            <th scope="col">Action</th>
           </tr>
         </thead>
         <tbody>
           {
-            data.products.length === 0 ? (
-              <tr class="empty-row">
-                <td colspan="7" class="empty-state">
-                  No products match the selected filters.
+            skeletonRows.map(() => (
+              <tr>
+                <td>
+                  <span class="table-skeleton-block table-skeleton-block--image" />
                 </td>
-              </tr>
-            ) : data.products.map((product) => (
-              <tr data-status={product.is_active ? "active" : "inactive"}>
-                {/* 1. Image Cell (Editable Popover) */}
-                <td style="width: 8%; vertical-align: middle;">
-                  <button
-                    type="button"
-                    class="table-cell-trigger"
-                    data-open-cell-popover
-                    data-popover-title={`Edit Image: ${product.name}`}
-                    style="width: 100%; display: flex; justify-content: center; cursor: pointer;"
-                  >
-                    {product.image_path ? (
-                      <img
-                        src={product.image_path}
-                        alt={product.name}
-                        style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;"
-                      />
-                    ) : (
-                      <div style="width: 40px; height: 40px; background-color: #e5e7eb; border-radius: 4px;" />
-                    )}
-                  </button>
-                  <div
-                    class="hidden-popover-form-holder"
-                    style="display: none;"
-                  >
-                    <form
-                      method="post"
-                      enctype="multipart/form-data"
-                      class="admin-table-form"
-                    >
-                      <input type="hidden" name="action" value="save-product" />
-                      <input
-                        type="hidden"
-                        name="productId"
-                        value={product.id}
-                      />
-
-                      <input type="hidden" name="name" value={product.name} />
-                      <input
-                        type="hidden"
-                        name="category"
-                        value={product.category}
-                      />
-                      <input
-                        type="hidden"
-                        name="unitLabel"
-                        value={product.unit_label}
-                      />
-                      <input
-                        type="hidden"
-                        name="description"
-                        value={product.description ?? ""}
-                      />
-                      <input
-                        type="hidden"
-                        name="defaultPrice"
-                        value={product.default_price}
-                      />
-                      <input
-                        type="hidden"
-                        name="resellerPrice"
-                        value={product.reseller_price}
-                      />
-                      <input
-                        type="hidden"
-                        name="stockStatus"
-                        value={product.stock_status}
-                      />
-                      {product.is_active && (
-                        <input type="hidden" name="isActive" value="on" />
-                      )}
-
-                      <label>
-                        <>
-                          <span>Upload new image</span>
-                          <input
-                            name="imageFile"
-                            type="file"
-                            accept="image/*"
-                            required
-                          />
-                        </>
-                      </label>
-                      <div class="button-row">
-                        <button type="submit">Save image</button>
-                      </div>
-                    </form>
-                  </div>
+                <td>
+                  <span class="table-skeleton-block" />
                 </td>
-
-                {/* 2. Name Cell (Editable Popover) */}
-                <td style="width: 24%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;">
-                  <button
-                    type="button"
-                    class="table-cell-trigger"
-                    data-open-cell-popover
-                    data-popover-title={`Edit Name & Category: ${product.name}`}
-                    style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;"
-                  >
-                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; color: inherit; font-weight: inherit;">
-                      {product.name} ({product.unit_label})
-                    </span>
-                  </button>
-                  <div
-                    class="hidden-popover-form-holder"
-                    style="display: none;"
-                  >
-                    <form
-                      method="post"
-                      enctype="multipart/form-data"
-                      class="admin-table-form"
-                    >
-                      <input type="hidden" name="action" value="save-product" />
-                      <input
-                        type="hidden"
-                        name="productId"
-                        value={product.id}
-                      />
-
-                      <input
-                        type="hidden"
-                        name="description"
-                        value={product.description ?? ""}
-                      />
-                      <input
-                        type="hidden"
-                        name="defaultPrice"
-                        value={product.default_price}
-                      />
-                      <input
-                        type="hidden"
-                        name="resellerPrice"
-                        value={product.reseller_price}
-                      />
-                      <input
-                        type="hidden"
-                        name="stockStatus"
-                        value={product.stock_status}
-                      />
-                      {product.is_active && (
-                        <input type="hidden" name="isActive" value="on" />
-                      )}
-
-                      <label>
-                        <>
-                          <span>Name</span>
-                          <input name="name" value={product.name} required />
-                        </>
-                      </label>
-                      <label>
-                        <span>Category</span>
-                        <select name="category" required>
-                          {productCategories.map((category) => (
-                            <option
-                              value={category}
-                              selected={product.category === category}
-                            >
-                              {category}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <label>
-                        <span>Unit label</span>
-                        <select name="unitLabel" required>
-                          {productUnitLabels.map((unitLabel) => (
-                            <option
-                              value={unitLabel}
-                              selected={product.unit_label === unitLabel}
-                            >
-                              {unitLabel}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      <div class="button-row">
-                        <button type="submit">Save product name</button>
-                      </div>
-                    </form>
-                  </div>
+                <td>
+                  <span class="table-skeleton-block table-skeleton-block--wide" />
                 </td>
-
-                {/* 3. Description Cell (Editable Popover) */}
-                <td style="width: 24%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle;">
-                  <button
-                    type="button"
-                    class="table-cell-trigger"
-                    data-open-cell-popover
-                    data-popover-title={`Edit Description: ${product.name}`}
-                    style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;"
-                  >
-                    {product.description ? (
-                      <span
-                        style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit;"
-                        title={product.description}
-                      >
-                        {product.description}
-                      </span>
-                    ) : (
-                      <span style="display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9ca3af; font-size: 0.875rem; font-style: italic;">
-                        No description
-                      </span>
-                    )}
-                  </button>
-                  <div
-                    class="hidden-popover-form-holder"
-                    style="display: none;"
-                  >
-                    <form
-                      method="post"
-                      enctype="multipart/form-data"
-                      class="admin-table-form"
-                    >
-                      <input type="hidden" name="action" value="save-product" />
-                      <input
-                        type="hidden"
-                        name="productId"
-                        value={product.id}
-                      />
-
-                      <input type="hidden" name="name" value={product.name} />
-                      <input
-                        type="hidden"
-                        name="category"
-                        value={product.category}
-                      />
-                      <input
-                        type="hidden"
-                        name="unitLabel"
-                        value={product.unit_label}
-                      />
-                      <input
-                        type="hidden"
-                        name="defaultPrice"
-                        value={product.default_price}
-                      />
-                      <input
-                        type="hidden"
-                        name="resellerPrice"
-                        value={product.reseller_price}
-                      />
-                      <input
-                        type="hidden"
-                        name="stockStatus"
-                        value={product.stock_status}
-                      />
-                      {product.is_active && (
-                        <input type="hidden" name="isActive" value="on" />
-                      )}
-
-                      <label>
-                        <>
-                          <span>Description</span>
-                          <textarea
-                            name="description"
-                            set:html={escapeTextareaValue(product.description)}
-                          />
-                        </>
-                      </label>
-                      <div class="button-row">
-                        <button type="submit">Save description</button>
-                      </div>
-                    </form>
-                  </div>
+                <td>
+                  <span class="table-skeleton-block" />
                 </td>
-
-                {/* 4. Pricing Cell (Editable Popover) */}
-                <td style="width: 17%; vertical-align: middle;">
-                  <button
-                    type="button"
-                    class="table-cell-trigger"
-                    data-open-cell-popover
-                    data-popover-title={`Edit Pricing: ${product.name}`}
-                    style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;"
-                  >
-                    <span style="display: block; color: inherit; line-height: 1.4;">
-                      {formatCurrency(product.default_price)} (
-                      {formatCurrency(product.reseller_price)})
-                    </span>
-                  </button>
-                  <div
-                    class="hidden-popover-form-holder"
-                    style="display: none;"
-                  >
-                    <form
-                      method="post"
-                      enctype="multipart/form-data"
-                      class="admin-table-form"
-                    >
-                      <input type="hidden" name="action" value="save-product" />
-                      <input
-                        type="hidden"
-                        name="productId"
-                        value={product.id}
-                      />
-                      <label>
-                        <>
-                          <span>Default price</span>
-                          <input
-                            name="defaultPrice"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={product.default_price}
-                            required
-                          />
-                        </>
-                      </label>
-                      <label>
-                        <>
-                          <span>Reseller price</span>
-                          <input
-                            name="resellerPrice"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={product.reseller_price}
-                            required
-                          />
-                        </>
-                      </label>
-
-                      <input type="hidden" name="name" value={product.name} />
-                      <input
-                        type="hidden"
-                        name="category"
-                        value={product.category}
-                      />
-                      <input
-                        type="hidden"
-                        name="unitLabel"
-                        value={product.unit_label}
-                      />
-                      <input
-                        type="hidden"
-                        name="stockStatus"
-                        value={product.stock_status}
-                      />
-                      <input
-                        type="hidden"
-                        name="description"
-                        value={product.description ?? ""}
-                      />
-                      {product.is_active && (
-                        <input type="hidden" name="isActive" value="on" />
-                      )}
-
-                      <div class="button-row">
-                        <button type="submit">Save pricing</button>
-                      </div>
-                    </form>
-                  </div>
+                <td>
+                  <span class="table-skeleton-block table-skeleton-block--short" />
                 </td>
-
-                {/* 5. Status Cell (Editable Popover) */}
-                <td style="width: 12%; vertical-align: middle;">
-                  <button
-                    type="button"
-                    class="table-cell-trigger"
-                    data-open-cell-popover
-                    data-popover-title={`Edit Status: ${product.name}`}
-                    style="width: 100%; text-align: left; display: block; overflow: hidden; cursor: pointer;"
-                  >
-                    <span style="color: inherit; line-height: 1.4;">
-                      {formatStockStatus(product.stock_status)}
-                    </span>
-                  </button>
-                  <div
-                    class="hidden-popover-form-holder"
-                    style="display: none;"
-                  >
-                    <form
-                      method="post"
-                      enctype="multipart/form-data"
-                      class="admin-table-form"
-                    >
-                      <input type="hidden" name="action" value="save-product" />
-                      <input
-                        type="hidden"
-                        name="productId"
-                        value={product.id}
-                      />
-                      <label>
-                        <span>Stock status</span>
-                        <select name="stockStatus" required>
-                          {stockStatuses.map((status) => (
-                            <option
-                              value={status}
-                              selected={product.stock_status === status}
-                            >
-                              {status}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {product.is_active && (
-                        <input type="hidden" name="isActive" value="on" />
-                      )}
-
-                      <input type="hidden" name="name" value={product.name} />
-                      <input
-                        type="hidden"
-                        name="category"
-                        value={product.category}
-                      />
-                      <input
-                        type="hidden"
-                        name="unitLabel"
-                        value={product.unit_label}
-                      />
-                      <input
-                        type="hidden"
-                        name="defaultPrice"
-                        value={product.default_price}
-                      />
-                      <input
-                        type="hidden"
-                        name="resellerPrice"
-                        value={product.reseller_price}
-                      />
-                      <input
-                        type="hidden"
-                        name="description"
-                        value={product.description ?? ""}
-                      />
-
-                      <div class="button-row">
-                        <button type="submit">Save status</button>
-                      </div>
-                    </form>
-                  </div>
+                <td>
+                  <span class="table-skeleton-block" />
                 </td>
-
-                {/* 6. Date Created Cell (Static) */}
-                <td style="width: 15%; vertical-align: middle;">
-                  {new Date(product.created_at).toLocaleDateString("en-US", {
-                    year: "numeric",
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </td>
-
-                {/* 7. Action Cell (Static Form) */}
-                <td style="width: 10%; vertical-align: middle;">
-                  {product.is_active ? (
-                    <form method="post" style="margin: 0;">
-                      <input
-                        type="hidden"
-                        name="action"
-                        value="deactivate-product"
-                      />
-                      <input
-                        type="hidden"
-                        name="productId"
-                        value={product.id}
-                      />
-                      <button
-                        type="submit"
-                        class="btn-table-manage"
-                        style="background-color: var(--color-brand-muted-black); padding: 0.25rem 0.5rem; font-size: 0.75rem; text-transform: none; letter-spacing: normal; width: auto; display: inline-block;"
-                      >
-                        Deactivate
-                      </button>
-                    </form>
-                  ) : (
-                    <span style="color: #9ca3af; font-style: italic; font-size: 0.85rem;">
-                      None
-                    </span>
-                  )}
+                <td>
+                  <span class="table-skeleton-block table-skeleton-block--short" />
                 </td>
               </tr>
             ))
           }
         </tbody>
       </table>
-      </div>
-    </div>
-
-    <div class="table-pagination">
-      <span
-        data-page-info
-        style="font-size: 0.9rem; color: var(--color-brand-muted-black); font-weight: 500;"
-      ></span>
-      <div style="display: flex; gap: 0.25rem; align-items: center;">
-        <button
-          type="button"
-          data-pagination-prev
-          class="btn-secondary"
-          style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;"
-          >&lt;</button
-        >
-        <div data-pagination-numbers style="display: flex; gap: 0.25rem;"></div>
-        <button
-          type="button"
-          data-pagination-next
-          class="btn-secondary"
-          style="padding: 0.25rem 0.75rem; border: none; border-radius: 0.25rem; cursor: pointer;"
-          >&gt;</button
-        >
-      </div>
-    </div>
-  </div>
-
-  <template data-product-filter-skeleton>
-    <div class="table-wrap" aria-busy="true" aria-live="polite">
-      <table class="product-table-skeleton" style="table-layout: fixed; width: 100%;">
-        <caption class="sr-only">Loading filtered products</caption>
-        <thead>
-          <tr>
-            <th scope="col" style="width: 8%;"></th>
-            <th scope="col" style="width: 24%;">Name</th>
-            <th scope="col" style="width: 24%;">Description</th>
-            <th scope="col" style="width: 17%;">Pricing</th>
-            <th scope="col" style="width: 12%;">Status</th>
-            <th scope="col" style="width: 15%;">Date Created</th>
-            <th scope="col" style="width: 10%;">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {skeletonRows.map(() => (
-            <tr>
-              <td><span class="table-skeleton-block table-skeleton-block--image"></span></td>
-              <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--wide"></span></td>
-              <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
-              <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    </DashboardTableBoard>
   </template>
 </section>
 
 <script>
   function initAdminProductFilters() {
-    const form = document.querySelector<HTMLFormElement>("[data-product-filter-form]");
-    const tableShell = document.querySelector<HTMLElement>("[data-product-table-shell]");
-    const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-product-filter-skeleton]");
-    const resetLink = document.querySelector<HTMLAnchorElement>("[data-product-filter-reset]");
+    const form = document.querySelector<HTMLFormElement>(
+      "[data-product-filter-form]",
+    );
+    const tableShell = document.querySelector<HTMLElement>(
+      "[data-product-table-shell]",
+    );
+    const skeletonTemplate = document.querySelector<HTMLTemplateElement>(
+      "[data-product-filter-skeleton]",
+    );
 
     if (!form || !tableShell || !skeletonTemplate) return;
     if (form.dataset.productFilterInitialized === "true") return;
@@ -857,19 +843,12 @@ function formatStockStatus(status: string): string {
 
     const cacheKey = "admin-products-filter-cache-v1";
     const fragmentPath = "/admin/products-fragment";
-    const filterKeys = ["search", "category", "stockStatus", "minPrice", "maxPrice"] as const;
-    const autoSubmitFields = activeForm.querySelectorAll<HTMLSelectElement>("select");
-    const searchInput = activeForm.querySelector<HTMLInputElement>("[data-product-search-input]");
-    const priceRange = activeForm.querySelector<HTMLElement>("[data-price-range]");
-    const minRange = activeForm.querySelector<HTMLInputElement>("[data-price-min-range]");
-    const maxRange = activeForm.querySelector<HTMLInputElement>("[data-price-max-range]");
-    const minHidden = activeForm.querySelector<HTMLInputElement>("[data-price-min-hidden]");
-    const maxHidden = activeForm.querySelector<HTMLInputElement>("[data-price-max-hidden]");
-    const minLabel = activeForm.querySelector<HTMLElement>("[data-price-min-label]");
-    const maxLabel = activeForm.querySelector<HTMLElement>("[data-price-max-label]");
-    const rangeFill = activeForm.querySelector<HTMLElement>("[data-price-range-fill]");
-    const priceMin = Number(priceRange?.dataset.priceMin ?? "0");
-    const priceMax = Number(priceRange?.dataset.priceMax ?? "1");
+    const filterKeys = ["search", "category", "stockStatus"] as const;
+    const autoSubmitFields =
+      activeForm.querySelectorAll<HTMLSelectElement>("select");
+    const searchInput = activeForm.querySelector<HTMLInputElement>(
+      "[data-product-search-input]",
+    );
     let submitTimer: number | undefined;
     let searchTimer: number | undefined;
     let activeFetchController: AbortController | undefined;
@@ -918,62 +897,25 @@ function formatStockStatus(status: string): string {
       return targetQuery ? `${path}?${targetQuery}` : path;
     }
 
-    function formatPrice(value: number) {
-      return new Intl.NumberFormat("en-PH", {
-        style: "currency",
-        currency: "PHP",
-        maximumFractionDigits: 0,
-      }).format(value);
-    }
-
-    function syncPriceRange() {
-      if (!minRange || !maxRange || !minHidden || !maxHidden) return;
-
-      let minValue = Number(minRange.value);
-      let maxValue = Number(maxRange.value);
-
-      if (minValue > maxValue) {
-        if (document.activeElement === minRange) {
-          maxValue = minValue;
-          maxRange.value = String(maxValue);
-        } else {
-          minValue = maxValue;
-          minRange.value = String(minValue);
-        }
-      }
-
-      minHidden.value = minValue > priceMin ? String(minValue) : "";
-      maxHidden.value = maxValue < priceMax ? String(maxValue) : "";
-
-      if (minLabel) minLabel.textContent = formatPrice(minValue);
-      if (maxLabel) maxLabel.textContent = formatPrice(maxValue);
-
-      if (rangeFill) {
-        const span = Math.max(priceMax - priceMin, 1);
-        const left = ((minValue - priceMin) / span) * 100;
-        const right = 100 - ((maxValue - priceMin) / span) * 100;
-        rangeFill.style.left = `${left}%`;
-        rangeFill.style.right = `${right}%`;
-      }
-    }
-
     function submitFilters() {
       window.clearTimeout(submitTimer);
       submitTimer = window.setTimeout(() => {
-        syncPriceRange();
         void applyFilters(normalizeFormQuery());
       }, 120);
     }
 
     function showSkeletonForQuery(targetQuery: string) {
-      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
+      const currentQuery = normalizeParams(
+        new URLSearchParams(window.location.search),
+      );
       const cachedQueries = readCache();
 
       if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) {
         return;
       }
 
-      const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
+      const skeleton =
+        activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
       if (!skeleton) return;
 
       activeTableShell.replaceChildren(skeleton);
@@ -981,7 +923,9 @@ function formatStockStatus(status: string): string {
 
     function replaceProductsFragment(fragmentHtml: string) {
       const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html");
-      const nextTableShell = parsed.querySelector<HTMLElement>("[data-product-table-shell]");
+      const nextTableShell = parsed.querySelector<HTMLElement>(
+        "[data-product-table-shell]",
+      );
 
       if (!nextTableShell) {
         throw new Error("Products fragment did not include a product table.");
@@ -996,7 +940,9 @@ function formatStockStatus(status: string): string {
       options: { updateHistory?: boolean } = {},
     ) {
       const updateHistory = options.updateHistory ?? true;
-      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
+      const currentQuery = normalizeParams(
+        new URLSearchParams(window.location.search),
+      );
 
       if (targetQuery === currentQuery && updateHistory) {
         return;
@@ -1016,11 +962,7 @@ function formatStockStatus(status: string): string {
           signal: fetchController.signal,
         });
 
-        if (!response.ok) {
-          throw new Error(`Product filters failed with ${response.status}.`);
-        }
-
-        const fragmentHtml = await response.text();
+        const fragmentHtml = await window.readDashboardFragmentResponse(response);
         if (updateHistory) {
           window.history.replaceState(
             { productFilterQuery: targetQuery },
@@ -1031,7 +973,6 @@ function formatStockStatus(status: string): string {
 
         replaceProductsFragment(fragmentHtml);
         activeForm.dataset.currentFilterQuery = targetQuery;
-        if (resetLink) resetLink.hidden = targetQuery.length === 0;
         writeCache([...readCache(), targetQuery]);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -1046,11 +987,13 @@ function formatStockStatus(status: string): string {
       }
     }
 
-    writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
+    writeCache([
+      ...readCache(),
+      normalizeParams(new URLSearchParams(window.location.search)),
+    ]);
 
     form.addEventListener("submit", (event) => {
       event.preventDefault();
-      syncPriceRange();
       void applyFilters(normalizeFormQuery());
     });
 
@@ -1062,37 +1005,35 @@ function formatStockStatus(status: string): string {
       window.clearTimeout(searchTimer);
       searchTimer = window.setTimeout(submitFilters, 450);
     });
-
-    minRange?.addEventListener("input", syncPriceRange);
-    maxRange?.addEventListener("input", syncPriceRange);
-    minRange?.addEventListener("change", submitFilters);
-    maxRange?.addEventListener("change", submitFilters);
-    syncPriceRange();
-
-    resetLink?.addEventListener("click", (event) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-        return;
-      }
-
-      event.preventDefault();
-      void applyFilters("");
-    });
   }
 
   document.addEventListener("DOMContentLoaded", initAdminProductFilters);
   document.addEventListener("astro:after-swap", initAdminProductFilters);
-  if (document.readyState === "complete" || document.readyState === "interactive") {
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
     initAdminProductFilters();
   }
 
   function initCreateProductImagePicker() {
-    const picker = document.querySelector<HTMLElement>("[data-product-image-picker]");
+    const picker = document.querySelector<HTMLElement>(
+      "[data-product-image-picker]",
+    );
     if (!picker || picker.dataset.initialized === "true") return;
 
-    const input = picker.querySelector<HTMLInputElement>("[data-product-image-input]");
-    const preview = picker.querySelector<HTMLImageElement>("[data-product-image-preview]");
-    const placeholder = picker.querySelector<HTMLElement>("[data-product-image-placeholder]");
-    const removeButton = picker.querySelector<HTMLButtonElement>("[data-product-image-remove]");
+    const input = picker.querySelector<HTMLInputElement>(
+      "[data-product-image-input]",
+    );
+    const preview = picker.querySelector<HTMLImageElement>(
+      "[data-product-image-preview]",
+    );
+    const placeholder = picker.querySelector<HTMLElement>(
+      "[data-product-image-placeholder]",
+    );
+    const removeButton = picker.querySelector<HTMLButtonElement>(
+      "[data-product-image-remove]",
+    );
     if (!input || !preview || !placeholder || !removeButton) return;
     picker.dataset.initialized = "true";
 
@@ -1146,7 +1087,82 @@ function formatStockStatus(status: string): string {
 
   document.addEventListener("DOMContentLoaded", initCreateProductImagePicker);
   document.addEventListener("astro:after-swap", initCreateProductImagePicker);
-  if (document.readyState === "complete" || document.readyState === "interactive") {
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
     initCreateProductImagePicker();
+  }
+
+  function initCreateProductCategorySuggestion() {
+    const form = document.querySelector<HTMLFormElement>(
+      "#create-product-form",
+    );
+    if (!form || form.dataset.categorySuggestionInitialized === "true") return;
+
+    const nameInput = form.querySelector<HTMLInputElement>(
+      "[data-create-product-name]",
+    );
+    const categorySelect = form.querySelector<HTMLSelectElement>(
+      "[data-create-product-category]",
+    );
+    if (!nameInput || !categorySelect) return;
+
+    form.dataset.categorySuggestionInitialized = "true";
+    let lastSuggestedCategory = "";
+    let hasManualOverride = false;
+
+    function inferCategory(value: string) {
+      const normalizedValue = value.trim().toLowerCase();
+      if (!normalizedValue) return "";
+      if (
+        normalizedValue.includes("chicken") ||
+        normalizedValue.includes("chick")
+      )
+        return "chicken";
+      if (normalizedValue.includes("pork")) return "pork";
+      if (normalizedValue.includes("egg")) return "egg";
+      return "";
+    }
+
+    function syncCategorySuggestion() {
+      if (!nameInput || !categorySelect) return;
+
+      const nextCategory = inferCategory(nameInput.value);
+      const currentCategory = categorySelect.value;
+      const canAutoApply =
+        !hasManualOverride || currentCategory === lastSuggestedCategory;
+
+      if (nextCategory && canAutoApply && currentCategory !== nextCategory) {
+        categorySelect.value = nextCategory;
+        hasManualOverride = false;
+      }
+
+      lastSuggestedCategory = nextCategory;
+    }
+
+    if (!nameInput || !categorySelect) return;
+
+    nameInput.addEventListener("input", syncCategorySuggestion);
+    categorySelect.addEventListener("change", () => {
+      hasManualOverride = categorySelect.value !== lastSuggestedCategory;
+    });
+
+    syncCategorySuggestion();
+  }
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    initCreateProductCategorySuggestion,
+  );
+  document.addEventListener(
+    "astro:after-swap",
+    initCreateProductCategorySuggestion,
+  );
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    initCreateProductCategorySuggestion();
   }
 </script>

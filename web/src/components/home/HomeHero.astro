@@ -1,11 +1,17 @@
 ---
 import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+import { toAdminContentPreviewHref } from "@/lib/public-website/admin-content-preview";
 
 type Props = {
   section: PublicPageSectionRecord;
+  previewRoot?: string;
 };
 
-const { section } = Astro.props;
+const { section, previewRoot } = Astro.props;
+
+function linkHref(href: string) {
+  return previewRoot ? toAdminContentPreviewHref(href) : href;
+}
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim().length > 0
@@ -36,7 +42,7 @@ const supportingText = stringValue(section.content.supportingText);
 
     <div class="home-hero__actions">
       <a
-        href="/shop"
+        href={linkHref("/shop")}
         class="home-hero__button home-hero__button--primary"
       >
         Browse shop

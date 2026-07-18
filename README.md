@@ -1,17 +1,14 @@
 # JEHMARP
 
-## Remote Supabase Test Accounts
+## Local Supabase Auth
 
-Temporary mock accounts for the hosted Supabase Auth project. Replace these
-credentials before production use and do not reuse them outside test data.
+Auth users are **not** seeded automatically. After `supabase start` / `supabase db reset`, create accounts in local Studio:
 
-| Purpose | Email | Temporary password | App role |
-| :-- | :-- | :-- | :-- |
-| Test admin | `admin@nmc.test` | `NmcTestAdmin!2026` | `admin` |
-| Test agent user | `agent@nmc.test` | `NmcTestAgent!2026` | `agent` |
-
-The admin account is mapped through `public.admin_role`. The agent account is
-mapped through `public.agent_profile`.
+1. Open http://127.0.0.1:54323
+2. Go to **Authentication → Users → Add user**
+3. Map roles in the database as needed:
+   - Admin access: row in `public.admin_role` for the user's auth id
+   - Agent access: row in `public.agent_profile` for the user's auth id
 
 ## Required Environment Variables
 

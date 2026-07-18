@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAdminActivityItems } from "./activity";
+import { buildAdminActivityItems, filterAdminActivityItems } from "./activity";
 
 import type { AdminDashboardData } from "./data";
 
@@ -40,6 +40,31 @@ describe("buildAdminActivityItems", () => {
   });
 });
 
+describe("filterAdminActivityItems", () => {
+  it("filters activity by title, detail, and category terms", () => {
+    const activity = buildAdminActivityItems(createAdminDashboardData());
+
+    expect(filterAdminActivityItems(activity, { search: "invoice" })).toEqual([
+      expect.objectContaining({
+        title: "Created invoice",
+        category: "invoice",
+      }),
+    ]);
+    expect(filterAdminActivityItems(activity, { search: "reseller sent" })).toEqual([
+      expect.objectContaining({
+        title: "New reseller application",
+        category: "reseller",
+      }),
+    ]);
+  });
+
+  it("returns all items when no search filter is provided", () => {
+    const activity = buildAdminActivityItems(createAdminDashboardData(), 3);
+
+    expect(filterAdminActivityItems(activity)).toEqual(activity);
+  });
+});
+
 function createAdminDashboardData(): AdminDashboardData {
   return {
     pages: [{
@@ -66,14 +91,6 @@ function createAdminDashboardData(): AdminDashboardData {
       created_at: "2026-07-04T10:00:00.000Z",
       updated_at: "2026-07-04T10:00:00.000Z",
     }],
-    productPriceRange: {
-      min: 0,
-      max: 320,
-    },
-    orderTotalRange: {
-      min: 0,
-      max: 0,
-    },
     agents: [],
     customers: [{
       id: "customer-id",
@@ -105,6 +122,8 @@ function createAdminDashboardData(): AdminDashboardData {
         phone_number: "09170000000",
         email: "ada@example.com",
         address: "123 Road",
+        assigned_agent_id: null,
+        assigned_agent: null,
         is_reseller: false,
       },
       agent: null,
@@ -155,11 +174,11 @@ function createAdminDashboardData(): AdminDashboardData {
       updated_at: "2026-07-04T14:00:00.000Z",
     }],
     summary: {
-      submittedOrders: 0,
-      openInquiries: 0,
+      orders: 1,
+      inquiries: 1,
       customers: 1,
-      activeProducts: 1,
-      newResellerApplications: 1,
+      products: 1,
+      resellerApplications: 1,
     },
   };
 }

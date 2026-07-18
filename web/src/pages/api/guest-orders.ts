@@ -1,12 +1,14 @@
 import type { APIRoute } from "astro";
 
 import { parseGuestOrderFormData, submitGuestOrder } from "@/lib/public-website/guest-orders";
+import { resolveFormReturnPath } from "@/lib/public-website/admin-content-preview";
 
 export const prerender = false;
 
 export const POST: APIRoute = async ({ request, redirect }) => {
   const formData = await request.formData();
   const parsed = parseGuestOrderFormData(formData);
+  const returnPath = resolveFormReturnPath(formData, "/shop");
 
   if (!parsed.success) {
     const params = new URLSearchParams({
@@ -14,7 +16,7 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       message: parsed.errors[0] ?? "Please check your order details.",
     });
 
-    return redirect(`/shop?${params.toString()}`, 303);
+    return redirect(`${returnPath}?${params.toString()}`, 303);
   }
 
   try {
@@ -26,14 +28,14 @@ export const POST: APIRoute = async ({ request, redirect }) => {
       reference: orderId,
     });
 
-    return redirect(`/shop?${params.toString()}`, 303);
+    return redirect(`${returnPath}?${params.toString()}`, 303);
   } catch (error) {
     const params = new URLSearchParams({
       order: "error",
       message: error instanceof Error ? error.message : "The order could not be submitted. Please try again.",
     });
 
-    return redirect(`/shop?${params.toString()}`, 303);
+    return redirect(`${returnPath}?${params.toString()}`, 303);
   }
 };
 

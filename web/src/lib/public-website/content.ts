@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { throwLoadError } from "@/lib/load-error";
 
 export type PublicPageRecord = {
   id: string;
@@ -24,6 +25,13 @@ export type PublicPageContent = {
   sections: PublicPageSectionRecord[];
 };
 
+export type PublicFeaturedProduct = {
+  id: string;
+  name: string;
+  description: string | null;
+  image_path: string | null;
+};
+
 type SectionLike = {
   type?: string;
   content?: Record<string, unknown>;
@@ -42,7 +50,7 @@ export async function getPublicPageContent(
     .maybeSingle();
 
   if (pageError) {
-    throw new Error(`Unable to load page content for ${slug}`);
+    throwLoadError(`Unable to load page content for ${slug}`, pageError);
   }
 
   if (!page) {
@@ -60,13 +68,32 @@ export async function getPublicPageContent(
     .order("sort_order", { ascending: true });
 
   if (sectionError) {
-    throw new Error(`Unable to load page sections for ${slug}`);
+    throwLoadError(`Unable to load page sections for ${slug}`, sectionError);
   }
 
   return {
     page: page as PublicPageRecord,
     sections: (sections ?? []) as PublicPageSectionRecord[],
   };
+}
+
+export async function getFeaturedPublicProducts(
+  context: Pick<APIContext, "cookies" | "request">,
+  limit = 4,
+): Promise<PublicFeaturedProduct[]> {
+  const supabase = createSupabaseServerClient(context);
+  const { data, error } = await supabase
+    .from("product")
+    .select("id, name, description, image_path")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    throwLoadError("Unable to load featured public products");
+  }
+
+  return (data ?? []) as PublicFeaturedProduct[];
 }
 
 export function getSectionHeading(section: SectionLike): string {

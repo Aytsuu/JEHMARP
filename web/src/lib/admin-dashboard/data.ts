@@ -1,4 +1,5 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { throwLoadError } from "@/lib/load-error";
 
 import type { AdminAgentFilters } from "./agent-filters";
 import type { AdminCustomerFilters } from "./customer-filters";
@@ -8,7 +9,6 @@ import type { AdminOrderFilters } from "./order-filters";
 import type { AdminProductFilters } from "./product-filters";
 import type { AdminResellerApplicationFilters } from "./reseller-application-filters";
 import type {
-  CommissionStatus,
   InquiryStatus,
   InvoiceStatus,
   OrderStatus,
@@ -39,13 +39,26 @@ const adminOrderSelect = `
     phone_number,
     email,
     address,
-    is_reseller
+    is_reseller,
+    assigned_agent_id,
+    assigned_agent:assigned_agent_id (
+      id,
+      user_id,
+      display_name,
+      contact,
+      status,
+      created_at,
+      updated_at
+    )
   ),
   agent:agent_id (
     id,
+    user_id,
     display_name,
-    email,
-    contact
+    contact,
+    status,
+    created_at,
+    updated_at
   ),
   customer_order_item (
     id,
@@ -56,8 +69,7 @@ const adminOrderSelect = `
     price_type,
     add_details,
     agent_commission_amount,
-    agent_commission_status,
-    agent_commission_notes,
+    agent_commission_paid,
     product:product_id (
       id,
       name,
@@ -155,8 +167,10 @@ export type AdminCustomer = {
 
 export type AdminOrderCustomer = Pick<
   AdminCustomer,
-  "id" | "first_name" | "last_name" | "phone_number" | "email" | "address" | "is_reseller"
->;
+  "id" | "first_name" | "last_name" | "phone_number" | "email" | "address" | "is_reseller" | "assigned_agent_id"
+> & {
+  assigned_agent: Pick<AdminAgent, "id" | "display_name" | "email" | "contact"> | null;
+};
 
 export type AdminOrderItem = {
   id: string;
@@ -167,8 +181,7 @@ export type AdminOrderItem = {
   price_type: "retail" | "reseller";
   add_details: string | null;
   agent_commission_amount: number;
-  agent_commission_status: CommissionStatus;
-  agent_commission_notes: string | null;
+  agent_commission_paid: boolean;
   product: Pick<AdminProduct, "id" | "name" | "unit_label" | "default_price"> | null;
 };
 
@@ -258,35 +271,20 @@ export type AdminDashboardData = {
   pages: AdminPage[];
   pageSections: AdminPageSection[];
   products: AdminProduct[];
-  productPriceRange: AdminProductPriceRange;
-  orderTotalRange: AdminOrderTotalRange;
   agents: AdminAgent[];
   customers: AdminCustomer[];
   orders: AdminOrder[];
   contactInquiries: AdminContactInquiry[];
   resellerApplications: AdminResellerApplication[];
-  summary: {
-    submittedOrders: number;
-    openInquiries: number;
-    customers: number;
-    activeProducts: number;
-    newResellerApplications: number;
-  };
+  summary: AdminDashboardSummary;
 };
 
-export type AdminProductPriceRange = {
-  min: number;
-  max: number;
-};
-
-export type AdminOrderTotalRange = {
-  min: number;
-  max: number;
-};
-
-export type AdminInvoiceTotalRange = {
-  min: number;
-  max: number;
+export type AdminDashboardSummary = {
+  orders: number;
+  inquiries: number;
+  customers: number;
+  products: number;
+  resellerApplications: number;
 };
 
 export type AdminDashboardDataOptions = {
@@ -299,12 +297,12 @@ export type AdminDashboardDataOptions = {
 
 export type AdminProductManagementData = Pick<
   AdminDashboardData,
-  "products" | "productPriceRange"
+  "products"
 >;
 
 export type AdminOrderManagementData = Pick<
   AdminDashboardData,
-  "agents" | "customers" | "orders" | "orderTotalRange" | "products"
+  "agents" | "customers" | "orders" | "products"
 >;
 
 export type AdminCustomerManagementData = Pick<
@@ -317,10 +315,7 @@ export type AdminAgentManagementData = Pick<
   "agents"
 >;
 
-export type AdminInvoiceManagementData = {
-  orders: AdminOrder[];
-  invoiceTotalRange: AdminInvoiceTotalRange;
-};
+export type AdminInvoiceManagementData = Pick<AdminDashboardData, "orders">;
 
 export type AdminInquiryManagementData = Pick<
   AdminDashboardData,
@@ -343,8 +338,6 @@ export async function loadAdminDashboardData(
     pages,
     pageSections,
     products,
-    productPriceRange,
-    orderTotalRange,
     agents,
     customers,
     orders,
@@ -354,8 +347,6 @@ export async function loadAdminDashboardData(
     loadPages(supabase),
     loadPageSections(supabase),
     loadProducts(supabase, options.productFilters),
-    loadProductPriceRange(supabase),
-    loadOrderTotalRange(supabase),
     loadAgents(supabase),
     loadCustomers(supabase),
     loadOrders(supabase, options.orderLimit ?? 50, options.orderFilters),
@@ -367,32 +358,46 @@ export async function loadAdminDashboardData(
     pages,
     pageSections,
     products,
-    productPriceRange,
-    orderTotalRange,
     agents,
     customers,
     orders,
     contactInquiries,
     resellerApplications,
-    summary: {
-      submittedOrders: orders.filter((order) => order.order_status === "pending").length,
-      openInquiries: contactInquiries.filter((inquiry) => inquiry.inquiry_status !== "closed").length,
-      customers: customers.length,
-      activeProducts: products.filter((product) => product.is_active).length,
-      newResellerApplications: resellerApplications.filter(
-        (application) => application.application_status === "submitted",
-      ).length,
-    },
+    summary: buildAdminDashboardSummary({
+      orders,
+      customers,
+      products,
+      contactInquiries,
+      resellerApplications,
+    }),
   };
+}
+
+export async function loadAdminDashboardSummaryData(): Promise<AdminDashboardSummary> {
+  const supabase = createSupabaseAdminClient();
+  const [orders, customers, products, contactInquiries, resellerApplications] = await Promise.all([
+    loadDashboardSummaryOrders(supabase),
+    loadDashboardSummaryCustomers(supabase),
+    loadDashboardSummaryProducts(supabase),
+    loadDashboardSummaryContactInquiries(supabase),
+    loadDashboardSummaryResellerApplications(supabase),
+  ]);
+
+  return buildAdminDashboardSummary({
+    orders,
+    customers,
+    products,
+    contactInquiries,
+    resellerApplications,
+  });
 }
 
 export async function loadAdminOrderManagementData(
   orderFilters: AdminOrderFilters = {},
 ): Promise<AdminOrderManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [products, orderTotalRange, agents, customers, orders] = await Promise.all([
+  const [products, agents, customers, orders] = await Promise.all([
     loadProducts(supabase),
-    loadOrderTotalRange(supabase),
     loadAgents(supabase),
     loadCustomers(supabase),
     loadOrders(supabase, 50, orderFilters),
@@ -400,7 +405,6 @@ export async function loadAdminOrderManagementData(
 
   return {
     products,
-    orderTotalRange,
     agents,
     customers,
     orders,
@@ -413,14 +417,10 @@ export async function loadAdminProductManagementData(
   // Product filtering is used by the products fragment endpoint. Keep the query
   // server-side without loading the rest of the dashboard page payload.
   const supabase = createSupabaseAdminClient();
-  const [products, productPriceRange] = await Promise.all([
-    loadProducts(supabase, productFilters),
-    loadProductPriceRange(supabase),
-  ]);
+  const products = await loadProducts(supabase, productFilters);
 
   return {
     products,
-    productPriceRange,
   };
 }
 
@@ -428,14 +428,10 @@ export async function loadAdminInvoiceManagementData(
   invoiceFilters: AdminInvoiceFilters = {},
 ): Promise<AdminInvoiceManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [orders, invoiceTotalRange] = await Promise.all([
-    loadInvoices(supabase, 50, invoiceFilters),
-    loadInvoiceTotalRange(supabase),
-  ]);
+  const orders = await loadInvoices(supabase, 50, invoiceFilters);
 
   return {
     orders,
-    invoiceTotalRange,
   };
 }
 
@@ -492,9 +488,14 @@ export async function loadAdminOrder(orderId: string): Promise<AdminOrder | null
     .eq("id", orderId)
     .maybeSingle();
 
-  if (error) throw new Error("Unable to load admin order.");
+  if (error) throwLoadError("Unable to load admin order.");
 
-  return data ? normalizeAdminOrder(data) : null;
+  if (!data) {
+    return null;
+  }
+
+  const [order] = await enrichOrdersWithAgentEmails(supabase, [normalizeAdminOrder(data)]);
+  return order ?? null;
 }
 
 async function loadPages(supabase: SupabaseAdminClient) {
@@ -503,7 +504,7 @@ async function loadPages(supabase: SupabaseAdminClient) {
     .select("id, slug, title, status, published_at, created_at, updated_at")
     .order("slug", { ascending: true });
 
-  if (error) throw new Error("Unable to load admin pages.");
+  if (error) throwLoadError("Unable to load admin pages.");
 
   return (data ?? []) as AdminPage[];
 }
@@ -514,35 +515,9 @@ async function loadPageSections(supabase: SupabaseAdminClient) {
     .select("id, page_id, type, sort_order, content, status, created_at, updated_at")
     .order("sort_order", { ascending: true });
 
-  if (error) throw new Error("Unable to load admin page sections.");
+  if (error) throwLoadError("Unable to load admin page sections.");
 
   return (data ?? []) as AdminPageSection[];
-}
-
-async function loadProductPriceRange(
-  supabase: SupabaseAdminClient,
-): Promise<AdminProductPriceRange> {
-  const { data, error } = await supabase
-    .from("product")
-    .select("default_price");
-
-  if (error) throw new Error("Unable to load admin product price range.");
-
-  const prices = (data ?? [])
-    .map((product) => Number((product as { default_price?: unknown }).default_price))
-    .filter((price) => Number.isFinite(price) && price >= 0);
-
-  if (prices.length === 0) {
-    return {
-      min: 0,
-      max: 0,
-    };
-  }
-
-  return {
-    min: Math.min(...prices),
-    max: Math.max(...prices),
-  };
 }
 
 async function loadProducts(
@@ -568,19 +543,11 @@ async function loadProducts(
     query = query.eq("stock_status", filters.stockStatus);
   }
 
-  if (typeof filters.minPrice === "number") {
-    query = query.gte("default_price", filters.minPrice);
-  }
-
-  if (typeof filters.maxPrice === "number") {
-    query = query.lte("default_price", filters.maxPrice);
-  }
-
   const { data, error } = await query
     .order("is_active", { ascending: false })
     .order("name", { ascending: true });
 
-  if (error) throw new Error("Unable to load admin products.");
+  if (error) throwLoadError("Unable to load admin products.");
 
   return (data ?? []) as AdminProduct[];
 }
@@ -595,12 +562,24 @@ async function loadAgents(
 ) {
   const { data, error } = await supabase
     .from("agent_profile")
-    .select("id, user_id, display_name, status, email, contact, created_at, updated_at")
+    .select("id, user_id, display_name, contact, status, created_at, updated_at")
     .order("display_name", { ascending: true });
 
-  if (error) throw new Error("Unable to load admin agents.");
+  if (error) throwLoadError("Unable to load admin agents.");
 
-  const agents = (data ?? []) as AdminAgent[];
+  const baseAgents = (data ?? []) as Array<
+    Omit<AdminAgent, "email"> & { email?: never }
+  >;
+  const emailByUserId = await loadAuthEmailsByUserId(
+    supabase,
+    baseAgents.map((agent) => agent.user_id),
+  );
+
+  const agents = baseAgents.map((agent) => ({
+    ...agent,
+    email: emailByUserId.get(agent.user_id) ?? null,
+    contact: agent.contact ?? null,
+  })) as AdminAgent[];
 
   if (!filters.search && !filters.status) {
     return agents;
@@ -620,7 +599,7 @@ async function loadCustomers(
     )
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error("Unable to load admin customers.");
+  if (error) throwLoadError("Unable to load admin customers.");
 
   const customers = (data ?? []) as AdminCustomer[];
 
@@ -635,7 +614,7 @@ async function loadCustomers(
       .from("agent_profile")
       .select("id, display_name");
 
-    if (agentError) throw new Error("Unable to load admin customers.");
+    if (agentError) throwLoadError("Unable to load admin customers.");
 
     (agentData ?? []).forEach((agent) => {
       const normalizedAgent = agent as { id?: unknown; display_name?: unknown };
@@ -650,62 +629,6 @@ async function loadCustomers(
   }
 
   return filterAdminCustomers(customers, filters, agentNamesById);
-}
-
-async function loadOrderTotalRange(
-  supabase: SupabaseAdminClient,
-): Promise<AdminOrderTotalRange> {
-  const { data, error } = await supabase
-    .from("customer_order")
-    .select(adminOrderSelect);
-
-  if (error) throw new Error("Unable to load admin order total range.");
-
-  const totals = ((data ?? []) as unknown[])
-    .map(normalizeAdminOrder)
-    .map(getAdminOrderDisplayTotal)
-    .filter((total) => Number.isFinite(total) && total >= 0);
-
-  if (totals.length === 0) {
-    return {
-      min: 0,
-      max: 0,
-    };
-  }
-
-  return {
-    min: Math.min(...totals),
-    max: Math.max(...totals),
-  };
-}
-
-async function loadInvoiceTotalRange(
-  supabase: SupabaseAdminClient,
-): Promise<AdminInvoiceTotalRange> {
-  const { data, error } = await supabase
-    .from("customer_order")
-    .select(adminOrderSelect)
-    .order("created_at", { ascending: false });
-
-  if (error) throw new Error("Unable to load admin invoice total range.");
-
-  const totals = ((data ?? []) as unknown[])
-    .map(normalizeAdminOrder)
-    .filter(hasInvoice)
-    .map(getAdminInvoiceDisplayTotal)
-    .filter((total) => Number.isFinite(total) && total >= 0);
-
-  if (totals.length === 0) {
-    return {
-      min: 0,
-      max: 0,
-    };
-  }
-
-  return {
-    min: Math.min(...totals),
-    max: Math.max(...totals),
-  };
 }
 
 async function loadOrders(
@@ -738,9 +661,12 @@ async function loadOrders(
 
   const { data, error } = await orderedQuery;
 
-  if (error) throw new Error("Unable to load admin orders.");
+  if (error) throwLoadError("Unable to load admin orders.");
 
-  const orders = ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+  const orders = await enrichOrdersWithAgentEmails(
+    supabase,
+    ((data ?? []) as unknown[]).map(normalizeAdminOrder),
+  );
   const filteredOrders = shouldPostFilter
     ? filterAdminOrders(orders, filters)
     : orders;
@@ -763,23 +689,16 @@ function normalizeAdminOrder(order: unknown): AdminOrder {
 }
 
 function hasComputedOrderFilters(filters: AdminOrderFilters) {
-  return Boolean(
-    filters.search ||
-      typeof filters.minTotal === "number" ||
-      typeof filters.maxTotal === "number",
-  );
+  return Boolean(filters.search);
 }
 
 function filterAdminOrders(orders: AdminOrder[], filters: AdminOrderFilters) {
   const search = filters.search?.toLowerCase();
 
   return orders.filter((order) => {
-    const total = getAdminOrderDisplayTotal(order);
     const matchesSearch = !search || getAdminOrderSearchText(order).includes(search);
-    const matchesMinTotal = typeof filters.minTotal !== "number" || total >= filters.minTotal;
-    const matchesMaxTotal = typeof filters.maxTotal !== "number" || total <= filters.maxTotal;
 
-    return matchesSearch && matchesMinTotal && matchesMaxTotal;
+    return matchesSearch;
   });
 }
 
@@ -793,9 +712,12 @@ async function loadInvoices(
     .select(adminOrderSelect)
     .order("created_at", { ascending: false });
 
-  if (error) throw new Error("Unable to load admin invoices.");
+  if (error) throwLoadError("Unable to load admin invoices.");
 
-  const orders = ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+  const orders = await enrichOrdersWithAgentEmails(
+    supabase,
+    ((data ?? []) as unknown[]).map(normalizeAdminOrder),
+  );
 
   return filterAdminInvoices(orders, filters).slice(0, limit);
 }
@@ -826,14 +748,11 @@ function filterAdminInvoices(orders: AdminOrder[], filters: AdminInvoiceFilters)
       return false;
     }
 
-    const total = getAdminInvoiceDisplayTotal(order);
     const matchesSearch = !search || getAdminInvoiceSearchText(order).includes(search);
     const matchesBalanceStatus =
       !filters.balanceStatus || order.payment_status === filters.balanceStatus;
-    const matchesMinTotal = typeof filters.minTotal !== "number" || total >= filters.minTotal;
-    const matchesMaxTotal = typeof filters.maxTotal !== "number" || total <= filters.maxTotal;
 
-    return matchesSearch && matchesBalanceStatus && matchesMinTotal && matchesMaxTotal;
+    return matchesSearch && matchesBalanceStatus;
   });
 }
 
@@ -862,25 +781,10 @@ function filterAdminCustomers(
   });
 }
 
-function getAdminOrderDisplayTotal(order: AdminOrder) {
-  const quantityKey = order.invoice.length > 0 ? "final_quantity" : "partial_quantity";
-
-  return order.customer_order_item.reduce((total, item) => {
-    return total + item[quantityKey] * item.unit_price;
-  }, 0);
-}
-
-function getAdminInvoiceDisplayTotal(order: AdminOrder) {
-  return order.customer_order_item.reduce((total, item) => {
-    return total + item.final_quantity * item.unit_price;
-  }, 0);
-}
-
 function getAdminOrderSearchText(order: AdminOrder) {
   const customer = order.customer;
   const agent = order.agent;
   const values = [
-    order.id,
     order.source,
     order.order_status,
     order.payment_status,
@@ -939,6 +843,102 @@ function normalizeRelationArray<T>(value: T[] | T | null | undefined): T[] {
   return value ? [value] : [];
 }
 
+async function enrichOrdersWithAgentEmails(
+  supabase: SupabaseAdminClient,
+  orders: AdminOrder[],
+): Promise<AdminOrder[]> {
+  const agentUserIds = orders
+    .flatMap((order) => [order.agent, order.customer?.assigned_agent ?? null])
+    .filter((agent): agent is NonNullable<AdminOrder["agent"]> & { user_id?: string } => Boolean(agent))
+    .map((agent) => agent.user_id)
+    .filter((userId): userId is string => typeof userId === "string" && userId.length > 0);
+
+  if (agentUserIds.length === 0) {
+    return orders.map((order) => ({
+      ...order,
+      agent: order.agent
+        ? {
+            id: order.agent.id,
+            display_name: order.agent.display_name,
+            email: order.agent.email ?? null,
+            contact: order.agent.contact ?? null,
+          }
+        : null,
+      customer: order.customer
+        ? {
+            ...order.customer,
+            assigned_agent: order.customer.assigned_agent
+              ? {
+                  id: order.customer.assigned_agent.id,
+                  display_name: order.customer.assigned_agent.display_name,
+                  email: order.customer.assigned_agent.email ?? null,
+                  contact: order.customer.assigned_agent.contact ?? null,
+                }
+              : null,
+          }
+        : null,
+    }));
+  }
+
+  const emailByUserId = await loadAuthEmailsByUserId(supabase, agentUserIds);
+
+  return orders.map((order) => ({
+    ...order,
+    agent: order.agent
+      ? {
+          id: order.agent.id,
+          display_name: order.agent.display_name,
+          email: emailByUserId.get((order.agent as { user_id?: string }).user_id ?? "") ?? null,
+          contact: order.agent.contact ?? null,
+        }
+      : null,
+    customer: order.customer
+      ? {
+          ...order.customer,
+          assigned_agent: order.customer.assigned_agent
+            ? {
+                id: order.customer.assigned_agent.id,
+                display_name: order.customer.assigned_agent.display_name,
+                email: emailByUserId.get(
+                  (order.customer.assigned_agent as { user_id?: string }).user_id ?? "",
+                ) ?? null,
+                contact: order.customer.assigned_agent.contact ?? null,
+              }
+            : null,
+        }
+      : null,
+  }));
+}
+
+async function loadAuthEmailsByUserId(
+  supabase: SupabaseAdminClient,
+  userIds: string[],
+): Promise<Map<string, string | null>> {
+  const uniqueUserIds = [...new Set(userIds)];
+  const emailByUserId = new Map<string, string | null>();
+
+  if (uniqueUserIds.length === 0) {
+    return emailByUserId;
+  }
+
+  const { data, error } = await supabase.auth.admin.listUsers({
+    page: 1,
+    perPage: Math.max(uniqueUserIds.length, 1),
+  });
+
+  if (error) {
+    throwLoadError("Unable to load admin agents.");
+  }
+
+  (data?.users ?? []).forEach((user) => {
+    if (typeof user.id === "string" && uniqueUserIds.includes(user.id)) {
+      emailByUserId.set(user.id, user.email ?? null);
+    }
+  });
+
+  return emailByUserId;
+}
+
 async function loadContactInquiries(
   supabase: SupabaseAdminClient,
   limit: number,
@@ -952,7 +952,7 @@ async function loadContactInquiries(
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) throw new Error("Unable to load admin contact inquiries.");
+  if (error) throwLoadError("Unable to load admin contact inquiries.");
 
   const inquiries = (data ?? []) as AdminContactInquiry[];
 
@@ -990,7 +990,7 @@ async function loadResellerApplications(
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (error) throw new Error("Unable to load admin reseller applications.");
+  if (error) throwLoadError("Unable to load admin reseller applications.");
 
   const applications = (data ?? []) as AdminResellerApplication[];
 
@@ -1013,4 +1013,86 @@ async function loadResellerApplications(
 
     return matchesSearch && matchesStatus;
   });
+}
+
+function buildAdminDashboardSummary({
+  orders,
+  customers,
+  products,
+  contactInquiries,
+  resellerApplications,
+}: Pick<
+  AdminDashboardData,
+  "orders" | "customers" | "products" | "contactInquiries" | "resellerApplications"
+>): AdminDashboardSummary {
+  return {
+    orders: orders.length,
+    inquiries: contactInquiries.length,
+    customers: customers.length,
+    products: products.length,
+    resellerApplications: resellerApplications.length,
+  };
+}
+
+async function loadDashboardSummaryOrders(
+  supabase: SupabaseAdminClient,
+): Promise<AdminOrder[]> {
+  const { data, error } = await supabase
+    .from("customer_order")
+    .select("id, customer_order_item(id), invoice(id)")
+    .order("created_at", { ascending: false });
+
+  if (error) throwLoadError("Unable to load admin orders.");
+
+  return ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+}
+
+async function loadDashboardSummaryCustomers(
+  supabase: SupabaseAdminClient,
+): Promise<AdminCustomer[]> {
+  const { data, error } = await supabase
+    .from("customer")
+    .select("id");
+
+  if (error) throwLoadError("Unable to load admin customers.");
+
+  return (data ?? []) as AdminCustomer[];
+}
+
+async function loadDashboardSummaryProducts(
+  supabase: SupabaseAdminClient,
+): Promise<AdminProduct[]> {
+  const { data, error } = await supabase
+    .from("product")
+    .select("id");
+
+  if (error) throwLoadError("Unable to load admin products.");
+
+  return (data ?? []) as AdminProduct[];
+}
+
+async function loadDashboardSummaryContactInquiries(
+  supabase: SupabaseAdminClient,
+): Promise<AdminContactInquiry[]> {
+  const { data, error } = await supabase
+    .from("contact_inquiry")
+    .select("id")
+    .order("created_at", { ascending: false });
+
+  if (error) throwLoadError("Unable to load admin contact inquiries.");
+
+  return (data ?? []) as AdminContactInquiry[];
+}
+
+async function loadDashboardSummaryResellerApplications(
+  supabase: SupabaseAdminClient,
+): Promise<AdminResellerApplication[]> {
+  const { data, error } = await supabase
+    .from("reseller_application")
+    .select("id")
+    .order("created_at", { ascending: false });
+
+  if (error) throwLoadError("Unable to load admin reseller applications.");
+
+  return (data ?? []) as AdminResellerApplication[];
 }

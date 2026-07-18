@@ -1,0 +1,32 @@
+---
+import AdminContentPageLayout from "@/components/admin/AdminContentPageLayout.astro";
+import AdminContentPreviewFrame from "@/components/admin/AdminContentPreviewFrame.astro";
+import PageShell from "@/components/PageShell.astro";
+import PublicOurStoryPageContent from "@/components/public-website/PublicOurStoryPageContent.astro";
+import { loadAdminContentPreviewPage } from "@/lib/admin-dashboard/content-preview-page";
+import { getPublicPageContent } from "@/lib/public-website/content";
+
+export const prerender = false;
+
+const preview = await loadAdminContentPreviewPage(Astro);
+
+if (!preview.ready) {
+  return preview.response;
+}
+
+const content = await getPublicPageContent(Astro, "our-story");
+const title = content.page?.title ?? "Our Story";
+---
+
+<AdminContentPageLayout
+  title={`${title} Preview - JEHMARP`}
+  description="Admin our story page preview."
+  feedback={preview.feedback}
+  dashboardData={preview.dashboardData}
+>
+  <AdminContentPreviewFrame activePath="/our-story">
+    <PageShell title={title}>
+      <PublicOurStoryPageContent content={content} />
+    </PageShell>
+  </AdminContentPreviewFrame>
+</AdminContentPageLayout>

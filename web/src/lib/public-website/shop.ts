@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { throwLoadError } from "@/lib/load-error";
 
 export const PRODUCT_PUBLIC_COLUMNS = [
   "id",
@@ -113,7 +114,7 @@ export async function listPublicProducts(
     .range(from, to);
 
   if (error) {
-    throw new Error("Unable to load public products");
+    throwLoadError("Unable to load public products");
   }
 
   return {
@@ -147,7 +148,11 @@ export function buildPagination({
   };
 }
 
-export function buildShopUrl(filters: ShopFilters, page: number): string {
+export function buildShopUrl(
+  filters: ShopFilters,
+  page: number,
+  basePath = "/shop",
+): string {
   const params = new URLSearchParams();
 
   if (filters.category) params.set("category", filters.category);
@@ -159,7 +164,7 @@ export function buildShopUrl(filters: ShopFilters, page: number): string {
 
   const query = params.toString();
 
-  return query ? `/shop?${query}` : "/shop";
+  return query ? `${basePath}?${query}` : basePath;
 }
 
 function getSortConfig(sort: ProductSort) {

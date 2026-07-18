@@ -23,6 +23,8 @@ describe("buildSalesInvoicePdf", () => {
         phone_number: "09170000000",
         email: "maria@example.test",
         address: "Cebu",
+        assigned_agent_id: null,
+        assigned_agent: null,
         is_reseller: false,
       },
       agent: null,
@@ -36,8 +38,7 @@ describe("buildSalesInvoicePdf", () => {
           price_type: "retail",
           add_details: "Cut small",
           agent_commission_amount: 0,
-          agent_commission_status: "unset",
-          agent_commission_notes: null,
+          agent_commission_paid: false,
           product: {
             id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
             name: "Pork Belly",
