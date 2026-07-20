@@ -102,7 +102,7 @@ describe("parseGuestOrderFormData", () => {
 });
 
 describe("submitGuestOrder", () => {
-  it("verifies Turnstile, applies Redis rate limits, then submits through the trusted RPC", async () => {
+  it("verifies Turnstile, applies Redis rate limits, records a duplicate guard, then submits through the trusted RPC", async () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
@@ -117,6 +117,10 @@ describe("submitGuestOrder", () => {
     const fetcher = vi.fn((url: string) => {
       if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
         return Promise.resolve(Response.json({ success: true }));
+      }
+
+      if (url.includes("/set/")) {
+        return Promise.resolve(Response.json({ result: "OK" }));
       }
 
       return Promise.resolve(Response.json({ result: 1 }));
@@ -138,8 +142,10 @@ describe("submitGuestOrder", () => {
       }),
     );
     expect(fetcher.mock.calls.filter(([url]) => String(url).includes("/incr/"))).toHaveLength(2);
+    expect(fetcher.mock.calls.filter(([url]) => String(url).includes("/set/"))).toHaveLength(1);
     expect(String(fetcher.mock.calls[1]?.[0])).not.toContain("maria%40example.com");
     expect(String(fetcher.mock.calls[1]?.[0])).not.toContain("203.0.113.10");
+    expect(String(fetcher.mock.calls[5]?.[0])).not.toContain("San%20Pedro");
     expect(rpc).toHaveBeenCalledWith("submit_guest_order", {
       customer_payload: validPayload().customer,
       item_payload: validPayload().items,
@@ -171,6 +177,71 @@ describe("submitGuestOrder", () => {
       }),
     ).rejects.toThrow("Too many guest orders were submitted from this network. Please try again later.");
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("blocks duplicate guest order fingerprints before writing the order", async () => {
+    vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "turnstile_secret");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.upstash.io");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis_token");
+
+    const rpc = vi.fn();
+    const fetcher = vi.fn((url: string) => {
+      if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
+        return Promise.resolve(Response.json({ success: true }));
+      }
+
+      if (url.includes("/set/")) {
+        return Promise.resolve(Response.json({ result: null }));
+      }
+
+      return Promise.resolve(Response.json({ result: 1 }));
+    });
+
+    await expect(
+      submitGuestOrder(validPayload(), {
+        fetch: fetcher as typeof fetch,
+        clientIp: "203.0.113.10",
+        supabase: { rpc } as never,
+      }),
+    ).rejects.toThrow("This guest order looks like a duplicate. Please wait before submitting it again.");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("clears the duplicate guard when the trusted RPC fails", async () => {
+    vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "turnstile_secret");
+    vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.upstash.io");
+    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis_token");
+
+    const rpc = vi.fn(() => Promise.resolve({
+      data: null,
+      error: { message: "database unavailable" },
+    }));
+    const fetcher = vi.fn((url: string) => {
+      if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
+        return Promise.resolve(Response.json({ success: true }));
+      }
+
+      if (url.includes("/set/")) {
+        return Promise.resolve(Response.json({ result: "OK" }));
+      }
+
+      return Promise.resolve(Response.json({ result: 1 }));
+    });
+
+    await expect(
+      submitGuestOrder(validPayload(), {
+        fetch: fetcher as typeof fetch,
+        clientIp: "203.0.113.10",
+        supabase: { rpc } as never,
+      }),
+    ).rejects.toThrow("Unable to submit guest order");
+    expect(fetcher.mock.calls.filter(([url]) => String(url).includes("/del/"))).toHaveLength(1);
   });
 });
 

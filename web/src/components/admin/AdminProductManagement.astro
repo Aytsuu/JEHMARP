@@ -515,7 +515,7 @@ function formatStockStatus(status: string): string {
                             />
                           </label>
                           <div class="button-row">
-                            <button type="submit">Save product</button>
+                            <button type="submit">Save Changes</button>
                           </div>
                         </form>
                       </div>
@@ -620,7 +620,7 @@ function formatStockStatus(status: string): string {
                             </>
                           </label>
                           <div class="button-row">
-                            <button type="submit">Save description</button>
+                            <button type="submit">Save Changes</button>
                           </div>
                         </form>
                       </div>
@@ -721,6 +721,81 @@ function formatStockStatus(status: string): string {
                               </span>
                             </>
                           </label>
+
+                          <input
+                            type="hidden"
+                            name="agentCommissionType"
+                            value={product.agent_commission_type}
+                          />
+                          <input
+                            type="hidden"
+                            name="agentCommissionValue"
+                            value={product.agent_commission_value}
+                          />
+                          <input
+                            type="hidden"
+                            name="name"
+                            value={product.name}
+                          />
+                          <input
+                            type="hidden"
+                            name="category"
+                            value={product.category}
+                          />
+                          <input
+                            type="hidden"
+                            name="unitLabel"
+                            value={product.unit_label}
+                          />
+                          <input
+                            type="hidden"
+                            name="stockStatus"
+                            value={product.stock_status}
+                          />
+                          <input
+                            type="hidden"
+                            name="description"
+                            value={product.description ?? ""}
+                          />
+                          {product.is_active && (
+                            <input type="hidden" name="isActive" value="on" />
+                          )}
+
+                          <div class="button-row">
+                            <button type="submit">Save Changes</button>
+                          </div>
+                        </form>
+                      </div>
+                    </td>
+
+                    {/* 4. Commission Cell (Editable Popover) */}
+                    <td>
+                      <button
+                        type="button"
+                        class="table-cell-trigger"
+                        data-open-cell-popover
+                        data-popover-title={`Edit Commission: ${product.name}`}
+                      >
+                        <span title={productAgentCommissionLabel(product)}>
+                          {productAgentCommissionLabel(product)}
+                        </span>
+                      </button>
+                      <div class="hidden-popover-form-holder">
+                        <form
+                          method="post"
+                          enctype="multipart/form-data"
+                          class="admin-table-form"
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="save-product"
+                          />
+                          <input
+                            type="hidden"
+                            name="productId"
+                            value={product.id}
+                          />
                           <label>
                             <>
                               <span>Agent commission type</span>
@@ -792,6 +867,21 @@ function formatStockStatus(status: string): string {
                           />
                           <input
                             type="hidden"
+                            name="defaultPrice"
+                            value={product.default_price}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerDeductionType"
+                            value={product.reseller_deduction_type}
+                          />
+                          <input
+                            type="hidden"
+                            name="resellerDeductionValue"
+                            value={product.reseller_deduction_value}
+                          />
+                          <input
+                            type="hidden"
                             name="stockStatus"
                             value={product.stock_status}
                           />
@@ -805,19 +895,13 @@ function formatStockStatus(status: string): string {
                           )}
 
                           <div class="button-row">
-                            <button type="submit">Save pricing</button>
+                            <button type="submit">Save Changes</button>
                           </div>
                         </form>
                       </div>
                     </td>
 
-                    <td>
-                      <span title={productAgentCommissionLabel(product)}>
-                        {productAgentCommissionLabel(product)}
-                      </span>
-                    </td>
-
-                    {/* 4. Status Cell (Editable Popover) */}
+                    {/* 5. Status Cell (Editable Popover) */}
                     <td>
                       <button
                         type="button"
@@ -911,13 +995,13 @@ function formatStockStatus(status: string): string {
                           />
 
                           <div class="button-row">
-                            <button type="submit">Save status</button>
+                            <button type="submit">Save Changes</button>
                           </div>
                         </form>
                       </div>
                     </td>
 
-                    {/* 5. Date Created Cell (Static) */}
+                    {/* 6. Date Created Cell (Static) */}
                     <td>
                       {new Date(product.created_at).toLocaleDateString(
                         "en-US",

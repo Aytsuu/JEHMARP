@@ -22,13 +22,51 @@ function stringValue(value: unknown): string | undefined {
 const heading = stringValue(section.content.heading) ?? "JEHMARP";
 const summary = stringValue(section.content.summary);
 const supportingText = stringValue(section.content.supportingText);
+const heroSlides = [
+  {
+    src: "/images/hero_carousel_1.jpg",
+    alt: "Fresh meat selection at JEHMARP",
+    width: 2560,
+    height: 1600,
+  },
+  {
+    src: "/images/hero_carousel_2.jpg",
+    alt: "JEHMARP butcher shop display",
+    width: 1280,
+    height: 881,
+  },
+  {
+    src: "/images/hero_carousel_3.jpg",
+    alt: "Premium cuts prepared at JEHMARP",
+    width: 3600,
+    height: 2025,
+  },
+] as const;
 ---
 
 <section class="home-hero" aria-labelledby="home-hero-heading">
   <div class="home-hero__slides">
-    <div class="home-hero__slide home-hero__slide--active" style="background-image: url('/images/hero_carousel_1.jpg');" data-slide-index="0"></div>
-    <div class="home-hero__slide" style="background-image: url('/images/hero_carousel_2.jpg');" data-slide-index="1"></div>
-    <div class="home-hero__slide" style="background-image: url('/images/hero_carousel_3.jpg');" data-slide-index="2"></div>
+    {
+      heroSlides.map((slide, index) => (
+        <div
+          class:list={[
+            "home-hero__slide",
+            index === 0 && "home-hero__slide--active",
+          ]}
+          data-slide-index={index}
+        >
+          <img
+            src={slide.src}
+            alt={slide.alt}
+            class="home-hero__slide-image"
+            width={slide.width}
+            height={slide.height}
+            loading={index === 0 ? "eager" : "lazy"}
+            decoding="async"
+          />
+        </div>
+      ))
+    }
   </div>
   <div class="home-hero__overlay"></div>
   <div class="home-hero__content">

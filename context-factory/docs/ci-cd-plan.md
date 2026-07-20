@@ -151,14 +151,21 @@ Required checks:
 
 Risky migration patterns:
 
+Blocking (fails PR checks without `migration-reviewed`):
+
 - `drop table`
 - `drop column`
 - `truncate`
 - unqualified `delete from`
+
+Review recommended (logged in the workflow summary, does not fail by itself):
+
 - `alter column ... set not null`
-- RLS policy removal
-- grant changes on exposed schemas
+- RLS policy replacement (`drop policy`)
 - `security definer` functions in exposed schemas
+- `grant` changes on exposed schemas
+
+Local replay, SQL tests, and production dry-run still run for every migration change.
 
 ### 5. Production Smoke Tests
 

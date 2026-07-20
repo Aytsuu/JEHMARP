@@ -155,12 +155,14 @@ begin
     order_id,
     amount,
     payment_method,
+    payment_terms,
     reference_number
   )
   values (
     first_order_id,
     200,
-    'cash',
+    'Cash',
+    'Cash on Delivery (COD)',
     'phase-9-first-full-payment'
   );
 
@@ -186,12 +188,14 @@ begin
     order_id,
     amount,
     payment_method,
+    payment_terms,
     reference_number
   )
   values (
     second_order_id,
     100,
-    'cash',
+    'Cash',
+    'Cash on Delivery (COD)',
     'phase-9-second-full-payment'
   );
 

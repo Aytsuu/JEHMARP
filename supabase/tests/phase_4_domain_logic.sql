@@ -220,12 +220,14 @@ begin
     order_id,
     amount,
     payment_method,
+    payment_terms,
     reference_number
   )
   values (
     test_order_id,
     197.50,
-    'cash',
+    'Cash',
+    'Cash on Delivery (COD)',
     'phase-4-payment-1'
   );
 
@@ -279,12 +281,14 @@ begin
     order_id,
     amount,
     payment_method,
+    payment_terms,
     reference_number
   )
   values (
     test_order_id,
     202.50,
-    'cash',
+    'Cash',
+    'Cash on Delivery (COD)',
     'phase-4-payment-2'
   );
 
@@ -461,12 +465,14 @@ begin
     order_id,
     amount,
     payment_method,
+    payment_terms,
     reference_number
   )
   values (
     reseller_order_id,
     25,
-    'cash',
+    'Cash',
+    'Cash on Delivery (COD)',
     'phase-4-cancelled-refund'
   );
 

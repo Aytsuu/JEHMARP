@@ -1,5 +1,5 @@
 ---
-import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import AgentRecordCard from "@/components/agent/AgentRecordCard.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
@@ -55,33 +55,28 @@ const agentOrders = data.orders.filter(
           </div>
         </div>
 
-        <div class="dashboard-interactive-table__surface">
-          <DashboardTableBoard>
-            <table class="dashboard-table">
-              <thead>
-                <tr>
-                  <th scope="col">Order</th>
-                  <th scope="col">Payment Status</th>
-                  <th scope="col">Expected</th>
-                  <th scope="col">Earned</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agentOrders.map((order) => (
-                  <tr data-status={order.payment_status}>
-                    <td>
-                      {fullName(order.customer)}
-                      <br />
-                      {formatDate(order.created_at)}
-                    </td>
-                    <td><StatusBadge kind="payment" status={order.payment_status} /></td>
-                    <td>{formatCurrency(orderExpectedCommission(order))}</td>
-                    <td>{formatCurrency(orderEarnedCommission(order))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </DashboardTableBoard>
+        <div class="agent-record-list" data-interactive-cards>
+          {agentOrders.map((order) => (
+            <AgentRecordCard status={order.payment_status}>
+              <div class="agent-record-card__header">
+                <div class="agent-record-card__title-group">
+                  <h3 class="agent-record-card__title">{fullName(order.customer)}</h3>
+                  <p class="agent-record-card__subtitle">{formatDate(order.created_at)}</p>
+                </div>
+                <StatusBadge kind="payment" status={order.payment_status} />
+              </div>
+              <dl class="agent-record-card__meta agent-record-card__meta--inline">
+                <div class="agent-record-card__meta-item">
+                  <dt>Expected</dt>
+                  <dd>{formatCurrency(orderExpectedCommission(order))}</dd>
+                </div>
+                <div class="agent-record-card__meta-item">
+                  <dt>Earned</dt>
+                  <dd>{formatCurrency(orderEarnedCommission(order))}</dd>
+                </div>
+              </dl>
+            </AgentRecordCard>
+          ))}
         </div>
 
         <DashboardTablePagination />

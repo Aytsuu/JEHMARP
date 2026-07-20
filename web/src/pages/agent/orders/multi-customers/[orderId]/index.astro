@@ -1,0 +1,1012 @@
+﻿---
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
+import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import ViewButton from "@/components/ViewButton.astro";
+import {
+  formatAgentActionFeedback,
+  handleAgentDashboardAction,
+} from "@/lib/agent-dashboard/actions";
+import {
+  loadAgentDashboardData,
+  type AgentOrder,
+} from "@/lib/agent-dashboard/data";
+import { requireAgentRoute } from "@/lib/agent-dashboard/page";
+import {
+  agentOrderPaymentStatus,
+  agentOrderTotal,
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderPaymentTotal,
+  orderTotal,
+} from "@/lib/agent-dashboard/view";
+import {
+  buildAttachCustomerProductOptions,
+  canAttachCustomerToAgentOrder,
+  formatPendingIndicator,
+  getAgentOrderProductDistribution,
+  sumPendingCustomerOrderAmount,
+} from "@/lib/agent-order-distribution";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+
+export const prerender = false;
+
+function formatAmountValue(value: number) {
+  return new Intl.NumberFormat("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function pendingAgentPaymentTotal(order: AgentOrder) {
+  return (order.agent_received_payment ?? []).reduce((sum, payment) => {
+    return payment.status === "pending_admin_confirmation"
+      ? sum + payment.amount
+      : sum;
+  }, 0);
+}
+
+const agentRoute = await requireAgentRoute(Astro);
+
+if (!agentRoute.ready) {
+  return agentRoute.response;
+}
+
+const { orderId } = Astro.params;
+
+if (!orderId) {
+  return Astro.redirect("/agent/orders", 302);
+}
+
+if (Astro.request.method === "POST") {
+  return handleAgentDashboardAction(
+    Astro,
+    agentRoute.userId,
+    `/agent/orders/multi-customers/${orderId}`,
+  );
+}
+
+const data = await loadAgentDashboardData(Astro, agentRoute.userId);
+const agentOrder = data.agentOrders.find((order) => order.id === orderId);
+
+if (!agentOrder) {
+  return Astro.redirect("/agent/orders", 302);
+}
+
+const feedback = formatAgentActionFeedback(Astro.url);
+const agentOrderPaymentState = agentOrderPaymentStatus(agentOrder);
+const canAttachCustomer = canAttachCustomerToAgentOrder(agentOrder);
+const totalAmount = agentOrderTotal(agentOrder);
+const pendingCustomerOrderAmount = sumPendingCustomerOrderAmount(agentOrder);
+const attachCustomerProducts = buildAttachCustomerProductOptions({
+  agentOrder,
+  products: data.products,
+});
+const attachCustomerCustomers = data.customers.map((customer) => ({
+  id: customer.id,
+  label: fullName(customer),
+  firstName: customer.first_name,
+  lastName: customer.last_name,
+  phoneNumber: customer.phone_number,
+  email: customer.email ?? "",
+  address: customer.address,
+}));
+const totalPaid = agentOrder.customer_order.reduce(
+  (sum, order) => sum + orderPaymentTotal(order),
+  0,
+);
+const totalPendingAgentReceived = agentOrder.customer_order.reduce(
+  (sum, order) => sum + pendingAgentPaymentTotal(order),
+  0,
+);
+const totalCommission = agentOrder.agent_order_item.reduce(
+  (sum, item) => sum + item.agent_commission_amount,
+  0,
+);
+const agentOrderCode = `Order-${agentOrder.id.slice(0, 6).toUpperCase()}`;
+const todayDate = new Date().toISOString().slice(0, 10);
+const productCount = agentOrder.agent_order_item.length;
+const customerCount = agentOrder.customer_order.length;
+---
+
+<AgentRecordPageLayout
+  title={`${agentOrderCode} - JEHMARP`}
+  description="Agent order cluster details."
+  heading={agentOrderCode}
+  backUrl="/agent/orders"
+  backLabel="Back to orders"
+  feedback={feedback}
+  dashboardData={data}
+>
+  <ul slot="heading-meta" class="record-meta" aria-label="Agent order date">
+    <li class="record-meta__item">
+      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </svg>
+      <span class="record-meta__text">{formatDate(agentOrder.created_at)}</span>
+    </li>
+  </ul>
+
+  <div slot="heading-aside" class="record-heading-badges">
+    <StatusBadge
+      kind="order"
+      status={agentOrder.order_status}
+      label={autoCapitalize(agentOrder.order_status)}
+    />
+    <StatusBadge
+      kind="payment"
+      status={agentOrderPaymentState}
+      label={autoCapitalize(agentOrderPaymentState)}
+    />
+  </div>
+
+  <div
+    class="agent-record-content flex max-w-full flex-col gap-4 md:gap-8"
+    data-agent-order-detail
+  >
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4">
+      <div class="detail-field">
+        <div class="detail-field-value detail-field-value--amount">
+          <span class="amount-ratio">
+            <span class="amount-ratio__paid">{formatCurrency(totalPaid)}</span>
+            <span class="amount-ratio__total"
+              >/{formatAmountValue(totalAmount)}</span
+            >
+            {
+              pendingCustomerOrderAmount > 0 && (
+                <span class="pending-indicator">
+                  {formatPendingIndicator(pendingCustomerOrderAmount, formatCurrency)}
+                </span>
+              )
+            }
+          </span>
+        </div>
+        <span class="detail-field-label">Total amount</span>
+      </div>
+
+      <div class="detail-field">
+        <div class="detail-field-value">{formatCurrency(totalCommission)}</div>
+        <span class="detail-field-label">Total commission</span>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-4" data-order-detail-tabs>
+      <div
+        class="agent-order-tabs flex border-b border-gray-200 md:hidden"
+        role="tablist"
+        aria-label="Agent order sections"
+      >
+        <button
+          type="button"
+          class="agent-order-tab is-active"
+          data-order-detail-tab-trigger
+          data-tab-target="products"
+          role="tab"
+          aria-selected="true"
+        >
+          Products ({productCount})
+        </button>
+        <button
+          type="button"
+          class="agent-order-tab"
+          data-order-detail-tab-trigger
+          data-tab-target="customers"
+          role="tab"
+          aria-selected="false"
+        >
+          Customers ({customerCount})
+        </button>
+      </div>
+
+      <div class="agent-order-tab-panels flex flex-col gap-8">
+        <section
+          class="record-section agent-order-tab-panel is-active"
+          data-order-detail-tab-panel="products"
+          aria-label={`Products (${productCount})`}
+        >
+          {
+            productCount === 0 ? (
+              <p class="empty-state">
+                No products have been added to this agent order yet.
+              </p>
+            ) : (
+              <>
+                <div class="grid gap-3 md:hidden">
+                  {agentOrder.agent_order_item.map((item) => {
+                    const unitPrice = item.product?.default_price ?? 0;
+                    const distribution = getAgentOrderProductDistribution(
+                      agentOrder,
+                      item.product_id,
+                    );
+
+                    return (
+                      <article class="agent-order-detail-card rounded-xl border border-gray-200 bg-white p-4">
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <h3 class="text-[0.95rem] font-bold text-gray-900">
+                              {item.product?.name ?? "Missing product"}
+                            </h3>
+                            <p class="mt-0.5 text-[0.82rem] text-gray-500">
+                              {formatCurrency(unitPrice)} /{" "}
+                              {item.product?.unit_label ?? "unit"}
+                            </p>
+                          </div>
+                          <strong class="shrink-0 text-[0.95rem] font-bold text-gray-900">
+                            {formatCurrency(item.quantity * unitPrice)}
+                          </strong>
+                        </div>
+                        <dl class="mt-3 grid grid-cols-1 gap-2.5">
+                          <div>
+                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                              Quantity
+                            </dt>
+                            <dd class="text-[0.9rem] font-semibold text-gray-900">
+                              {item.quantity} {item.product?.unit_label ?? ""}
+                              {
+                                distribution.pendingQuantityIncrease > 0 && (
+                                  <span class="pending-indicator">
+                                    {formatPendingIndicator(
+                                      distribution.pendingQuantityIncrease,
+                                      (value) => `${value} ${item.product?.unit_label ?? ""}`,
+                                    )}
+                                  </span>
+                                )
+                              }
+                            </dd>
+                          </div>
+                          <div>
+                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                              Details
+                            </dt>
+                            <dd class="text-[0.9rem] font-semibold text-gray-900">
+                              {item.add_details ?? "N/A"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                              Commission
+                            </dt>
+                            <dd class="text-[0.9rem] font-semibold text-gray-900">
+                              {formatCurrency(item.agent_commission_amount)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                              Distribution
+                            </dt>
+                            <dd class="text-[0.9rem] font-semibold text-gray-900">
+                              {distribution.remainingQuantity > 0
+                                ? `${distribution.remainingQuantity} ${item.product?.unit_label ?? "unit"} remaining`
+                                : "Fully distributed"}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <div class="order-record-table-wrap hidden md:block">
+                  <table class="agent-customers-table agent-order-products-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Product</th>
+                        <th scope="col">Quantity</th>
+                        <th scope="col">Details</th>
+                        <th scope="col">Total</th>
+                        <th scope="col">Commission</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agentOrder.agent_order_item.map((item) => {
+                        const unitPrice = item.product?.default_price ?? 0;
+                        const distribution = getAgentOrderProductDistribution(
+                          agentOrder,
+                          item.product_id,
+                        );
+
+                        return (
+                          <tr>
+                            <td>
+                              {item.product?.name ?? "Missing product"}
+                              <span class="agent-order-products-table__meta">
+                                {formatCurrency(unitPrice)} /{" "}
+                                {item.product?.unit_label ?? "unit"}
+                              </span>
+                            </td>
+                            <td>
+                              <span>
+                                {item.quantity} {item.product?.unit_label ?? ""}
+                              </span>
+                              {
+                                distribution.pendingQuantityIncrease > 0 && (
+                                  <span class="pending-indicator">
+                                    {formatPendingIndicator(
+                                      distribution.pendingQuantityIncrease,
+                                      (value) => `${value} ${item.product?.unit_label ?? ""}`,
+                                    )}
+                                  </span>
+                                )
+                              }
+                              <span class="agent-order-products-table__meta">
+                                {distribution.remainingQuantity > 0
+                                  ? `${distribution.remainingQuantity} ${item.product?.unit_label ?? "unit"} remaining`
+                                  : "Fully distributed"}
+                              </span>
+                            </td>
+                            <td>{item.add_details ?? "N/A"}</td>
+                            <td>{formatCurrency(item.quantity * unitPrice)}</td>
+                            <td>{formatCurrency(item.agent_commission_amount)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )
+          }
+        </section>
+
+        <section
+          class="record-section agent-order-tab-panel"
+          data-order-detail-tab-panel="customers"
+          aria-label={`Customers (${customerCount})`}
+          hidden
+        >
+          <div class="customer-orders-table-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div class="customer-orders-table-toolbar__summary hidden md:flex">
+              <span>Pending admin confirmation</span>
+              <strong>{formatCurrency(totalPendingAgentReceived)}</strong>
+            </div>
+            <div class="customer-orders-table-toolbar__actions flex w-full md:w-auto">
+              <button
+                type="button"
+                class="btn-table-manage customer-orders-table-toolbar__add-customer inline-flex items-center justify-center gap-2"
+                data-open-create-sheet
+                data-sheet-target="#agent-order-attach-customer-sheet"
+                disabled={!canAttachCustomer}
+                title={canAttachCustomer
+                  ? undefined
+                  : "Completed and paid agent orders cannot accept new customers."}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.25"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M12 5v14"></path>
+                  <path d="M5 12h14"></path>
+                </svg>
+                <span class="hidden md:inline">Add Customer</span>
+                <span class="sr-only md:hidden">Add Customer</span>
+              </button>
+            </div>
+          </div>
+
+          {
+            customerCount === 0 ? (
+              <p class="empty-state">No customer orders have been attached yet.</p>
+            ) : (
+              <form
+                method="post"
+                class="agent-payment-bulk-form flex flex-col gap-4"
+                data-agent-payment-bulk-form
+              >
+                <input
+                  type="hidden"
+                  name="action"
+                  value="record-agent-payment-distribution"
+                />
+                <div data-selected-payment-order-inputs hidden></div>
+
+                <div class="agent-payment-bulk-panel grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 md:grid-cols-2 lg:grid-cols-4">
+                  <label class="grid gap-1">
+                    <span>Total received</span>
+                    <input
+                      type="number"
+                      name="amount"
+                      min="0.01"
+                      step="0.01"
+                      required
+                    />
+                  </label>
+                  <label class="grid gap-1">
+                    <span>Method</span>
+                    <select
+                      name="paymentMethod"
+                      required
+                    >
+                      <option value="">Select method</option>
+                      <option value="Cash">Cash</option>
+                      <option value="Check">Check</option>
+                    </select>
+                  </label>
+                  <label class="grid gap-1">
+                    <span>Payment Terms</span>
+                    <select name="paymentTerms" required>
+                      <option value="">Select payment terms</option>
+                      <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Gcash">Gcash</option>
+                    </select>
+                  </label>
+                  <label class="grid gap-1">
+                    <span>Date</span>
+                    <input
+                      type="date"
+                      name="paymentDate"
+                      value={todayDate}
+                      required
+                    />
+                  </label>
+                  <label class="grid gap-1">
+                    <span>Reference</span>
+                    <input type="text" name="referenceNumber" />
+                  </label>
+                  <label class="agent-payment-bulk-panel__notes grid gap-1 md:col-span-2">
+                    <span>Notes</span>
+                    <textarea name="notes" rows="2"></textarea>
+                  </label>
+                  <button
+                    type="submit"
+                    class="agent-payment-bulk-panel__submit w-full normal-case md:col-span-2 lg:col-span-1"
+                  >
+                    Record selected payments
+                  </button>
+                </div>
+
+                <div class="grid gap-3 md:hidden">
+                  {agentOrder.customer_order.map((order) => {
+                    const invoice = order.invoice[0];
+                    const orderAmount = orderTotal(
+                      order,
+                      invoice ? "final_quantity" : "partial_quantity",
+                    );
+                    const orderPaid = orderPaymentTotal(order);
+                    const pendingAgentReceived = pendingAgentPaymentTotal(order);
+                    const remainingBalance = Math.max(
+                      orderAmount - orderPaid - pendingAgentReceived,
+                      0,
+                    );
+                    const canRecordPayment = remainingBalance > 0;
+                    const isPendingOrder = order.order_status === "pending";
+                    const customerName = order.customer
+                      ? fullName(order.customer)
+                      : "Guest";
+
+                    return (
+                      <article class="agent-order-detail-card rounded-xl border border-gray-200 bg-white p-4">
+                        <label class="mb-3 inline-flex items-center gap-2 text-[0.82rem] font-semibold text-gray-600">
+                          <input
+                            type="checkbox"
+                            value={order.id}
+                            data-payment-order-checkbox
+                            disabled={!canRecordPayment}
+                            aria-label={`Select ${customerName}`}
+                            class="h-4 w-4 accent-gray-900"
+                          />
+                          <span>Select for payment</span>
+                        </label>
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <h3 class="text-[0.95rem] font-bold text-gray-900">{customerName}</h3>
+                            <p class="mt-0.5 text-[0.82rem] text-gray-500">
+                              {formatDate(order.created_at)} · {formatOrderSource(order.source)}
+                            </p>
+                          </div>
+                          <div class="flex shrink-0 flex-wrap justify-end gap-1">
+                            <StatusBadge
+                              kind="order"
+                              status={order.order_status}
+                              label={autoCapitalize(order.order_status)}
+                            />
+                            <StatusBadge
+                              kind="payment"
+                              status={order.payment_status}
+                              label={autoCapitalize(order.payment_status)}
+                            />
+                          </div>
+                        </div>
+                        <dl class="mt-3 grid grid-cols-1 gap-2.5">
+                          <div>
+                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                              Total amount
+                            </dt>
+                            <dd class="text-[0.9rem] font-semibold text-gray-900">
+                              <span class="amount-ratio">
+                                <span class="amount-ratio__paid">
+                                  {formatCurrency(orderPaid)}
+                                </span>
+                                <span class="amount-ratio__total">
+                                  /{formatAmountValue(orderAmount)}
+                                </span>
+                                {
+                                  isPendingOrder && (
+                                    <span class="pending-indicator">
+                                      {formatPendingIndicator(orderAmount, formatCurrency)}
+                                    </span>
+                                  )
+                                }
+                              </span>
+                            </dd>
+                          </div>
+                          {
+                            pendingAgentReceived > 0 && (
+                              <div>
+                                <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                                  Pending confirmation
+                                </dt>
+                                <dd class="text-[0.9rem] font-semibold text-gray-900">
+                                  {formatCurrency(pendingAgentReceived)}
+                                </dd>
+                              </div>
+                            )
+                          }
+                        </dl>
+                        <div class="mt-3 flex justify-end">
+                          <ViewButton href={`/agent/orders/${order.id}`} />
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <div class="order-record-table-wrap hidden md:block">
+                  <table class="agent-customers-table agent-order-customer-orders-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Select</th>
+                        <th scope="col">Customer</th>
+                        <th scope="col">Date</th>
+                        <th scope="col">Source</th>
+                        <th scope="col">Order Status</th>
+                        <th scope="col">Payment Status</th>
+                        <th scope="col">Total amount</th>
+                        <th scope="col">Agent received</th>
+                        <th scope="col">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agentOrder.customer_order.map((order) => {
+                        const invoice = order.invoice[0];
+                        const orderAmount = orderTotal(
+                          order,
+                          invoice ? "final_quantity" : "partial_quantity",
+                        );
+                        const orderPaid = orderPaymentTotal(order);
+                        const pendingAgentReceived = pendingAgentPaymentTotal(order);
+                        const remainingBalance = Math.max(
+                          orderAmount - orderPaid - pendingAgentReceived,
+                          0,
+                        );
+                        const canRecordPayment = remainingBalance > 0;
+                        const isPendingOrder = order.order_status === "pending";
+
+                        return (
+                          <tr>
+                            <td>
+                              <input
+                                type="checkbox"
+                                value={order.id}
+                                data-payment-order-checkbox
+                                disabled={!canRecordPayment}
+                                aria-label={`Select ${order.customer ? fullName(order.customer) : "guest order"}`}
+                              />
+                            </td>
+                            <td>
+                              {order.customer ? fullName(order.customer) : "Guest"}
+                            </td>
+                            <td>{formatDate(order.created_at)}</td>
+                            <td>{formatOrderSource(order.source)}</td>
+                            <td>
+                              <StatusBadge
+                                kind="order"
+                                status={order.order_status}
+                                label={autoCapitalize(order.order_status)}
+                              />
+                            </td>
+                            <td>
+                              <StatusBadge
+                                kind="payment"
+                                status={order.payment_status}
+                                label={autoCapitalize(order.payment_status)}
+                              />
+                            </td>
+                            <td>
+                              <span class="amount-ratio">
+                                <span class="amount-ratio__paid">
+                                  {formatCurrency(orderPaid)}
+                                </span>
+                                <span class="amount-ratio__total">
+                                  /{formatAmountValue(orderAmount)}
+                                </span>
+                                {
+                                  isPendingOrder && (
+                                    <span class="pending-indicator">
+                                      {formatPendingIndicator(orderAmount, formatCurrency)}
+                                    </span>
+                                  )
+                                }
+                              </span>
+                            </td>
+                            <td>
+                              <span class="agent-received-payment">
+                                <strong>{formatCurrency(pendingAgentReceived)}</strong>
+                                <span>Pending admin confirmation</span>
+                              </span>
+                            </td>
+                            <td>
+                              <ViewButton href={`/agent/orders/${order.id}`} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </form>
+            )
+          }
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <AgentOrderAttachCustomerSheet
+    agentOrderId={agentOrder.id}
+    customers={attachCustomerCustomers}
+    products={attachCustomerProducts}
+    mode="agent"
+    canAttachCustomer={canAttachCustomer}
+  />
+</AgentRecordPageLayout>
+
+<script>
+  function initAgentPaymentBulkForm() {
+    const bulkPaymentForm = document.querySelector<HTMLFormElement>(
+      "[data-agent-payment-bulk-form]",
+    );
+    if (!bulkPaymentForm || bulkPaymentForm.dataset.agentPaymentBulkInitialized === "true") {
+      return;
+    }
+    bulkPaymentForm.dataset.agentPaymentBulkInitialized = "true";
+
+    const selectedOrderInputContainer = bulkPaymentForm.querySelector<HTMLElement>(
+      "[data-selected-payment-order-inputs]",
+    );
+    const selectedOrderIds: string[] = [];
+
+    const syncSelectedOrderInputs = () => {
+      if (!selectedOrderInputContainer) return;
+
+      selectedOrderInputContainer.replaceChildren(
+        ...selectedOrderIds.map((selectedOrderId) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "orderId";
+          input.value = selectedOrderId;
+          return input;
+        }),
+      );
+    };
+
+    bulkPaymentForm.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (!target.matches("[data-payment-order-checkbox]")) return;
+
+      const existingIndex = selectedOrderIds.indexOf(target.value);
+
+      if (target.checked && existingIndex === -1) {
+        selectedOrderIds.push(target.value);
+      }
+
+      if (!target.checked && existingIndex !== -1) {
+        selectedOrderIds.splice(existingIndex, 1);
+      }
+
+      syncSelectedOrderInputs();
+    });
+  }
+
+  initAgentPaymentBulkForm();
+  document.addEventListener("astro:after-swap", initAgentPaymentBulkForm);
+</script>
+
+<style>
+  .record-heading-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+  }
+
+  .detail-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
+    padding: 1rem;
+  }
+
+  .detail-field-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--color-brand-muted-black);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .detail-field-value {
+    font-size: 1.35rem;
+    line-height: 1.15;
+    color: #111827;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .amount-ratio {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0;
+    white-space: nowrap;
+  }
+
+  .amount-ratio__paid {
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+  }
+
+  .amount-ratio__total {
+    font-size: 0.78em;
+    font-weight: 500;
+    color: #9ca3af;
+  }
+
+  .record-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .agent-order-tab {
+    flex: 1;
+    min-height: 2.5rem;
+    margin-bottom: -1px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: #6b7280;
+    padding: 0.55rem 0.75rem;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    cursor: pointer;
+  }
+
+  .agent-order-tab.is-active {
+    border-bottom-color: var(--color-brand-red);
+    color: var(--color-brand-red);
+  }
+
+  .agent-order-tab-panel[hidden] {
+    display: none;
+  }
+
+  .customer-orders-table-toolbar {
+    border: 1px solid rgba(17, 24, 39, 0.1);
+    border-radius: 0.75rem;
+    background: #ffffff;
+    padding: 0.85rem 1rem;
+  }
+
+  .customer-orders-table-toolbar__summary {
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .customer-orders-table-toolbar__summary span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .customer-orders-table-toolbar__summary strong {
+    color: #111827;
+    font-size: 1.05rem;
+    line-height: 1.2;
+  }
+
+  .customer-orders-table-toolbar__add-customer:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .pending-indicator {
+    margin-left: 0.35rem;
+    color: #b45309;
+    font-size: 0.82em;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .order-record-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+  }
+
+  .order-record-table-wrap .agent-customers-table {
+    margin: 0;
+    border: 0;
+  }
+
+  .agent-customers-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .agent-customers-table th,
+  .agent-customers-table td {
+    padding: 1.1rem 0.75rem;
+    vertical-align: middle;
+  }
+
+  .agent-order-products-table {
+    min-width: 760px;
+  }
+
+  .agent-order-products-table__meta {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.8rem;
+    color: var(--color-brand-muted-black);
+  }
+
+  .agent-order-customer-orders-table {
+    min-width: 1120px;
+  }
+
+  .agent-order-customer-orders-table th:first-child,
+  .agent-order-customer-orders-table td:first-child {
+    width: 4.5rem;
+    text-align: center;
+  }
+
+  .agent-order-customer-orders-table .amount-ratio {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .agent-order-customer-orders-table .amount-ratio__total {
+    font-size: 0.82em;
+  }
+
+  .agent-received-payment {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .agent-received-payment strong {
+    color: #111827;
+    font-size: 0.95rem;
+  }
+
+  .agent-received-payment span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    line-height: 1.35;
+  }
+
+  .agent-payment-bulk-panel label span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.74rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .agent-payment-bulk-panel input,
+  .agent-payment-bulk-panel textarea,
+  .agent-payment-bulk-panel select {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid rgba(17, 24, 39, 0.14);
+    border-radius: 0.5rem;
+    background: #ffffff;
+    color: #111827;
+    padding: 0.5rem 0.65rem;
+    font: inherit;
+    font-size: 0.88rem;
+  }
+
+  .agent-payment-bulk-panel textarea {
+    resize: vertical;
+  }
+
+  .agent-payment-bulk-panel__submit {
+    min-height: 2.55rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: #111827;
+    color: #ffffff;
+    padding: 0.45rem 0.75rem;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .agent-payment-bulk-panel :disabled,
+  .agent-order-customer-orders-table input:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .agent-order-customer-orders-table input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: #111827;
+  }
+
+  @media (max-width: 767px) {
+    .detail-field-value {
+      font-size: 1.1rem;
+    }
+
+    .record-heading-badges {
+      justify-content: flex-start;
+    }
+
+    .customer-orders-table-toolbar__add-customer {
+      width: 2.35rem;
+      min-width: 2.35rem;
+      padding: 0;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .agent-order-tab-panel {
+      display: block !important;
+    }
+
+    .agent-order-tab-panel[hidden] {
+      display: block !important;
+    }
+
+    .agent-payment-bulk-panel {
+      grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+      align-items: end;
+    }
+
+    .agent-payment-bulk-panel__notes {
+      grid-column: span 2;
+    }
+
+    .agent-payment-bulk-panel__submit {
+      width: auto;
+    }
+  }
+</style>

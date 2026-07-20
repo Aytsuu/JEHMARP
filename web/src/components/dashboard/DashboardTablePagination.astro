@@ -3,38 +3,57 @@ import { adminPaginationPageSizes, type AdminPagination } from "@/lib/admin-dash
 
 type Props = {
   pagination?: AdminPagination;
+  variant?: "full" | "summary" | "controls";
 };
 
-const { pagination } = Astro.props;
+const { pagination, variant = "full" } = Astro.props;
+const showSummary = variant === "full" || variant === "summary";
+const showControls = variant === "full" || variant === "controls";
 ---
 
 <footer
-  class="dashboard-interactive-table__footer"
+  class:list={[
+    "dashboard-interactive-table__footer",
+    variant === "controls" && "dashboard-interactive-table__footer--controls",
+    variant === "summary" && "dashboard-interactive-table__footer--summary",
+  ]}
   data-server-pagination-footer={pagination ? "true" : undefined}
   data-current-page={pagination?.page}
   data-total-pages={pagination?.totalPages}
   data-total-rows={pagination?.totalRows}
   data-page-size={pagination?.pageSize}
 >
-  <div class="table-pagination">
-    <div class="table-pagination__summary">
-      <span data-page-info>
-        {pagination
-          ? pagination.totalRows === 0
-            ? "No records found"
-            : `Showing ${pagination.fromRow}-${pagination.toRow} of ${pagination.totalRows}`
-          : ""}
-      </span>
-      <label class="table-pagination__limit">
-        <select data-limit-select>
-          {adminPaginationPageSizes.map((pageSize) => (
-            <option value={pageSize} selected={pagination?.pageSize === pageSize}>
-              {pageSize} rows
-            </option>
-          ))}
-        </select>
-      </label>
-    </div>
+  <div
+    class:list={[
+      "table-pagination",
+      variant === "controls" && "table-pagination--controls-only",
+      variant === "summary" && "table-pagination--summary-only",
+    ]}
+  >
+    {
+      showSummary && (
+        <div class="table-pagination__summary">
+          <span data-page-info>
+            {pagination
+              ? pagination.totalRows === 0
+                ? "No records found"
+                : `Showing ${pagination.fromRow}-${pagination.toRow} of ${pagination.totalRows}`
+              : ""}
+          </span>
+          <label class="table-pagination__limit">
+            <select data-limit-select>
+              {adminPaginationPageSizes.map((pageSize) => (
+                <option value={pageSize} selected={pagination?.pageSize === pageSize}>
+                  {pageSize} rows
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )
+    }
+    {
+      showControls && (
     <div class="table-pagination__controls">
       <button
         type="button"
@@ -77,5 +96,7 @@ const { pagination } = Astro.props;
         </svg>
       </button>
     </div>
+      )
+    }
   </div>
 </footer>

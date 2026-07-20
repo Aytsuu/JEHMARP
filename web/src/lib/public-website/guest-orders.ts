@@ -98,18 +98,33 @@ export async function submitGuestOrder(
     clientIp: options.clientIp,
     contact: payload.customer.email ?? payload.customer.phoneNumber,
   });
-
-  const supabase = options.supabase ?? createSupabaseAdminClient();
-  const { data, error } = await supabase.rpc("submit_guest_order", {
-    customer_payload: payload.customer,
-    item_payload: payload.items,
+  const duplicateGuardKey = await enforceGuestOrderDuplicateGuard(fetcher, {
+    redisUrl: env.upstashRedisRestUrl,
+    redisToken: env.upstashRedisRestToken,
+    payload,
   });
 
-  if (error || typeof data !== "string") {
-    throw new Error("Unable to submit guest order");
-  }
+  const supabase = options.supabase ?? createSupabaseAdminClient();
 
-  return data;
+  try {
+    const { data, error } = await supabase.rpc("submit_guest_order", {
+      customer_payload: payload.customer,
+      item_payload: payload.items,
+    });
+
+    if (error || typeof data !== "string") {
+      throw new Error("Unable to submit guest order");
+    }
+
+    return data;
+  } catch (error) {
+    await clearGuestOrderDuplicateGuard(fetcher, {
+      redisUrl: env.upstashRedisRestUrl,
+      redisToken: env.upstashRedisRestToken,
+      key: duplicateGuardKey,
+    });
+    throw error;
+  }
 }
 
 async function enforceGuestOrderRateLimit(
@@ -142,6 +157,54 @@ async function enforceGuestOrderRateLimit(
   }
 }
 
+async function enforceGuestOrderDuplicateGuard(
+  fetcher: typeof fetch,
+  options: {
+    redisUrl: string | undefined;
+    redisToken: string | undefined;
+    payload: GuestOrderPayload;
+  },
+): Promise<string> {
+  if (!options.redisUrl || !options.redisToken) {
+    throw new Error("Order duplicate detection is not configured.");
+  }
+
+  const key = `guest-order:duplicate:${createGuestOrderFingerprint(options.payload)}`;
+  const result = await runRedisCommand(fetcher, options.redisUrl, options.redisToken, [
+    "set",
+    key,
+    "1",
+    "nx",
+    "ex",
+    "1800",
+  ]);
+
+  if (result !== "OK") {
+    throw new Error("This guest order looks like a duplicate. Please wait before submitting it again.");
+  }
+
+  return key;
+}
+
+async function clearGuestOrderDuplicateGuard(
+  fetcher: typeof fetch,
+  options: {
+    redisUrl: string | undefined;
+    redisToken: string | undefined;
+    key: string;
+  },
+): Promise<void> {
+  if (!options.redisUrl || !options.redisToken) {
+    return;
+  }
+
+  try {
+    await runRedisCommand(fetcher, options.redisUrl, options.redisToken, ["del", options.key]);
+  } catch (error) {
+    console.error("Unable to clear guest order duplicate guard after failed submission.", error);
+  }
+}
+
 async function enforceRedisCounter(
   fetcher: typeof fetch,
   redisUrl: string,
@@ -169,6 +232,21 @@ async function runRedisNumberCommand(
   redisToken: string,
   parts: string[],
 ): Promise<number> {
+  const result = await runRedisCommand(fetcher, redisUrl, redisToken, parts);
+
+  if (typeof result !== "number") {
+    throw new Error("Order rate limiting is unavailable.");
+  }
+
+  return result;
+}
+
+async function runRedisCommand(
+  fetcher: typeof fetch,
+  redisUrl: string,
+  redisToken: string,
+  parts: string[],
+): Promise<unknown> {
   const url = `${redisUrl.replace(/\/$/, "")}/${parts.map(encodeURIComponent).join("/")}`;
   const response = await fetcher(url, {
     headers: {
@@ -177,7 +255,7 @@ async function runRedisNumberCommand(
   });
   const data = await readJsonResponse(response);
 
-  if (!response.ok || typeof data.result !== "number") {
+  if (!response.ok || !("result" in data)) {
     throw new Error("Order rate limiting is unavailable.");
   }
 
@@ -192,6 +270,37 @@ async function readJsonResponse(response: Response): Promise<Record<string, unkn
 
 function hashValue(value: string): string {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function createGuestOrderFingerprint(payload: GuestOrderPayload): string {
+  return hashValue(JSON.stringify({
+    address: normalizeFingerprintText(payload.customer.address),
+    email: normalizeFingerprintText(payload.customer.email ?? ""),
+    phoneNumber: normalizePhoneNumber(payload.customer.phoneNumber),
+    items: payload.items
+      .map((item) => ({
+        productId: normalizeFingerprintText(item.productId),
+        quantity: item.quantity,
+        addDetails: normalizeFingerprintText(item.addDetails ?? ""),
+      }))
+      .toSorted((left, right) => {
+        const productCompare = left.productId.localeCompare(right.productId);
+
+        if (productCompare !== 0) {
+          return productCompare;
+        }
+
+        return left.addDetails.localeCompare(right.addDetails);
+      }),
+  }));
+}
+
+function normalizeFingerprintText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizePhoneNumber(value: string): string {
+  return value.replace(/\D/g, "");
 }
 
 function parseOrderItems(formData: FormData) {

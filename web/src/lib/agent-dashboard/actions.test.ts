@@ -238,6 +238,134 @@ describe("parseAgentActionFormData", () => {
       errors: ["At least one customer order is required."],
     });
   });
+
+  it("parses attach-agent-order-customer actions for existing assigned customers", () => {
+    const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
+    const formData = new FormData();
+    formData.set("action", "attach-agent-order-customer");
+    formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+    formData.set(
+      "attachCustomerEntries",
+      JSON.stringify([
+        {
+          customerId,
+          items: [
+            {
+              productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+              quantity: 2,
+              addDetails: "Packed separately",
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set([customerId]))).toEqual({
+      success: true,
+      action: {
+        type: "attach-agent-order-customer",
+        agentOrderId: "11111111-1111-4111-8111-111111111111",
+        entries: [
+          {
+            customer: {
+              type: "existing",
+              customerId,
+            },
+            items: [
+              {
+                productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+                quantity: 2,
+                addDetails: "Packed separately",
+              },
+            ],
+          },
+        ],
+        requireApproval: true,
+      },
+    });
+  });
+
+  it("parses attach-agent-order-customer actions for new customers", () => {
+    const formData = new FormData();
+    formData.set("action", "attach-agent-order-customer");
+    formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+    formData.set(
+      "attachCustomerEntries",
+      JSON.stringify([
+        {
+          customerId: null,
+          firstName: "Ana",
+          lastName: "Buyer",
+          phoneNumber: "09171234567",
+          email: "ana@example.test",
+          address: "Market stall",
+          items: [
+            {
+              productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+              quantity: 1.5,
+              addDetails: null,
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
+      success: true,
+      action: {
+        type: "attach-agent-order-customer",
+        agentOrderId: "11111111-1111-4111-8111-111111111111",
+        entries: [
+          {
+            customer: {
+              type: "new",
+              payload: {
+                firstName: "Ana",
+                lastName: "Buyer",
+                phoneNumber: "09171234567",
+                email: "ana@example.test",
+                address: "Market stall",
+              },
+            },
+            items: [
+              {
+                productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+                quantity: 1.5,
+                addDetails: null,
+              },
+            ],
+          },
+        ],
+        requireApproval: true,
+      },
+    });
+  });
+
+  it("rejects attach-agent-order-customer actions for unassigned customers", () => {
+    const formData = new FormData();
+    formData.set("action", "attach-agent-order-customer");
+    formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+    formData.set(
+      "attachCustomerEntries",
+      JSON.stringify([
+        {
+          customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+          items: [
+            {
+              productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+              quantity: 2,
+              addDetails: null,
+            },
+          ],
+        },
+      ]),
+    );
+
+    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
+      success: false,
+      errors: ["Selected customer is not assigned to this agent."],
+    });
+  });
 });
 
 describe("executeAgentAction", () => {

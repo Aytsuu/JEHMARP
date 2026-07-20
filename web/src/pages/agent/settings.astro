@@ -1,5 +1,5 @@
 ---
-import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
 import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
 import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
@@ -16,13 +16,15 @@ const feedback = formatAgentActionFeedback(Astro.url);
 const data = await loadAgentDashboardData(Astro, agentRoute.userId);
 ---
 
-<AgentPageFrame
+<AgentRecordPageLayout
   title="Agent Settings - JEHMARP"
   description="Manage your reseller profile and preferences."
   heading="Settings"
   intro="Update your reseller contact info, payout options, and alert thresholds."
   feedback={feedback}
   dashboardData={data}
+  backUrl="/agent/profile"
+  backLabel="Back to profile"
 >
   <div class="admin-panel">
     <div class="admin-card">
@@ -35,4 +37,4 @@ const data = await loadAgentDashboardData(Astro, agentRoute.userId);
       </div>
     </div>
   </div>
-</AgentPageFrame>
+</AgentRecordPageLayout>

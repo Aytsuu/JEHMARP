@@ -1,5 +1,5 @@
 ---
-import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import ViewButton from "@/components/ViewButton.astro";
@@ -36,7 +36,7 @@ const historicalOrders = customerOrders.filter((order) => order.order_status ===
 const feedback = formatAgentActionFeedback(Astro.url);
 ---
 
-<AgentPageFrame
+<AgentRecordPageLayout
   title={`Customer Details - ${fullName(customer)} - JEHMARP`}
   description="Agent customer detail record, pending orders, and historical summary."
   heading={`Customer Record: ${fullName(customer)}`}
@@ -157,4 +157,4 @@ const feedback = formatAgentActionFeedback(Astro.url);
     )}
   </div>
   </div>
-</AgentPageFrame>
+</AgentRecordPageLayout>

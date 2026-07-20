@@ -79,6 +79,24 @@ export function parseShopFilters(url: URL): ShopFilters {
   };
 }
 
+export async function listOrderablePublicProducts(
+  _context: Pick<APIContext, "cookies" | "request">,
+): Promise<PublicProduct[]> {
+  const supabase = createSupabasePublicClient();
+
+  const { data, error } = await supabase
+    .from("product")
+    .select(PRODUCT_PUBLIC_COLUMNS)
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  if (error) {
+    throwLoadError("Unable to load orderable products");
+  }
+
+  return (data ?? []) as unknown as PublicProduct[];
+}
+
 export async function listPublicProducts(
   _context: Pick<APIContext, "cookies" | "request">,
   filters: ShopFilters,

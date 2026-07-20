@@ -3,16 +3,17 @@ type Props = {
   title?: string;
   open?: boolean;
   class?: string;
-};
+} & Record<string, unknown>;
 
 const {
   title,
   open = false,
   class: className = "",
+  ...rest
 } = Astro.props;
 ---
 
-<details class:list={["ui-accordion", className]} open={open}>
+<details class:list={["ui-accordion", className]} open={open} {...rest}>
   <summary class="ui-accordion__summary">
     <span class="ui-accordion__title">
       {Astro.slots.has("title") ? <slot name="title" /> : title}

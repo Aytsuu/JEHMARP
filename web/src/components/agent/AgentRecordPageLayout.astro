@@ -66,10 +66,11 @@ const hasHeadingAside = Astro.slots.has("heading-aside");
     ]}
     data-admin-record-page={fullHeight || undefined}
     data-agent-record-page
+    data-agent-notifications-page
   >
     <div
       class="admin-notifications-page__inner"
-      style={`max-width: ${contentMaxWidth};`}
+      style={`--notifications-page-max-width: ${contentMaxWidth};`}
     >
       <div class="admin-notifications-page__sticky">
         <header class="admin-notifications-page__header">
@@ -180,6 +181,7 @@ const hasHeadingAside = Astro.slots.has("heading-aside");
 
   .admin-notifications-page__inner {
     width: 100%;
+    max-width: var(--notifications-page-max-width, 48rem);
     margin: 0 auto;
     padding: 2rem 1.25rem 2.5rem;
     background: #ffffff;
@@ -323,5 +325,38 @@ const hasHeadingAside = Astro.slots.has("heading-aside");
   .admin-notifications-page--full-height :global(.status-message),
   .admin-notifications-page--full-height :global(.error-message) {
     margin: 0 0 0.75rem;
+  }
+
+  @media (max-width: 47.99rem) {
+    :global(.dashboard-body--agent) .admin-notifications-page {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      width: 100%;
+      min-height: 100%;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    :global(.dashboard-body--agent) .admin-notifications-page__inner {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      width: 100%;
+      max-width: none;
+      min-height: 100%;
+      margin: 0;
+      padding: 0.75rem;
+      background: #ffffff;
+    }
+
+    :global(.dashboard-body--agent) .admin-notifications-page__sticky,
+    :global(.dashboard-body--agent) .admin-notifications-page__content {
+      padding: 0;
+    }
+
+    :global(.dashboard-body--agent) .admin-notifications-page__header {
+      margin-bottom: 1rem;
+    }
   }
 </style>

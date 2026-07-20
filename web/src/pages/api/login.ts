@@ -1,8 +1,10 @@
 import type { APIRoute } from "astro";
 
 import { getDashboardRoleWithClient } from "@/lib/auth";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getServerEnv } from "@/lib/env";
+import { getClientIp } from "@/lib/security/client-ip";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
 
 export const prerender = false;
 
@@ -22,24 +24,10 @@ export const POST: APIRoute = async (context) => {
     if (!turnstileToken) {
       return context.redirect("/login?error=Please%20complete%20the%20verification%20challenge.", 303);
     }
-    const verifyBody = new FormData();
-    verifyBody.set("secret", env.turnstileSecretKey);
-    verifyBody.set("response", turnstileToken);
-    
-    const clientIp = context.clientAddress;
-    if (clientIp) {
-      verifyBody.set("remoteip", clientIp);
-    }
-
     try {
-      const verifyResponse = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-        method: "POST",
-        body: verifyBody,
+      await verifyTurnstileToken(env.turnstileSecretKey, turnstileToken, {
+        clientIp: getClientIp(context.request.headers),
       });
-      const verifyData = await verifyResponse.json();
-      if (!verifyData.success) {
-        return context.redirect("/login?error=Verification%20failed.%20Please%20try%20again.", 303);
-      }
     } catch {
       return context.redirect("/login?error=Verification%20failed.%20Please%20try%20again.", 303);
     }

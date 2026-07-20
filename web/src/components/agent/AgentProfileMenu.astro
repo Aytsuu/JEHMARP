@@ -1,0 +1,157 @@
+---
+import { agentProfileNavItems } from "@/lib/dashboard/agent-navigation";
+
+const currentPath = Astro.url.pathname;
+
+function isProfileSectionActive(href: string) {
+  return currentPath === href || currentPath.startsWith(`${href}/`);
+}
+---
+
+<section class="agent-profile-menu" aria-label="Profile options">
+  <div class="agent-profile-menu__list">
+    {
+      agentProfileNavItems.map((item) => {
+        const isCurrent = !item.isAction && isProfileSectionActive(item.href);
+
+        return item.isAction ? (
+          <form class="agent-profile-menu__form" method="post" action={item.href} data-astro-reload>
+            <button type="submit" class="agent-profile-menu__item agent-profile-menu__item--action">
+              <span class="agent-profile-menu__icon" set:html={item.icon} />
+              <span class="agent-profile-menu__copy">
+                <strong>{item.label}</strong>
+                <small>Sign out of your agent account</small>
+              </span>
+            </button>
+          </form>
+        ) : (
+          <a
+            href={item.href}
+            class:list={["agent-profile-menu__item", isCurrent && "agent-profile-menu__item--active"]}
+            aria-current={isCurrent ? "page" : undefined}
+          >
+            <span class="agent-profile-menu__icon" set:html={item.icon} />
+            <span class="agent-profile-menu__copy">
+              <strong>{item.label}</strong>
+              <small>
+                {
+                  item.href === "/agent/earnings"
+                    ? "Track commissions and payout history"
+                    : item.href === "/agent/activity"
+                      ? "Review recent orders, payments, and customer updates"
+                      : "Manage your reseller profile and preferences"
+                }
+              </small>
+            </span>
+            <span class="agent-profile-menu__chevron" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </span>
+          </a>
+        );
+      })
+    }
+  </div>
+</section>
+
+<style>
+  .agent-profile-menu__list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .agent-profile-menu__form {
+    margin: 0;
+  }
+
+  .agent-profile-menu__item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.85rem;
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    color: inherit;
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      border-color 0.2s ease,
+      background-color 0.2s ease;
+  }
+
+  .agent-profile-menu__item:hover,
+  .agent-profile-menu__item:focus-visible {
+    border-color: rgba(102, 24, 24, 0.22);
+    outline: none;
+  }
+
+  .agent-profile-menu__item--active {
+    border-color: rgba(102, 24, 24, 0.28);
+    background: #fffdf8;
+  }
+
+  .agent-profile-menu__item--action {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    justify-content: initial;
+    gap: 0.85rem;
+    width: 100%;
+    padding: 1rem;
+    border: 1px solid #f3d0d0;
+    border-radius: 0.75rem;
+    background: #fffafa;
+    color: inherit;
+    font: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .agent-profile-menu__item--action:hover:not(:disabled),
+  .agent-profile-menu__item--action:focus-visible {
+    background: #fffafa;
+    color: inherit;
+  }
+
+  .agent-profile-menu__icon :global(svg) {
+    display: block;
+    width: 1.25rem;
+    height: 1.25rem;
+    color: var(--color-brand-red);
+  }
+
+  .agent-profile-menu__copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .agent-profile-menu__copy strong {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .agent-profile-menu__copy small {
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: #6b7280;
+  }
+
+  .agent-profile-menu__chevron svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: #9ca3af;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+</style>

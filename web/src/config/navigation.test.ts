@@ -49,11 +49,10 @@ describe("dashboard routes", () => {
   it("defines agent operations separately from public navigation", () => {
     expect(agentDashboardRoutes).toEqual([
       { label: "Dashboard", href: "/agent" },
-      { label: "My Earnings", href: "/agent/earnings" },
       { label: "Customers", href: "/agent/customers" },
       { label: "My Orders", href: "/agent/orders" },
-      { label: "Payments", href: "/agent/payments" },
       { label: "Notifications", href: "/agent/notifications" },
+      { label: "Profile", href: "/agent/profile" },
     ]);
   });
 

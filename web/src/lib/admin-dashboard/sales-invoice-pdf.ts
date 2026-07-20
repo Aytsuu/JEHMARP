@@ -3,9 +3,9 @@ import {
   buildSalesInvoiceLayout,
   getBrandLines,
 } from "@/lib/order-documents/layout";
+import { buildPdfDocument, pdfPageWidth } from "@/lib/order-documents/pdf-document";
 
-const pageWidth = 595;
-const pageHeight = 842;
+const pageWidth = pdfPageWidth;
 const marginX = 40;
 const tableRowsPerPage = 10;
 
@@ -20,13 +20,26 @@ type SalesInvoicePage = {
   pageCount: number;
 };
 
-export function buildSalesInvoicePdf(order: DocumentOrder): Uint8Array {
+export function buildSalesInvoiceContentStreams(order: DocumentOrder): string[] {
   const pages = chunkOrderItems(order.customer_order_item);
-  const contentStreams = pages.map((items, index) => buildSalesInvoicePageContent(order, {
+
+  return pages.map((items, index) => buildSalesInvoicePageContent(order, {
     items,
     pageNumber: index + 1,
     pageCount: pages.length,
   }));
+}
+
+export function buildSalesInvoicePdf(order: DocumentOrder): Uint8Array {
+  return buildPdfDocument(buildSalesInvoiceContentStreams(order));
+}
+
+export function buildBulkSalesInvoicePdf(orders: DocumentOrder[]): Uint8Array {
+  const contentStreams = orders.flatMap((order) => buildSalesInvoiceContentStreams(order));
+
+  if (contentStreams.length === 0) {
+    throw new Error("No sales invoice pages to generate.");
+  }
 
   return buildPdfDocument(contentStreams);
 }
@@ -150,48 +163,6 @@ function drawPaymentAndIssuer(commands: string[], order: DocumentOrder) {
   addText(commands, 360, 136, layout.issuerSubline, { size: 9 });
 }
 
-function buildPdfDocument(contentStreams: string[]) {
-  const fontObjectId = 3;
-  const pageObjectIds = contentStreams.map((_, index) => 4 + index * 2);
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${contentStreams.length} >>`,
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    ...contentStreams.flatMap((content, index) => {
-      const pageObjectId = pageObjectIds[index];
-      const contentObjectId = pageObjectId + 1;
-      const contentLength = new TextEncoder().encode(content).length;
-
-      return [
-        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontObjectId} 0 R >> >> /Contents ${contentObjectId} 0 R >>`,
-        `<< /Length ${contentLength} >>\nstream\n${content}\nendstream`,
-      ];
-    }),
-  ];
-
-  return encodePdfObjects(objects);
-}
-
-function encodePdfObjects(objects: string[]) {
-  const chunks = ["%PDF-1.4\n"];
-  const offsets = [0];
-
-  objects.forEach((object, index) => {
-    offsets.push(byteLength(chunks.join("")));
-    chunks.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
-  });
-
-  const xrefOffset = byteLength(chunks.join(""));
-  chunks.push(`xref\n0 ${objects.length + 1}\n`);
-  chunks.push("0000000000 65535 f \n");
-  offsets.slice(1).forEach((offset) => {
-    chunks.push(`${String(offset).padStart(10, "0")} 00000 n \n`);
-  });
-  chunks.push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
-
-  return new TextEncoder().encode(chunks.join(""));
-}
-
 function addText(commands: string[], x: number, y: number, value: string, options: TextOptions = {}) {
   const size = options.size ?? 10;
   const text = sanitizePdfText(value);
@@ -281,8 +252,4 @@ function escapePdfText(value: string) {
 
 function formatNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
-
-function byteLength(value: string) {
-  return new TextEncoder().encode(value).length;
 }

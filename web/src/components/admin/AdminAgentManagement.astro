@@ -132,26 +132,102 @@ const skeletonRows = Array.from({ length: 6 });
                   >
                     <span>{agent.display_name}</span>
                   </button>
-                  <div class="hidden-popover-form-holder">
+                  <div class="hidden-popover-form-holder" style="display: none;">
                     <form method="post" class="admin-table-form">
                       <input type="hidden" name="action" value="update-agent" />
                       <input type="hidden" name="agentId" value={agent.id} />
                       <input type="hidden" name="status" value={agent.status} />
+                      <input type="hidden" name="contact" value={agent.contact ?? ""} />
+                      <input type="hidden" name="email" value={agent.email ?? ""} />
                       <label><span>Employee ID</span><input name="employeeId" value={agent.employee_id ?? ""} /></label>
                       <label><span>First name</span><input name="firstName" value={agent.first_name} required /></label>
                       <label><span>Last name</span><input name="lastName" value={agent.last_name} required /></label>
-                      <button type="submit">Save</button>
+                      <button type="submit">Save Changes</button>
                     </form>
                   </div>
                 </td>
                 <td class="dashboard-table__cell--truncate">
-                  <span>{agent.employee_id ?? "No employee ID"}</span>
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Employee ID: ${agent.display_name}`}
+                  >
+                    <span>{agent.employee_id ?? "No employee ID"}</span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="update-agent" />
+                      <input type="hidden" name="agentId" value={agent.id} />
+                      <input type="hidden" name="firstName" value={agent.first_name} />
+                      <input type="hidden" name="lastName" value={agent.last_name} />
+                      <input type="hidden" name="status" value={agent.status} />
+                      <input type="hidden" name="contact" value={agent.contact ?? ""} />
+                      <input type="hidden" name="email" value={agent.email ?? ""} />
+                      <label><span>Employee ID</span><input name="employeeId" value={agent.employee_id ?? ""} /></label>
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
                 </td>
                 <td class="dashboard-table__cell--truncate">
-                  <span>{agent.email ?? "No email"}</span>
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Email: ${agent.display_name}`}
+                  >
+                    <span>{agent.email ?? "No email"}</span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="update-agent" />
+                      <input type="hidden" name="agentId" value={agent.id} />
+                      <input type="hidden" name="employeeId" value={agent.employee_id ?? ""} />
+                      <input type="hidden" name="firstName" value={agent.first_name} />
+                      <input type="hidden" name="lastName" value={agent.last_name} />
+                      <input type="hidden" name="status" value={agent.status} />
+                      <input type="hidden" name="contact" value={agent.contact ?? ""} />
+                      <label><span>Email</span><input name="email" type="email" value={agent.email ?? ""} autocomplete="email" /></label>
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
                 </td>
                 <td class="dashboard-table__cell--truncate">
-                  <span>{agent.contact ?? "No contact"}</span>
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Contact: ${agent.display_name}`}
+                  >
+                    <span>{agent.contact ?? "No contact"}</span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="update-agent" />
+                      <input type="hidden" name="agentId" value={agent.id} />
+                      <input type="hidden" name="employeeId" value={agent.employee_id ?? ""} />
+                      <input type="hidden" name="firstName" value={agent.first_name} />
+                      <input type="hidden" name="lastName" value={agent.last_name} />
+                      <input type="hidden" name="status" value={agent.status} />
+                      <input type="hidden" name="email" value={agent.email ?? ""} />
+                      <label>
+                        <span>Contact number</span>
+                        <input
+                          name="contact"
+                          type="tel"
+                          value={agent.contact ?? ""}
+                          inputmode="numeric"
+                          pattern="[0-9]{11}"
+                          minlength="11"
+                          maxlength="11"
+                          required
+                          autocomplete="tel"
+                          data-digits-only
+                        />
+                      </label>
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
                 </td>
                 <td>
                   <button
@@ -162,13 +238,15 @@ const skeletonRows = Array.from({ length: 6 });
                   >
                     <StatusBadge kind="agent" status={agent.status} />
                   </button>
-                  <div class="hidden-popover-form-holder">
+                  <div class="hidden-popover-form-holder" style="display: none;">
                     <form method="post" class="admin-table-form">
                       <input type="hidden" name="action" value="update-agent" />
                       <input type="hidden" name="agentId" value={agent.id} />
                       <input type="hidden" name="employeeId" value={agent.employee_id ?? ""} />
                       <input type="hidden" name="firstName" value={agent.first_name} />
                       <input type="hidden" name="lastName" value={agent.last_name} />
+                      <input type="hidden" name="contact" value={agent.contact ?? ""} />
+                      <input type="hidden" name="email" value={agent.email ?? ""} />
                       <label>
                         <span>Status</span>
                         <select name="status" required>
@@ -179,7 +257,7 @@ const skeletonRows = Array.from({ length: 6 });
                           ))}
                         </select>
                       </label>
-                      <button type="submit">Save status</button>
+                      <button type="submit">Save Changes</button>
                     </form>
                   </div>
                 </td>

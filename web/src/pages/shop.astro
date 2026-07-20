@@ -3,13 +3,17 @@ import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
 import PublicShopPageContent from "@/components/public-website/PublicShopPageContent.astro";
 import {
+  listOrderablePublicProducts,
   listPublicProducts,
   parseShopFilters,
 } from "@/lib/public-website/shop";
 import { getPublicEnv } from "@/lib/env";
 
 const filters = parseShopFilters(Astro.url);
-const { products, pagination } = await listPublicProducts(Astro, filters);
+const [{ products, pagination }, orderableProducts] = await Promise.all([
+  listPublicProducts(Astro, filters),
+  listOrderablePublicProducts(Astro),
+]);
 const orderStatus = Astro.url.searchParams.get("order");
 const orderReference = Astro.url.searchParams.get("reference");
 const orderMessage = Astro.url.searchParams.get("message");
@@ -24,6 +28,7 @@ const { turnstileSiteKey } = getPublicEnv();
     <PublicShopPageContent
       filters={filters}
       products={products}
+      orderableProducts={orderableProducts}
       pagination={pagination}
       orderStatus={orderStatus}
       orderReference={orderReference}

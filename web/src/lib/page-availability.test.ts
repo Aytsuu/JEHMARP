@@ -68,7 +68,7 @@ describe("getDashboardRouteStatuses", () => {
       getDashboardRouteStatuses({
         PAGE_STATUS_ADMIN_DASHBOARD: "ready",
         PAGE_STATUS_ADMIN_ORDERS: "maintenance",
-        PAGE_STATUS_AGENT_PAYMENTS: "not_ready",
+        PAGE_STATUS_AGENT_PROFILE: "not_ready",
       }),
     ).toMatchObject({
       "/admin": {
@@ -79,9 +79,9 @@ describe("getDashboardRouteStatuses", () => {
         status: "maintenance",
         envKey: "PAGE_STATUS_ADMIN_ORDERS",
       },
-      "/agent/payments": {
+      "/agent/profile": {
         status: "not_ready",
-        envKey: "PAGE_STATUS_AGENT_PAYMENTS",
+        envKey: "PAGE_STATUS_AGENT_PROFILE",
       },
     });
   });

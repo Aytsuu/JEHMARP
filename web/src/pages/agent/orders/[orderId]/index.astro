@@ -1,5 +1,5 @@
 ---
-import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
@@ -67,7 +67,7 @@ const canRecordAgentPayment = remainingRecordableBalance > 0;
 const todayDate = new Date().toISOString().slice(0, 10);
 ---
 
-<AgentPageFrame
+<AgentRecordPageLayout
   title={`Order Details #${order.id.slice(0, 8)} - JEHMARP`}
   description="Agent order detail view, commissions, and PDFs."
   heading="Order Details"
@@ -309,7 +309,7 @@ const todayDate = new Date().toISOString().slice(0, 10);
       )}
     </div>
   </div>
-</AgentPageFrame>
+</AgentRecordPageLayout>
 
 <style>
   .agent-payment-form {

@@ -73,6 +73,9 @@ const statusBadgeVariants: Record<StatusBadgeKind, Record<string, StatusBadgeVar
     content: "neutral",
     inquiry: "info",
     reseller: "warning",
+    payment: "warning",
+    commission: "success",
+    registration: "info",
   },
   delivery: {
     sent: "success",

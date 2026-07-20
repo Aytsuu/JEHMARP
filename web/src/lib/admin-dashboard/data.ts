@@ -84,6 +84,7 @@ const adminOrderSelect = `
     unit_price,
     price_type,
     add_details,
+    agent_order_quantity_increase,
     agent_commission_amount,
     agent_commission_paid,
     product:product_id (
@@ -235,6 +236,7 @@ const adminAgentOrderSelect = `
       unit_price,
       price_type,
       add_details,
+      agent_order_quantity_increase,
       agent_commission_amount,
       agent_commission_paid,
       product:product_id (
@@ -381,6 +383,7 @@ export type AdminOrderItem = {
   unit_price: number;
   price_type: "retail" | "reseller";
   add_details: string | null;
+  agent_order_quantity_increase?: number;
   agent_commission_amount: number;
   agent_commission_paid: boolean;
   product: (Pick<AdminProduct, "id" | "name" | "unit_label" | "default_price" | "agent_commission_type" | "agent_commission_value"> & {
@@ -1708,6 +1711,7 @@ function getAdminAgentOrderSearchText(order: AdminAgentOrder) {
       customerOrder.customer?.last_name,
       customerOrder.customer?.phone_number,
       customerOrder.customer?.email,
+      customerOrder.customer?.address,
     ]),
   ];
 

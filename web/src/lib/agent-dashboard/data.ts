@@ -36,6 +36,7 @@ const agentOrderSelect = `
     unit_price,
     price_type,
     add_details,
+    agent_order_quantity_increase,
     agent_commission_amount,
     agent_commission_paid,
     product:product_id (
@@ -144,6 +145,7 @@ const agentOrderClusterSelect = `
       unit_price,
       price_type,
       add_details,
+      agent_order_quantity_increase,
       agent_commission_amount,
       agent_commission_paid,
       product:product_id (
@@ -201,7 +203,12 @@ const agentOrderClusterSelect = `
 export type AgentProfile = {
   id: string;
   user_id: string;
+  employee_id: string | null;
+  first_name: string;
+  last_name: string;
   display_name: string;
+  contact: string | null;
+  email: string | null;
   status: "active" | "inactive" | "suspended";
 };
 
@@ -243,6 +250,7 @@ export type AgentOrderItem = {
   unit_price: number;
   price_type: "retail" | "reseller";
   add_details: string | null;
+  agent_order_quantity_increase?: number;
   agent_commission_amount: number;
   agent_commission_paid: boolean;
   product: Pick<AgentProduct, "id" | "name" | "unit_label" | "default_price"> | null;
@@ -426,17 +434,26 @@ export async function loadAgentOrder(
 }
 
 async function loadAgentProfile(supabase: SupabaseServerClient, userId: string) {
-  const { data, error } = await supabase
-    .from("agent_profile")
-    .select("id, user_id, display_name, status")
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .maybeSingle();
+  const [{ data, error }, { data: authData, error: authError }] = await Promise.all([
+    supabase
+      .from("agent_profile")
+      .select("id, user_id, employee_id, first_name, last_name, display_name, contact, status")
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
 
   if (error) throwLoadError("Unable to load agent profile.");
   if (!data) throw new Error("Active agent profile was not found.");
 
-  return data as AgentProfile;
+  const email =
+    authError || authData.user?.id !== userId ? null : authData.user.email ?? null;
+
+  return {
+    ...data,
+    email,
+  } as AgentProfile;
 }
 
 async function loadAssignedCustomers(supabase: SupabaseServerClient) {

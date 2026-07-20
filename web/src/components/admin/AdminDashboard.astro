@@ -1,5 +1,6 @@
 ---
 import AdminCharts from "@/components/admin/AdminCharts";
+import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
 import { formatCurrency } from "@/lib/admin-dashboard/view";
 
@@ -15,28 +16,28 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
 ---
 
 <section class="admin-summary-grid" aria-label="Dashboard summary">
-  <article class="admin-summary-card" data-summary-card="orders">
-    <h2>Orders</h2>
-    <p data-summary-value>{data.summary.orders}</p>
-    <a href="/admin/orders">Review orders</a>
-  </article>
-  <article class="admin-summary-card">
+  <article class="admin-summary-card admin-summary-card--brand">
     <h2>Gross Sales</h2>
     <p>{formatCurrency(analytics.summary.grossSales)}</p>
     <a href="/admin/sales">Review sales</a>
   </article>
-  <article class="admin-summary-card admin-summary-card--button" data-summary-card="pendingOrderPayments">
+  <article class="admin-summary-card" data-summary-card="pendingOrderPayments">
+    <h2>Pending Payments</h2>
+    <p>{formatCurrency(analytics.summary.pendingOrderPayments)}</p>
     <button
       type="button"
-      class="admin-summary-card__trigger"
-      data-open-pending-payments-modal
+      class="admin-summary-card__link"
+      data-open-dashboard-modal="pending-payments-modal"
       aria-haspopup="dialog"
       aria-controls="pending-payments-modal"
     >
-      <span class="admin-summary-card__label">Pending Payments</span>
-      <strong>{formatCurrency(analytics.summary.pendingOrderPayments)}</strong>
-      <span class="admin-summary-card__action">View unpaid customers</span>
+      View unpaid customers
     </button>
+  </article>
+  <article class="admin-summary-card" data-summary-card="orders">
+    <h2>Orders</h2>
+    <p data-summary-value>{data.summary.orders}</p>
+    <a href="/admin/orders">Review orders</a>
   </article>
   <article class="admin-summary-card" data-summary-card="customers">
     <h2>Customers</h2>
@@ -50,57 +51,34 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
   </article>
 </section>
 
-<div
+<DashboardModal
   id="pending-payments-modal"
-  class="dashboard-modal"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="pending-payments-modal-title"
-  aria-hidden="true"
-  data-pending-payments-modal
+  title="Pending Customer Payments"
+  description={`${formatCurrency(analytics.summary.pendingOrderPayments)} total unpaid balance`}
 >
-  <div class="dashboard-modal__backdrop" data-close-pending-payments-modal></div>
-  <section class="dashboard-modal__panel" tabindex="-1">
-    <header class="dashboard-modal__header">
-      <div>
-        <h2 id="pending-payments-modal-title">Pending Customer Payments</h2>
-        <p>{formatCurrency(analytics.summary.pendingOrderPayments)} total unpaid balance</p>
+  {
+    pendingCustomerBalances.length > 0 ? (
+      <div class="pending-payments-list">
+        {pendingCustomerBalances.map((customer) => (
+          <a
+            class="pending-payments-list__row"
+            href={`/admin/customers/${customer.customerId}`}
+          >
+            <span>
+              <strong>{customer.customerName}</strong>
+              <small>
+                {customer.orderCount} unpaid {customer.orderCount === 1 ? "order" : "orders"}
+              </small>
+            </span>
+            <b>{formatCurrency(customer.unpaidBalance)}</b>
+          </a>
+        ))}
       </div>
-      <button
-        type="button"
-        class="dashboard-modal__close"
-        data-close-pending-payments-modal
-        aria-label="Close pending payments"
-      >
-        &times;
-      </button>
-    </header>
-    <div class="dashboard-modal__body">
-      {
-        pendingCustomerBalances.length > 0 ? (
-          <div class="pending-payments-list">
-            {pendingCustomerBalances.map((customer) => (
-              <a
-                class="pending-payments-list__row"
-                href={`/admin/customers/${customer.customerId}`}
-              >
-                <span>
-                  <strong>{customer.customerName}</strong>
-                  <small>
-                    {customer.orderCount} unpaid {customer.orderCount === 1 ? "order" : "orders"}
-                  </small>
-                </span>
-                <b>{formatCurrency(customer.unpaidBalance)}</b>
-              </a>
-            ))}
-          </div>
-        ) : (
-          <p class="dashboard-modal__empty">No customer unpaid balances.</p>
-        )
-      }
-    </div>
-  </section>
-</div>
+    ) : (
+      <p class="dashboard-modal__empty">No customer unpaid balances.</p>
+    )
+  }
+</DashboardModal>
 
 <section aria-label="Analytics Visualization">
   <AdminCharts client:only="react" analytics={analytics} />
@@ -164,54 +142,5 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
   document.addEventListener("astro:after-swap", initAdminDashboardSummary);
   if (document.readyState === "complete" || document.readyState === "interactive") {
     initAdminDashboardSummary();
-  }
-
-  function initPendingPaymentsModal() {
-    const modal = document.querySelector<HTMLElement>("[data-pending-payments-modal]");
-    const panel = modal?.querySelector<HTMLElement>(".dashboard-modal__panel");
-    const openButton = document.querySelector<HTMLElement>("[data-open-pending-payments-modal]");
-    const closeButtons = modal?.querySelectorAll<HTMLElement>("[data-close-pending-payments-modal]");
-
-    if (!modal || !panel || !openButton || modal.dataset.initialized === "true") return;
-
-    const activeModal = modal;
-    const activePanel = panel;
-
-    activeModal.dataset.initialized = "true";
-    let previousFocus: HTMLElement | null = null;
-
-    function openModal() {
-      previousFocus = document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-      activeModal.classList.add("dashboard-modal--open");
-      activeModal.setAttribute("aria-hidden", "false");
-      document.body.classList.add("dashboard-modal-is-open");
-      activePanel.focus();
-    }
-
-    function closeModal() {
-      activeModal.classList.remove("dashboard-modal--open");
-      activeModal.setAttribute("aria-hidden", "true");
-      document.body.classList.remove("dashboard-modal-is-open");
-      previousFocus?.focus();
-    }
-
-    openButton.addEventListener("click", openModal);
-    closeButtons?.forEach((button) => {
-      button.addEventListener("click", closeModal);
-    });
-
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && activeModal.classList.contains("dashboard-modal--open")) {
-        closeModal();
-      }
-    });
-  }
-
-  document.addEventListener("DOMContentLoaded", initPendingPaymentsModal);
-  document.addEventListener("astro:after-swap", initPendingPaymentsModal);
-  if (document.readyState === "complete" || document.readyState === "interactive") {
-    initPendingPaymentsModal();
   }
 </script>

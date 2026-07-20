@@ -2,6 +2,16 @@ import type { APIContext } from "astro";
 import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { canAttachCustomerToAgentOrder } from "@/lib/agent-order-distribution";
+import {
+  parseAttachCustomerEntriesJson,
+  type AgentOrderAttachEntry,
+} from "@/lib/agent-order-attach";
+import {
+  executeAgentProfileUpdate,
+  parseAgentProfileUpdateFields,
+  createAgentProfileAdminClient,
+} from "@/lib/agent-profile-update";
 import { loadAgentDashboardData } from "./data";
 
 const uuidSchema = z.uuid();
@@ -54,6 +64,17 @@ export type AgentAction =
         referenceNumber: string | null;
         notes: string | null;
       };
+    }
+  | {
+      type: "attach-agent-order-customer";
+      agentOrderId: string;
+      entries: AgentOrderAttachEntry[];
+      requireApproval: boolean;
+    }
+  | {
+      type: "update-agent-profile";
+      agentId: string;
+      payload: ReturnType<typeof parseAgentProfileUpdateFields>;
     };
 
 type ParseSuccess = {
@@ -74,7 +95,8 @@ export function parseAgentActionFormData(
   agentId: string,
   _assignedCustomerIds: ReadonlySet<string>,
 ): AgentActionParseResult {
-  void _assignedCustomerIds;
+  void _agentUserId;
+  const assignedCustomerIds = _assignedCustomerIds;
 
   try {
     const action = requiredString(formData, "action");
@@ -128,6 +150,31 @@ export function parseAgentActionFormData(
             referenceNumber: optionalString(formData, "referenceNumber"),
             notes: optionalString(formData, "notes"),
           },
+        },
+      };
+    }
+
+    if (action === "attach-agent-order-customer") {
+      const entriesJson = requiredString(formData, "attachCustomerEntries");
+
+      return {
+        success: true,
+        action: {
+          type: "attach-agent-order-customer",
+          agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
+          entries: parseAttachCustomerEntriesJson(entriesJson, { assignedCustomerIds }),
+          requireApproval: true,
+        },
+      };
+    }
+
+    if (action === "update-agent-profile") {
+      return {
+        success: true,
+        action: {
+          type: "update-agent-profile",
+          agentId,
+          payload: parseAgentProfileUpdateFields(formData),
         },
       };
     }
@@ -229,6 +276,51 @@ export async function executeAgentAction(
 
       return;
     }
+    case "attach-agent-order-customer": {
+      await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
+
+      for (const entry of action.entries) {
+        const { data, error } = await supabase.rpc("attach_customer_to_agent_order", {
+          target_agent_order_id: action.agentOrderId,
+          target_customer_id: entry.customer.type === "existing" ? entry.customer.customerId : null,
+          item_payload: entry.items,
+          customer_payload: entry.customer.type === "new"
+            ? {
+                firstName: entry.customer.payload.firstName,
+                lastName: entry.customer.payload.lastName,
+                phoneNumber: entry.customer.payload.phoneNumber,
+                email: entry.customer.payload.email,
+                address: entry.customer.payload.address,
+              }
+            : null,
+          require_approval: action.requireApproval,
+        });
+
+        if (error || typeof data !== "string") {
+          throw new Error(error?.message || "Unable to attach customer order.");
+        }
+      }
+
+      return;
+    }
+    case "update-agent-profile": {
+      const adminClient = createAgentProfileAdminClient();
+      const { data: currentProfile, error } = await adminClient
+        .from("agent_profile")
+        .select("status")
+        .eq("id", action.agentId)
+        .maybeSingle();
+
+      if (error || !currentProfile) {
+        throw new Error("Unable to load agent profile.");
+      }
+
+      await executeAgentProfileUpdate(adminClient, action.agentId, {
+        ...action.payload,
+        status: currentProfile.status,
+      });
+      return;
+    }
   }
 }
 
@@ -248,6 +340,40 @@ function getAgentOrderCustomerPayload(
         orderFor: "personal",
         releaseDate,
       };
+  }
+}
+
+async function assertAgentOrderAllowsCustomerAttach(
+  supabase: SupabaseServerClient,
+  agentOrderId: string,
+) {
+  const { data, error } = await supabase
+    .from("agent_order")
+    .select("order_status, customer_order ( payment_status )")
+    .eq("id", agentOrderId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to verify agent order status before attaching a customer.");
+  }
+
+  if (!data) {
+    throw new Error("Agent order was not found.");
+  }
+
+  const customerOrders = Array.isArray(data.customer_order)
+    ? data.customer_order
+    : data.customer_order
+      ? [data.customer_order]
+      : [];
+
+  if (!canAttachCustomerToAgentOrder({
+    order_status: String(data.order_status),
+    customer_order: customerOrders.map((order) => ({
+      payment_status: String((order as { payment_status?: unknown }).payment_status ?? "unpaid"),
+    })),
+  })) {
+    throw new Error("Completed and paid agent orders cannot accept new customers.");
   }
 }
 
@@ -382,6 +508,20 @@ function optionalString(formData: FormData, key: string) {
   return value.length > 0 ? value : null;
 }
 
+function optionalUuid(formData: FormData, key: string) {
+  const value = optionalString(formData, key);
+
+  return value ? uuidSchema.parse(value) : null;
+}
+
+function optionalEmail(formData: FormData, key: string) {
+  const value = optionalString(formData, key);
+
+  if (!value) return null;
+
+  return z.email().parse(value);
+}
+
 function normalizeFormDataEntry(value: FormDataEntryValue | undefined) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -394,6 +534,12 @@ function getActionSuccessMessage(action: AgentAction) {
       return "Payment recorded for admin confirmation.";
     case "record-agent-payment-distribution":
       return "Payments recorded for admin confirmation.";
+    case "attach-agent-order-customer":
+      return action.entries.length > 1
+        ? "Customer orders submitted for admin approval."
+        : "Customer order submitted for admin approval.";
+    case "update-agent-profile":
+      return "Profile updated.";
   }
 }
 

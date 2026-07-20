@@ -54,10 +54,40 @@ jobs:
           echo "Changed migration files:"
           echo "${changed_files}"
 
-          risky_pattern='drop[[:space:]]+table|drop[[:space:]]+column|truncate|delete[[:space:]]+from|alter[[:space:]]+column.*set[[:space:]]+not[[:space:]]+null|drop[[:space:]]+policy|security[[:space:]]+definer|grant[[:space:]]+'
-          if echo "${changed_files}" | xargs grep -Ein "${risky_pattern}"; then
+          blocking_pattern='drop[[:space:]]+table|drop[[:space:]]+column|truncate[[:space:]]|delete[[:space:]]+from'
+          review_pattern='alter[[:space:]]+column.*set[[:space:]]+not[[:space:]]+null|drop[[:space:]]+policy|security[[:space:]]+definer|grant[[:space:]]+'
+
+          blocking_matches="$(echo "${changed_files}" | xargs grep -Ein "${blocking_pattern}" || true)"
+          review_matches="$(echo "${changed_files}" | xargs grep -Ein "${review_pattern}" || true)"
+
+          if [ -n "${review_matches}" ]; then
+            echo "Migration review recommended:"
+            echo "${review_matches}"
             {
-              echo "### Risky migration SQL detected"
+              echo "### Migration review recommended"
+              echo ""
+              echo "The following patterns were found in changed migrations:"
+              echo "- \`security definer\` functions"
+              echo "- \`grant\` statements"
+              echo "- \`alter column ... set not null\`"
+              echo "- \`drop policy\`"
+              echo ""
+              echo "These are expected for RPC and RLS migrations, but should still be reviewed."
+              echo "Add the \`migration-reviewed\` label after manual review if you want this noted on the PR."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ -n "${blocking_matches}" ]; then
+            echo "Blocking migration SQL detected:"
+            echo "${blocking_matches}"
+            {
+              echo "### Blocking migration SQL detected"
+              echo ""
+              echo "Destructive SQL was found in changed migrations:"
+              echo "- \`drop table\`"
+              echo "- \`drop column\`"
+              echo "- \`truncate\`"
+              echo "- \`delete from\`"
               echo ""
               echo "Review the matched migration SQL manually before merge."
               echo "Add the \`migration-reviewed\` label to this PR after review."

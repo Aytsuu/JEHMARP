@@ -2,21 +2,26 @@ import type { APIRoute } from "astro";
 
 import { parseGuestOrderFormData, submitGuestOrder } from "@/lib/public-website/guest-orders";
 import { resolveFormReturnPath } from "@/lib/public-website/admin-content-preview";
+import { getClientIp } from "@/lib/security/client-ip";
+import { isTrustedFormOrigin } from "@/lib/security/form-origin";
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request, redirect }) => {
+export const POST: APIRoute = async ({ request, redirect, url }) => {
+  if (!isTrustedFormOrigin(request.headers, url)) {
+    return redirectWithError(redirect, "Invalid form submission.", "/shop");
+  }
+
   const formData = await request.formData();
   const parsed = parseGuestOrderFormData(formData);
   const returnPath = resolveFormReturnPath(formData, "/shop");
 
   if (!parsed.success) {
-    const params = new URLSearchParams({
-      order: "error",
-      message: parsed.errors[0] ?? "Please check your order details.",
-    });
-
-    return redirect(`${returnPath}?${params.toString()}`, 303);
+    return redirectWithError(
+      redirect,
+      parsed.errors[0] ?? "Please check your order details.",
+      returnPath,
+    );
   }
 
   try {
@@ -30,17 +35,23 @@ export const POST: APIRoute = async ({ request, redirect }) => {
 
     return redirect(`${returnPath}?${params.toString()}`, 303);
   } catch (error) {
-    const params = new URLSearchParams({
-      order: "error",
-      message: error instanceof Error ? error.message : "The order could not be submitted. Please try again.",
-    });
-
-    return redirect(`${returnPath}?${params.toString()}`, 303);
+    return redirectWithError(
+      redirect,
+      error instanceof Error ? error.message : "The order could not be submitted. Please try again.",
+      returnPath,
+    );
   }
 };
 
-function getClientIp(headers: Headers): string | null {
-  const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+function redirectWithError(
+  redirect: Parameters<APIRoute>[0]["redirect"],
+  message: string,
+  returnPath: string,
+): Response {
+  const params = new URLSearchParams({
+    order: "error",
+    message,
+  });
 
-  return headers.get("cf-connecting-ip") ?? forwardedFor ?? headers.get("x-real-ip");
+  return redirect(`${returnPath}?${params.toString()}`, 303);
 }

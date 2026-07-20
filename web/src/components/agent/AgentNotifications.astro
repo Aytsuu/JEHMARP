@@ -1,7 +1,7 @@
 ---
+import AgentNotificationCard from "@/components/agent/AgentNotificationCard.astro";
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
 import { buildAgentNotifications } from "@/lib/agent-dashboard/notifications";
-import { formatDate } from "@/lib/agent-dashboard/view";
 
 type Props = {
   data: AgentDashboardData;
@@ -12,50 +12,39 @@ const notifications = buildAgentNotifications(data);
 ---
 
 <section id="agent-notifications" class="admin-panel agent-notifications" aria-labelledby="agent-notifications-title">
-  <div data-interactive-table class="dashboard-interactive-table">
-    <div class="table-filters order-management-toolbar agent-notifications__toolbar">
-      <button type="button" class="btn-table-manage" data-mark-all-read>Mark All as Read</button>
-      <button type="button" class="btn-table-manage btn-table-manage--muted" data-clear-notifications>Clear Stored Read</button>
+  <div data-interactive-table class="dashboard-interactive-table agent-notifications__table">
+    <div class="agent-notifications__toolbar">
+      <button
+        type="button"
+        class="agent-notifications__icon-btn"
+        data-mark-all-read
+        aria-label="Mark all as read"
+        title="Mark all as read"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 7 17l-5-5" />
+          <path d="m22 10-7.5 7.5L13 16" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="agent-notifications__icon-btn agent-notifications__icon-btn--muted"
+        data-clear-notifications
+        aria-label="Clear stored read"
+        title="Clear stored read"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      </button>
     </div>
 
-    <div class="agent-notifications__list" data-notifications-list>
+    <div class="admin-notifications__list agent-notifications__list" data-notifications-list>
       {notifications.map((notif) => (
-        <article
-          class="admin-card notification-item"
-          data-notification-id={notif.id}
-        >
-          <div class="agent-notifications__item-header">
-            <div class="agent-notifications__item-title-row">
-              <span
-                class={`notification-badge badge-${notif.severity}`}
-              >
-                {notif.type}
-              </span>
-              <strong>{notif.title}</strong>
-              <span class="unread-dot"></span>
-            </div>
-            <span class="agent-notifications__date">{formatDate(notif.date)}</span>
-          </div>
-
-          <p class="agent-notifications__message">{notif.message}</p>
-
-          <div class="agent-notifications__actions">
-            {notif.registrationUrl ? (
-              <button
-                type="button"
-                class="btn-table-manage"
-                data-open-registration-link
-                data-registration-url={notif.registrationUrl}
-                data-registration-expires-at={notif.expiresAt ?? ""}
-              >
-                View Link
-              </button>
-            ) : (
-              <a href={notif.link} class="btn-table-manage">View Details</a>
-            )}
-            <button type="button" class="btn-table-manage btn-table-manage--ghost" data-mark-read>Mark as read</button>
-          </div>
-        </article>
+        <AgentNotificationCard notification={notif} />
       ))}
     </div>
   </div>
@@ -91,17 +80,56 @@ const notifications = buildAgentNotifications(data);
 </section>
 
 <style>
-  .badge-warning {
-    background-color: #fef3c7;
-    color: #92400e;
+  .agent-notifications__table > .agent-notifications__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    margin: 0 0 0.85rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
-  .badge-info {
-    background-color: #dbeafe;
-    color: #1e40af;
+
+  .agent-notifications__icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #374151;
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease;
   }
-  .badge-success {
-    background-color: #d1fae5;
-    color: #065f46;
+
+  .agent-notifications__icon-btn:hover,
+  .agent-notifications__icon-btn:focus-visible {
+    background: rgba(17, 24, 39, 0.06);
+    color: #111827;
+    outline: none;
+  }
+
+  .agent-notifications__icon-btn--muted {
+    color: #6b7280;
+  }
+
+  .agent-notifications__icon-btn svg {
+    width: 1.05rem;
+    height: 1.05rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .agent-notifications__list {
+    margin-top: 0;
+    padding: 0;
   }
 
   .agent-registration-link-modal[hidden] {
@@ -192,9 +220,86 @@ const notifications = buildAgentNotifications(data);
     color: #166534 !important;
     font-weight: 700;
   }
+
+  @media (max-width: 47.99rem) {
+    .agent-registration-link-modal {
+      padding: 0.75rem;
+    }
+
+    .agent-registration-link-modal__panel {
+      padding: 1rem;
+    }
+  }
 </style>
 
 <script>
+  function applyNotificationReadState(item: HTMLElement, isRead: boolean) {
+    item.classList.toggle("notification-item--read", isRead);
+    item.classList.toggle("notification-item--unread", !isRead);
+  }
+
+  function markNotificationRead(
+    item: HTMLElement,
+    readIds: string[],
+  ): string[] {
+    const id = item.dataset.notificationId;
+    if (!id || readIds.includes(id)) {
+      applyNotificationReadState(item, true);
+      return readIds;
+    }
+
+    const nextReadIds = [...readIds, id];
+    localStorage.setItem("agent-read-notifications", JSON.stringify(nextReadIds));
+    applyNotificationReadState(item, true);
+    (
+      window as Window & { updateSidebarUnreadBadges?: () => void }
+    ).updateSidebarUnreadBadges?.();
+    return nextReadIds;
+  }
+
+  function initSystemNotificationAutoRead(
+    items: HTMLElement[],
+    readIds: string[],
+  ) {
+    const systemItems = items.filter(
+      (item) => item.dataset.notificationSystem === "true",
+    );
+    if (systemItems.length === 0) return readIds;
+
+    let currentReadIds = readIds;
+
+    const markVisibleSystemNotifications = () => {
+      systemItems.forEach((item) => {
+        if (item.classList.contains("notification-item--read")) return;
+
+        const rect = item.getBoundingClientRect();
+        const inView = rect.top < window.innerHeight && rect.bottom > 0;
+        if (inView) {
+          currentReadIds = markNotificationRead(item, currentReadIds);
+        }
+      });
+    };
+
+    markVisibleSystemNotifications();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          currentReadIds = markNotificationRead(
+            entry.target as HTMLElement,
+            currentReadIds,
+          );
+        });
+      },
+      { threshold: 0.35 },
+    );
+
+    systemItems.forEach((item) => observer.observe(item));
+
+    return currentReadIds;
+  }
+
   function initNotifications() {
     const root = document.querySelector<HTMLElement>("#agent-notifications");
     if (!root || root.dataset.agentNotificationsInitialized === "true") return;
@@ -208,34 +313,26 @@ const notifications = buildAgentNotifications(data);
     const copiedText = root.querySelector<HTMLElement>("[data-registration-link-copied]");
 
     const items = Array.from(list.querySelectorAll<HTMLElement>(".notification-item"));
-    let readIds = JSON.parse(localStorage.getItem("agent-read-notifications") || "[]");
+    let readIds = JSON.parse(localStorage.getItem("agent-read-notifications") || "[]") as string[];
 
-    // Apply initial read state styling
     items.forEach((item) => {
       const id = item.dataset.notificationId;
-      if (id && readIds.includes(id)) {
-        item.classList.add("read");
-      }
+      const isSystem = item.dataset.notificationSystem === "true";
+      applyNotificationReadState(
+        item,
+        isSystem || Boolean(id && readIds.includes(id)),
+      );
     });
 
-    // Set up click handlers on list
+    readIds = initSystemNotificationAutoRead(items, readIds);
+
     list.addEventListener("click", (e) => {
       const target = e.target as HTMLElement;
-        const markReadBtn = target.closest("[data-mark-read]");
-        if (markReadBtn) {
-          const item = target.closest(".notification-item") as HTMLElement;
-          if (item) {
-          const id = item.dataset.notificationId;
-          if (id) {
-            if (!readIds.includes(id)) {
-              readIds.push(id);
-              localStorage.setItem("agent-read-notifications", JSON.stringify(readIds));
-            }
-            item.classList.add("read");
-            (
-              window as Window & { updateSidebarUnreadBadges?: () => void }
-            ).updateSidebarUnreadBadges?.();
-          }
+      const markReadBtn = target.closest("[data-mark-read]");
+      if (markReadBtn) {
+        const item = target.closest(".notification-item") as HTMLElement;
+        if (item) {
+          readIds = markNotificationRead(item, readIds);
         }
       }
 
@@ -276,7 +373,7 @@ const notifications = buildAgentNotifications(data);
           if (id && !readIds.includes(id)) {
             readIds.push(id);
           }
-          item.classList.add("read");
+          applyNotificationReadState(item, true);
         });
         localStorage.setItem("agent-read-notifications", JSON.stringify(readIds));
         (
@@ -291,8 +388,10 @@ const notifications = buildAgentNotifications(data);
         localStorage.removeItem("agent-read-notifications");
         readIds = [];
         items.forEach((item) => {
-          item.classList.remove("read");
+          const isSystem = item.dataset.notificationSystem === "true";
+          applyNotificationReadState(item, isSystem);
         });
+        readIds = initSystemNotificationAutoRead(items, readIds);
         (
           window as Window & { updateSidebarUnreadBadges?: () => void }
         ).updateSidebarUnreadBadges?.();

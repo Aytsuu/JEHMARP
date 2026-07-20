@@ -8,7 +8,7 @@ import ViewButton from "@/components/ViewButton.astro";
 import type { AdminCustomerManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminCustomerFilters } from "@/lib/admin-dashboard/customer-filters";
 import { customerTypes } from "@/lib/admin-dashboard/customer-filters";
-import { formatCompactCurrency, fullName } from "@/lib/admin-dashboard/view";
+import { formatCompactCurrency, fullName, selected } from "@/lib/admin-dashboard/view";
 
 type Props = {
   data: AdminCustomerManagementData;
@@ -165,7 +165,6 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
               <th scope="col">Email</th>
               <th scope="col">Contact</th>
               <th scope="col">Type</th>
-              <th scope="col">Agent</th>
               <th scope="col">Assigned Agent</th>
               <th scope="col">Credit</th>
               <th scope="col">Action</th>
@@ -174,38 +173,196 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
           <tbody>
             {data.customers.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={8}
+                colspan={7}
                 message="No customers match the selected filters."
               />
             ) : data.customers.map((customer) => (
               <tr>
-                <td class="dashboard-table__cell--truncate">{fullName(customer)}</td>
-                <td class="dashboard-table__cell--truncate">{customer.email ?? "No email"}</td>
-                <td class="dashboard-table__cell--truncate">{customer.phone_number}</td>
-                <td>
-                  <StatusBadge
-                    kind="customer-type"
-                    status={customer.is_reseller ? "reseller" : "retail"}
-                    label={customer.is_reseller ? "Reseller" : "Retail"}
-                  />
-                </td>
-                <td>
-                  {customer.is_agent ? (
-                    <StatusBadge kind="agent" status="active" label="Agent" />
-                  ) : (
-                    <span class="dashboard-table__muted">No</span>
-                  )}
+                <td class="dashboard-table__cell--truncate">
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Customer: ${fullName(customer)}`}
+                  >
+                    <span class="order-customer-cell">
+                      <span class="order-customer-cell__name">{fullName(customer)}</span>
+                      {customer.is_agent && (
+                        <StatusBadge kind="agent" status="active" label="Agent" />
+                      )}
+                    </span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="save-customer" />
+                      <input type="hidden" name="customerId" value={customer.id} />
+                      <label><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
+                      <label><span>Last name</span><input name="lastName" value={customer.last_name} required /></label>
+                      <input type="hidden" name="phoneNumber" value={customer.phone_number} />
+                      <input type="hidden" name="email" value={customer.email ?? ""} />
+                      <input type="hidden" name="address" value={customer.address} />
+                      <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
+                      <input type="hidden" name="creditLimit" value={customer.credit_limit} />
+                      {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
                 </td>
                 <td class="dashboard-table__cell--truncate">
-                  {customer.assigned_agent_name ?? "None"}
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Email: ${fullName(customer)}`}
+                  >
+                    <span>{customer.email ?? "No email"}</span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="save-customer" />
+                      <input type="hidden" name="customerId" value={customer.id} />
+                      <input type="hidden" name="firstName" value={customer.first_name} />
+                      <input type="hidden" name="lastName" value={customer.last_name} />
+                      <input type="hidden" name="phoneNumber" value={customer.phone_number} />
+                      <input type="hidden" name="address" value={customer.address} />
+                      <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
+                      <input type="hidden" name="creditLimit" value={customer.credit_limit} />
+                      {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
+                      <label><span>Email</span><input name="email" type="email" value={customer.email ?? ""} autocomplete="email" /></label>
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
+                </td>
+                <td class="dashboard-table__cell--truncate">
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Contact: ${fullName(customer)}`}
+                  >
+                    <span>{customer.phone_number}</span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="save-customer" />
+                      <input type="hidden" name="customerId" value={customer.id} />
+                      <input type="hidden" name="firstName" value={customer.first_name} />
+                      <input type="hidden" name="lastName" value={customer.last_name} />
+                      <input type="hidden" name="email" value={customer.email ?? ""} />
+                      <input type="hidden" name="address" value={customer.address} />
+                      <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
+                      <input type="hidden" name="creditLimit" value={customer.credit_limit} />
+                      {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
+                      <label><span>Phone number</span><input name="phoneNumber" value={customer.phone_number} required inputmode="tel" autocomplete="tel" /></label>
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
                 </td>
                 <td>
-                  <span class="customer-credit-cell">
-                    <span>{formatCompactCurrency(customer.outstanding_credit_balance)} / {formatCompactCurrency(customer.credit_limit)}</span>
-                    {customer.credit_limit_exceeded && (
-                      <StatusBadge kind="payment" status="partial" label="Exceeded" />
-                    )}
-                  </span>
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Type: ${fullName(customer)}`}
+                  >
+                    <StatusBadge
+                      kind="customer-type"
+                      status={customer.is_reseller ? "reseller" : "retail"}
+                      label={customer.is_reseller ? "Reseller" : "Retail"}
+                    />
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="save-customer" />
+                      <input type="hidden" name="customerId" value={customer.id} />
+                      <input type="hidden" name="firstName" value={customer.first_name} />
+                      <input type="hidden" name="lastName" value={customer.last_name} />
+                      <input type="hidden" name="phoneNumber" value={customer.phone_number} />
+                      <input type="hidden" name="email" value={customer.email ?? ""} />
+                      <input type="hidden" name="address" value={customer.address} />
+                      <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
+                      <input type="hidden" name="creditLimit" value={customer.credit_limit} />
+                      <label class="checkbox-row">
+                        <input name="isReseller" type="checkbox" checked={customer.is_reseller || undefined} />
+                        <span>Reseller customer</span>
+                      </label>
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
+                </td>
+                <td class="dashboard-table__cell--truncate">
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Assigned Agent: ${fullName(customer)}`}
+                  >
+                    <span>{customer.assigned_agent_name ?? "None"}</span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="save-customer" />
+                      <input type="hidden" name="customerId" value={customer.id} />
+                      <input type="hidden" name="firstName" value={customer.first_name} />
+                      <input type="hidden" name="lastName" value={customer.last_name} />
+                      <input type="hidden" name="phoneNumber" value={customer.phone_number} />
+                      <input type="hidden" name="email" value={customer.email ?? ""} />
+                      <input type="hidden" name="address" value={customer.address} />
+                      <input type="hidden" name="creditLimit" value={customer.credit_limit} />
+                      {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
+                      <label>
+                        <span>Assigned agent</span>
+                        <select name="assignedAgentId">
+                          <option value="" selected={!customer.assigned_agent_id}>None</option>
+                          {data.agents.map((agent) => (
+                            <option value={agent.id} selected={selected(customer.assigned_agent_id, agent.id)}>
+                              {agent.display_name}
+                              {agent.employee_id ? ` (${agent.employee_id})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
+                </td>
+                <td>
+                  <button
+                    type="button"
+                    class="table-cell-trigger"
+                    data-open-cell-popover
+                    data-popover-title={`Edit Credit: ${fullName(customer)}`}
+                  >
+                    <span class="customer-credit-cell">
+                      <span>
+                        {formatCompactCurrency(customer.outstanding_credit_balance)} / {formatCompactCurrency(customer.credit_limit)}
+                      </span>
+                      {customer.credit_limit_exceeded && (
+                        <StatusBadge kind="payment" status="partial" label="Exceeded" />
+                      )}
+                    </span>
+                  </button>
+                  <div class="hidden-popover-form-holder" style="display: none;">
+                    <form method="post" class="admin-table-form">
+                      <input type="hidden" name="action" value="save-customer" />
+                      <input type="hidden" name="customerId" value={customer.id} />
+                      <input type="hidden" name="firstName" value={customer.first_name} />
+                      <input type="hidden" name="lastName" value={customer.last_name} />
+                      <input type="hidden" name="phoneNumber" value={customer.phone_number} />
+                      <input type="hidden" name="email" value={customer.email ?? ""} />
+                      <input type="hidden" name="address" value={customer.address} />
+                      <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
+                      {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
+                      <p class="cell-popover__readonly-value">
+                        Outstanding balance: {formatCompactCurrency(customer.outstanding_credit_balance)}
+                      </p>
+                      <label>
+                        <span>Credit limit</span>
+                        <input name="creditLimit" type="number" min="0" step="1" value={customer.credit_limit} required />
+                      </label>
+                      <button type="submit">Save Changes</button>
+                    </form>
+                  </div>
                 </td>
                 <td>
                   <ViewButton href={`/admin/customers/${customer.id}`} />
@@ -230,7 +387,6 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             <th scope="col">Email</th>
             <th scope="col">Contact</th>
             <th scope="col">Type</th>
-            <th scope="col">Agent</th>
             <th scope="col">Assigned Agent</th>
             <th scope="col">Credit</th>
             <th scope="col">Action</th>
@@ -244,7 +400,6 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
             </tr>
@@ -278,10 +433,3 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
     initAdminCustomerFilters();
   }
 </script>
-
-<style>
-  .customer-credit-cell > span:first-child {
-    color: #111827;
-    font-weight: 650;
-  }
-</style>

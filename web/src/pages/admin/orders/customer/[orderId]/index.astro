@@ -138,6 +138,19 @@ const isOrderDetailTabActive = (tab: string) => tab === activeOrderDetailTab;
 const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
 const orderSlipPdfHref = `/admin/orders/customer/${order.id}/order-slip.pdf`;
 const salesInvoicePdfHref = `/admin/orders/customer/${order.id}/sales-invoice.pdf`;
+
+function sanitizeAttachmentFileName(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "") || "file";
+}
+
+const orderSlipPdfFileName = `order-slip-${sanitizeAttachmentFileName(fullName(order.customer))}-${order.id.slice(0, 8)}.pdf`;
+const salesInvoicePdfFileName = invoice
+  ? `sales-invoice-${sanitizeAttachmentFileName(fullName(order.customer))}-${invoice.invoice_number}.pdf`
+  : null;
 const totalCommission = order.customer_order_item.reduce((total, item) => {
   return total + item.agent_commission_amount;
 }, 0);
@@ -606,6 +619,36 @@ const backLabel = backHref.startsWith("/admin/customers/")
             </ul>
           </article>
         </div>
+
+        <section class="order-attachments" aria-labelledby="order-attachments-title">
+          <h2 id="order-attachments-title" class="order-attachments__title">Attachments</h2>
+          <ul class="order-attachments__list">
+            <li class="order-attachments__item">
+              <a
+                href={orderSlipPdfHref}
+                class="order-attachments__link"
+                target="_blank"
+                rel="noreferrer"
+              >
+                {orderSlipPdfFileName}
+              </a>
+            </li>
+            {
+              salesInvoicePdfFileName ? (
+                <li class="order-attachments__item">
+                  <a
+                    href={salesInvoicePdfHref}
+                    class="order-attachments__link"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {salesInvoicePdfFileName}
+                  </a>
+                </li>
+              ) : null
+            }
+          </ul>
+        </section>
       </div>
 
     </aside>
@@ -874,14 +917,14 @@ const backLabel = backHref.startsWith("/admin/customers/")
 
         <section
           class:list={[
-            "order-tab-panel order-tab-panel--document document-preview--pdf-like document-preview--rounded-sm",
+            "order-tab-panel order-tab-panel--document",
             isOrderDetailTabActive("order-slip") && "is-active",
           ]}
           data-order-detail-tab-panel="order-slip"
           role="tabpanel"
           hidden={!isOrderDetailTabActive("order-slip")}
         >
-          <div class="document-preview-scroll">
+          <div class="document-preview-body document-preview--pdf-like document-preview--rounded-sm">
           <header class="pdf-preview-header">
             <div class="pdf-preview-brand">
               {
@@ -984,30 +1027,12 @@ const backLabel = backHref.startsWith("/admin/customers/")
             </div>
           </footer>
           </div>
-          <div class="document-preview-toolbar">
-            <div class="panel-actions">
-              <a
-                href={orderSlipPdfHref}
-                class="document-action"
-                target="_blank"
-                rel="noreferrer"
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true"
-                  ><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path
-                    d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4"
-                  ></path></svg
-                >
-                <span>Open PDF</span>
-              </a>
-            </div>
-          </div>
         </section>
 
         <section
           class:list={[
             "order-tab-panel",
-            hasSalesInvoice &&
-              "order-tab-panel--document document-preview--pdf-like document-preview--rounded-sm",
+            hasSalesInvoice && "order-tab-panel--document",
             isOrderDetailTabActive("sales-invoice") && "is-active",
           ]}
           data-order-detail-tab-panel="sales-invoice"
@@ -1050,7 +1075,7 @@ const backLabel = backHref.startsWith("/admin/customers/")
               </div>
             ) : (
               <>
-                <div class="document-preview-scroll">
+                <div class="document-preview-body document-preview--pdf-like document-preview--rounded-sm">
                 <header class="pdf-preview-header">
                   <div class="pdf-preview-brand">
                     {salesInvoiceLayout.brandLines.map((line, index) => (
@@ -1163,25 +1188,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
                     <p>{salesInvoiceLayout.issuerSubline}</p>
                   </div>
                 </footer>
-                </div>
-                <div class="document-preview-toolbar">
-                  <div class="panel-actions">
-                    <a
-                      href={salesInvoicePdfHref}
-                      class="document-action"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <>
-                          <path d="M15 3h6v6" />
-                          <path d="M10 14 21 3" />
-                          <path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4" />
-                        </>
-                      </svg>
-                      <span>Open PDF</span>
-                    </a>
-                  </div>
                 </div>
               </>
             )
@@ -2479,6 +2485,15 @@ const backLabel = backHref.startsWith("/admin/customers/")
     padding: 0;
   }
 
+  :global(.dashboard-main:has([data-order-detail-page]) .dashboard-main__content) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+
   :global(.admin-shell:has([data-order-detail-page])) {
     display: flex;
     flex: 1;
@@ -2511,6 +2526,8 @@ const backLabel = backHref.startsWith("/admin/customers/")
   .order-detail-page {
     display: grid;
     grid-template-columns: minmax(320px, 520px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
     flex: 1;
     min-height: 0;
     height: 100%;
@@ -2520,15 +2537,20 @@ const backLabel = backHref.startsWith("/admin/customers/")
   .order-detail-sidebar {
     display: flex;
     flex-direction: column;
+    align-self: stretch;
     min-height: 0;
+    height: 100%;
     background: #ffffff;
     border-right: 1px solid rgba(17, 24, 39, 0.08);
     overflow: hidden;
   }
 
   .order-sidebar-header {
-    flex-shrink: 0;
+    flex: 1 1 auto;
+    min-height: 0;
     padding: 2rem 2rem 1rem;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 
   .order-sidebar-main {
@@ -2673,6 +2695,52 @@ const backLabel = backHref.startsWith("/admin/customers/")
     gap: 0.75rem;
   }
 
+  .order-attachments {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .order-attachments__title {
+    margin: 0 0 0.85rem;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .order-attachments__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .order-attachments__item {
+    min-width: 0;
+  }
+
+  .order-attachments__link {
+    display: inline-block;
+    max-width: 100%;
+    color: #661818;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.4;
+    text-decoration: none;
+    overflow-wrap: anywhere;
+  }
+
+  .order-attachments__link:hover,
+  .order-attachments__link:focus-visible {
+    color: #551313;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
   .order-party-card {
     border-radius: 1rem;
     border: 1px solid rgba(17, 24, 39, 0.08);
@@ -2791,16 +2859,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
 
   .order-summary-top__main .route-back-button {
     flex-shrink: 0;
-  }
-
-  .document-action svg {
-    width: 1rem;
-    height: 1rem;
-    fill: none;
-    stroke: currentColor;
-    stroke-width: 2;
-    stroke-linecap: round;
-    stroke-linejoin: round;
   }
 
   .order-title-copy h1 {
@@ -3000,7 +3058,9 @@ const backLabel = backHref.startsWith("/admin/customers/")
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
     gap: 0;
+    align-self: stretch;
     min-height: 0;
+    height: 100%;
     padding: 2rem;
     background: transparent;
     overflow: hidden;
@@ -3048,13 +3108,16 @@ const backLabel = backHref.startsWith("/admin/customers/")
   .order-tab-panels {
     display: flex;
     flex-direction: column;
+    flex: 1;
     gap: 0;
     min-height: 0;
     overflow: hidden;
   }
 
   .order-tab-panels > .order-tab-panel.is-active {
+    display: flex;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
   }
 
@@ -3071,23 +3134,24 @@ const backLabel = backHref.startsWith("/admin/customers/")
   }
 
   .order-tab-panel.is-active {
-    display: block;
+    display: flex;
+    flex-direction: column;
   }
 
-  .order-tab-panel--document.document-preview--pdf-like {
-    border-radius: 0.125rem;
+  .order-tab-panel--document {
     padding: 0;
-    border: 1px solid #d7d7d7;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     box-shadow: none;
-    background: #ffffff;
     backdrop-filter: none;
-    color: #111111;
     overflow: hidden;
   }
 
-  .order-tab-panel--document.document-preview--pdf-like.is-active {
-    display: flex;
-    flex-direction: column;
+  .document-preview-body {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
   }
 
   .order-products-panel,
@@ -3271,27 +3335,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
     letter-spacing: 0.05em;
   }
 
-  .document-preview-scroll {
-    flex: 1;
-    min-height: 0;
-    overflow-y: auto;
-    padding: 2.75rem 2.5rem;
-    scrollbar-gutter: stable;
-  }
-
-  .document-preview-toolbar {
-    flex-shrink: 0;
-    display: flex;
-    justify-content: flex-end;
-    padding: 0.85rem 1.5rem 1.15rem;
-    background: #ffffff;
-    border-top: 1px solid rgba(17, 24, 39, 0.06);
-  }
-
-  .document-preview-toolbar .panel-actions {
-    margin: 0;
-  }
-
   .panel-header,
   .document-preview-header,
   .document-footer,
@@ -3326,39 +3369,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
     align-items: center;
     gap: 0.75rem;
     flex-wrap: wrap;
-  }
-
-  .document-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.55rem;
-    min-height: 2.75rem;
-    padding: 0 1rem;
-    border-radius: 0.8rem;
-    border: 1px solid rgba(17, 24, 39, 0.12);
-    background: #ffffff;
-    color: #111827;
-    text-decoration: none;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  [data-order-detail-tab-panel="order-slip"] .document-action,
-  [data-order-detail-tab-panel="sales-invoice"] .document-action {
-    min-height: 2.35rem;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 0.375rem;
-    background: #2e2e2e;
-    color: #ffffff;
-  }
-
-  [data-order-detail-tab-panel="order-slip"] .document-action:hover,
-  [data-order-detail-tab-panel="order-slip"] .document-action:focus-visible,
-  [data-order-detail-tab-panel="sales-invoice"] .document-action:hover,
-  [data-order-detail-tab-panel="sales-invoice"] .document-action:focus-visible {
-    background: #3a3a3a;
-    color: #ffffff;
-    outline: none;
   }
 
   .document-preview {
@@ -4211,6 +4221,11 @@ const backLabel = backHref.startsWith("/admin/customers/")
   }
 
   @media (max-width: 1080px) {
+    :global(.dashboard-main:has([data-order-detail-page]) .dashboard-main__content) {
+      height: auto;
+      overflow: visible;
+    }
+
     :global(.dashboard-body:has([data-order-detail-page])),
     :global(.dashboard-frame:has([data-order-detail-page])),
     :global(.dashboard-main:has([data-order-detail-page])) {

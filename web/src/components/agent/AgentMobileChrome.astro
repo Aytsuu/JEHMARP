@@ -1,0 +1,79 @@
+---
+import { agentPrimaryNavItems, isAgentNavActive } from "@/lib/dashboard/agent-navigation";
+import type { DashboardSidebarUnreadBadge } from "@/lib/dashboard/sidebar-navigation";
+
+type Props = {
+  currentPath: string;
+  sidebarUnreadBadges?: Record<string, DashboardSidebarUnreadBadge>;
+};
+
+const { currentPath, sidebarUnreadBadges = {} } = Astro.props;
+---
+
+<header class="agent-mobile-header" aria-label="Agent dashboard" transition:persist="agent-mobile-header">
+  <a class="agent-mobile-header__brand" href="/">
+    <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
+    <span class="agent-mobile-header__brand-text">JEHMARP</span>
+  </a>
+</header>
+
+<nav class="agent-mobile-nav" aria-label="Agent navigation" transition:persist="agent-mobile-nav">
+  <ul class="agent-mobile-nav__list">
+    {
+      agentPrimaryNavItems.map((item) => {
+        const isCurrent = isAgentNavActive(currentPath, item.href);
+        const unreadBadge = sidebarUnreadBadges[item.href];
+        const hasUnread =
+          unreadBadge &&
+          ("count" in unreadBadge ? unreadBadge.count > 0 : unreadBadge.ids.length > 0);
+
+        return (
+          <li class="agent-mobile-nav__item">
+            <a
+              href={item.href}
+              class:list={[
+                "agent-mobile-nav__link",
+                isCurrent && "agent-mobile-nav__link--active",
+              ]}
+              aria-current={isCurrent ? "page" : undefined}
+              data-dashboard-nav-link
+              data-agent-nav-link
+              data-astro-transition="none"
+              data-astro-prefetch="viewport"
+            >
+              <span class="agent-mobile-nav__icon" set:html={item.icon} />
+              <span class="agent-mobile-nav__label">{item.label}</span>
+              {
+                hasUnread && (
+                  <span
+                    class="agent-mobile-nav__badge"
+                    data-sidebar-unread-badge={"count" in unreadBadge ? undefined : true}
+                    data-storage-key={
+                      "count" in unreadBadge ? undefined : unreadBadge.storageKey
+                    }
+                    data-unread-ids={
+                      "count" in unreadBadge ? undefined : unreadBadge.ids.join(",")
+                    }
+                    aria-hidden="true"
+                  />
+                )
+              }
+            </a>
+          </li>
+        );
+      })
+    }
+  </ul>
+</nav>
+
+<script>
+  import {
+    initAgentMobileNavigation,
+    syncAgentMobileChrome,
+  } from "@/lib/client/agent-mobile-route";
+
+  initAgentMobileNavigation();
+  syncAgentMobileChrome();
+  document.addEventListener("astro:page-load", () => syncAgentMobileChrome());
+  document.addEventListener("astro:after-swap", () => syncAgentMobileChrome());
+</script>

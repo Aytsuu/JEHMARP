@@ -3,6 +3,14 @@ import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 
 import { parseContactNumber } from "@/lib/formatters";
+import { canAttachCustomerToAgentOrder } from "@/lib/agent-order-distribution";
+import { parseAttachCustomerEntriesJson, type AgentOrderAttachEntry } from "@/lib/agent-order-attach";
+import {
+  assertAgentContactIsAvailable,
+  assertAgentEmailIsAvailable,
+  executeAgentProfileUpdate,
+  parseAgentProfileUpdateFields,
+} from "@/lib/agent-profile-update";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PRODUCT_IMAGE_BUCKET, isManagedStoragePath } from "@/lib/supabase/storage";
@@ -138,14 +146,7 @@ export type AdminAction =
   | {
       type: "update-agent";
       agentId: string;
-      payload: {
-        employee_id: string | null;
-        first_name: string;
-        last_name: string;
-        display_name: string;
-        status: "active" | "inactive" | "suspended";
-        updated_at: string;
-      };
+      payload: ReturnType<typeof parseAgentProfileUpdateFields>;
     }
   | {
       type: "create-order";
@@ -224,6 +225,17 @@ export type AdminAction =
         agent_commission_updated_by: string;
         agent_commission_updated_at: string;
       };
+    }
+  | {
+      type: "update-agent-order-item-quantity";
+      agentOrderItemId: string;
+      quantity: number;
+    }
+  | {
+      type: "attach-agent-order-customer";
+      agentOrderId: string;
+      entries: AgentOrderAttachEntry[];
+      requireApproval: boolean;
     }
   | {
       type: "record-payment";
@@ -549,7 +561,7 @@ export async function executeAdminAction(
       await executeCustomerPromotionToAgent(action.customerId);
       return;
     case "update-agent":
-      await executeTableUpdate(supabase, "agent_profile", action.agentId, action.payload);
+      await executeAgentProfileUpdate(createSupabaseAdminClient(), action.agentId, action.payload);
       return;
     case "create-order":
       await executeOrderCreate(supabase, action);
@@ -571,6 +583,45 @@ export async function executeAdminAction(
       await assertAgentOrderItemCommissionEditable(supabase, action.agentOrderItemId);
       await executeTableUpdate(supabase, "agent_order_item", action.agentOrderItemId, action.payload);
       return;
+    case "update-agent-order-item-quantity": {
+      const { error } = await supabase.rpc("update_agent_order_item_quantity", {
+        target_agent_order_item_id: action.agentOrderItemId,
+        new_quantity: action.quantity,
+      });
+
+      if (error) {
+        throw new Error(error.message || "Unable to update agent order item quantity.");
+      }
+
+      return;
+    }
+    case "attach-agent-order-customer": {
+      await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
+
+      for (const entry of action.entries) {
+        const { data, error } = await supabase.rpc("attach_customer_to_agent_order", {
+          target_agent_order_id: action.agentOrderId,
+          target_customer_id: entry.customer.type === "existing" ? entry.customer.customerId : null,
+          item_payload: entry.items,
+          customer_payload: entry.customer.type === "new"
+            ? {
+                firstName: entry.customer.payload.firstName,
+                lastName: entry.customer.payload.lastName,
+                phoneNumber: entry.customer.payload.phoneNumber,
+                email: entry.customer.payload.email,
+                address: entry.customer.payload.address,
+              }
+            : null,
+          require_approval: action.requireApproval,
+        });
+
+        if (error || typeof data !== "string") {
+          throw new Error(error?.message || "Unable to attach customer order to agent order.");
+        }
+      }
+
+      return;
+    }
     case "update-invoice-item-quantity":
       await assertOrderItemInvoiceQuantityEditable(supabase, action.orderItemId);
       await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
@@ -799,11 +850,7 @@ function parseAdminActionFormDataOrThrow(
       return success({
         type: "update-agent",
         agentId: uuidSchema.parse(requiredString(formData, "agentId")),
-        payload: {
-          ...parseAgentProfilePayload(formData),
-          status: enumValue(formData, "status", ["active", "inactive", "suspended"] as const),
-          updated_at: new Date().toISOString(),
-        },
+        payload: parseAgentProfileUpdateFields(formData),
       });
     case "create-order": {
       const existingCustomerId = optionalUuid(formData, "customerId");
@@ -890,6 +937,22 @@ function parseAdminActionFormDataOrThrow(
           agent_commission_updated_at: new Date().toISOString(),
         },
       });
+    case "update-agent-order-item-quantity":
+      return success({
+        type: "update-agent-order-item-quantity",
+        agentOrderItemId: uuidSchema.parse(requiredString(formData, "agentOrderItemId")),
+        quantity: positiveNumber(formData, "quantity"),
+      });
+    case "attach-agent-order-customer": {
+      const entriesJson = requiredString(formData, "attachCustomerEntries");
+
+      return success({
+        type: "attach-agent-order-customer",
+        agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
+        entries: parseAttachCustomerEntriesJson(entriesJson),
+        requireApproval: false,
+      });
+    }
     case "update-invoice-item-quantity":
       return success({
         type: "update-invoice-item-quantity",
@@ -1082,52 +1145,6 @@ async function executeAgentCreate(
     }
 
     throw new Error("Unable to create agent profile.");
-  }
-}
-
-async function assertAgentEmailIsAvailable(
-  adminClient: SupabaseAdminClient,
-  email: string | null,
-) {
-  if (!email) return;
-
-  const normalizedEmail = email.trim().toLowerCase();
-  const { data, error } = await adminClient.auth.admin.listUsers({
-    page: 1,
-    perPage: 200,
-  });
-
-  if (error) {
-    throw new Error("Unable to validate existing agent email.");
-  }
-
-  const hasExistingEmail = (data?.users ?? []).some(
-    (user) => (user.email ?? "").trim().toLowerCase() === normalizedEmail,
-  );
-
-  if (hasExistingEmail) {
-    throw new Error("Email already exists for another account.");
-  }
-}
-
-async function assertAgentContactIsAvailable(
-  adminClient: SupabaseAdminClient,
-  contact: string,
-) {
-  const normalizedContact = contact.trim();
-  const { data, error } = await adminClient
-    .from("agent_profile")
-    .select("id")
-    .eq("contact", normalizedContact)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error("Unable to validate existing agent contact number.");
-  }
-
-  if (data?.id) {
-    throw new Error("Contact number already exists for another agent.");
   }
 }
 
@@ -1991,6 +2008,40 @@ async function assertAgentOrderItemCommissionEditable(
   }
 }
 
+async function assertAgentOrderAllowsCustomerAttach(
+  supabase: SupabaseServerClient,
+  agentOrderId: string,
+) {
+  const { data, error } = await supabase
+    .from("agent_order")
+    .select("order_status, customer_order ( payment_status )")
+    .eq("id", agentOrderId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to verify agent order status before attaching a customer.");
+  }
+
+  if (!data) {
+    throw new Error("Agent order was not found.");
+  }
+
+  const customerOrders = Array.isArray(data.customer_order)
+    ? data.customer_order
+    : data.customer_order
+      ? [data.customer_order]
+      : [];
+
+  if (!canAttachCustomerToAgentOrder({
+    order_status: String(data.order_status),
+    customer_order: customerOrders.map((order) => ({
+      payment_status: String((order as { payment_status?: unknown }).payment_status ?? "unpaid"),
+    })),
+  })) {
+    throw new Error("Completed and paid agent orders cannot accept new customers.");
+  }
+}
+
 function roundCurrency(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -2445,6 +2496,14 @@ function parseOrderItems(formData: FormData) {
   return parsedItems;
 }
 
+function parseAttachAgentOrderItems(formData: FormData) {
+  return parseOrderItems(formData).map((item) => ({
+    productId: item.product_id,
+    quantity: item.partial_quantity,
+    addDetails: item.add_details,
+  }));
+}
+
 function parseCreateAgentPayload(
   formData: FormData,
 ): Extract<AdminAction, { type: "create-agent" }>["payload"] {
@@ -2607,6 +2666,12 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Commission updated.";
     case "update-agent-order-commission":
       return "Commission updated.";
+    case "update-agent-order-item-quantity":
+      return "Product quantity updated.";
+    case "attach-agent-order-customer":
+      return action.entries.length > 1
+        ? "Customer orders attached."
+        : "Customer order attached.";
     case "update-invoice-item-quantity":
       return "Quantity updated.";
     case "add-order-item":

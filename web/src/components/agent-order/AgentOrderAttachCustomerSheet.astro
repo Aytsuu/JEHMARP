@@ -1,0 +1,496 @@
+---
+import Accordion from "@/components/ui/Accordion.astro";
+import OrderCustomerPicker from "@/components/order/OrderCustomerPicker.astro";
+import Sheet from "@/components/ui/Sheet.astro";
+import { formatCurrency } from "@/lib/admin-dashboard/view";
+
+type CustomerOption = {
+  id: string;
+  label: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email: string;
+  address: string;
+};
+
+type ProductOption = {
+  id: string;
+  name: string;
+  unitLabel: string;
+  defaultPrice: number;
+  remainingQuantity?: number | null;
+};
+
+type Props = {
+  agentOrderId: string;
+  customers: CustomerOption[];
+  products: ProductOption[];
+  mode: "admin" | "agent";
+  canAttachCustomer?: boolean;
+  sheetId?: string;
+  formId?: string;
+};
+
+const {
+  agentOrderId,
+  customers,
+  products,
+  mode,
+  canAttachCustomer = true,
+  sheetId = "agent-order-attach-customer-sheet",
+  formId = "agent-order-attach-customer-form",
+} = Astro.props;
+
+const canSubmit = products.length > 0 && canAttachCustomer;
+const actionName = "attach-agent-order-customer";
+
+function productOptionLabel(product: ProductOption) {
+  const remainingLabel = product.remainingQuantity != null
+    ? ` - ${product.remainingQuantity} ${product.unitLabel} remaining`
+    : "";
+
+  return `${product.name}${remainingLabel} - ${formatCurrency(product.defaultPrice)} per ${product.unitLabel}`;
+}
+---
+
+<Sheet id={sheetId} width="42rem">
+  <div slot="header" class="order-create-sheet__header-copy">
+    <h3 class="drawer-sheet__title" data-sheet-title>Add Customer Order</h3>
+    <p class="order-create-sheet__header-description">
+      {
+        mode === "agent"
+          ? "Attach one or more customer orders to this distribution. Submissions that increase product totals require admin approval."
+          : "Attach one or more customer orders using remaining product quantities or add new products to this agent order."
+      }
+    </p>
+  </div>
+  <form
+    id={formId}
+    method="post"
+    class="order-create-form"
+    data-agent-order-attach-form
+    data-can-submit={String(canSubmit)}
+  >
+    <input type="hidden" name="action" value={actionName} />
+    <input type="hidden" name="agentOrderId" value={agentOrderId} />
+    <input type="hidden" name="attachCustomerEntries" value="" data-attach-customer-entries />
+
+    {!canSubmit && (
+      <p class="empty-state">
+        {
+          !canAttachCustomer
+            ? "This agent order is completed and fully paid, so new customers cannot be added."
+            : "No active products are available for this order."
+        }
+      </p>
+    )}
+
+    <div class="order-create-section" data-customer-entries>
+      <Accordion class="customer-entry-accordion" open data-customer-entry>
+        <span slot="title" data-customer-entry-title>New customer</span>
+        <button
+          slot="actions"
+          type="button"
+          class="order-item-accordion__remove"
+          data-remove-customer-entry
+          hidden
+          aria-label="Remove customer"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
+          </svg>
+        </button>
+
+        <section class="order-create-section order-create-section--nested">
+          <div class="order-create-section__header">
+            <h3 class="order-create-section__title">Customer</h3>
+          </div>
+          <div class="order-create-section__body">
+            <label class="field-row">
+              <span>Existing customer</span>
+              <OrderCustomerPicker disabled={!canSubmit} />
+            </label>
+          </div>
+        </section>
+
+        <section class="order-create-section order-create-section--nested" data-new-customer-fields>
+          <div class="order-create-section__header">
+            <h3 class="order-create-section__title">Customer details</h3>
+          </div>
+          <div class="order-create-section__body admin-form-grid">
+            <label class="field-row">
+              <span>First name</span>
+              <input required disabled={!canSubmit} data-customer-first-name />
+            </label>
+            <label class="field-row">
+              <span>Last name</span>
+              <input required disabled={!canSubmit} data-customer-last-name />
+            </label>
+            <label class="field-row">
+              <span>Phone number</span>
+              <input required disabled={!canSubmit} data-customer-phone-number />
+            </label>
+            <label class="field-row">
+              <span>Email</span>
+              <input type="email" disabled={!canSubmit} data-customer-email />
+            </label>
+            <label class="field-row field-row--full">
+              <span>Address</span>
+              <textarea rows="2" required disabled={!canSubmit} data-customer-address></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="order-create-section order-create-section--nested">
+          <div class="order-create-section__header">
+            <h3 class="order-create-section__title">Order items</h3>
+          </div>
+          <div class="order-create-section__body">
+            <div class="order-item-list" data-order-items>
+              <Accordion class="order-item-accordion" open>
+                <span slot="title" data-order-item-title>Select product</span>
+                <button
+                  slot="actions"
+                  type="button"
+                  class="order-item-accordion__remove"
+                  data-remove-order-item
+                  aria-label="Remove item"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
+                  </svg>
+                </button>
+                <div class="order-item-accordion__fields" data-order-item-row>
+                  <label class="field-row">
+                    <span>Product</span>
+                    <select required disabled={!canSubmit} data-order-product-select>
+                      <option value="">Select product</option>
+                      {products.map((product) => (
+                        <option
+                          value={product.id}
+                          data-product-name={product.name}
+                          data-product-price={product.defaultPrice}
+                          data-product-remaining={product.remainingQuantity ?? ""}
+                        >
+                          {productOptionLabel(product)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label class="field-row">
+                    <span>Quantity</span>
+                    <input type="number" min="0.001" step="0.001" required disabled={!canSubmit} data-order-quantity />
+                  </label>
+                  <label class="field-row">
+                    <span>Details</span>
+                    <textarea data-order-add-details placeholder="Cut, packing, or delivery notes" disabled={!canSubmit}></textarea>
+                  </label>
+                </div>
+              </Accordion>
+            </div>
+            <button type="button" class="order-create-form__add-item" data-add-order-item disabled={!canSubmit}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14"></path><path d="M5 12h14"></path>
+              </svg>
+              <span>Add item</span>
+            </button>
+          </div>
+        </section>
+      </Accordion>
+    </div>
+
+    <button
+      type="button"
+      class="order-create-form__add-item order-create-form__add-customer"
+      data-add-customer-entry
+      disabled={!canSubmit}
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 5v14"></path><path d="M5 12h14"></path>
+      </svg>
+      <span>Add customer</span>
+    </button>
+
+    <template data-customer-option-template>
+      {customers.map((customer) => (
+        <button
+          type="button"
+          class="order-customer-picker__option"
+          data-customer-id={customer.id}
+          data-customer-label={customer.label}
+          data-customer-first-name={customer.firstName}
+          data-customer-last-name={customer.lastName}
+          data-customer-phone-number={customer.phoneNumber}
+          data-customer-email={customer.email}
+          data-customer-address={customer.address}
+        >
+          {customer.label}
+        </button>
+      ))}
+    </template>
+
+    <template data-customer-entry-template>
+      <details class="ui-accordion customer-entry-accordion" data-customer-entry>
+        <summary class="ui-accordion__summary">
+          <span class="ui-accordion__title" data-customer-entry-title>New customer</span>
+          <span class="ui-accordion__summary-actions">
+            <button type="button" class="order-item-accordion__remove" data-remove-customer-entry aria-label="Remove customer">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
+              </svg>
+            </button>
+            <span class="ui-accordion__icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </span>
+          </span>
+        </summary>
+        <div class="ui-accordion__content">
+          <section class="order-create-section order-create-section--nested">
+            <div class="order-create-section__header">
+              <h3 class="order-create-section__title">Customer</h3>
+            </div>
+            <div class="order-create-section__body">
+              <label class="field-row">
+                <span>Existing customer</span>
+                <div class="order-customer-picker" data-customer-picker>
+                  <input
+                    autocomplete="off"
+                    placeholder="Type a customer name"
+                    aria-label="Search customer"
+                    data-customer-search
+                    data-customer-search-input
+                    disabled={!canSubmit}
+                  />
+                  <button
+                    type="button"
+                    class="order-customer-picker__toggle"
+                    aria-label="Show customer options"
+                    aria-expanded="false"
+                    data-customer-picker-toggle
+                    disabled={!canSubmit}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <polyline points="6 9 12 15 18 9"></polyline>
+                    </svg>
+                  </button>
+                  <div class="order-customer-picker__menu" hidden data-customer-picker-menu>
+                    <div class="order-customer-picker__options" data-customer-options></div>
+                    <p class="order-customer-picker__empty" hidden data-customer-options-empty>
+                      No customers found.
+                    </p>
+                  </div>
+                </div>
+                <input type="hidden" data-customer-id />
+              </label>
+            </div>
+          </section>
+
+          <section class="order-create-section order-create-section--nested" data-new-customer-fields>
+            <div class="order-create-section__header">
+              <h3 class="order-create-section__title">Customer details</h3>
+            </div>
+            <div class="order-create-section__body admin-form-grid">
+              <label class="field-row">
+                <span>First name</span>
+                <input required disabled={!canSubmit} data-customer-first-name />
+              </label>
+              <label class="field-row">
+                <span>Last name</span>
+                <input required disabled={!canSubmit} data-customer-last-name />
+              </label>
+              <label class="field-row">
+                <span>Phone number</span>
+                <input required disabled={!canSubmit} data-customer-phone-number />
+              </label>
+              <label class="field-row">
+                <span>Email</span>
+                <input type="email" disabled={!canSubmit} data-customer-email />
+              </label>
+              <label class="field-row field-row--full">
+                <span>Address</span>
+                <textarea rows="2" required disabled={!canSubmit} data-customer-address></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="order-create-section order-create-section--nested">
+            <div class="order-create-section__header">
+              <h3 class="order-create-section__title">Order items</h3>
+            </div>
+            <div class="order-create-section__body">
+              <div class="order-item-list" data-order-items>
+                <details class="ui-accordion order-item-accordion" open>
+                  <summary class="ui-accordion__summary">
+                    <span class="ui-accordion__title" data-order-item-title>Select product</span>
+                    <span class="ui-accordion__summary-actions">
+                      <button type="button" class="order-item-accordion__remove" data-remove-order-item aria-label="Remove item">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
+                        </svg>
+                      </button>
+                      <span class="ui-accordion__icon" aria-hidden="true">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                      </span>
+                    </span>
+                  </summary>
+                  <div class="ui-accordion__content">
+                    <div class="order-item-accordion__fields" data-order-item-row>
+                      <label class="field-row">
+                        <span>Product</span>
+                        <select required disabled={!canSubmit} data-order-product-select>
+                          <option value="">Select product</option>
+                          {products.map((product) => (
+                            <option
+                              value={product.id}
+                              data-product-name={product.name}
+                              data-product-price={product.defaultPrice}
+                              data-product-remaining={product.remainingQuantity ?? ""}
+                            >
+                              {productOptionLabel(product)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label class="field-row">
+                        <span>Quantity</span>
+                        <input type="number" min="0.001" step="0.001" required disabled={!canSubmit} data-order-quantity />
+                      </label>
+                      <label class="field-row">
+                        <span>Details</span>
+                        <textarea data-order-add-details placeholder="Cut, packing, or delivery notes" disabled={!canSubmit}></textarea>
+                      </label>
+                    </div>
+                  </div>
+                </details>
+              </div>
+              <button type="button" class="order-create-form__add-item" data-add-order-item disabled={!canSubmit}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 5v14"></path><path d="M5 12h14"></path>
+                </svg>
+                <span>Add item</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </details>
+    </template>
+
+    <template data-order-item-template>
+      <details class="ui-accordion order-item-accordion" data-order-item-accordion>
+        <summary class="ui-accordion__summary">
+          <span class="ui-accordion__title" data-order-item-title>Select product</span>
+          <span class="ui-accordion__summary-actions">
+            <button type="button" class="order-item-accordion__remove" data-remove-order-item aria-label="Remove item">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
+              </svg>
+            </button>
+            <span class="ui-accordion__icon" aria-hidden="true">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </span>
+          </span>
+        </summary>
+        <div class="ui-accordion__content">
+          <div class="order-item-accordion__fields" data-order-item-row>
+            <label class="field-row">
+              <span>Product</span>
+              <select required disabled={!canSubmit} data-order-product-select>
+                <option value="">Select product</option>
+                {products.map((product) => (
+                  <option
+                    value={product.id}
+                    data-product-name={product.name}
+                    data-product-price={product.defaultPrice}
+                    data-product-remaining={product.remainingQuantity ?? ""}
+                  >
+                    {productOptionLabel(product)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label class="field-row">
+              <span>Quantity</span>
+              <input type="number" min="0.001" step="0.001" required disabled={!canSubmit} data-order-quantity />
+            </label>
+            <label class="field-row">
+              <span>Details</span>
+              <textarea data-order-add-details placeholder="Cut, packing, or delivery notes" disabled={!canSubmit}></textarea>
+            </label>
+          </div>
+        </div>
+      </details>
+    </template>
+  </form>
+
+  <div slot="footer" class="order-create-sheet__footer">
+    <div class="order-create-form__total" aria-live="polite">
+      <span>Total amount</span>
+      <strong data-agent-order-attach-total>{formatCurrency(0)}</strong>
+    </div>
+    <button
+      type="submit"
+      form={formId}
+      data-agent-order-attach-submit
+      disabled={!canSubmit}
+    >
+      {mode === "agent" ? "Submit for approval" : "Add customer order"}
+    </button>
+  </div>
+</Sheet>
+
+<script>
+  import "@/lib/client/agent-order-attach-form";
+</script>
+
+<style>
+  .field-row--full {
+    grid-column: 1 / -1;
+  }
+
+  .order-create-section--nested {
+    margin-top: 0.75rem;
+  }
+
+  .order-create-section--nested .order-create-section__title {
+    font-size: 0.82rem;
+  }
+
+  .customer-entry-accordion + .customer-entry-accordion {
+    margin-top: 0.75rem;
+  }
+
+  .order-create-form__add-customer {
+    margin-top: 0.75rem;
+  }
+
+  .order-create-form__total {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-right: auto;
+  }
+
+  .order-create-form__total span {
+    color: #6b7280;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .order-create-form__total strong {
+    color: #111827;
+    font-size: 1.1rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+</style>

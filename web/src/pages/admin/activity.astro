@@ -1,6 +1,6 @@
 ---
 import AdminActivity from "@/components/admin/AdminActivity.astro";
-import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import {
   loadAdminActivityManagementData,
@@ -37,7 +37,7 @@ const [dashboardData, data] = await Promise.all([
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
-<AdminPageFrame
+<AdminNotificationsPageLayout
   title="Admin Activity - JEHMARP"
   description="Admin activity feed for operational changes."
   heading="Activity"
@@ -50,4 +50,4 @@ const feedback = formatAdminActionFeedback(Astro.url);
     activeFilters={activityFilters}
     filterQuery={activityFilterQuery}
   />
-</AdminPageFrame>
+</AdminNotificationsPageLayout>

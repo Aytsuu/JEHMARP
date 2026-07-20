@@ -1,5 +1,6 @@
 ---
 import Accordion from "@/components/ui/Accordion.astro";
+import ActionMenu from "@/components/ActionMenu.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminOrderManagementData } from "@/lib/admin-dashboard/data";
 import ViewButton from "@/components/ViewButton.astro";
@@ -416,7 +417,7 @@ const orderRows = data.orderRows;
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
-            placeholder="Search customer, phone, or email..."
+            placeholder="Search customer, phone, email, or customers in agent orders..."
             autocomplete="off"
             aria-label="Search orders"
             data-order-search-input
@@ -454,6 +455,25 @@ const orderRows = data.orderRows;
         </div>
       </form>
       <div class="order-management-toolbar__actions">
+        <ActionMenu
+          id="admin-orders-document-menu"
+          menuLabel="Document options for selected orders"
+          triggerLabel="Document"
+          triggerClass="order-management-toolbar__document-menu"
+          disabled
+          items={[
+            {
+              label: "Sales Invoice",
+              icon: "external-pdf",
+              dataAction: "bulk-sales-invoice-pdf",
+            },
+            {
+              label: "Order Slip",
+              icon: "external-pdf",
+              dataAction: "bulk-order-slip-pdf",
+            },
+          ]}
+        />
         <button
           type="button"
           class="btn-table-manage order-management-toolbar__create"
@@ -470,6 +490,12 @@ const orderRows = data.orderRows;
         <table class="dashboard-table">
           <thead>
             <tr>
+              <th scope="col" class="dashboard-table__select-column">
+                <label class="dashboard-table__select-all">
+                  <span class="sr-only">Select all orders on this page</span>
+                  <input type="checkbox" data-order-select-all />
+                </label>
+              </th>
               <th scope="col">Customer</th>
               <th scope="col">Date</th>
               <th scope="col">Source</th>
@@ -482,12 +508,23 @@ const orderRows = data.orderRows;
           <tbody>
             {orderRows.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={7}
+                colspan={8}
                 message="No orders match the selected filters."
               />
             ) : orderRows.map((order) => {
               return (
                 <tr data-status={order.status}>
+                  <td class="dashboard-table__select-column">
+                    <label class="dashboard-table__row-select">
+                      <span class="sr-only">Select order for {order.customer_label}</span>
+                      <input
+                        type="checkbox"
+                        value={order.id}
+                        data-order-row-checkbox
+                        data-order-row-type={order.row_type}
+                      />
+                    </label>
+                  </td>
                   <td class="dashboard-table__cell--truncate">
                     <span class="order-customer-cell">
                       <span class="order-customer-cell__name">{order.customer_label}</span>
@@ -535,6 +572,9 @@ const orderRows = data.orderRows;
         <caption class="sr-only">Loading filtered orders</caption>
         <thead>
           <tr>
+            <th scope="col" class="dashboard-table__select-column">
+              <span class="table-skeleton-block table-skeleton-block--short"></span>
+            </th>
             <th scope="col">Customer</th>
             <th scope="col">Date</th>
             <th scope="col">Source</th>
@@ -547,6 +587,7 @@ const orderRows = data.orderRows;
         <tbody>
           {skeletonRows.map(() => (
             <tr>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
@@ -563,6 +604,7 @@ const orderRows = data.orderRows;
 </section>
 
 <script>
+  import { initAdminOrderBulkPdf } from "@/lib/client/admin-order-bulk-pdf";
   import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
 
   function initCreateOrderSheet() {
@@ -1045,6 +1087,16 @@ const orderRows = data.orderRows;
   if (document.readyState === "complete" || document.readyState === "interactive") {
     initAdminOrderFilters();
   }
+
+  function initAdminOrderBulkPdfControls() {
+    initAdminOrderBulkPdf();
+  }
+
+  document.addEventListener("DOMContentLoaded", initAdminOrderBulkPdfControls);
+  document.addEventListener("astro:after-swap", initAdminOrderBulkPdfControls);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initAdminOrderBulkPdfControls();
+  }
 </script>
 
 <style>
@@ -1076,5 +1128,35 @@ const orderRows = data.orderRows;
     font-size: 1.1rem;
     letter-spacing: 0;
     white-space: nowrap;
+  }
+
+  .order-management-toolbar__document-menu {
+    min-height: 2.35rem;
+  }
+
+  .dashboard-table__select-column {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    max-width: 2.75rem;
+    padding-left: 0.75rem;
+    padding-right: 0.5rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .dashboard-table__select-all,
+  .dashboard-table__row-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+  }
+
+  .dashboard-table__select-column input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--color-brand-red);
+    cursor: pointer;
   }
 </style>

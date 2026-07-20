@@ -1,0 +1,158 @@
+---
+import type { AgentProfile } from "@/lib/agent-dashboard/data";
+import { fullName } from "@/lib/agent-dashboard/view";
+
+type Props = {
+  agent: AgentProfile;
+};
+
+const { agent } = Astro.props;
+const agentName = agent.display_name.trim() || fullName(agent);
+const contactValue = agent.contact ?? "";
+const emailValue = agent.email ?? "";
+const employeeIdValue = agent.employee_id ?? "";
+---
+
+<section class="agent-account-profile" aria-label="Account details">
+  <div class="dashboard-detail-grid dashboard-detail-grid--compact">
+    <div class="detail-field agent-account-profile__field">
+      <button
+        type="button"
+        class="agent-account-profile__trigger table-cell-trigger"
+        data-open-cell-popover
+        data-popover-title="Edit Employee ID"
+      >
+        <span class="detail-field-label">Employee ID</span>
+        <span class="detail-field-value">{agent.employee_id ?? "Not assigned"}</span>
+      </button>
+      <div class="hidden-popover-form-holder" style="display: none;">
+        <form method="post" class="admin-table-form">
+          <input type="hidden" name="action" value="update-agent-profile" />
+          <input type="hidden" name="firstName" value={agent.first_name} />
+          <input type="hidden" name="lastName" value={agent.last_name} />
+          <input type="hidden" name="status" value={agent.status} />
+          <input type="hidden" name="contact" value={contactValue} />
+          <input type="hidden" name="email" value={emailValue} />
+          <label><span>Employee ID</span><input name="employeeId" value={employeeIdValue} autocomplete="off" /></label>
+          <button type="submit">Save Changes</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="detail-field agent-account-profile__field">
+      <button
+        type="button"
+        class="agent-account-profile__trigger table-cell-trigger"
+        data-open-cell-popover
+        data-popover-title="Edit Name"
+      >
+        <span class="detail-field-label">Name</span>
+        <span class="detail-field-value">{agentName}</span>
+      </button>
+      <div class="hidden-popover-form-holder" style="display: none;">
+        <form method="post" class="admin-table-form">
+          <input type="hidden" name="action" value="update-agent-profile" />
+          <input type="hidden" name="employeeId" value={employeeIdValue} />
+          <input type="hidden" name="status" value={agent.status} />
+          <input type="hidden" name="contact" value={contactValue} />
+          <input type="hidden" name="email" value={emailValue} />
+          <label><span>First name</span><input name="firstName" value={agent.first_name} required autocomplete="given-name" /></label>
+          <label><span>Last name</span><input name="lastName" value={agent.last_name} required autocomplete="family-name" /></label>
+          <button type="submit">Save Changes</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="detail-field agent-account-profile__field">
+      <button
+        type="button"
+        class="agent-account-profile__trigger table-cell-trigger"
+        data-open-cell-popover
+        data-popover-title="Edit Email"
+      >
+        <span class="detail-field-label">Email</span>
+        <span class="detail-field-value">{agent.email ?? "No email"}</span>
+      </button>
+      <div class="hidden-popover-form-holder" style="display: none;">
+        <form method="post" class="admin-table-form">
+          <input type="hidden" name="action" value="update-agent-profile" />
+          <input type="hidden" name="employeeId" value={employeeIdValue} />
+          <input type="hidden" name="firstName" value={agent.first_name} />
+          <input type="hidden" name="lastName" value={agent.last_name} />
+          <input type="hidden" name="status" value={agent.status} />
+          <input type="hidden" name="contact" value={contactValue} />
+          <label><span>Email</span><input name="email" type="email" value={emailValue} autocomplete="email" /></label>
+          <button type="submit">Save Changes</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="detail-field agent-account-profile__field">
+      <button
+        type="button"
+        class="agent-account-profile__trigger table-cell-trigger"
+        data-open-cell-popover
+        data-popover-title="Edit Contact"
+      >
+        <span class="detail-field-label">Contact</span>
+        <span class="detail-field-value">{agent.contact ?? "No contact"}</span>
+      </button>
+      <div class="hidden-popover-form-holder" style="display: none;">
+        <form method="post" class="admin-table-form">
+          <input type="hidden" name="action" value="update-agent-profile" />
+          <input type="hidden" name="employeeId" value={employeeIdValue} />
+          <input type="hidden" name="firstName" value={agent.first_name} />
+          <input type="hidden" name="lastName" value={agent.last_name} />
+          <input type="hidden" name="status" value={agent.status} />
+          <input type="hidden" name="email" value={emailValue} />
+          <label>
+            <span>Contact number</span>
+            <input
+              name="contact"
+              type="tel"
+              value={contactValue}
+              inputmode="numeric"
+              pattern="[0-9]{11}"
+              minlength="11"
+              maxlength="11"
+              required
+              autocomplete="tel"
+              data-digits-only
+            />
+          </label>
+          <button type="submit">Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .agent-account-profile {
+    margin-bottom: 0.25rem;
+  }
+
+  .agent-account-profile__field {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .agent-account-profile__trigger {
+    display: flex;
+    width: 100%;
+    min-height: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: 0.65rem 0.8rem;
+    border: 0;
+    border-radius: inherit;
+    background: transparent;
+    text-align: left;
+  }
+
+  .agent-account-profile__trigger::after {
+    top: 0.75rem;
+    right: 0.75rem;
+  }
+</style>

@@ -1,12 +1,10 @@
 ---
 import Accordion from "@/components/ui/Accordion.astro";
 import Sheet from "@/components/ui/Sheet.astro";
-import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
-import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import AgentRecordCard from "@/components/agent/AgentRecordCard.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
-import ViewButton from "@/components/ViewButton.astro";
 import {
   agentOrderPaymentStatus,
   agentOrderTotal,
@@ -32,7 +30,7 @@ const orderRows = [
     payment_status: agentOrderPaymentStatus(order),
     customer_label: `${order.customer_order.length} customer${order.customer_order.length === 1 ? "" : "s"}`,
     total: agentOrderTotal(order),
-    href: `/agent/agent-orders/${order.id}`,
+    href: `/agent/orders/multi-customers/${order.id}`,
   })),
   ...standaloneOrders.map((order) => ({
     id: order.id,
@@ -48,7 +46,7 @@ const orderRows = [
 ));
 ---
 
-<section class="admin-panel" aria-labelledby="agent-order-list-title">
+<section class="admin-panel agent-orders" aria-labelledby="agent-order-list-title">
   <Sheet id="agent-create-order-sheet" width="42rem">
     <div slot="header" class="order-create-sheet__header-copy">
       <h3 class="drawer-sheet__title" data-sheet-title>Submit Order</h3>
@@ -114,7 +112,7 @@ const orderRows = [
           <h3 class="order-create-section__title">Release</h3>
         </div>
         <div class="order-create-section__body">
-          <label class="field-row">
+          <label class="field-row field-row--date">
             <span>Release date</span>
             <input
               name="releaseDate"
@@ -336,87 +334,91 @@ const orderRows = [
     </div>
   </Sheet>
 
-  <div data-interactive-table class="dashboard-interactive-table">
-    <div class="table-filters order-management-toolbar">
-      <div
-        class="order-filter-form"
-        role="search"
-        aria-label="Search orders"
-      >
-        <div class="order-filter-form__field order-filter-form__field--search">
-          <input
-            type="search"
-            placeholder="Search orders..."
-            data-search-input
-            aria-label="Search orders"
-          />
+  <div data-interactive-table class="dashboard-interactive-table agent-orders__table">
+    <div class="table-filters order-management-toolbar agent-orders__toolbar">
+      <div class="agent-orders__toolbar-row">
+        <div
+          class="order-filter-form agent-orders__search"
+          role="search"
+          aria-label="Search orders"
+        >
+          <div class="order-filter-form__field order-filter-form__field--search">
+            <input
+              type="search"
+              placeholder="Search orders..."
+              data-search-input
+              aria-label="Search orders"
+            />
+          </div>
         </div>
-      </div>
-      <div class="order-management-toolbar__actions">
         <button
           type="button"
-          class="btn-table-manage order-management-toolbar__create"
+          class="btn-table-manage order-management-toolbar__create agent-orders__create"
           data-open-create-sheet
           data-sheet-target="#agent-create-order-sheet"
           disabled={!canSubmitOrder}
+          aria-label="Submit order"
         >
-          Submit Order
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.25"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
+          <span class="agent-orders__create-label">Submit Order</span>
         </button>
       </div>
     </div>
 
-    <div class="dashboard-interactive-table__surface">
-      <DashboardTableBoard>
-        <table class="dashboard-table">
-          <thead>
-            <tr>
-              <th scope="col">Date</th>
-              <th scope="col">Order Status</th>
-              <th scope="col">Payment Status</th>
-              <th scope="col">Customer(s)</th>
-              <th scope="col">Order Total</th>
-              <th scope="col">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {
-              orderRows.length === 0 ? (
-                <DashboardTableEmptyState
-                  colspan={6}
-                  message="No agent orders yet."
-                />
-              ) : (
-                orderRows.map((order) => (
-                  <tr data-status={order.order_status}>
-                    <td>{formatDate(order.created_at)}</td>
-                    <td>
-                      <StatusBadge
-                        kind="order"
-                        status={order.order_status}
-                        label={autoCapitalize(order.order_status)}
-                      />
-                    </td>
-                    <td>
-                      <StatusBadge
-                        kind="payment"
-                        status={order.payment_status}
-                      />
-                    </td>
-                    <td>{order.customer_label}</td>
-                    <td>{formatCurrency(order.total)}</td>
-                    <td>
-                      <ViewButton href={order.href} />
-                    </td>
-                  </tr>
-                ))
-              )
-            }
-          </tbody>
-        </table>
-      </DashboardTableBoard>
+    <div class="agent-orders__pagination-summary">
+      <DashboardTablePagination variant="summary" />
     </div>
 
-    <DashboardTablePagination />
+    <div class="agent-record-list agent-orders__list" data-interactive-cards>
+      {
+        orderRows.length === 0 ? (
+          <p class="empty-state">No agent orders yet.</p>
+        ) : (
+          orderRows.map((order) => (
+            <AgentRecordCard href={order.href} status={order.order_status}>
+              <div class="agent-record-card__header">
+                <div class="agent-record-card__title-group">
+                  <h3 class="agent-record-card__title">{order.customer_label}</h3>
+                  <p class="agent-record-card__subtitle">{formatDate(order.created_at)}</p>
+                </div>
+                <div class="agent-record-card__badges">
+                  <StatusBadge
+                    kind="order"
+                    status={order.order_status}
+                    label={autoCapitalize(order.order_status)}
+                  />
+                  <StatusBadge kind="payment" status={order.payment_status} />
+                </div>
+              </div>
+              <dl class="agent-record-card__meta agent-record-card__meta--inline">
+                <div class="agent-record-card__meta-item">
+                  <dt>Order total</dt>
+                  <dd>{formatCurrency(order.total)}</dd>
+                </div>
+              </dl>
+            </AgentRecordCard>
+          ))
+        )
+      }
+    </div>
+
+    <div class="agent-orders__pagination-controls">
+      <DashboardTablePagination variant="controls" />
+    </div>
   </div>
 </section>
 
@@ -527,13 +529,106 @@ const orderRows = [
 </script>
 
 <style>
+  .agent-orders__table > .agent-orders__toolbar {
+    display: block;
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .agent-orders__toolbar-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.4rem;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .agent-orders__search.order-filter-form {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .agent-orders__search .order-filter-form__field--search {
+    width: 100%;
+  }
+
+  .agent-orders__search input {
+    width: 100%;
+  }
+
+  .agent-orders__create {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .agent-orders__list {
+    margin-top: 0.85rem;
+  }
+
+  .agent-orders__pagination-summary {
+    margin-top: 0.85rem;
+  }
+
+  .agent-orders__pagination-controls {
+    margin-top: 1rem;
+  }
+
+  .agent-orders__pagination-summary :global(.dashboard-interactive-table__footer),
+  .agent-orders__pagination-controls :global(.dashboard-interactive-table__footer) {
+    position: static;
+    border-top: 0;
+    background: transparent;
+    min-height: 0;
+  }
+
+  .agent-orders__pagination-summary :global(.table-pagination),
+  .agent-orders__pagination-controls :global(.table-pagination) {
+    padding-inline: 0;
+  }
+
+  .agent-orders__pagination-summary :global(.table-pagination) {
+    justify-content: space-between;
+    margin-top: 0;
+  }
+
+  .agent-orders__pagination-controls :global(.table-pagination) {
+    justify-content: center;
+    margin-top: 0;
+  }
+
+  @media (max-width: 47.99rem) {
+    .agent-orders__create {
+      width: 2.35rem;
+      min-width: 2.35rem;
+      padding: 0;
+    }
+
+    .agent-orders__create-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  }
+
   .order-mode-options {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    grid-template-columns: 1fr;
     gap: 0.75rem;
     margin: 0;
     padding: 0;
     border: 0;
+    min-width: 0;
   }
 
   .order-mode-option {
@@ -579,9 +674,15 @@ const orderRows = [
     line-height: 1.35;
   }
 
+  @media (min-width: 30rem) {
+    .order-mode-options {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   .order-create-form__total {
     display: flex;
-    min-width: 10rem;
+    min-width: 0;
     flex-direction: column;
     justify-content: center;
     gap: 0.25rem;
@@ -603,13 +704,15 @@ const orderRows = [
     white-space: nowrap;
   }
 
-  @media (max-width: 520px) {
+  @media (max-width: 47.99rem) {
     .order-mode-options {
-      grid-template-columns: 1fr;
+      gap: 0.5rem;
     }
 
-    .order-create-form__total {
-      width: 100%;
+    .order-mode-option {
+      min-height: auto;
+      padding: 0.75rem;
+      gap: 0.65rem;
     }
   }
 </style>
