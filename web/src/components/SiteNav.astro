@@ -28,6 +28,14 @@ const isActive = (href: string) => {
   }
   return pathname.startsWith(href);
 };
+
+const navItems = [
+  ...publicRoutes.map((item) => ({ ...item, variant: "link" as const })),
+  ...authRoutes.map((item) => ({
+    ...item,
+    variant: item.href === "/login" ? ("button" as const) : ("link" as const),
+  })),
+];
 ---
 
 <header class="site-nav">
@@ -42,29 +50,32 @@ const isActive = (href: string) => {
       <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
       <span class="site-nav__brand-text">JEHMARP</span>
     </a>
-    <ul class="site-nav__list">
+    <button
+      type="button"
+      class="site-nav__menu-toggle lg:hidden"
+      data-site-nav-toggle
+      aria-expanded="false"
+      aria-controls="site-nav-mobile-menu"
+      aria-label="Open navigation menu"
+    >
+      <span class="site-nav__menu-toggle-bar" aria-hidden="true"></span>
+      <span class="site-nav__menu-toggle-bar" aria-hidden="true"></span>
+      <span class="site-nav__menu-toggle-bar" aria-hidden="true"></span>
+    </button>
+    <ul class="site-nav__list site-nav__list--desktop">
       {
-        publicRoutes.map((item) => (
-          <li>
-            <a
-              href={linkHref(item.href)}
-              class={isActive(item.href) ? "site-nav__link--active" : ""}
-            >
-              {item.label}
-            </a>
-          </li>
-        ))
-      }
-      {
-        authRoutes.map((item) => {
-          const isLogin = item.href === "/login";
-          const buttonClass = isLogin
-            ? `site-nav__link--button ${isActive(item.href) ? "site-nav__link--active" : ""}`
-            : (isActive(item.href) ? "site-nav__link--active" : "");
+        navItems.map((item) => {
+          const active = isActive(item.href);
+          const linkClass =
+            item.variant === "button"
+              ? `site-nav__link--button ${active ? "site-nav__link--active" : ""}`
+              : active
+                ? "site-nav__link--active"
+                : "";
 
           return (
             <li>
-              <a href={linkHref(item.href)} class={buttonClass}>
+              <a href={linkHref(item.href)} class={linkClass}>
                 {item.label}
               </a>
             </li>
@@ -74,6 +85,56 @@ const isActive = (href: string) => {
     </ul>
   </nav>
 </header>
+
+<div
+  id="site-nav-mobile-menu"
+  class="site-nav__mobile-menu"
+  hidden
+  aria-hidden="true"
+>
+  <div
+    class="site-nav__mobile-menu-backdrop"
+    data-site-nav-backdrop
+    aria-hidden="true"
+  ></div>
+  <nav class="site-nav__mobile-menu-panel" aria-label="Mobile navigation">
+    <ul class="site-nav__mobile-list">
+      {
+        navItems.map((item) => {
+          const active = isActive(item.href);
+          return (
+            <li>
+              <a
+                href={linkHref(item.href)}
+                class:list={[
+                  "site-nav__mobile-link",
+                  active && "site-nav__mobile-link--active",
+                  item.variant === "button" && "site-nav__mobile-link--button",
+                ]}
+              >
+                {item.label}
+              </a>
+            </li>
+          );
+        })
+      }
+    </ul>
+  </nav>
+</div>
+
+<script>
+  import { initSiteNavMobileMenu } from "@/lib/client/site-nav-mobile-menu";
+
+  document.addEventListener("DOMContentLoaded", initSiteNavMobileMenu);
+  document.addEventListener("astro:after-swap", initSiteNavMobileMenu);
+
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    initSiteNavMobileMenu();
+  }
+</script>
 
 {!disableSmartScroll && (
   <script>

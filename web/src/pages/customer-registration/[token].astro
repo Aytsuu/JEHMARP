@@ -1,0 +1,266 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import {
+  getCustomerRegistrationLinkState,
+  parseCustomerRegistrationFormData,
+  submitCustomerRegistration,
+} from "@/lib/public-website/customer-registration";
+import { isTrustedFormOrigin } from "@/lib/security/form-origin";
+
+export const prerender = false;
+
+const token = Astro.params.token ?? "";
+let feedback: { status?: string; error?: string } = {
+  status: Astro.url.searchParams.get("status") ?? undefined,
+  error: Astro.url.searchParams.get("error") ?? undefined,
+};
+
+if (Astro.request.method === "POST") {
+  if (!isTrustedFormOrigin(Astro.request.headers, Astro.url)) {
+    return Astro.redirect(
+      `${Astro.url.pathname}?error=${encodeURIComponent("Invalid request origin.")}`,
+      303,
+    );
+  }
+
+  const formData = await Astro.request.formData();
+  const parsed = parseCustomerRegistrationFormData(formData);
+
+  if (!parsed.success) {
+    return Astro.redirect(
+      `${Astro.url.pathname}?error=${encodeURIComponent(parsed.errors.join(" "))}`,
+      303,
+    );
+  }
+
+  try {
+    await submitCustomerRegistration(token, parsed);
+    return Astro.redirect(
+      `${Astro.url.pathname}?status=${encodeURIComponent("Registration submitted.")}`,
+      303,
+    );
+  } catch (error) {
+    return Astro.redirect(
+      `${Astro.url.pathname}?error=${encodeURIComponent(error instanceof Error ? error.message : "Unable to submit registration.")}`,
+      303,
+    );
+  }
+}
+
+const linkState = await getCustomerRegistrationLinkState(token);
+const expiresAt = linkState.status === "valid"
+  ? new Intl.DateTimeFormat("en-PH", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Asia/Manila",
+    }).format(new Date(linkState.expiresAt))
+  : null;
+---
+
+<Layout
+  title="Customer Registration - JEHMARP"
+  description="Temporary customer registration form for JEHMARP agent-assisted registrations."
+>
+  <section class="customer-registration-page" aria-labelledby="customer-registration-title">
+    <div class="customer-registration-page__shell">
+      <div class="customer-registration-page__header">
+        <p class="customer-registration-page__eyebrow">JEHMARP Customer Registration</p>
+        <h1 id="customer-registration-title">Register Customer Information</h1>
+        {expiresAt && <p>Link expires on {expiresAt}.</p>}
+      </div>
+
+      {feedback.status && (
+        <div class="customer-registration-alert customer-registration-alert--success" role="status">
+          {feedback.status}
+        </div>
+      )}
+
+      {feedback.error && (
+        <div class="customer-registration-alert customer-registration-alert--error" role="alert">
+          {feedback.error}
+        </div>
+      )}
+
+      {linkState.status !== "valid" ? (
+        <div class="customer-registration-card">
+          <h2>Registration link unavailable</h2>
+          <p>{linkState.message}</p>
+        </div>
+      ) : feedback.status ? (
+        <div class="customer-registration-card">
+          <h2>Registration submitted</h2>
+          <p>The customer record has been sent to JEHMARP.</p>
+        </div>
+      ) : (
+        <form method="post" class="customer-registration-form">
+          <label>
+            <span>Agent employee ID</span>
+            <input name="agentEmployeeId" autocomplete="off" />
+          </label>
+          <label>
+            <span>First name</span>
+            <input name="firstName" required autocomplete="given-name" />
+          </label>
+          <label>
+            <span>Last name</span>
+            <input name="lastName" required autocomplete="family-name" />
+          </label>
+          <label>
+            <span>Phone number</span>
+            <input
+              name="phoneNumber"
+              type="tel"
+              inputmode="numeric"
+              pattern="[0-9]{11}"
+              minlength="11"
+              maxlength="11"
+              required
+              autocomplete="tel"
+            />
+          </label>
+          <label>
+            <span>Email</span>
+            <input name="email" type="email" autocomplete="email" />
+          </label>
+          <label class="customer-registration-form__wide">
+            <span>Address</span>
+            <textarea name="address" rows="4" required autocomplete="street-address"></textarea>
+          </label>
+          <div class="customer-registration-form__actions">
+            <button type="submit">Submit Registration</button>
+          </div>
+        </form>
+      )}
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .customer-registration-page {
+    background: #f8fafc;
+    min-height: 72vh;
+    padding: clamp(2rem, 5vw, 4rem) 1rem;
+  }
+
+  .customer-registration-page__shell {
+    width: min(100%, 48rem);
+    margin: 0 auto;
+  }
+
+  .customer-registration-page__header {
+    margin-bottom: 1.5rem;
+  }
+
+  .customer-registration-page__eyebrow {
+    margin: 0 0 0.35rem;
+    color: #991b1b;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .customer-registration-page h1 {
+    margin: 0;
+    color: #111827;
+    font-size: clamp(2rem, 4vw, 3rem);
+    letter-spacing: 0;
+  }
+
+  .customer-registration-page__header p:last-child {
+    color: #4b5563;
+    margin: 0.5rem 0 0;
+  }
+
+  .customer-registration-alert,
+  .customer-registration-card,
+  .customer-registration-form {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: #fff;
+  }
+
+  .customer-registration-alert {
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    font-weight: 700;
+  }
+
+  .customer-registration-alert--success {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #166534;
+  }
+
+  .customer-registration-alert--error {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
+  .customer-registration-card {
+    padding: 1.25rem;
+  }
+
+  .customer-registration-card h2 {
+    margin: 0 0 0.5rem;
+    font-size: 1.2rem;
+    letter-spacing: 0;
+  }
+
+  .customer-registration-card p {
+    margin: 0;
+    color: #4b5563;
+  }
+
+  .customer-registration-form {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    padding: 1.25rem;
+  }
+
+  .customer-registration-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    color: #374151;
+    font-size: 0.82rem;
+    font-weight: 800;
+  }
+
+  .customer-registration-form input,
+  .customer-registration-form textarea {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.7rem 0.75rem;
+    font: inherit;
+  }
+
+  .customer-registration-form__wide,
+  .customer-registration-form__actions {
+    grid-column: 1 / -1;
+  }
+
+  .customer-registration-form__actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .customer-registration-form button {
+    border: 0;
+    border-radius: 0.375rem;
+    background: #991b1b;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 800;
+    padding: 0.75rem 1rem;
+  }
+
+  @media (max-width: 640px) {
+    .customer-registration-form {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

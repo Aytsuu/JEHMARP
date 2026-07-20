@@ -18,12 +18,14 @@ describe("parseAdminProductFilters", () => {
     });
   });
 
-  it("ignores unsupported or invalid filter values", () => {
+  it("allows custom categories and ignores invalid status filters", () => {
     const filters = parseAdminProductFilters(
-      new URL("https://example.test/admin/products?category=beef&stockStatus=hidden"),
+      new URL("https://example.test/admin/products?category= Frozen Foods &stockStatus=hidden"),
     );
 
-    expect(filters).toEqual({});
+    expect(filters).toEqual({
+      category: "frozen foods",
+    });
   });
 });
 

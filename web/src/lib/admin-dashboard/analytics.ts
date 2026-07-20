@@ -1,14 +1,23 @@
 import {
+  fullName,
   orderBalance,
   orderPaymentTotal,
   orderTotal,
 } from "./view";
 
-import type { AdminDashboardData, AdminOrder, AdminCustomer } from "./data";
+import type {
+  AdminContactInquiry,
+  AdminCustomer,
+  AdminDashboardData,
+  AdminOrder,
+  AdminResellerApplication,
+} from "./data";
 
 export type AnalyticsSummary = {
+  grossSales: number;
   totalPaidAmount: number;
   outstandingBalance: number;
+  pendingOrderPayments: number;
   orderCount: number;
   newResellerApplications: number;
   newContactInquiries: number;
@@ -35,6 +44,36 @@ export type ProductSalesMetric = {
   grossSales: number;
 };
 
+export type WeeklyProductOrderProductMetric = {
+  productId: string;
+  label: string;
+  currentQuantity: number;
+  previousQuantity: number;
+  quantityDifference: number;
+};
+
+export type WeeklyProductOrderDayMetric = {
+  label: string;
+  shortLabel: string;
+  date: string;
+  previousDate: string;
+  totalQuantity: number;
+  previousTotalQuantity: number;
+  quantityDifference: number;
+  products: WeeklyProductOrderProductMetric[];
+};
+
+export type WeeklyProductOrderSeriesMetric = {
+  productId: string;
+  label: string;
+};
+
+export type WeeklyProductOrdersMetric = {
+  days: WeeklyProductOrderDayMetric[];
+  peakDay: Omit<WeeklyProductOrderDayMetric, "products">;
+  productSeries: WeeklyProductOrderSeriesMetric[];
+};
+
 export type AgentSalesMetric = {
   label: string;
   orderCount: number;
@@ -42,6 +81,22 @@ export type AgentSalesMetric = {
   paidAmount: number;
   earnedCommission: number;
   expectedCommission: number;
+};
+
+export type PendingCustomerBalanceMetric = {
+  customerId: string;
+  customerName: string;
+  orderCount: number;
+  unpaidBalance: number;
+};
+
+export type RecentOrderMetric = {
+  id: string;
+  customerName: string;
+  orderStatus: AdminOrder["order_status"];
+  paymentStatus: AdminOrder["payment_status"];
+  grossSales: number;
+  createdAt: string;
 };
 
 export type AdminAnalytics = {
@@ -52,13 +107,28 @@ export type AdminAnalytics = {
   paymentsByStatus: CountMetric[];
   topProducts: ProductSalesMetric[];
   salesByCategory: ProductSalesMetric[];
+  weeklyProductOrders: WeeklyProductOrdersMetric;
   salesByAgent: AgentSalesMetric[];
+  pendingCustomerBalances: PendingCustomerBalanceMetric[];
+  recentOrders: RecentOrderMetric[];
+  recentInquiries: AdminContactInquiry[];
+  recentResellerApplications: AdminResellerApplication[];
   recentCustomers: AdminCustomer[];
 };
 
 const orderStatuses = ["pending", "processing", "closed"] as const;
 
 const paymentStatuses = ["unpaid", "partial", "paid", "refunded"] as const;
+
+const weekDayLabels = [
+  { label: "Monday", shortLabel: "Mon" },
+  { label: "Tuesday", shortLabel: "Tue" },
+  { label: "Wednesday", shortLabel: "Wed" },
+  { label: "Thursday", shortLabel: "Thu" },
+  { label: "Friday", shortLabel: "Fri" },
+  { label: "Saturday", shortLabel: "Sat" },
+  { label: "Sunday", shortLabel: "Sun" },
+] as const;
 
 export function buildAdminAnalytics(
   data: AdminDashboardData,
@@ -70,9 +140,13 @@ export function buildAdminAnalytics(
 
   return {
     summary: {
+      grossSales: roundCurrency(data.orders.reduce((total, order) => total + orderTotal(order, "final_quantity"), 0)),
       totalPaidAmount: roundCurrency(data.orders.reduce((total, order) => total + orderPaymentTotal(order), 0)),
       outstandingBalance: roundCurrency(data.orders
         .filter(isOutstandingBalanceOrder)
+        .reduce((total, order) => total + orderBalance(order), 0)),
+      pendingOrderPayments: roundCurrency(data.orders
+        .filter(hasPendingPayment)
         .reduce((total, order) => total + orderBalance(order), 0)),
       orderCount: data.orders.length,
       newResellerApplications: data.resellerApplications.filter(
@@ -102,8 +176,13 @@ export function buildAdminAnalytics(
     })),
     topProducts: buildProductSales(data).slice(0, 5),
     salesByCategory: buildCategorySales(data),
+    weeklyProductOrders: buildWeeklyProductOrders(data, now),
     salesByAgent: buildAgentSales(data),
-    recentCustomers: data.customers.slice(0, 5),
+    pendingCustomerBalances: buildPendingCustomerBalances(data),
+    recentOrders: buildRecentOrders(data),
+    recentInquiries: byNewest(data.contactInquiries).slice(0, 5),
+    recentResellerApplications: byNewest(data.resellerApplications).slice(0, 5),
+    recentCustomers: byNewest(data.customers).slice(0, 5),
   };
 }
 
@@ -208,6 +287,146 @@ function buildAgentSales(data: AdminDashboardData): AgentSalesMetric[] {
   return Array.from(metrics.values()).sort((left, right) => right.grossSales - left.grossSales);
 }
 
+function buildWeeklyProductOrders(
+  data: AdminDashboardData,
+  now: Date,
+): WeeklyProductOrdersMetric {
+  const weekStart = startOfUtcWeek(now);
+  const previousWeekStart = addUtcDays(weekStart, -7);
+  const currentQuantities = buildWeeklyProductQuantityMap(data, weekStart);
+  const previousQuantities = buildWeeklyProductQuantityMap(data, previousWeekStart);
+  const productIds = Array.from(new Set([
+    ...Array.from(currentQuantities.values()).flatMap((products) => Array.from(products.keys())),
+    ...Array.from(previousQuantities.values()).flatMap((products) => Array.from(products.keys())),
+  ])).sort((left, right) => productName(data, left).localeCompare(productName(data, right)));
+
+  const days = weekDayLabels.map((dayLabel, dayIndex) => {
+    const date = addUtcDays(weekStart, dayIndex);
+    const previousDate = addUtcDays(previousWeekStart, dayIndex);
+    const dateKey = dayIdentifier(date);
+    const previousDateKey = dayIdentifier(previousDate);
+    const currentProducts = currentQuantities.get(dateKey) ?? new Map<string, number>();
+    const previousProducts = previousQuantities.get(previousDateKey) ?? new Map<string, number>();
+    const products = productIds
+      .map((productId) => {
+        const currentQuantity = roundQuantity(currentProducts.get(productId) ?? 0);
+        const previousQuantity = roundQuantity(previousProducts.get(productId) ?? 0);
+
+        return {
+          productId,
+          label: productName(data, productId),
+          currentQuantity,
+          previousQuantity,
+          quantityDifference: roundQuantity(currentQuantity - previousQuantity),
+        };
+      })
+      .filter((product) => product.currentQuantity > 0 || product.previousQuantity > 0);
+    const totalQuantity = roundQuantity(products.reduce((total, product) => total + product.currentQuantity, 0));
+    const previousTotalQuantity = roundQuantity(products.reduce((total, product) => total + product.previousQuantity, 0));
+
+    return {
+      label: dayLabel.label,
+      shortLabel: dayLabel.shortLabel,
+      date: dateKey,
+      previousDate: previousDateKey,
+      totalQuantity,
+      previousTotalQuantity,
+      quantityDifference: roundQuantity(totalQuantity - previousTotalQuantity),
+      products,
+    };
+  });
+  const peakDay = days.reduce((peak, day) => (
+    day.totalQuantity > peak.totalQuantity ? day : peak
+  ), days[0]);
+
+  return {
+    days,
+    peakDay: {
+      label: peakDay.label,
+      shortLabel: peakDay.shortLabel,
+      date: peakDay.date,
+      previousDate: peakDay.previousDate,
+      totalQuantity: peakDay.totalQuantity,
+      previousTotalQuantity: peakDay.previousTotalQuantity,
+      quantityDifference: peakDay.quantityDifference,
+    },
+    productSeries: productIds.map((productId) => ({
+      productId,
+      label: productName(data, productId),
+    })),
+  };
+}
+
+function buildWeeklyProductQuantityMap(
+  data: AdminDashboardData,
+  weekStart: Date,
+): Map<string, Map<string, number>> {
+  const weekEnd = addUtcDays(weekStart, 7);
+  const metrics = new Map<string, Map<string, number>>();
+
+  for (const order of data.orders) {
+    const orderDate = new Date(order.created_at);
+
+    if (orderDate < weekStart || orderDate >= weekEnd) continue;
+
+    const dateKey = dayIdentifier(orderDate);
+    const currentDay = metrics.get(dateKey) ?? new Map<string, number>();
+
+    for (const item of order.customer_order_item) {
+      currentDay.set(
+        item.product_id,
+        roundQuantity((currentDay.get(item.product_id) ?? 0) + item.final_quantity),
+      );
+    }
+
+    metrics.set(dateKey, currentDay);
+  }
+
+  return metrics;
+}
+
+function buildPendingCustomerBalances(data: AdminDashboardData): PendingCustomerBalanceMetric[] {
+  const metrics = new Map<string, PendingCustomerBalanceMetric>();
+
+  for (const order of data.orders) {
+    const balance = roundCurrency(orderBalance(order));
+
+    if (balance <= 0 || !hasPendingPayment(order)) continue;
+
+    const customerId = order.customer_id;
+    const customer = order.customer ?? data.customers.find((item) => item.id === customerId) ?? null;
+    const current = metrics.get(customerId) ?? {
+      customerId,
+      customerName: fullName(customer),
+      orderCount: 0,
+      unpaidBalance: 0,
+    };
+
+    metrics.set(customerId, {
+      customerId,
+      customerName: current.customerName,
+      orderCount: current.orderCount + 1,
+      unpaidBalance: roundCurrency(current.unpaidBalance + balance),
+    });
+  }
+
+  return Array.from(metrics.values()).sort((left, right) => (
+    right.unpaidBalance - left.unpaidBalance ||
+    left.customerName.localeCompare(right.customerName)
+  ));
+}
+
+function buildRecentOrders(data: AdminDashboardData): RecentOrderMetric[] {
+  return byNewest(data.orders).slice(0, 5).map((order) => ({
+    id: order.id,
+    customerName: fullName(order.customer ?? data.customers.find((customer) => customer.id === order.customer_id) ?? null),
+    orderStatus: order.order_status,
+    paymentStatus: order.payment_status,
+    grossSales: roundCurrency(orderTotal(order, "final_quantity")),
+    createdAt: order.created_at,
+  }));
+}
+
 function getAnalyticsAgentId(order: AdminOrder, data: AdminDashboardData): string | null {
   return order.agent_id
     ?? order.agent?.id
@@ -251,6 +470,10 @@ function isOutstandingBalanceOrder(order: AdminOrder): boolean {
   return order.order_status !== "closed" || order.payment_status !== "paid";
 }
 
+function hasPendingPayment(order: AdminOrder): boolean {
+  return order.payment_status !== "paid" && orderBalance(order) > 0;
+}
+
 function productName(data: AdminDashboardData, productId: string): string {
   return data.products.find((product) => product.id === productId)?.name ?? "Unknown product";
 }
@@ -267,6 +490,27 @@ function dayIdentifier(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
+function startOfUtcWeek(value: Date): Date {
+  const start = new Date(Date.UTC(
+    value.getUTCFullYear(),
+    value.getUTCMonth(),
+    value.getUTCDate(),
+  ));
+  const dayOffset = (start.getUTCDay() + 6) % 7;
+
+  start.setUTCDate(start.getUTCDate() - dayOffset);
+
+  return start;
+}
+
+function addUtcDays(value: Date, days: number): Date {
+  const result = new Date(value);
+
+  result.setUTCDate(result.getUTCDate() + days);
+
+  return result;
+}
+
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -277,4 +521,10 @@ function roundQuantity(value: number): number {
 
 function byLabel(left: { label: string }, right: { label: string }): number {
   return left.label.localeCompare(right.label);
+}
+
+function byNewest<T extends { created_at: string }>(items: T[]): T[] {
+  return [...items].sort((left, right) => (
+    new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
+  ));
 }

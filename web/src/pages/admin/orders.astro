@@ -5,11 +5,18 @@ import {
   formatAdminActionFeedback,
   markUnreadAdminOrdersRead,
 } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  loadAdminDashboardData,
+  loadAdminOrderManagementData,
+} from "@/lib/admin-dashboard/data";
 import {
   parseAdminOrderFilters,
   serializeAdminOrderFilters,
 } from "@/lib/admin-dashboard/order-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -23,10 +30,15 @@ if (!adminRoute.ready) {
 await markUnreadAdminOrdersRead(Astro, adminRoute.userId);
 
 const orderFilters = parseAdminOrderFilters(Astro.url);
-const orderFilterQuery = serializeAdminOrderFilters(orderFilters);
-const data = await loadAdminDashboardData({
-  orderFilters,
-});
+const orderPagination = parseAdminPagination(Astro.url);
+const orderFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminOrderFilters(orderFilters),
+  orderPagination,
+);
+const [dashboardData, data] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminOrderManagementData(orderFilters, orderPagination),
+]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---
 
@@ -36,7 +48,7 @@ const feedback = formatAdminActionFeedback(Astro.url);
   heading="Order Management"
   intro="Review submitted orders, approve or reject, update status, edit commissions, record payments, and manage invoices."
   feedback={feedback}
-  dashboardData={data}
+  dashboardData={dashboardData}
 >
   <AdminOrderManagement
     data={data}

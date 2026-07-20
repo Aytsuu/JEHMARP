@@ -1,0 +1,131 @@
+---
+import AgentActivityCard from "@/components/agent/AgentActivityCard.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import { buildAgentActivityItems } from "@/lib/agent-dashboard/activity";
+
+type Props = {
+  data: AgentDashboardData;
+};
+
+const { data } = Astro.props;
+const activityItems = buildAgentActivityItems(data);
+const summaryLabel =
+  activityItems.length === 0
+    ? "No activity yet"
+    : `${activityItems.length} activity ${activityItems.length === 1 ? "entry" : "entries"}`;
+---
+
+<section id="agent-activity" class="agent-activity" aria-labelledby="agent-activity-title">
+  <div data-interactive-table class="dashboard-interactive-table agent-activity__table">
+    <div class="agent-activity__toolbar">
+      <div class="table-filters order-management-toolbar agent-activity__search">
+        <div class="table-filters__search order-filter-form__field order-filter-form__field--search">
+          <input
+            type="search"
+            placeholder="Search activity, details, or category..."
+            data-search-input
+            aria-label="Search activity"
+          />
+        </div>
+      </div>
+      <p class="agent-activity__summary">{summaryLabel}</p>
+    </div>
+
+    <div class="agent-activity__pagination-summary">
+      <DashboardTablePagination variant="summary" />
+    </div>
+
+    <div class="agent-activity__list" data-interactive-cards>
+      {
+        activityItems.length === 0 ? (
+          <p class="agent-activity__empty">No agent activity is available yet.</p>
+        ) : (
+          activityItems.map((item) => <AgentActivityCard item={item} />)
+        )
+      }
+    </div>
+
+    <div class="agent-activity__pagination-controls">
+      <DashboardTablePagination variant="controls" />
+    </div>
+  </div>
+</section>
+
+<style>
+  .agent-activity__table > .agent-activity__toolbar {
+    display: grid;
+    gap: 0.85rem;
+    margin-bottom: 0.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .agent-activity__search {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .agent-activity__search input {
+    width: 100%;
+  }
+
+  .agent-activity__summary {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #4b5563;
+  }
+
+  .agent-activity__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 0.85rem;
+  }
+
+  .agent-activity__empty {
+    margin: 0;
+    padding: 1.5rem 1rem;
+    border: 1px dashed #d1d5db;
+    border-radius: 0.75rem;
+    background: #f9fafb;
+    color: #6b7280;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .agent-activity__pagination-summary {
+    margin-top: 0.85rem;
+  }
+
+  .agent-activity__pagination-controls {
+    margin-top: 1rem;
+  }
+
+  .agent-activity__pagination-summary :global(.dashboard-interactive-table__footer),
+  .agent-activity__pagination-controls :global(.dashboard-interactive-table__footer) {
+    position: static;
+    border-top: 0;
+    background: transparent;
+    min-height: 0;
+  }
+
+  .agent-activity__pagination-summary :global(.table-pagination),
+  .agent-activity__pagination-controls :global(.table-pagination) {
+    padding-inline: 0;
+  }
+
+  .agent-activity__pagination-summary :global(.table-pagination) {
+    justify-content: space-between;
+    margin-top: 0;
+  }
+
+  .agent-activity__pagination-controls :global(.table-pagination) {
+    justify-content: center;
+    margin-top: 0;
+  }
+</style>

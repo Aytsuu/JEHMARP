@@ -1,6 +1,6 @@
 import type { APIContext } from "astro";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { throwLoadError } from "@/lib/load-error";
 
 export type PublicPageRecord = {
@@ -38,10 +38,10 @@ type SectionLike = {
 };
 
 export async function getPublicPageContent(
-  context: Pick<APIContext, "cookies" | "request">,
+  _context: Pick<APIContext, "cookies" | "request">,
   slug: string,
 ): Promise<PublicPageContent> {
-  const supabase = createSupabaseServerClient(context);
+  const supabase = createSupabasePublicClient();
   const { data: page, error: pageError } = await supabase
     .from("page")
     .select("id, slug, title, status, published_at")
@@ -78,10 +78,10 @@ export async function getPublicPageContent(
 }
 
 export async function getFeaturedPublicProducts(
-  context: Pick<APIContext, "cookies" | "request">,
+  _context: Pick<APIContext, "cookies" | "request">,
   limit = 4,
 ): Promise<PublicFeaturedProduct[]> {
-  const supabase = createSupabaseServerClient(context);
+  const supabase = createSupabasePublicClient();
   const { data, error } = await supabase
     .from("product")
     .select("id, name, description, image_path")

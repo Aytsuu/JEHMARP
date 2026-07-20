@@ -22,6 +22,7 @@ export const adminDashboardRoutes = [
   { label: "Customers", href: "/admin/customers" },
   { label: "Agents", href: "/admin/agents" },
   { label: "Orders", href: "/admin/orders" },
+  { label: "Sales", href: "/admin/sales" },
   { label: "Invoices", href: "/admin/invoices" },
   { label: "Inquiries", href: "/admin/inquiries" },
   { label: "Reseller Applications", href: "/admin/reseller-applications" },
@@ -32,9 +33,8 @@ export const adminDashboardRoutes = [
 
 export const agentDashboardRoutes = [
   { label: "Dashboard", href: "/agent" },
-  { label: "Earnings", href: "/agent/earnings" },
   { label: "Customers", href: "/agent/customers" },
-  { label: "Orders", href: "/agent/orders" },
-  { label: "Payments", href: "/agent/payments" },
+  { label: "My Orders", href: "/agent/orders" },
   { label: "Notifications", href: "/agent/notifications" },
+  { label: "Profile", href: "/agent/profile" },
 ] as const satisfies readonly NavigationItem[];

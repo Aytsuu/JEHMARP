@@ -44,10 +44,23 @@ describe("buildSalesInvoicePdf", () => {
             name: "Pork Belly",
             unit_label: "kg",
             default_price: 125,
+            agent_commission_type: "value",
+            agent_commission_value: 0,
           },
         },
       ],
-      payment: [],
+      payment: [
+        {
+          id: "f31976e6-b478-41b6-9b85-9b830154f962",
+          amount: 375,
+          payment_method: "Check",
+          payment_terms: "Bank Transfer",
+          payment_date: "2026-07-03",
+          reference_number: null,
+          notes: null,
+          created_at: "2026-07-03T00:00:00.000Z",
+        },
+      ],
       invoice: [
         {
           id: "7c66f907-8324-473c-b0b5-d017a4728121",
@@ -72,6 +85,11 @@ describe("buildSalesInvoicePdf", () => {
     expect(text).toContain("Pork Belly");
     expect(text).toContain("Amount");
     expect(text).toContain("Total Amount Due PHP 375.00");
+    expect(text).toContain("\\( \\) Cash   \\( \\) Check");
+    expect(text).toContain("\\( \\) Cash on Delivery \\(COD\\)  \\( \\) Bank Transfer   \\( \\) Gcash");
+    expect(text).toContain("95.44 314.25 m 97.78 311.55 l 102.46 316.95 l S");
+    expect(text).toContain("175 261.25 m 177.34 258.55 l 182.02 263.95 l S");
+    expect(text).not.toContain("(?)");
     expect(text).toContain("Narcisan S. Galamiton");
     expect(text).toContain("40 617 515 48 re S");
     expect(text).not.toContain("40 425 355 264 re S");

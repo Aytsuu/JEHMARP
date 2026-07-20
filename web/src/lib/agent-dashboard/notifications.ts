@@ -9,9 +9,11 @@ export type AgentNotification = {
   date: string;
   link: string;
   severity: "warning" | "info" | "success";
+  registrationUrl?: string;
+  expiresAt?: string;
 };
 
-type AgentNotificationSource = Pick<AgentDashboardData, "orders" | "summary">;
+type AgentNotificationSource = Pick<AgentDashboardData, "orders" | "summary" | "registrationLinks">;
 
 function buildAgentActionNotifications(
   data: AgentNotificationSource,
@@ -40,6 +42,20 @@ function buildAgentActionNotifications(
         severity: "info",
       });
     }
+  });
+
+  (data.registrationLinks ?? []).forEach((link) => {
+    notifications.push({
+      id: `customer-registration-link-${link.id}`,
+      type: "Customer Registration",
+      title: "Temporary customer registration link",
+      message: "Copy this temporary link and share it with customers who need to register under an agent.",
+      date: link.created_at,
+      link: `/customer-registration/${link.token}`,
+      registrationUrl: `/customer-registration/${link.token}`,
+      expiresAt: link.expires_at,
+      severity: "info",
+    });
   });
 
   if (data.summary.monthlyEarnings > 0) {

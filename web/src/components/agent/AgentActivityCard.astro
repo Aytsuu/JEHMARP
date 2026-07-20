@@ -1,0 +1,159 @@
+---
+import type { AgentActivityItem } from "@/lib/agent-dashboard/activity";
+import { formatDateTime } from "@/lib/admin-dashboard/view";
+import { autoCapitalize } from "@/lib/formatters";
+import { resolveStatusBadgeVariant } from "@/lib/status-badge";
+
+type Props = {
+  item: AgentActivityItem;
+};
+
+const { item } = Astro.props;
+const categoryLabel = autoCapitalize(item.category);
+const severity = resolveStatusBadgeVariant("activity", item.category);
+---
+
+<article class="activity-item" data-interactive-row>
+  <div class="activity-item__content">
+    <div class="activity-item__meta">
+      <span class={`activity-item__type activity-item__type--${severity}`}>
+        {
+          item.category === "order" && (
+            <svg class="activity-item__type-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+          )
+        }
+        {
+          item.category === "customer" && (
+            <svg class="activity-item__type-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          )
+        }
+        {
+          item.category === "payment" && (
+            <svg class="activity-item__type-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="12" y1="1" x2="12" y2="23" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          )
+        }
+        {
+          item.category === "commission" && (
+            <svg class="activity-item__type-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2v20" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7H14" />
+            </svg>
+          )
+        }
+        {
+          item.category === "registration" && (
+            <svg class="activity-item__type-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93" />
+              <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13 19.07" />
+            </svg>
+          )
+        }
+        <span>{categoryLabel}</span>
+      </span>
+      <time class="activity-item__time" datetime={item.occurredAt}>
+        {formatDateTime(item.occurredAt)}
+      </time>
+    </div>
+
+    <h3 class="activity-item__title">{item.title}</h3>
+    <p class="activity-item__message">{item.detail}</p>
+  </div>
+</article>
+
+<style>
+  .activity-item {
+    padding: 1rem 1rem 0.9rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    transition: border-color 0.2s ease;
+  }
+
+  .activity-item__content {
+    display: grid;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  .activity-item__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.65rem;
+  }
+
+  .activity-item__type {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .activity-item__type-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .activity-item__type--warning {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .activity-item__type--info {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .activity-item__type--success {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .activity-item__type--neutral {
+    background: #f3f4f6;
+    color: #4b5563;
+  }
+
+  .activity-item__time {
+    font-size: 0.78rem;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .activity-item__title {
+    margin: 0;
+    font-size: 0.98rem;
+    line-height: 1.35;
+    font-weight: 700;
+    color: #111827;
+    letter-spacing: -0.01em;
+  }
+
+  .activity-item__message {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: #4b5563;
+  }
+</style>

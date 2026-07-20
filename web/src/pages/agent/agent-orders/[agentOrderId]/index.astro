@@ -1,0 +1,11 @@
+---
+export const prerender = false;
+
+const { agentOrderId } = Astro.params;
+
+if (!agentOrderId) {
+  return Astro.redirect("/agent/orders", 302);
+}
+
+return Astro.redirect(`/agent/orders/multi-customers/${agentOrderId}`, 301);
+---

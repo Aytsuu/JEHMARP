@@ -20,12 +20,23 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
     optimizeDeps: {
-      include: ['recharts'],
+      include: [
+        'recharts',
+        'astro/virtual-modules/transitions.js',
+        'astro/virtual-modules/transitions-events.js',
+        'astro/virtual-modules/transitions-router.js',
+        'astro/virtual-modules/transitions-swap-functions.js',
+        'astro/virtual-modules/transitions-types.js',
+      ],
     },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },
+  },
+  prefetch: {
+    defaultStrategy: 'hover',
+    prefetchAll: true,
   },
 });

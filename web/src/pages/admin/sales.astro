@@ -1,0 +1,57 @@
+---
+import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminSalesManagement from "@/components/admin/AdminSalesManagement.astro";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import {
+  loadAdminDashboardData,
+  loadAdminSalesManagementData,
+} from "@/lib/admin-dashboard/data";
+import {
+  parseAdminOrderFilters,
+  serializeAdminOrderFilters,
+} from "@/lib/admin-dashboard/order-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const salesFilters = parseAdminOrderFilters(Astro.url);
+const visibleSalesFilters = {
+  search: salesFilters.search,
+  source: salesFilters.source,
+};
+const salesPagination = parseAdminPagination(Astro.url);
+const salesFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminOrderFilters(visibleSalesFilters),
+  salesPagination,
+);
+const [dashboardData, data] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminSalesManagementData(visibleSalesFilters, salesPagination),
+]);
+const feedback = formatAdminActionFeedback(Astro.url);
+---
+
+<AdminPageFrame
+  title="Admin Sales - JEHMARP"
+  description="Final sales records for completed customer orders."
+  heading="Sales"
+  intro="Review completed sales records by customer, sale date, source, and order total."
+  feedback={feedback}
+  dashboardData={dashboardData}
+>
+  <AdminSalesManagement
+    data={data}
+    activeFilters={visibleSalesFilters}
+    filterQuery={salesFilterQuery}
+  />
+</AdminPageFrame>

@@ -1,0 +1,30 @@
+---
+type Props = {
+  status?: string;
+  href?: string;
+};
+
+const { status, href } = Astro.props;
+---
+
+<article
+  class="agent-record-card admin-card"
+  data-interactive-row
+  data-status={status}
+>
+  {
+    href && (
+      <a href={href} class="agent-record-card__overlay" aria-label="View details">
+        <span class="sr-only">View details</span>
+      </a>
+    )
+  }
+  <div class="agent-record-card__content">
+    <slot />
+  </div>
+  {Astro.slots.has("footer") && (
+    <div class="agent-record-card__footer">
+      <slot name="footer" />
+    </div>
+  )}
+</article>

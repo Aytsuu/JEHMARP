@@ -1,0 +1,31 @@
+---
+import AgentAccountProfile from "@/components/agent/AgentAccountProfile.astro";
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
+import AgentProfileMenu from "@/components/agent/AgentProfileMenu.astro";
+import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
+import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
+import { requireAgentRoute } from "@/lib/agent-dashboard/page";
+
+export const prerender = false;
+
+const agentRoute = await requireAgentRoute(Astro);
+
+if (!agentRoute.ready) {
+  return agentRoute.response;
+}
+
+const data = await loadAgentDashboardData(Astro, agentRoute.userId);
+const feedback = formatAgentActionFeedback(Astro.url);
+---
+
+<AgentRecordPageLayout
+  title="Agent Profile - JEHMARP"
+  description="Manage earnings, settings, and account access."
+  heading="Profile"
+  intro="Update your account details and access earnings, activity, settings, and sign out."
+  feedback={feedback}
+  dashboardData={data}
+>
+  <AgentAccountProfile agent={data.agent} />
+  <AgentProfileMenu />
+</AgentRecordPageLayout>

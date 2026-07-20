@@ -29,6 +29,8 @@ const dashboardRouteStatusConfigs = [
     envKey: toPageStatusEnvKey(route.href),
   })),
   { label: "Settings", href: "/agent/settings", envKey: "PAGE_STATUS_AGENT_SETTINGS" },
+  { label: "My Earnings", href: "/agent/earnings", envKey: "PAGE_STATUS_AGENT_EARNINGS" },
+  { label: "Activity", href: "/agent/activity", envKey: "PAGE_STATUS_AGENT_ACTIVITY" },
 ] as const satisfies readonly DashboardRouteStatusConfig[];
 
 export function normalizePageStatus(value: unknown): PageStatus {

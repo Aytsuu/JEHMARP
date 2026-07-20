@@ -1,6 +1,6 @@
 ---
 import AgentEarnings from "@/components/agent/AgentEarnings.astro";
-import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
 import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
 import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
@@ -17,13 +17,15 @@ const data = await loadAgentDashboardData(Astro, agentRoute.userId);
 const feedback = formatAgentActionFeedback(Astro.url);
 ---
 
-<AgentPageFrame
-  title="Agent Earnings - JEHMARP"
+<AgentRecordPageLayout
+  title="My Earnings - JEHMARP"
   description="Agent earnings and commission summary."
-  heading="Agent Earnings"
+  heading="My Earnings"
   intro="Review monthly earnings, commission earned today, and expected commission by order."
   feedback={feedback}
   dashboardData={data}
+  backUrl="/agent/profile"
+  backLabel="Back to profile"
 >
   <AgentEarnings data={data} />
-</AgentPageFrame>
+</AgentRecordPageLayout>

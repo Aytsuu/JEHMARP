@@ -1,6 +1,7 @@
 const FORM_SUBMISSION_STATE_FLAG = "formSubmissionStateInitialized";
 const SUBMITTING_FLAG = "isSubmitting";
 const LOADING_CLASS = "form-submit-button--loading";
+const initializedDocuments = new WeakSet<Document>();
 
 function isPostForm(form: HTMLFormElement) {
   return (form.getAttribute("method") || "get").toLowerCase() === "post";
@@ -14,8 +15,9 @@ function getSubmitButtons(form: HTMLFormElement) {
 
 export function initFormSubmissionState(root: Document = document) {
   const body = root.body;
-  if (!body || body.dataset[FORM_SUBMISSION_STATE_FLAG] === "true") return;
+  if (!body || initializedDocuments.has(root)) return;
 
+  initializedDocuments.add(root);
   body.dataset[FORM_SUBMISSION_STATE_FLAG] = "true";
 
   root.addEventListener(
@@ -37,7 +39,10 @@ export function initFormSubmissionState(root: Document = document) {
       const submitter =
         event.submitter instanceof HTMLButtonElement ? event.submitter : null;
 
-      submitButtons.forEach((button) => {
+      const buttonsToDisable = new Set(submitButtons);
+      if (submitter) buttonsToDisable.add(submitter);
+
+      buttonsToDisable.forEach((button) => {
         button.disabled = true;
       });
 

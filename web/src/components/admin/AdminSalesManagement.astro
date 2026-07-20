@@ -1,0 +1,155 @@
+---
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import TableActionMenu from "@/components/TableActionMenu.astro";
+import type { AdminSalesManagementData } from "@/lib/admin-dashboard/data";
+import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
+import { orderSources } from "@/lib/admin-dashboard/order-filters";
+import { formatCurrency, formatDate } from "@/lib/admin-dashboard/view";
+import { formatOrderSource } from "@/lib/formatters";
+
+type Props = {
+  data: AdminSalesManagementData;
+  activeFilters: AdminOrderFilters;
+  filterQuery: string;
+};
+
+const { data, activeFilters, filterQuery } = Astro.props;
+const skeletonRows = Array.from({ length: 6 });
+---
+
+<section id="admin-sales" class="admin-panel" aria-labelledby="admin-sales-title">
+  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table">
+    <div class="table-filters order-management-toolbar">
+      <form
+        method="get"
+        action="/admin/sales"
+        class="order-filter-form"
+        data-sales-filter-form
+        data-current-filter-query={filterQuery}
+        aria-label="Filter sales"
+      >
+        <div class="order-filter-form__field order-filter-form__field--search">
+          <input
+            name="search"
+            type="search"
+            value={activeFilters.search ?? ""}
+            placeholder="Search customer, invoice, phone, or email..."
+            autocomplete="off"
+            aria-label="Search sales"
+            data-sales-search-input
+          />
+        </div>
+        <div class="order-filter-form__field">
+          <select name="source" aria-label="Filter by source">
+            <option value="">All sources</option>
+            {orderSources.map((source) => (
+              <option value={source} selected={activeFilters.source === source}>
+                {formatOrderSource(source)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </form>
+    </div>
+
+    <div data-sales-table-shell class="dashboard-interactive-table__surface">
+      <DashboardTableBoard>
+        <table class="dashboard-table">
+          <thead>
+            <tr>
+              <th scope="col">Customer</th>
+              <th scope="col">Sale Date</th>
+              <th scope="col">Source</th>
+              <th scope="col">Order Total</th>
+              <th scope="col">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.salesRows.length === 0 ? (
+              <DashboardTableEmptyState
+                colspan={5}
+                message="No completed sales match the selected filters."
+              />
+            ) : data.salesRows.map((sale) => {
+              const salesInvoicePdfHref = sale.invoice_number
+                ? `/admin/orders/customer/${sale.id}/sales-invoice.pdf`
+                : undefined;
+
+              return (
+                <tr data-status={sale.payment_status}>
+                  <td class="dashboard-table__cell--truncate">{sale.customer_label || "Guest"}</td>
+                  <td>{formatDate(sale.sale_date)}</td>
+                  <td>{sale.source_label}</td>
+                  <td>{formatCurrency(sale.order_total)}</td>
+                  <td>
+                    <TableActionMenu
+                      menuLabel={`Open actions for sale ${sale.customer_label || sale.id}`}
+                      pdfHref={salesInvoicePdfHref}
+                      detailsHref={sale.href}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </DashboardTableBoard>
+    </div>
+
+    <DashboardTablePagination pagination={data.pagination} />
+  </div>
+
+  <template data-sales-filter-skeleton>
+    <DashboardTableBoard aria-busy="true" aria-live="polite">
+      <table class="product-table-skeleton dashboard-table">
+        <caption class="sr-only">Loading filtered sales</caption>
+        <thead>
+          <tr>
+            <th scope="col">Customer</th>
+            <th scope="col">Sale Date</th>
+            <th scope="col">Source</th>
+            <th scope="col">Order Total</th>
+            <th scope="col">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {skeletonRows.map(() => (
+            <tr>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DashboardTableBoard>
+  </template>
+</section>
+
+<script>
+  import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
+
+  function initAdminSalesFilters() {
+    initDashboardFragmentTable({
+      cacheKey: "admin-sales-filter-cache-v1",
+      fragmentPath: "/admin/sales-fragment",
+      pagePath: "/admin/sales",
+      formSelector: "[data-sales-filter-form]",
+      tableShellSelector: "[data-sales-table-shell]",
+      skeletonTemplateSelector: "[data-sales-filter-skeleton]",
+      filterKeys: ["search", "source"],
+      searchInputSelector: "[data-sales-search-input]",
+      historyStateKey: "salesFilterQuery",
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initAdminSalesFilters);
+  document.addEventListener("astro:after-swap", initAdminSalesFilters);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initAdminSalesFilters();
+  }
+</script>

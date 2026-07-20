@@ -2,9 +2,18 @@
 import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import {
+  loadAdminAgentDetailsData,
+  loadAdminDashboardData,
+} from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
-import { fullName, formatDate } from "@/lib/admin-dashboard/view";
+import {
+  agentOrderPaymentStatus,
+  agentOrderTotal,
+  formatCurrency,
+  fullName,
+  formatDate,
+} from "@/lib/admin-dashboard/view";
 import { autoCapitalize } from "@/lib/formatters";
 
 export const prerender = false;
@@ -16,25 +25,32 @@ if (!adminRoute.ready) {
 }
 
 const { agentId } = Astro.params;
-const data = await loadAdminDashboardData();
-const agent = data.agents.find((a) => a.id === agentId);
+const [dashboardData, detailData] = await Promise.all([
+  loadAdminDashboardData(),
+  agentId ? loadAdminAgentDetailsData(agentId) : Promise.resolve(null),
+]);
 
-if (!agent) {
+if (!detailData) {
   return Astro.redirect("/admin/agents", 302);
 }
 
-const assignedCustomers = data.customers.filter((c) => c.assigned_agent_id === agent.id);
-const customersWithPendingOrders = assignedCustomers.filter((customer) =>
-  data.orders.some(
-    (order) => order.customer_id === customer.id && order.order_status !== "closed",
-  ),
-);
+const agent = detailData.agent;
+const assignedCustomers = detailData.assignedCustomers;
+const agentOrders = detailData.agentOrders.map((order) => {
+  const paymentStatus = agentOrderPaymentStatus(order);
+  const indication = order.order_status !== "processing" && order.order_status !== "closed"
+    ? "Pending order"
+    : order.order_status === "processing" && paymentStatus !== "paid"
+      ? "Pending payment"
+      : autoCapitalize(order.order_status);
 
-function hasPendingOrders(customerId: string): boolean {
-  return data.orders.some(
-    (order) => order.customer_id === customerId && order.order_status !== "closed",
-  );
-}
+  return {
+    order,
+    paymentStatus,
+    indication,
+    totalAmount: agentOrderTotal(order),
+  };
+});
 
 const feedback = formatAdminActionFeedback(Astro.url);
 const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
@@ -47,11 +63,20 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
   backUrl="/admin/agents"
   backLabel="Back to agents"
   feedback={feedback}
-  dashboardData={data}
+  dashboardData={dashboardData}
   contentMaxWidth="72rem"
   fullHeight
 >
   <ul slot="heading-meta" class="record-meta" aria-label="Agent details">
+    <li class="record-meta__item">
+      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M3 5h18v14H3z"></path>
+        <path d="M7 9h4"></path>
+        <path d="M7 13h6"></path>
+        <path d="M16 9h1"></path>
+      </svg>
+      <span class="record-meta__text">{agent.employee_id ?? "No employee ID"}</span>
+    </li>
     <li class="record-meta__item">
       <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
@@ -95,10 +120,13 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
         </div>
 
         <div class="detail-field detail-field--wide">
-          <span class="detail-field-label">Active tracing</span>
-          <div class="detail-field-value">
-            {customersWithPendingOrders.length} customer(s) with pending orders
-          </div>
+          <span class="detail-field-label">Customer remaining balance</span>
+          <div class="detail-field-value">{formatCurrency(detailData.remainingBalance)}</div>
+        </div>
+
+        <div class="detail-field">
+          <span class="detail-field-label">Agent orders</span>
+          <div class="detail-field-value">{agentOrders.length}</div>
         </div>
       </div>
     </div>
@@ -118,50 +146,87 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
                   <th scope="col">Customer</th>
                   <th scope="col">Contact</th>
                   <th scope="col">Address</th>
-                  <th scope="col">Status indicators</th>
                   <th scope="col">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {
-                  assignedCustomers.map((customer) => {
-                    const pending = hasPendingOrders(customer.id);
-                    return (
-                      <tr>
-                        <td>
-                          {fullName(customer)}
-                          {
-                            customer.is_reseller && (
-                              <span class="agent-customers-table__reseller">(reseller)</span>
-                            )
-                          }
-                        </td>
-                        <td>
-                          {customer.phone_number}
-                          <br />
-                          {customer.email ?? "No email"}
-                        </td>
-                        <td>{customer.address}</td>
-                        <td>
-                          {
-                            pending ? (
-                              <span class="agent-customers-table__pending-badge">
-                                PENDING ORDERS
-                              </span>
-                            ) : (
-                              <span class="agent-customers-table__idle">No pending orders</span>
-                            )
-                          }
-                        </td>
-                        <td>
-                          <ViewButton
-                            href={`/admin/customers/${customer.id}?returnTo=${agentReturnTo}`}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })
+                  assignedCustomers.map((customer) => (
+                    <tr>
+                      <td>
+                        {fullName(customer)}
+                        {
+                          customer.is_reseller && (
+                            <span class="agent-customers-table__reseller">(reseller)</span>
+                          )
+                        }
+                      </td>
+                      <td>
+                        {customer.phone_number}
+                        <br />
+                        {customer.email ?? "No email"}
+                      </td>
+                      <td>{customer.address}</td>
+                      <td>
+                        <ViewButton
+                          href={`/admin/customers/${customer.id}?returnTo=${agentReturnTo}`}
+                        />
+                      </td>
+                    </tr>
+                  ))
                 }
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </div>
+
+    <div class="content-section">
+      <h3 class="agent-record-content__heading">
+        Agent Orders ({agentOrders.length})
+      </h3>
+      {
+        agentOrders.length === 0 ? (
+          <p class="empty-state">No agent orders submitted by this agent yet.</p>
+        ) : (
+          <div class="table-wrap">
+            <table class="agent-customers-table agent-orders-table">
+              <thead>
+                <tr>
+                  <th scope="col">Order</th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Payment</th>
+                  <th scope="col">Total Amount</th>
+                  <th scope="col">Indication</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agentOrders.map(({ order, paymentStatus, totalAmount, indication }) => (
+                  <tr>
+                    <td>Agent order {order.id.slice(0, 8)}</td>
+                    <td>{formatDate(order.created_at)}</td>
+                    <td>{autoCapitalize(order.order_status)}</td>
+                    <td>{autoCapitalize(paymentStatus)}</td>
+                    <td>{formatCurrency(totalAmount)}</td>
+                    <td>
+                      <span class:list={[
+                        "agent-orders-table__indicator",
+                        {
+                          "agent-orders-table__indicator--warning": indication === "Pending order",
+                          "agent-orders-table__indicator--payment": indication === "Pending payment",
+                        },
+                      ]}>
+                        {indication}
+                      </span>
+                    </td>
+                    <td>
+                      <ViewButton href={`/admin/orders/agent/${order.id}?returnTo=${agentReturnTo}`} />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -236,26 +301,21 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
 
   .agent-customers-table th:nth-child(1),
   .agent-customers-table td:nth-child(1) {
-    width: 25%;
+    width: 28%;
   }
 
   .agent-customers-table th:nth-child(2),
   .agent-customers-table td:nth-child(2) {
-    width: 25%;
+    width: 28%;
   }
 
   .agent-customers-table th:nth-child(3),
   .agent-customers-table td:nth-child(3) {
-    width: 25%;
+    width: 34%;
   }
 
   .agent-customers-table th:nth-child(4),
   .agent-customers-table td:nth-child(4) {
-    width: 15%;
-  }
-
-  .agent-customers-table th:nth-child(5),
-  .agent-customers-table td:nth-child(5) {
     width: 10%;
   }
 
@@ -265,19 +325,30 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
     margin-left: 0.25rem;
   }
 
-  .agent-customers-table__pending-badge {
-    background-color: var(--color-brand-red);
-    color: white;
-    padding: 0.25rem 0.65rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    display: inline-block;
+  .agent-orders-table {
+    min-width: 760px;
   }
 
-  .agent-customers-table__idle {
-    color: var(--color-brand-muted-black);
-    font-size: 0.875rem;
+  .agent-orders-table__indicator {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.5rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.25rem;
+    background: #f3f4f6;
+    color: #374151;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .agent-orders-table__indicator--warning {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .agent-orders-table__indicator--payment {
+    background: #fee2e2;
+    color: #991b1b;
   }
 
   @media (max-width: 900px) {

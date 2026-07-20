@@ -1,6 +1,6 @@
 ---
-import AgentPayments from "@/components/agent/AgentPayments.astro";
-import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import AgentActivity from "@/components/agent/AgentActivity.astro";
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
 import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
 import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
@@ -17,13 +17,15 @@ const data = await loadAgentDashboardData(Astro, agentRoute.userId);
 const feedback = formatAgentActionFeedback(Astro.url);
 ---
 
-<AgentPageFrame
-  title="Agent Payments - JEHMARP"
-  description="Payment status summary for agent-accessible orders."
-  heading="Payment Status"
-  intro="Review payment status counts and remaining balances for accessible orders."
+<AgentRecordPageLayout
+  title="Activity - JEHMARP"
+  description="Recent agent order, customer, payment, and commission activity."
+  heading="Activity"
+  intro="Review recent order submissions, customer updates, payments, and commission changes."
   feedback={feedback}
   dashboardData={data}
+  backUrl="/agent/profile"
+  backLabel="Back to profile"
 >
-  <AgentPayments data={data} />
-</AgentPageFrame>
+  <AgentActivity data={data} />
+</AgentRecordPageLayout>

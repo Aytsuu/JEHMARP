@@ -24,7 +24,10 @@ describe("GET /admin/dashboard-summary.json", () => {
       userId: "admin-user-id",
     });
     loadAdminDashboardSummaryData.mockResolvedValue({
-      orders: 12,
+      totalOrders: 12,
+      pendingOrders: 4,
+      processingOrders: 3,
+      agents: 5,
       inquiries: 4,
       customers: 7,
       products: 9,
@@ -40,7 +43,10 @@ describe("GET /admin/dashboard-summary.json", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     await expect(response.json()).resolves.toEqual({
-      orders: 12,
+      totalOrders: 12,
+      pendingOrders: 4,
+      processingOrders: 3,
+      agents: 5,
       inquiries: 4,
       customers: 7,
       products: 9,

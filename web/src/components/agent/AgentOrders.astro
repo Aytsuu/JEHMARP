@@ -1,16 +1,19 @@
 ---
-import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import Accordion from "@/components/ui/Accordion.astro";
+import Sheet from "@/components/ui/Sheet.astro";
+import AgentRecordCard from "@/components/agent/AgentRecordCard.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
-import ViewButton from "@/components/ViewButton.astro";
 import {
+  agentOrderPaymentStatus,
+  agentOrderTotal,
   formatCurrency,
   formatDate,
   fullName,
   orderTotal,
 } from "@/lib/agent-dashboard/view";
-import { formatOrderSource } from "@/lib/formatters";
+import { autoCapitalize } from "@/lib/formatters";
 
 type Props = {
   data: AgentDashboardData;
@@ -18,275 +21,698 @@ type Props = {
 
 const { data } = Astro.props;
 const canSubmitOrder = data.products.length > 0;
-const hasAssignedCustomers = data.customers.length > 0;
+const standaloneOrders = data.orders.filter((order) => !order.agent_order_id);
+const orderRows = [
+  ...data.agentOrders.map((order) => ({
+    id: order.id,
+    created_at: order.created_at,
+    order_status: order.order_status,
+    payment_status: agentOrderPaymentStatus(order),
+    customer_label: `${order.customer_order.length} customer${order.customer_order.length === 1 ? "" : "s"}`,
+    total: agentOrderTotal(order),
+    href: `/agent/orders/multi-customers/${order.id}`,
+  })),
+  ...standaloneOrders.map((order) => ({
+    id: order.id,
+    created_at: order.created_at,
+    order_status: order.order_status,
+    payment_status: order.payment_status,
+    customer_label: order.customer ? fullName(order.customer) : "Personal order",
+    total: orderTotal(order, order.invoice.length > 0 ? "final_quantity" : "partial_quantity"),
+    href: `/agent/orders/${order.id}`,
+  })),
+].toSorted((first, second) => (
+  Date.parse(second.created_at) - Date.parse(first.created_at)
+));
 ---
 
-<section class="admin-panel" aria-labelledby="agent-orders-title">
-  <div class="hidden-create-form-holder" style="display: none;">
-    <form method="post" class="admin-form" aria-labelledby="agent-order-form-title" data-agent-order-form data-can-submit-order={String(canSubmitOrder)}>
+<section class="admin-panel agent-orders" aria-labelledby="agent-order-list-title">
+  <Sheet id="agent-create-order-sheet" width="42rem">
+    <div slot="header" class="order-create-sheet__header-copy">
+      <h3 class="drawer-sheet__title" data-sheet-title>Submit Order</h3>
+      <p class="order-create-sheet__header-description">
+        Add the products for admin review. Customer records can be attached after distribution.
+      </p>
+    </div>
+    <form
+      id="agent-create-order-form"
+      method="post"
+      class="order-create-form"
+      aria-labelledby="agent-order-form-title"
+      data-agent-order-form
+      data-can-submit-order={String(canSubmitOrder)}
+    >
       <input type="hidden" name="action" value="create-agent-order" />
-      <h3 id="agent-order-form-title">New agent order</h3>
+      <h3 id="agent-order-form-title" class="sr-only">New agent order</h3>
 
-        <div class="admin-form-grid">
-          <label class="field-row" data-existing-customer-field>
-            <span>Customer</span>
-            <select name="customerId" disabled={!canSubmitOrder || !hasAssignedCustomers}>
-              <option value="">Select customer</option>
-              {data.customers.map((customer) => (
-                <option
-                  value={customer.id}
-                  data-customer-first-name={customer.first_name}
-                  data-customer-last-name={customer.last_name}
-                  data-customer-phone-number={customer.phone_number}
-                  data-customer-email={customer.email ?? ""}
-                  data-customer-address={customer.address}
-                >
-                  {fullName(customer)} - {customer.phone_number}
-                </option>
-              ))}
-            </select>
+      {!canSubmitOrder && (
+        <p class="empty-state">
+          No active products are available for order submission.
+        </p>
+      )}
+
+      <section class="order-create-section">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Order type</h3>
+        </div>
+        <div class="order-create-section__body">
+          <fieldset class="order-mode-options">
+            <legend class="sr-only">Choose order type</legend>
+            <label class="order-mode-option">
+              <input
+                type="radio"
+                name="orderSubmissionMode"
+                value="distribution"
+                checked
+                disabled={!canSubmitOrder}
+              />
+              <span>
+                <strong>For distribution</strong>
+                <small>Submit product quantities first, then attach customer orders after allocation.</small>
+              </span>
+            </label>
+            <label class="order-mode-option">
+              <input
+                type="radio"
+                name="orderSubmissionMode"
+                value="personal"
+                disabled={!canSubmitOrder}
+              />
+              <span>
+                <strong>For myself</strong>
+                <small>Create this as your own customer order.</small>
+              </span>
+            </label>
+          </fieldset>
+        </div>
+      </section>
+
+      <section class="order-create-section">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Release</h3>
+        </div>
+        <div class="order-create-section__body">
+          <label class="field-row field-row--date">
+            <span>Release date</span>
+            <input
+              name="releaseDate"
+              type="date"
+              disabled={!canSubmitOrder}
+            />
           </label>
         </div>
+      </section>
 
-        <fieldset class="fieldset-block" data-customer-details-fields disabled={!canSubmitOrder}>
-          <legend>Customer details</legend>
-          <div class="admin-form-grid">
-            <label class="field-row"><span>First name</span><input name="firstName" required data-customer-first-name /></label>
-            <label class="field-row"><span>Last name</span><input name="lastName" required data-customer-last-name /></label>
-            <label class="field-row"><span>Phone number</span><input name="phoneNumber" required data-customer-phone-number /></label>
-            <label class="field-row"><span>Email</span><input name="email" type="email" data-customer-email /></label>
-          </div>
-          <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
-        </fieldset>
-
-        <div class="table-wrap">
-          <table>
-            <caption>Order items</caption>
-            <thead>
-              <tr>
-                <th scope="col">Product</th>
-                <th scope="col">Quantity</th>
-                <th scope="col">Details</th>
-                <th scope="col">Manage</th>
-              </tr>
-            </thead>
-            <tbody data-agent-order-items>
-              <tr data-agent-order-item-row>
-                <td>
-                  <label class="field-row">
-                    <span>Product <span data-row-number>1</span></span>
-                    <select name="productId" required disabled={!canSubmitOrder}>
-                      <option value="">Select product</option>
-                      {data.products.map((product) => (
-                        <option value={product.id}>
-                          {product.name} - {formatCurrency(product.default_price)} per {product.unit_label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </td>
-                <td>
-                  <label class="field-row">
-                    <span>Quantity <span data-row-number>1</span></span>
-                    <input name="quantity" type="number" min="0.001" step="0.001" required disabled={!canSubmitOrder} />
-                  </label>
-                </td>
-                <td>
-                  <label class="field-row">
-                    <span>Details <span data-row-number>1</span></span>
-                    <textarea name="addDetails" placeholder="Cut, packing, or delivery notes" disabled={!canSubmitOrder}></textarea>
-                  </label>
-                </td>
-                <td>
-                  <span class="empty-state">Required</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+      <section class="order-create-section">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Order items</h3>
         </div>
+        <div class="order-create-section__body">
+          <div class="order-item-list" data-order-items>
+            <Accordion class="order-item-accordion" open>
+              <span slot="title" data-order-item-title>Select product</span>
+              <button
+                slot="actions"
+                type="button"
+                class="order-item-accordion__remove"
+                data-remove-order-item
+                aria-label="Remove item"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 6h18"></path>
+                  <path d="M8 6V4h8v2"></path>
+                  <path d="M19 6l-1 14H6L5 6"></path>
+                  <path d="M10 11v6"></path>
+                  <path d="M14 11v6"></path>
+                </svg>
+              </button>
+              <div class="order-item-accordion__fields" data-order-item-row>
+                <label class="field-row">
+                  <span>Product</span>
+                  <select
+                    name="productId"
+                    required
+                    disabled={!canSubmitOrder}
+                    data-order-product-select
+                  >
+                    <option value="">Select product</option>
+                    {data.products.map((product) => (
+                      <option
+                        value={product.id}
+                        data-product-name={product.name}
+                        data-product-price={product.default_price}
+                      >
+                        {product.name} - {formatCurrency(product.default_price)} per {product.unit_label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label class="field-row">
+                  <span>Quantity</span>
+                  <input
+                    name="quantity"
+                    type="number"
+                    min="0.001"
+                    step="0.001"
+                    required
+                    disabled={!canSubmitOrder}
+                  />
+                </label>
+                <label class="field-row">
+                  <span>Details</span>
+                  <textarea
+                    name="addDetails"
+                    placeholder="Cut, packing, or delivery notes"
+                    disabled={!canSubmitOrder}
+                  ></textarea>
+                </label>
+              </div>
+            </Accordion>
+          </div>
+          <button
+            type="button"
+            class="order-create-form__add-item"
+            data-add-order-item
+            disabled={!canSubmitOrder}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.25"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14"></path>
+              <path d="M5 12h14"></path>
+            </svg>
+            <span>Add Item</span>
+          </button>
+        </div>
+      </section>
 
-        <template data-agent-order-item-template>
-          <tr data-agent-order-item-row>
-            <td>
+      <template data-order-item-template>
+        <details class="ui-accordion order-item-accordion" data-order-item-accordion>
+          <summary class="ui-accordion__summary">
+            <span class="ui-accordion__title" data-order-item-title>Select product</span>
+            <span class="ui-accordion__summary-actions">
+              <button
+                type="button"
+                class="order-item-accordion__remove"
+                data-remove-order-item
+                aria-label="Remove item"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 6h18"></path>
+                  <path d="M8 6V4h8v2"></path>
+                  <path d="M19 6l-1 14H6L5 6"></path>
+                  <path d="M10 11v6"></path>
+                  <path d="M14 11v6"></path>
+                </svg>
+              </button>
+              <span class="ui-accordion__icon" aria-hidden="true">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </span>
+            </span>
+          </summary>
+          <div class="ui-accordion__content">
+            <div class="order-item-accordion__fields" data-order-item-row>
               <label class="field-row">
-                <span>Product <span data-row-number></span></span>
-                <select name="productId" required disabled={!canSubmitOrder}>
+                <span>Product</span>
+                <select
+                  name="productId"
+                  required
+                  disabled={!canSubmitOrder}
+                  data-order-product-select
+                >
                   <option value="">Select product</option>
                   {data.products.map((product) => (
-                    <option value={product.id}>
+                    <option
+                      value={product.id}
+                      data-product-name={product.name}
+                      data-product-price={product.default_price}
+                    >
                       {product.name} - {formatCurrency(product.default_price)} per {product.unit_label}
                     </option>
                   ))}
                 </select>
               </label>
-            </td>
-            <td>
               <label class="field-row">
-                <span>Quantity <span data-row-number></span></span>
-                <input name="quantity" type="number" min="0.001" step="0.001" required disabled={!canSubmitOrder} />
+                <span>Quantity</span>
+                <input
+                  name="quantity"
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                  required
+                  disabled={!canSubmitOrder}
+                />
               </label>
-            </td>
-            <td>
               <label class="field-row">
-                <span>Details <span data-row-number></span></span>
-                <textarea name="addDetails" placeholder="Cut, packing, or delivery notes" disabled={!canSubmitOrder}></textarea>
+                <span>Details</span>
+                <textarea
+                  name="addDetails"
+                  placeholder="Cut, packing, or delivery notes"
+                  disabled={!canSubmitOrder}
+                ></textarea>
               </label>
-            </td>
-            <td>
-              <button type="button" data-remove-agent-order-item>Remove</button>
-            </td>
-          </tr>
-        </template>
-
-        <button type="button" data-add-agent-order-item disabled={!canSubmitOrder}>Add item</button>
-        <button type="submit" disabled={!canSubmitOrder}>Submit for review</button>
-      </form>
+            </div>
+          </div>
+        </details>
+      </template>
+    </form>
+    <div slot="footer" class="order-create-sheet__footer">
+      <div class="order-create-form__total" aria-live="polite">
+        <span>Total amount</span>
+        <strong data-agent-order-total-value>{formatCurrency(0)}</strong>
+      </div>
+      <button
+        type="submit"
+        form="agent-create-order-form"
+        disabled={!canSubmitOrder}
+      >
+        Submit for review
+      </button>
     </div>
-</section>
+  </Sheet>
 
-<section class="admin-panel" aria-labelledby="agent-order-list-title">
-
-  {data.orders.length === 0 ? (
-    <p class="empty-state">No accessible orders yet.</p>
-  ) : (
-    <div data-interactive-table class="dashboard-interactive-table">
-      <div class="table-filters">
-        <div class="table-filters__search">
-          <input
-            type="text"
-            placeholder="Search orders..."
-            data-search-input
-            aria-label="Search orders"
-          />
+  <div data-interactive-table class="dashboard-interactive-table agent-orders__table">
+    <div class="table-filters order-management-toolbar agent-orders__toolbar">
+      <div class="agent-orders__toolbar-row">
+        <div
+          class="order-filter-form agent-orders__search"
+          role="search"
+          aria-label="Search orders"
+        >
+          <div class="order-filter-form__field order-filter-form__field--search">
+            <input
+              type="search"
+              placeholder="Search orders..."
+              data-search-input
+              aria-label="Search orders"
+            />
+          </div>
         </div>
-        <div class="order-management-toolbar__actions">
-          <button
-            type="button"
-            class="btn-table-manage order-management-toolbar__create"
-            data-open-create-sheet
-            disabled={!canSubmitOrder}
+        <button
+          type="button"
+          class="btn-table-manage order-management-toolbar__create agent-orders__create"
+          data-open-create-sheet
+          data-sheet-target="#agent-create-order-sheet"
+          disabled={!canSubmitOrder}
+          aria-label="Submit order"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.25"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
           >
-            Submit Order
-          </button>
-        </div>
+            <path d="M12 5v14"></path>
+            <path d="M5 12h14"></path>
+          </svg>
+          <span class="agent-orders__create-label">Submit Order</span>
+        </button>
       </div>
-
-      <div class="dashboard-interactive-table__surface">
-        <DashboardTableBoard>
-          <table class="dashboard-table">
-            <thead>
-              <tr>
-                <th scope="col">Customer</th>
-                <th scope="col">Date</th>
-                <th scope="col">Source</th>
-                <th scope="col">Order Status</th>
-                <th scope="col">Payment Status</th>
-                <th scope="col">Order Total</th>
-                <th scope="col">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.orders.map((order) => {
-                const invoice = order.invoice.length > 0;
-                const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
-
-                return (
-                  <tr data-status={order.order_status}>
-                    <td class="dashboard-table__cell--truncate">
-                      {order.customer ? fullName(order.customer) : "Guest"}
-                    </td>
-                    <td>{formatDate(order.created_at)}</td>
-                    <td>{formatOrderSource(order.source)}</td>
-                    <td><StatusBadge kind="order" status={order.order_status} /></td>
-                    <td><StatusBadge kind="payment" status={order.payment_status} /></td>
-                    <td>{formatCurrency(total)}</td>
-                    <td>
-                      <ViewButton href={`/agent/orders/${order.id}`} />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </DashboardTableBoard>
-      </div>
-
-      <DashboardTablePagination />
     </div>
-  )}
+
+    <div class="agent-orders__pagination-summary">
+      <DashboardTablePagination variant="summary" />
+    </div>
+
+    <div class="agent-record-list agent-orders__list" data-interactive-cards>
+      {
+        orderRows.length === 0 ? (
+          <p class="empty-state">No agent orders yet.</p>
+        ) : (
+          orderRows.map((order) => (
+            <AgentRecordCard href={order.href} status={order.order_status}>
+              <div class="agent-record-card__header">
+                <div class="agent-record-card__title-group">
+                  <h3 class="agent-record-card__title">{order.customer_label}</h3>
+                  <p class="agent-record-card__subtitle">{formatDate(order.created_at)}</p>
+                </div>
+                <div class="agent-record-card__badges">
+                  <StatusBadge
+                    kind="order"
+                    status={order.order_status}
+                    label={autoCapitalize(order.order_status)}
+                  />
+                  <StatusBadge kind="payment" status={order.payment_status} />
+                </div>
+              </div>
+              <dl class="agent-record-card__meta agent-record-card__meta--inline">
+                <div class="agent-record-card__meta-item">
+                  <dt>Order total</dt>
+                  <dd>{formatCurrency(order.total)}</dd>
+                </div>
+              </dl>
+            </AgentRecordCard>
+          ))
+        )
+      }
+    </div>
+
+    <div class="agent-orders__pagination-controls">
+      <DashboardTablePagination variant="controls" />
+    </div>
+  </div>
 </section>
 
 <script>
-  const orderItems = document.querySelector("[data-agent-order-items]");
-  const orderItemTemplate = document.querySelector<HTMLTemplateElement>("[data-agent-order-item-template]");
-  const addOrderItemButton = document.querySelector<HTMLButtonElement>("[data-add-agent-order-item]");
-  const orderForm = document.querySelector<HTMLElement>("[data-agent-order-form]");
-  const existingCustomerField = document.querySelector<HTMLElement>("[data-existing-customer-field]");
-  const existingCustomerSelect = existingCustomerField?.querySelector<HTMLSelectElement>("select[name='customerId']");
-  const customerDetailsFields = document.querySelector<HTMLFieldSetElement>("[data-customer-details-fields]");
-  const firstNameInput = document.querySelector<HTMLInputElement>("input[data-customer-first-name]");
-  const lastNameInput = document.querySelector<HTMLInputElement>("input[data-customer-last-name]");
-  const phoneNumberInput = document.querySelector<HTMLInputElement>("input[data-customer-phone-number]");
-  const emailInput = document.querySelector<HTMLInputElement>("input[data-customer-email]");
-  const addressTextarea = document.querySelector<HTMLTextAreaElement>("textarea[data-customer-address]");
-  const canSubmitOrder = orderForm?.dataset.canSubmitOrder === "true";
+  import { calculateOrderItemsTotal } from "@/lib/client/order-total";
 
-  function refreshOrderItemRowNumbers() {
-    if (!orderItems) return;
+  function initAgentOrderForm() {
+    const form = document.querySelector<HTMLFormElement>("#agent-create-order-form");
+    if (!form || form.dataset.agentOrderFormInitialized === "true") return;
+    form.dataset.agentOrderFormInitialized = "true";
+    const orderForm = form;
 
-    orderItems.querySelectorAll("[data-agent-order-item-row]").forEach((row, index) => {
-      row.querySelectorAll("[data-row-number]").forEach((label) => {
-        label.textContent = String(index + 1);
+    const orderItems = orderForm.querySelector<HTMLElement>("[data-order-items]");
+    const orderItemTemplate = orderForm.querySelector<HTMLTemplateElement>("[data-order-item-template]");
+    const addOrderItemButton = orderForm.querySelector<HTMLButtonElement>("[data-add-order-item]");
+    const orderTotalValue = document.querySelector<HTMLElement>("[data-agent-order-total-value]");
+
+    function formatCurrencyForClient(value: number) {
+      return new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+      }).format(value);
+    }
+
+    function calculateOrderTotal() {
+      const items = Array.from(orderForm.querySelectorAll<HTMLElement>("[data-order-item-row]")).map((row) => {
+        const select = row.querySelector<HTMLSelectElement>("[data-order-product-select]");
+        const quantityInput = row.querySelector<HTMLInputElement>("input[name='quantity']");
+        const selectedOption = select?.selectedOptions?.[0];
+        return {
+          quantity: Number(quantityInput?.value ?? 0),
+          unitPrice: Number(selectedOption?.dataset.productPrice ?? 0),
+        };
       });
+
+      return calculateOrderItemsTotal(items);
+    }
+
+    function updateOrderTotal() {
+      if (!orderTotalValue) return;
+      orderTotalValue.textContent = formatCurrencyForClient(calculateOrderTotal());
+    }
+
+    function updateOrderItemTitle(scope: ParentNode) {
+      const title = scope.querySelector<HTMLElement>("[data-order-item-title]");
+      const select = scope.querySelector<HTMLSelectElement>("[data-order-product-select]");
+      const selectedOption = select?.selectedOptions?.[0];
+      const productName = selectedOption?.dataset.productName?.trim() || "Select product";
+      if (title) title.textContent = productName;
+    }
+
+    function bindOrderItem(scope: ParentNode) {
+      const select = scope.querySelector<HTMLSelectElement>("[data-order-product-select]");
+      const quantityInput = scope.querySelector<HTMLInputElement>("input[name='quantity']");
+      select?.addEventListener("change", () => {
+        updateOrderItemTitle(scope);
+        updateOrderTotal();
+      });
+      quantityInput?.addEventListener("input", updateOrderTotal);
+      updateOrderItemTitle(scope);
+    }
+
+    orderItems?.querySelectorAll<HTMLElement>(".order-item-accordion").forEach((item) => {
+      bindOrderItem(item);
     });
+
+    addOrderItemButton?.addEventListener("click", () => {
+      const templateItem = orderItemTemplate?.content.firstElementChild;
+
+      if (!orderItems || !templateItem) return;
+
+      const clonedItem = templateItem.cloneNode(true);
+      orderItems.append(clonedItem);
+
+      if (clonedItem instanceof HTMLElement) {
+        bindOrderItem(clonedItem);
+      }
+
+      if (clonedItem instanceof HTMLDetailsElement) {
+        clonedItem.open = true;
+      }
+
+      updateOrderTotal();
+    });
+
+    orderItems?.addEventListener("click", (event) => {
+      const target = event.target;
+      const removeButton = target instanceof HTMLElement
+        ? target.closest<HTMLElement>("[data-remove-order-item]")
+        : null;
+
+      if (!removeButton) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      removeButton.closest(".order-item-accordion")?.remove();
+      updateOrderTotal();
+    });
+
+    updateOrderTotal();
   }
 
-  addOrderItemButton?.addEventListener("click", () => {
-    const templateRow = orderItemTemplate?.content.firstElementChild;
-
-    if (!orderItems || !templateRow) return;
-
-    orderItems.append(templateRow.cloneNode(true));
-    refreshOrderItemRowNumbers();
-  });
-
-  orderItems?.addEventListener("click", (event) => {
-    const target = event.target;
-
-    if (!(target instanceof HTMLElement) || !target.matches("[data-remove-agent-order-item]")) return;
-
-    target.closest("[data-agent-order-item-row]")?.remove();
-    refreshOrderItemRowNumbers();
-  });
-
-  function getSelectedCustomerOption() {
-    if (!existingCustomerSelect?.value) return undefined;
-
-    return existingCustomerSelect.selectedOptions[0];
+  document.addEventListener("DOMContentLoaded", initAgentOrderForm);
+  document.addEventListener("astro:after-swap", initAgentOrderForm);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initAgentOrderForm();
   }
-
-  function fillCustomerFields(customer: HTMLOptionElement | undefined) {
-    if (firstNameInput) firstNameInput.value = customer?.dataset.customerFirstName ?? "";
-    if (lastNameInput) lastNameInput.value = customer?.dataset.customerLastName ?? "";
-    if (phoneNumberInput) phoneNumberInput.value = customer?.dataset.customerPhoneNumber ?? "";
-    if (emailInput) emailInput.value = customer?.dataset.customerEmail ?? "";
-    if (addressTextarea) addressTextarea.value = customer?.dataset.customerAddress ?? "";
-  }
-
-  function refreshCustomerFields() {
-    const selectedCustomer = getSelectedCustomerOption();
-
-    if (selectedCustomer) {
-      fillCustomerFields(selectedCustomer);
-    } else if (document.activeElement === existingCustomerSelect) {
-      fillCustomerFields(undefined);
-    }
-
-    if (customerDetailsFields) {
-      customerDetailsFields.disabled = Boolean(selectedCustomer) || !canSubmitOrder;
-    }
-  }
-
-  existingCustomerSelect?.addEventListener("change", refreshCustomerFields);
-  refreshCustomerFields();
 </script>
+
+<style>
+  .agent-orders__table > .agent-orders__toolbar {
+    display: block;
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .agent-orders__toolbar-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0.4rem;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .agent-orders__search.order-filter-form {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .agent-orders__search .order-filter-form__field--search {
+    width: 100%;
+  }
+
+  .agent-orders__search input {
+    width: 100%;
+  }
+
+  .agent-orders__create {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .agent-orders__list {
+    margin-top: 0.85rem;
+  }
+
+  .agent-orders__pagination-summary {
+    margin-top: 0.85rem;
+  }
+
+  .agent-orders__pagination-controls {
+    margin-top: 1rem;
+  }
+
+  .agent-orders__pagination-summary :global(.dashboard-interactive-table__footer),
+  .agent-orders__pagination-controls :global(.dashboard-interactive-table__footer) {
+    position: static;
+    border-top: 0;
+    background: transparent;
+    min-height: 0;
+  }
+
+  .agent-orders__pagination-summary :global(.table-pagination),
+  .agent-orders__pagination-controls :global(.table-pagination) {
+    padding-inline: 0;
+  }
+
+  .agent-orders__pagination-summary :global(.table-pagination) {
+    justify-content: space-between;
+    margin-top: 0;
+  }
+
+  .agent-orders__pagination-controls :global(.table-pagination) {
+    justify-content: center;
+    margin-top: 0;
+  }
+
+  @media (max-width: 47.99rem) {
+    .agent-orders__create {
+      width: 2.35rem;
+      min-width: 2.35rem;
+      padding: 0;
+    }
+
+    .agent-orders__create-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  }
+
+  .order-mode-options {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+
+  .order-mode-option {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: flex-start;
+    gap: 0.75rem;
+    min-height: 5.5rem;
+    border: 1px solid rgba(17, 24, 39, 0.14);
+    border-radius: 0.5rem;
+    background: #ffffff;
+    padding: 0.9rem;
+    cursor: pointer;
+  }
+
+  .order-mode-option:has(input:checked) {
+    border-color: var(--color-brand-red);
+    background: #fff8f8;
+  }
+
+  .order-mode-option input {
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0.15rem;
+    accent-color: var(--color-brand-red);
+  }
+
+  .order-mode-option strong,
+  .order-mode-option small {
+    display: block;
+  }
+
+  .order-mode-option strong {
+    color: #111827;
+    font-size: 0.92rem;
+    line-height: 1.25;
+  }
+
+  .order-mode-option small {
+    margin-top: 0.25rem;
+    color: var(--color-brand-muted-black);
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  @media (min-width: 30rem) {
+    .order-mode-options {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .order-create-form__total {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-right: auto;
+  }
+
+  .order-create-form__total span {
+    color: #6b7280;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .order-create-form__total strong {
+    color: #111827;
+    font-size: 1.1rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 47.99rem) {
+    .order-mode-options {
+      gap: 0.5rem;
+    }
+
+    .order-mode-option {
+      min-height: auto;
+      padding: 0.75rem;
+      gap: 0.65rem;
+    }
+  }
+</style>

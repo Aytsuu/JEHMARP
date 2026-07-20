@@ -6,14 +6,7 @@ import TableActionMenu from "@/components/TableActionMenu.astro";
 import type { AdminInvoiceManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminInvoiceFilters } from "@/lib/admin-dashboard/invoice-filters";
 import { invoiceBalanceStatuses } from "@/lib/admin-dashboard/invoice-filters";
-import {
-  formatCurrency,
-  formatDate,
-  fullName,
-  orderBalance,
-  orderPaymentTotal,
-  orderTotal,
-} from "@/lib/admin-dashboard/view";
+import { formatCurrency, formatDate } from "@/lib/admin-dashboard/view";
 
 type Props = {
   data: AdminInvoiceManagementData;
@@ -31,7 +24,7 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
 ---
 
 <section id="admin-invoices" class="admin-panel" aria-labelledby="admin-invoices-title">
-  <div data-interactive-table class="dashboard-interactive-table">
+  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table">
     <div class="table-filters order-management-toolbar">
       <form
         method="get"
@@ -80,31 +73,27 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
             </tr>
           </thead>
           <tbody>
-            {data.orders.length === 0 ? (
+            {data.invoiceRows.length === 0 ? (
               <DashboardTableEmptyState
                 colspan={7}
                 message="No invoices match the selected filters."
               />
-            ) : data.orders.map((order) => {
-              const invoice = order.invoice[0];
-              const invoiceTotal = orderTotal(order, "final_quantity");
-              const paidTotal = orderPaymentTotal(order);
-              const balance = orderBalance(order);
-              const salesInvoicePdfHref = `/admin/orders/${order.id}/sales-invoice.pdf`;
-              const orderDetailsHref = `/admin/orders/${order.id}`;
+            ) : data.invoiceRows.map((invoice) => {
+              const salesInvoicePdfHref = `/admin/orders/customer/${invoice.order_id}/sales-invoice.pdf`;
+              const orderDetailsHref = `/admin/orders/customer/${invoice.order_id}`;
 
               return (
-                <tr data-status={order.payment_status}>
+                <tr data-status={invoice.payment_status}>
                   <td class="dashboard-table__cell--truncate">
                     {invoice.invoice_number}
                   </td>
                   <td class="dashboard-table__cell--truncate">
-                    {order.customer ? fullName(order.customer) : "Guest"}
+                    {invoice.customer_label || "Guest"}
                   </td>
-                  <td>{formatDate(invoice.created_at)}</td>
-                  <td>{formatCurrency(invoiceTotal)}</td>
-                  <td>{formatCurrency(paidTotal)}</td>
-                  <td>{formatCurrency(balance)}</td>
+                  <td>{formatDate(invoice.invoice_created_at)}</td>
+                  <td>{formatCurrency(invoice.invoice_total)}</td>
+                  <td>{formatCurrency(invoice.paid_total)}</td>
+                  <td>{formatCurrency(invoice.balance)}</td>
                   <td>
                     <TableActionMenu
                       menuLabel={`Open actions for ${invoice.invoice_number}`}
@@ -120,7 +109,7 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
       </DashboardTableBoard>
     </div>
 
-    <DashboardTablePagination />
+    <DashboardTablePagination pagination={data.pagination} />
   </div>
 
   <template data-invoice-filter-skeleton>
@@ -157,160 +146,19 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
 </section>
 
 <script>
+  import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
+
   function initAdminInvoiceFilters() {
-    const form = document.querySelector<HTMLFormElement>("[data-invoice-filter-form]");
-    const tableShell = document.querySelector<HTMLElement>("[data-invoice-table-shell]");
-    const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-invoice-filter-skeleton]");
-    if (!form || !tableShell || !skeletonTemplate) return;
-    if (form.dataset.invoiceFilterInitialized === "true") return;
-    form.dataset.invoiceFilterInitialized = "true";
-
-    const activeForm = form;
-    const activeTableShell = tableShell;
-    const activeSkeletonTemplate = skeletonTemplate;
-    const cacheKey = "admin-invoices-filter-cache-v1";
-    const fragmentPath = "/admin/invoices-fragment";
-    const filterKeys = ["search", "balanceStatus"] as const;
-    const autoSubmitFields = activeForm.querySelectorAll<HTMLSelectElement>("select");
-    const searchInput = activeForm.querySelector<HTMLInputElement>("[data-invoice-search-input]");
-    let submitTimer: number | undefined;
-    let searchTimer: number | undefined;
-    let activeFetchController: AbortController | undefined;
-
-    function readCache(): string[] {
-      try {
-        const parsed = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
-        return Array.isArray(parsed)
-          ? parsed.filter((value): value is string => typeof value === "string")
-          : [];
-      } catch {
-        return [];
-      }
-    }
-
-    function writeCache(values: string[]) {
-      sessionStorage.setItem(cacheKey, JSON.stringify([...new Set(values)]));
-    }
-
-    function normalizeParams(params: URLSearchParams) {
-      const normalized = new URLSearchParams();
-
-      filterKeys.forEach((key) => {
-        const value = params.get(key)?.trim();
-        if (value) normalized.set(key, value);
-      });
-
-      return normalized.toString();
-    }
-
-    function normalizeFormQuery() {
-      const params = new URLSearchParams();
-      const formData = new FormData(activeForm);
-
-      filterKeys.forEach((key) => {
-        const value = formData.get(key);
-        if (typeof value === "string" && value.trim()) {
-          params.set(key, value.trim());
-        }
-      });
-
-      return params.toString();
-    }
-
-    function buildUrl(path: string, targetQuery: string) {
-      return targetQuery ? `${path}?${targetQuery}` : path;
-    }
-
-    function showSkeletonForQuery(targetQuery: string) {
-      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
-      const cachedQueries = readCache();
-
-      if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) {
-        return;
-      }
-
-      const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
-      if (!skeleton) return;
-
-      activeTableShell.replaceChildren(skeleton);
-    }
-
-    function replaceInvoicesFragment(fragmentHtml: string) {
-      const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html");
-      const nextTableShell = parsed.querySelector<HTMLElement>("[data-invoice-table-shell]");
-
-      if (!nextTableShell) {
-        throw new Error("Invoices fragment did not include an invoice table.");
-      }
-
-      activeTableShell.innerHTML = nextTableShell.innerHTML;
-      document.dispatchEvent(new Event("dashboard:interactive-table-updated"));
-    }
-
-    async function applyFilters(targetQuery: string) {
-      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
-
-      if (targetQuery === currentQuery) {
-        return;
-      }
-
-      showSkeletonForQuery(targetQuery);
-      activeFetchController?.abort();
-
-      const fetchController = new AbortController();
-      activeFetchController = fetchController;
-
-      try {
-        const response = await fetch(buildUrl(fragmentPath, targetQuery), {
-          headers: {
-            "X-Requested-With": "fetch",
-          },
-          signal: fetchController.signal,
-        });
-
-        const fragmentHtml = await window.readDashboardFragmentResponse(response);
-        window.history.replaceState(
-          { invoiceFilterQuery: targetQuery },
-          "",
-          buildUrl("/admin/invoices", targetQuery),
-        );
-        replaceInvoicesFragment(fragmentHtml);
-        activeForm.dataset.currentFilterQuery = targetQuery;
-        writeCache([...readCache(), targetQuery]);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        window.location.href = buildUrl("/admin/invoices", targetQuery);
-      } finally {
-        if (activeFetchController === fetchController) {
-          activeFetchController = undefined;
-        }
-      }
-    }
-
-    function submitFilters() {
-      window.clearTimeout(submitTimer);
-      submitTimer = window.setTimeout(() => {
-        void applyFilters(normalizeFormQuery());
-      }, 120);
-    }
-
-    writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
-
-    activeForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      void applyFilters(normalizeFormQuery());
-    });
-
-    autoSubmitFields.forEach((field) => {
-      field.addEventListener("change", submitFilters);
-    });
-
-    searchInput?.addEventListener("input", () => {
-      window.clearTimeout(searchTimer);
-      searchTimer = window.setTimeout(submitFilters, 450);
+    initDashboardFragmentTable({
+      cacheKey: "admin-invoices-filter-cache-v2",
+      fragmentPath: "/admin/invoices-fragment",
+      pagePath: "/admin/invoices",
+      formSelector: "[data-invoice-filter-form]",
+      tableShellSelector: "[data-invoice-table-shell]",
+      skeletonTemplateSelector: "[data-invoice-filter-skeleton]",
+      filterKeys: ["search", "balanceStatus"],
+      searchInputSelector: "[data-invoice-search-input]",
+      historyStateKey: "invoiceFilterQuery",
     });
   }
 

@@ -1,0 +1,362 @@
+---
+import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import PageAvailabilityNotice from "@/components/dashboard/PageAvailabilityNotice.astro";
+import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
+import { getAgentUnreadNotificationIds } from "@/lib/agent-dashboard/notifications";
+import { agentDashboardRoutes } from "@/config/navigation";
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import { getDashboardPageAvailability } from "@/lib/page-availability";
+
+type Props = {
+  title: string;
+  description: string;
+  heading: string;
+  intro?: string;
+  backUrl?: string;
+  backLabel?: string;
+  feedback?: {
+    status?: string;
+    error?: string;
+    cleanPath?: string;
+  };
+  dashboardData?: AgentDashboardData;
+  contentMaxWidth?: string;
+  fullHeight?: boolean;
+};
+
+const {
+  title,
+  description,
+  heading,
+  intro,
+  backUrl,
+  backLabel,
+  feedback,
+  dashboardData,
+  contentMaxWidth = "48rem",
+  fullHeight = false,
+} = Astro.props;
+const headingId = `${heading
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-|-$/g, "")}-title`;
+const notificationIds = dashboardData ? getAgentUnreadNotificationIds(dashboardData) : [];
+const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
+const isPageReady = pageAvailability.status === "ready";
+const hasHeadingMeta = Astro.slots.has("heading-meta");
+const hasHeadingAside = Astro.slots.has("heading-aside");
+---
+
+<DashboardLayout
+  title={title}
+  description={description}
+  navLabel="Agent operations"
+  navItems={agentDashboardRoutes}
+  sidebarUnreadBadges={{
+    "/agent/notifications": {
+      ids: notificationIds,
+      storageKey: "agent-read-notifications",
+    },
+  }}
+>
+  <div
+    class:list={[
+      "admin-notifications-page",
+      fullHeight && "admin-notifications-page--full-height",
+    ]}
+    data-admin-record-page={fullHeight || undefined}
+    data-agent-record-page
+    data-agent-notifications-page
+  >
+    <div
+      class="admin-notifications-page__inner"
+      style={`--notifications-page-max-width: ${contentMaxWidth};`}
+    >
+      <div class="admin-notifications-page__sticky">
+        <header class="admin-notifications-page__header">
+          <div class="admin-notifications-page__heading-row">
+            {backUrl && (
+              <RouteBackButton href={backUrl} label={backLabel ?? `Back from ${heading}`} />
+            )}
+            <div
+              class:list={[
+                "admin-notifications-page__heading-main",
+                hasHeadingAside && "admin-notifications-page__heading-main--with-aside",
+              ]}
+            >
+              <div class="admin-notifications-page__heading-copy">
+                <h1 id={headingId} class="admin-notifications-page__title">{heading}</h1>
+                {
+                  hasHeadingMeta ? (
+                    <div class="admin-notifications-page__heading-meta">
+                      <slot name="heading-meta" />
+                    </div>
+                  ) : (
+                    intro && <p class="admin-notifications-page__intro">{intro}</p>
+                  )
+                }
+              </div>
+              {
+                hasHeadingAside && (
+                  <div class="admin-notifications-page__heading-aside">
+                    <slot name="heading-aside" />
+                  </div>
+                )
+              }
+            </div>
+          </div>
+        </header>
+
+        {
+          feedback?.status && (
+            <p class="status-message" role="status">
+              {feedback.status}
+            </p>
+          )
+        }
+        {
+          feedback?.error && (
+            <p class="error-message" role="alert">
+              {feedback.error}
+            </p>
+          )
+        }
+      </div>
+
+      <div class="admin-notifications-page__content">
+        {isPageReady ? <slot /> : <PageAvailabilityNotice availability={pageAvailability} />}
+      </div>
+    </div>
+  </div>
+</DashboardLayout>
+
+{
+  feedback?.cleanPath && (
+    <script is:inline define:vars={{ agentFeedbackCleanPath: feedback.cleanPath }}>
+      if (typeof agentFeedbackCleanPath === "string" && window.history.replaceState) {
+        window.history.replaceState(window.history.state, "", agentFeedbackCleanPath);
+      }
+    </script>
+  )
+}
+
+<style>
+  :global(.dashboard-body:has([data-admin-record-page])) {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  :global(.dashboard-frame:has([data-admin-record-page])) {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  :global(.dashboard-main:has([data-admin-record-page])) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    max-height: 100vh;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .admin-notifications-page {
+    width: 100%;
+    min-height: 100%;
+    padding: 2rem 1rem 3rem;
+  }
+
+  .admin-notifications-page--full-height {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .admin-notifications-page__inner {
+    width: 100%;
+    max-width: var(--notifications-page-max-width, 48rem);
+    margin: 0 auto;
+    padding: 2rem 1.25rem 2.5rem;
+    background: #ffffff;
+  }
+
+  .admin-notifications-page--full-height .admin-notifications-page__inner {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    height: 100%;
+    margin: 0 auto;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .admin-notifications-page__sticky {
+    flex-shrink: 0;
+  }
+
+  .admin-notifications-page--full-height .admin-notifications-page__sticky {
+    padding: 1.5rem 1.25rem 0;
+  }
+
+  .admin-notifications-page__header {
+    margin-bottom: 1.75rem;
+  }
+
+  .admin-notifications-page--full-height .admin-notifications-page__header {
+    margin-bottom: 1.25rem;
+  }
+
+  .admin-notifications-page__heading-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+
+  .admin-notifications-page__heading-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .admin-notifications-page__heading-main--with-aside {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .admin-notifications-page__heading-copy {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .admin-notifications-page__heading-aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    padding-top: 0.15rem;
+  }
+
+  .admin-notifications-page__title {
+    margin: 0;
+    font-size: clamp(1.4rem, 1.9vw, 1.85rem);
+    line-height: 1;
+    font-weight: 700;
+    color: #000000;
+    letter-spacing: -0.025em;
+  }
+
+  .admin-notifications-page__intro {
+    margin: 0.4rem 0 0;
+    max-width: none;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--color-brand-muted-black);
+  }
+
+  .admin-notifications-page__heading-meta {
+    margin-top: 0.65rem;
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem 1.1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta__item) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    color: var(--color-brand-muted-black);
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta__icon) {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex-shrink: 0;
+    color: #6b7280;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .admin-notifications-page__heading-meta :global(.record-meta__text) {
+    min-width: 0;
+    white-space: pre-line;
+  }
+
+  .admin-notifications-page__content {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .admin-notifications-page--full-height .admin-notifications-page__content {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 0 1.25rem 1.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-notifications-page :global(.status-message),
+  .admin-notifications-page :global(.error-message) {
+    margin: 0 0 1rem;
+  }
+
+  .admin-notifications-page--full-height :global(.status-message),
+  .admin-notifications-page--full-height :global(.error-message) {
+    margin: 0 0 0.75rem;
+  }
+
+  @media (max-width: 47.99rem) {
+    :global(.dashboard-body--agent) .admin-notifications-page {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      width: 100%;
+      min-height: 100%;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    :global(.dashboard-body--agent) .admin-notifications-page__inner {
+      display: flex;
+      flex: 1;
+      flex-direction: column;
+      width: 100%;
+      max-width: none;
+      min-height: 100%;
+      margin: 0;
+      padding: 0.75rem;
+      background: #ffffff;
+    }
+
+    :global(.dashboard-body--agent) .admin-notifications-page__sticky,
+    :global(.dashboard-body--agent) .admin-notifications-page__content {
+      padding: 0;
+    }
+
+    :global(.dashboard-body--agent) .admin-notifications-page__header {
+      margin-bottom: 1rem;
+    }
+  }
+</style>

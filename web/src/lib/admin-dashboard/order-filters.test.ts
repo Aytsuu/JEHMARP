@@ -26,6 +26,16 @@ describe("parseAdminOrderFilters", () => {
 
     expect(filters).toEqual({});
   });
+
+  it("parses agent order status filters", () => {
+    const filters = parseAdminOrderFilters(
+      new URL("https://example.test/admin/orders?orderStatus=pending_customers"),
+    );
+
+    expect(filters).toEqual({
+      orderStatus: "pending_customers",
+    });
+  });
 });
 
 describe("serializeAdminOrderFilters", () => {

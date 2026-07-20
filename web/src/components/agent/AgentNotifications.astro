@@ -1,7 +1,7 @@
 ---
+import AgentNotificationCard from "@/components/agent/AgentNotificationCard.astro";
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
 import { buildAgentNotifications } from "@/lib/agent-dashboard/notifications";
-import { formatDate } from "@/lib/agent-dashboard/view";
 
 type Props = {
   data: AgentDashboardData;
@@ -11,103 +11,358 @@ const { data } = Astro.props;
 const notifications = buildAgentNotifications(data);
 ---
 
-<section id="agent-notifications" class="admin-panel" aria-labelledby="agent-notifications-title" style="max-width: 48rem; margin: 0 auto;">
-  <div data-interactive-table>
-    <div class="table-filters" style="justify-content: flex-end; gap: 0.75rem;">
-      <button type="button" class="btn-table-manage" data-mark-all-read style="padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.9rem; font-weight: 600; letter-spacing: normal;">Mark All as Read</button>
-      <button type="button" class="btn-table-manage" data-clear-notifications style="padding: 0.5rem 1rem; border-radius: 0.375rem; font-size: 0.9rem; font-weight: 600; letter-spacing: normal; background-color: var(--color-brand-muted-black);">Clear Stored Read</button>
+<section id="agent-notifications" class="admin-panel agent-notifications" aria-labelledby="agent-notifications-title">
+  <div data-interactive-table class="dashboard-interactive-table agent-notifications__table">
+    <div class="agent-notifications__toolbar">
+      <button
+        type="button"
+        class="agent-notifications__icon-btn"
+        data-mark-all-read
+        aria-label="Mark all as read"
+        title="Mark all as read"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M18 6 7 17l-5-5" />
+          <path d="m22 10-7.5 7.5L13 16" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        class="agent-notifications__icon-btn agent-notifications__icon-btn--muted"
+        data-clear-notifications
+        aria-label="Clear stored read"
+        title="Clear stored read"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <line x1="10" y1="11" x2="10" y2="17" />
+          <line x1="14" y1="11" x2="14" y2="17" />
+        </svg>
+      </button>
     </div>
 
-    <div style="display: flex; flex-direction: column; gap: 1rem;" data-notifications-list>
+    <div class="admin-notifications__list agent-notifications__list" data-notifications-list>
       {notifications.map((notif) => (
-        <article
-          class="admin-card notification-item"
-          data-notification-id={notif.id}
-          style="border-radius: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; transition: opacity 0.2s ease, transform 0.2s ease;"
-        >
-          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <span
-                class={`notification-badge badge-${notif.severity}`}
-                style="padding: 0.25rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;"
-              >
-                {notif.type}
-              </span>
-              <strong style="font-size: 1.05rem; color: var(--color-brand-red);">{notif.title}</strong>
-              <span class="unread-dot" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--color-brand-red);"></span>
-            </div>
-            <span style="font-size: 0.85rem; color: var(--color-brand-muted-black); font-weight: 500;">{formatDate(notif.date)}</span>
-          </div>
-
-          <p style="margin: 0.25rem 0; font-size: 0.95rem; line-height: 1.5; color: var(--color-brand-muted-black);">{notif.message}</p>
-
-          <div style="display: flex; gap: 0.75rem; margin-top: 0.25rem; align-items: center;">
-            <a href={notif.link} class="btn-table-manage" style="text-decoration: none; padding: 0.35rem 0.75rem; font-size: 0.85rem;">View Details</a>
-            <button type="button" class="btn-table-manage" data-mark-read style="padding: 0.35rem 0.75rem; font-size: 0.85rem; background-color: transparent; border: 1px solid #d1d5db; color: var(--color-brand-muted-black);">Mark as read</button>
-          </div>
-        </article>
+        <AgentNotificationCard notification={notif} />
       ))}
     </div>
+  </div>
+
+  <div class="agent-registration-link-modal" data-registration-link-modal hidden>
+    <div class="agent-registration-link-modal__backdrop" data-close-registration-link></div>
+    <section class="agent-registration-link-modal__panel" role="dialog" aria-modal="true" aria-labelledby="registration-link-modal-title">
+      <button type="button" class="agent-registration-link-modal__close" data-close-registration-link aria-label="Close">×</button>
+      <div class="agent-registration-link-modal__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93"></path>
+          <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13 19.07"></path>
+        </svg>
+      </div>
+      <h3 id="registration-link-modal-title">Customer Registration Link</h3>
+      <p>
+        Share this link with customers. They can submit basic information until the link expires.
+        Customers may enter your employee ID so the record is assigned to you automatically.
+      </p>
+      <p class="agent-registration-link-modal__expiry" data-registration-link-expiry></p>
+      <div class="agent-registration-link-modal__copy-row">
+        <input data-registration-link-input readonly />
+        <button type="button" class="btn-table-manage" data-copy-registration-link aria-label="Copy registration link">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+      </div>
+      <p class="agent-registration-link-modal__copied" data-registration-link-copied hidden>Copied.</p>
+    </section>
   </div>
 </section>
 
 <style>
-  .badge-warning {
-    background-color: #fef3c7;
-    color: #92400e;
+  .agent-notifications__table > .agent-notifications__toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    margin: 0 0 0.85rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
-  .badge-info {
-    background-color: #dbeafe;
-    color: #1e40af;
+
+  .agent-notifications__icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #374151;
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease;
   }
-  .badge-success {
-    background-color: #d1fae5;
-    color: #065f46;
+
+  .agent-notifications__icon-btn:hover,
+  .agent-notifications__icon-btn:focus-visible {
+    background: rgba(17, 24, 39, 0.06);
+    color: #111827;
+    outline: none;
   }
-  .notification-item.read {
-    opacity: 0.65;
+
+  .agent-notifications__icon-btn--muted {
+    color: #6b7280;
   }
-  .notification-item.read .unread-dot {
-    display: none !important;
+
+  .agent-notifications__icon-btn svg {
+    width: 1.05rem;
+    height: 1.05rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .agent-notifications__list {
+    margin-top: 0;
+    padding: 0;
+  }
+
+  .agent-registration-link-modal[hidden] {
+    display: none;
+  }
+
+  .agent-registration-link-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 80;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+  }
+
+  .agent-registration-link-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+  }
+
+  .agent-registration-link-modal__panel {
+    position: relative;
+    width: min(100%, 30rem);
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: #fff;
+    padding: 1.25rem;
+  }
+
+  .agent-registration-link-modal__close {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+
+  .agent-registration-link-modal__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    color: #991b1b;
+  }
+
+  .agent-registration-link-modal__icon svg,
+  .agent-registration-link-modal__copy-row svg {
+    width: 100%;
+    height: 100%;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+  }
+
+  .agent-registration-link-modal__panel h3 {
+    margin: 0.75rem 0 0.5rem;
+    letter-spacing: 0;
+  }
+
+  .agent-registration-link-modal__panel p {
+    color: #4b5563;
+  }
+
+  .agent-registration-link-modal__copy-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+  }
+
+  .agent-registration-link-modal__copy-row input {
+    min-width: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .agent-registration-link-modal__copy-row button {
+    width: 2.75rem;
+    justify-content: center;
+  }
+
+  .agent-registration-link-modal__copied {
+    margin: 0.5rem 0 0;
+    color: #166534 !important;
+    font-weight: 700;
+  }
+
+  @media (max-width: 47.99rem) {
+    .agent-registration-link-modal {
+      padding: 0.75rem;
+    }
+
+    .agent-registration-link-modal__panel {
+      padding: 1rem;
+    }
   }
 </style>
 
 <script>
+  function applyNotificationReadState(item: HTMLElement, isRead: boolean) {
+    item.classList.toggle("notification-item--read", isRead);
+    item.classList.toggle("notification-item--unread", !isRead);
+  }
+
+  function markNotificationRead(
+    item: HTMLElement,
+    readIds: string[],
+  ): string[] {
+    const id = item.dataset.notificationId;
+    if (!id || readIds.includes(id)) {
+      applyNotificationReadState(item, true);
+      return readIds;
+    }
+
+    const nextReadIds = [...readIds, id];
+    localStorage.setItem("agent-read-notifications", JSON.stringify(nextReadIds));
+    applyNotificationReadState(item, true);
+    (
+      window as Window & { updateSidebarUnreadBadges?: () => void }
+    ).updateSidebarUnreadBadges?.();
+    return nextReadIds;
+  }
+
+  function initSystemNotificationAutoRead(
+    items: HTMLElement[],
+    readIds: string[],
+  ) {
+    const systemItems = items.filter(
+      (item) => item.dataset.notificationSystem === "true",
+    );
+    if (systemItems.length === 0) return readIds;
+
+    let currentReadIds = readIds;
+
+    const markVisibleSystemNotifications = () => {
+      systemItems.forEach((item) => {
+        if (item.classList.contains("notification-item--read")) return;
+
+        const rect = item.getBoundingClientRect();
+        const inView = rect.top < window.innerHeight && rect.bottom > 0;
+        if (inView) {
+          currentReadIds = markNotificationRead(item, currentReadIds);
+        }
+      });
+    };
+
+    markVisibleSystemNotifications();
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          currentReadIds = markNotificationRead(
+            entry.target as HTMLElement,
+            currentReadIds,
+          );
+        });
+      },
+      { threshold: 0.35 },
+    );
+
+    systemItems.forEach((item) => observer.observe(item));
+
+    return currentReadIds;
+  }
+
   function initNotifications() {
+    const root = document.querySelector<HTMLElement>("#agent-notifications");
+    if (!root || root.dataset.agentNotificationsInitialized === "true") return;
+    root.dataset.agentNotificationsInitialized = "true";
+
     const list = document.querySelector("[data-notifications-list]");
     if (!list) return;
+    const modal = root.querySelector<HTMLElement>("[data-registration-link-modal]");
+    const linkInput = root.querySelector<HTMLInputElement>("[data-registration-link-input]");
+    const expiryText = root.querySelector<HTMLElement>("[data-registration-link-expiry]");
+    const copiedText = root.querySelector<HTMLElement>("[data-registration-link-copied]");
 
     const items = Array.from(list.querySelectorAll<HTMLElement>(".notification-item"));
-    let readIds = JSON.parse(localStorage.getItem("agent-read-notifications") || "[]");
+    let readIds = JSON.parse(localStorage.getItem("agent-read-notifications") || "[]") as string[];
 
-    // Apply initial read state styling
     items.forEach((item) => {
       const id = item.dataset.notificationId;
-      if (id && readIds.includes(id)) {
-        item.classList.add("read");
+      const isSystem = item.dataset.notificationSystem === "true";
+      applyNotificationReadState(
+        item,
+        isSystem || Boolean(id && readIds.includes(id)),
+      );
+    });
+
+    readIds = initSystemNotificationAutoRead(items, readIds);
+
+    list.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const markReadBtn = target.closest("[data-mark-read]");
+      if (markReadBtn) {
+        const item = target.closest(".notification-item") as HTMLElement;
+        if (item) {
+          readIds = markNotificationRead(item, readIds);
+        }
+      }
+
+      const registrationLinkButton = target.closest<HTMLButtonElement>("[data-open-registration-link]");
+      if (registrationLinkButton && modal && linkInput && expiryText) {
+        const relativeUrl = registrationLinkButton.dataset.registrationUrl ?? "";
+        const expiresAt = registrationLinkButton.dataset.registrationExpiresAt ?? "";
+        const url = new URL(relativeUrl, window.location.origin).toString();
+        linkInput.value = url;
+        expiryText.textContent = expiresAt
+          ? `Expires ${new Intl.DateTimeFormat("en-PH", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            }).format(new Date(expiresAt))}.`
+          : "";
+        if (copiedText) copiedText.hidden = true;
+        modal.hidden = false;
       }
     });
 
-    // Set up click handlers on list
-    list.addEventListener("click", (e) => {
-      const target = e.target as HTMLElement;
-        const markReadBtn = target.closest("[data-mark-read]");
-        if (markReadBtn) {
-          const item = target.closest(".notification-item") as HTMLElement;
-          if (item) {
-          const id = item.dataset.notificationId;
-          if (id) {
-            if (!readIds.includes(id)) {
-              readIds.push(id);
-              localStorage.setItem("agent-read-notifications", JSON.stringify(readIds));
-            }
-            item.classList.add("read");
-            (
-              window as Window & { updateSidebarUnreadBadges?: () => void }
-            ).updateSidebarUnreadBadges?.();
-          }
-        }
-      }
+    root.querySelectorAll("[data-close-registration-link]").forEach((closeTarget) => {
+      closeTarget.addEventListener("click", () => {
+        if (modal) modal.hidden = true;
+      });
+    });
+
+    root.querySelector("[data-copy-registration-link]")?.addEventListener("click", async () => {
+      if (!linkInput) return;
+      await navigator.clipboard.writeText(linkInput.value);
+      if (copiedText) copiedText.hidden = false;
     });
 
     const markAllReadBtn = document.querySelector("[data-mark-all-read]");
@@ -118,7 +373,7 @@ const notifications = buildAgentNotifications(data);
           if (id && !readIds.includes(id)) {
             readIds.push(id);
           }
-          item.classList.add("read");
+          applyNotificationReadState(item, true);
         });
         localStorage.setItem("agent-read-notifications", JSON.stringify(readIds));
         (
@@ -133,8 +388,10 @@ const notifications = buildAgentNotifications(data);
         localStorage.removeItem("agent-read-notifications");
         readIds = [];
         items.forEach((item) => {
-          item.classList.remove("read");
+          const isSystem = item.dataset.notificationSystem === "true";
+          applyNotificationReadState(item, isSystem);
         });
+        readIds = initSystemNotificationAutoRead(items, readIds);
         (
           window as Window & { updateSidebarUnreadBadges?: () => void }
         ).updateSidebarUnreadBadges?.();

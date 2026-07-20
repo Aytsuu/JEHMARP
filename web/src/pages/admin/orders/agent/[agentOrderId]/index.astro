@@ -1,0 +1,1267 @@
+---
+import ActionMenu from "@/components/ActionMenu.astro";
+import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
+import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import ViewButton from "@/components/ViewButton.astro";
+import {
+  formatAdminActionFeedback,
+  handleAdminDashboardAction,
+} from "@/lib/admin-dashboard/actions";
+import {
+  loadAdminAgentOrder,
+  loadAdminDashboardData,
+  type AdminOrder,
+} from "@/lib/admin-dashboard/data";
+import {
+  agentOrderPaymentStatus,
+  agentOrderTotal,
+  defaultProductCommissionAmount,
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderPaymentTotal,
+  orderTotal,
+} from "@/lib/admin-dashboard/view";
+import {
+  canAttachCustomerToAgentOrder,
+  buildAttachCustomerProductOptions,
+  formatPendingIndicator,
+  getAgentOrderProductDistribution,
+  minimumAgentOrderItemQuantity,
+  sumPendingCustomerOrderAmount,
+} from "@/lib/agent-order-distribution";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+
+export const prerender = false;
+
+function formatAmountValue(value: number) {
+  return new Intl.NumberFormat("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function getPendingAgentReceivedPayments(order: AdminOrder) {
+  return (order.agent_received_payment ?? []).filter(
+    (payment) => payment.status === "pending_admin_confirmation",
+  );
+}
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+const { agentOrderId } = Astro.params;
+
+if (!agentOrderId) {
+  return Astro.redirect("/admin/orders", 302);
+}
+
+if (Astro.request.method === "POST") {
+  return handleAdminDashboardAction(
+    Astro,
+    adminRoute.userId,
+    `/admin/orders/agent/${agentOrderId}`,
+  );
+}
+
+const [dashboardData, agentOrder] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminAgentOrder(agentOrderId),
+]);
+
+if (!agentOrder) {
+  return Astro.redirect("/admin/orders", 302);
+}
+
+const feedback = formatAdminActionFeedback(Astro.url);
+const agentOrderPaymentState = agentOrderPaymentStatus(agentOrder);
+const isCommissionLocked = agentOrderPaymentState === "paid";
+const canAttachCustomer = canAttachCustomerToAgentOrder(agentOrder);
+const isQuantityEditable = agentOrderPaymentState === "unpaid" || agentOrderPaymentState === "partial";
+const totalAmount = agentOrderTotal(agentOrder);
+const pendingCustomerOrderAmount = sumPendingCustomerOrderAmount(agentOrder);
+const attachCustomerProducts = buildAttachCustomerProductOptions({
+  agentOrder,
+  products: dashboardData.products,
+});
+const attachCustomerCustomers = dashboardData.customers.map((customer) => ({
+  id: customer.id,
+  label: fullName(customer),
+  firstName: customer.first_name,
+  lastName: customer.last_name,
+  phoneNumber: customer.phone_number,
+  email: customer.email ?? "",
+  address: customer.address,
+}));
+const totalPaid = agentOrder.customer_order.reduce(
+  (sum, order) => sum + orderPaymentTotal(order),
+  0,
+);
+const totalCommission = agentOrder.agent_order_item.reduce(
+  (sum, item) => sum + item.agent_commission_amount,
+  0,
+);
+const agentName = agentOrder.agent?.display_name ?? "Unassigned agent";
+const agentOrderCode = `Order-${agentOrder.id.slice(0, 6).toUpperCase()}`;
+const orderHeading = `${agentName}'s Order`;
+const agentOrderReturnTo = encodeURIComponent(
+  `/admin/orders/agent/${agentOrder.id}`,
+);
+const returnToParam = Astro.url.searchParams.get("returnTo");
+const backUrl =
+  returnToParam?.startsWith("/admin/") && !returnToParam.startsWith("//")
+    ? returnToParam
+    : "/admin/orders";
+const backLabel = backUrl.startsWith("/admin/agents/")
+  ? "Back to agent record"
+  : "Back to orders";
+const pendingPaymentConfirmations = agentOrder.customer_order.flatMap(
+  (order) => {
+    if (!order.invoice[0]) {
+      return [];
+    }
+
+    const customerName = order.customer ? fullName(order.customer) : "Guest";
+
+    return getPendingAgentReceivedPayments(order).map((payment) => ({
+      payment,
+      customerName,
+    }));
+  },
+);
+const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
+  (sum, { payment }) => sum + payment.amount,
+  0,
+);
+---
+
+<AdminNotificationsPageLayout
+  title={`${orderHeading} - JEHMARP`}
+  description="Admin agent order cluster details."
+  heading={orderHeading}
+  backUrl={backUrl}
+  backLabel={backLabel}
+  feedback={feedback}
+  dashboardData={dashboardData}
+  contentMaxWidth="72rem"
+  fullHeight
+>
+  <ul slot="heading-meta" class="record-meta" aria-label="Agent order details">
+    <li class="record-meta__item">
+      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <line x1="4" y1="9" x2="20" y2="9"></line>
+        <line x1="4" y1="15" x2="20" y2="15"></line>
+        <line x1="10" y1="3" x2="8" y2="21"></line>
+        <line x1="16" y1="3" x2="14" y2="21"></line>
+      </svg>
+      <span class="record-meta__text">{agentOrderCode}</span>
+    </li>
+    <li class="record-meta__item">
+      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </svg>
+      <span class="record-meta__text">{formatDate(agentOrder.created_at)}</span>
+    </li>
+  </ul>
+
+  <div slot="heading-aside" class="record-heading-badges">
+    <StatusBadge
+      kind="order"
+      status={agentOrder.order_status}
+      label={autoCapitalize(agentOrder.order_status)}
+    />
+    <StatusBadge
+      kind="payment"
+      status={agentOrderPaymentState}
+      label={autoCapitalize(agentOrderPaymentState)}
+    />
+  </div>
+
+  <div class="agent-record-content">
+    <div class="assigned-summary-grid">
+      <div class="detail-field">
+        <div class="detail-field-value detail-field-value--amount">
+          <span class="amount-ratio">
+            <span class="amount-ratio__paid">{formatCurrency(totalPaid)}</span>
+            <span class="amount-ratio__total"
+              >/{formatAmountValue(totalAmount)}</span
+            >
+            {
+              pendingCustomerOrderAmount > 0 && (
+                <span class="pending-indicator">
+                  {formatPendingIndicator(pendingCustomerOrderAmount, formatCurrency)}
+                </span>
+              )
+            }
+          </span>
+        </div>
+        <span class="detail-field-label">Total amount</span>
+      </div>
+
+      <div class="detail-field">
+        <div class="detail-field-value">{formatCurrency(totalCommission)}</div>
+        <span class="detail-field-label">Total commission</span>
+      </div>
+
+      <div class="detail-field">
+        <div class="detail-field-value">
+          {agentOrder.agent_order_item.length}
+        </div>
+        <span class="detail-field-label">Products</span>
+      </div>
+
+      <div class="detail-field">
+        <div class="detail-field-value">{agentOrder.customer_order.length}</div>
+        <span class="detail-field-label">Customers</span>
+      </div>
+    </div>
+
+    <div class="record-section">
+      <h2 class="section-line-heading">
+        <span class="section-line-heading__line" aria-hidden="true"></span>
+        <span class="section-line-heading__label">Products</span>
+        <span class="section-line-heading__line" aria-hidden="true"></span>
+      </h2>
+      {
+        agentOrder.agent_order_item.length === 0 ? (
+          <p class="empty-state">
+            No products have been added to this agent order yet.
+          </p>
+        ) : (
+          <div class="order-record-table-wrap">
+            <table class="agent-customers-table agent-order-products-table">
+              <thead>
+                <tr>
+                  <th scope="col">Product</th>
+                  <th scope="col">Quantity</th>
+                  <th scope="col">Details</th>
+                  <th scope="col">Total</th>
+                  <th scope="col">Commission</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agentOrder.agent_order_item.map((item) => {
+                  const unitPrice = item.product?.default_price ?? 0;
+                  const defaultCommission = defaultProductCommissionAmount({
+                    product: item.product,
+                    quantity: item.quantity,
+                    unitPrice,
+                  });
+                  const distribution = getAgentOrderProductDistribution(
+                    agentOrder,
+                    item.product_id,
+                  );
+                  const minQuantity = minimumAgentOrderItemQuantity(
+                    distribution.approvedDistributedQuantity,
+                  );
+                  const canEditQuantity = isQuantityEditable &&
+                    distribution.remainingQuantity > 0;
+
+                  return (
+                    <tr>
+                      <td>
+                        {item.product?.name ?? "Missing product"}
+                        <span class="agent-order-products-table__meta">
+                          {formatCurrency(unitPrice)} /{" "}
+                          {item.product?.unit_label ?? "unit"}
+                        </span>
+                      </td>
+                      <td>
+                        {canEditQuantity ? (
+                          <form method="post" class="agent-order-quantity-form">
+                            <input
+                              type="hidden"
+                              name="action"
+                              value="update-agent-order-item-quantity"
+                            />
+                            <input
+                              type="hidden"
+                              name="agentOrderItemId"
+                              value={item.id}
+                            />
+                            <label
+                              class="sr-only"
+                              for={`agent-order-quantity-${item.id}`}
+                            >
+                              Quantity for {item.product?.name ?? "item"}
+                            </label>
+                            <input
+                              id={`agent-order-quantity-${item.id}`}
+                              type="number"
+                              name="quantity"
+                              min={minQuantity}
+                              max={item.quantity - 0.001}
+                              step="0.001"
+                              value={item.quantity}
+                              required
+                            />
+                            <button type="submit">Save</button>
+                          </form>
+                        ) : (
+                          <span>
+                            {item.quantity} {item.product?.unit_label ?? ""}
+                          </span>
+                        )}
+                        {
+                          distribution.pendingQuantityIncrease > 0 && (
+                            <span class="pending-indicator">
+                              {formatPendingIndicator(
+                                distribution.pendingQuantityIncrease,
+                                (value) => `${value} ${item.product?.unit_label ?? ""}`,
+                              )}
+                            </span>
+                          )
+                        }
+                        <span class="agent-order-products-table__meta">
+                          {distribution.remainingQuantity > 0
+                            ? `${distribution.remainingQuantity} ${item.product?.unit_label ?? "unit"} remaining`
+                            : "Fully distributed"}
+                          {!canEditQuantity && isQuantityEditable
+                            ? " - locked when fully distributed"
+                            : ""}
+                        </span>
+                      </td>
+                      <td>{item.add_details ?? "N/A"}</td>
+                      <td>{formatCurrency(item.quantity * unitPrice)}</td>
+                      <td>
+                        <form method="post" class="agent-order-commission-form">
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="update-agent-order-commission"
+                          />
+                          <input
+                            type="hidden"
+                            name="agentOrderItemId"
+                            value={item.id}
+                          />
+                          <label
+                            class="sr-only"
+                            for={`agent-order-commission-${item.id}`}
+                          >
+                            Commission for {item.product?.name ?? "item"}
+                          </label>
+                          <input
+                            id={`agent-order-commission-${item.id}`}
+                            type="number"
+                            name="amount"
+                            min="0"
+                            step="0.01"
+                            value={item.agent_commission_amount}
+                            disabled={isCommissionLocked}
+                          />
+                          <button type="submit" disabled={isCommissionLocked}>
+                            Save
+                          </button>
+                        </form>
+                        <span class="agent-order-products-table__meta">
+                          Default {formatCurrency(defaultCommission)}
+                          {isCommissionLocked
+                            ? " - locked after full payment"
+                            : ""}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      }
+    </div>
+
+    <div class="record-section" id="agent-order-customers">
+      <h2 class="section-line-heading">
+        <span class="section-line-heading__line" aria-hidden="true"></span>
+        <span class="section-line-heading__label">Customers</span>
+        <span class="section-line-heading__line" aria-hidden="true"></span>
+      </h2>
+
+      <div class="customer-orders-table-toolbar">
+        <div class="customer-orders-table-toolbar__summary">
+          <span>Payment confirmations</span>
+          <strong>{formatCurrency(pendingPaymentConfirmationTotal)}</strong>
+        </div>
+        <div class="customer-orders-table-toolbar__actions">
+          {
+            agentOrder.customer_order.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  class:list={[
+                    "payment-confirmation-trigger",
+                    "payment-confirmation-trigger--toolbar",
+                    {
+                      "payment-confirmation-trigger--empty":
+                        pendingPaymentConfirmations.length === 0,
+                    },
+                  ]}
+                  data-open-cell-popover={
+                    pendingPaymentConfirmations.length > 0 ? true : undefined
+                  }
+                  data-popover-title="Payment confirmations"
+                  disabled={pendingPaymentConfirmations.length === 0}
+                >
+                  <span class="payment-confirmation-trigger__label">
+                    {pendingPaymentConfirmations.length > 0
+                      ? `Review ${pendingPaymentConfirmations.length}`
+                      : "None pending"}
+                  </span>
+                </button>
+
+                <div class="hidden-popover-form-holder">
+                  <div class="payment-confirmation-popover">
+                    <div class="payment-confirmation-popover__summary">
+                      <span>Total amount</span>
+                      <strong>
+                        {formatCurrency(pendingPaymentConfirmationTotal)}
+                      </strong>
+                    </div>
+
+                    <div class="payment-confirmation-popover__list">
+                      {pendingPaymentConfirmations.map(
+                        ({ payment, customerName }) => (
+                          <article class="payment-confirmation-item payment-confirmation-item--compact">
+                            <span class="payment-confirmation-item__customer">
+                              {customerName}
+                            </span>
+                            <strong class="payment-confirmation-item__amount">
+                              {formatCurrency(payment.amount)}
+                            </strong>
+                            <form
+                              method="post"
+                              class="payment-confirmation-item__actions"
+                            >
+                              <input
+                                type="hidden"
+                                name="action"
+                                value="confirm-agent-payment"
+                              />
+                              <input
+                                type="hidden"
+                                name="agentPaymentId"
+                                value={payment.id}
+                              />
+                              <button
+                                type="submit"
+                                class="payment-confirmation-submit"
+                              >
+                                Confirm
+                              </button>
+                            </form>
+                          </article>
+                        ),
+                      )}
+                    </div>
+
+                    <form
+                      method="post"
+                      class="payment-confirmation-popover__confirm-all"
+                    >
+                      <input
+                        type="hidden"
+                        name="action"
+                        value="confirm-agent-payments"
+                      />
+                      {pendingPaymentConfirmations.map(({ payment }) => (
+                        <input
+                          type="hidden"
+                          name="agentPaymentId"
+                          value={payment.id}
+                        />
+                      ))}
+                      <button
+                        type="submit"
+                        class="payment-confirmation-submit payment-confirmation-submit--all"
+                      >
+                        Confirm All
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              </>
+            )
+          }
+          {
+            agentOrder.customer_order.length > 0 && (
+              <ActionMenu
+                id="agent-order-customers-document-menu"
+                menuLabel="Document options for selected customer orders"
+                triggerLabel="Document"
+                triggerClass="customer-orders-table-toolbar__document-menu"
+                disabled
+                items={[
+                  {
+                    label: "Sales Invoice",
+                    icon: "external-pdf",
+                    dataAction: "bulk-sales-invoice-pdf",
+                  },
+                  {
+                    label: "Order Slip",
+                    icon: "external-pdf",
+                    dataAction: "bulk-order-slip-pdf",
+                  },
+                ]}
+              />
+            )
+          }
+          <button
+            type="button"
+            class="btn-table-manage customer-orders-table-toolbar__add-customer"
+            data-open-create-sheet
+            data-sheet-target="#agent-order-attach-customer-sheet"
+            disabled={!canAttachCustomer}
+            title={canAttachCustomer
+              ? undefined
+              : "Completed and paid agent orders cannot accept new customers."}
+          >
+            Add Customer
+          </button>
+        </div>
+      </div>
+
+      {
+        agentOrder.customer_order.length === 0 ? (
+          <p class="empty-state">No customer orders have been attached yet.</p>
+        ) : (
+          <>
+            <div class="order-record-table-wrap">
+              <table class="agent-customers-table agent-order-customer-orders-table">
+                <thead>
+                  <tr>
+                    <th scope="col" class="dashboard-table__select-column">
+                      <label class="dashboard-table__select-all">
+                        <span class="sr-only">Select all customer orders</span>
+                        <input type="checkbox" data-order-select-all />
+                      </label>
+                    </th>
+                    <th scope="col">Customer</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Order Status</th>
+                    <th scope="col">Payment Status</th>
+                    <th scope="col">Total amount</th>
+                    <th scope="col">Payment Confirmation</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {agentOrder.customer_order.map((order) => {
+                    const invoice = order.invoice[0];
+                    const orderAmount = orderTotal(
+                      order,
+                      invoice ? "final_quantity" : "partial_quantity",
+                    );
+                    const orderPaid = orderPaymentTotal(order);
+                    const isPendingOrder = order.order_status === "pending";
+                    const pendingAgentPayments =
+                      getPendingAgentReceivedPayments(order);
+                    const pendingAgentPaymentTotal = pendingAgentPayments.reduce(
+                      (sum, payment) => sum + payment.amount,
+                      0,
+                    );
+                    const hasSalesInvoice = Boolean(invoice);
+                    const customerName = order.customer
+                      ? fullName(order.customer)
+                      : "Guest";
+
+                    return (
+                      <tr>
+                        <td class="dashboard-table__select-column">
+                          <label class="dashboard-table__row-select">
+                            <span class="sr-only">Select order for {customerName}</span>
+                            <input
+                              type="checkbox"
+                              value={order.id}
+                              data-order-row-checkbox
+                              data-order-row-type="customer"
+                            />
+                          </label>
+                        </td>
+                        <td>{customerName}</td>
+                        <td>{formatDate(order.created_at)}</td>
+                        <td>{formatOrderSource(order.source)}</td>
+                        <td>
+                          <StatusBadge
+                            kind="order"
+                            status={order.order_status}
+                            label={autoCapitalize(order.order_status)}
+                          />
+                        </td>
+                        <td>
+                          <StatusBadge
+                            kind="payment"
+                            status={order.payment_status}
+                            label={autoCapitalize(order.payment_status)}
+                          />
+                        </td>
+                        <td>
+                          <span class="amount-ratio">
+                            <span class="amount-ratio__paid">
+                              {formatCurrency(orderPaid)}
+                            </span>
+                            <span class="amount-ratio__total">
+                              /{formatAmountValue(orderAmount)}
+                            </span>
+                            {
+                              isPendingOrder && (
+                                <span class="pending-indicator">
+                                  {formatPendingIndicator(orderAmount, formatCurrency)}
+                                </span>
+                              )
+                            }
+                          </span>
+                        </td>
+                        <td>
+                          <div class="payment-confirmation-cell">
+                            <button
+                              type="button"
+                              class:list={[
+                                "payment-confirmation-trigger",
+                                {
+                                  "payment-confirmation-trigger--empty":
+                                    pendingAgentPayments.length === 0,
+                                },
+                              ]}
+                              data-open-cell-popover={
+                                pendingAgentPayments.length > 0
+                                  ? true
+                                  : undefined
+                              }
+                              data-popover-title={`Payment confirmation: ${customerName}`}
+                              disabled={pendingAgentPayments.length === 0}
+                            >
+                              <span class="payment-confirmation-trigger__label">
+                                {pendingAgentPayments.length > 0
+                                  ? "Review payments"
+                                  : "None pending"}
+                              </span>
+                              {pendingAgentPayments.length > 0 && (
+                                <span class="payment-confirmation-trigger__meta">
+                                  {formatCurrency(pendingAgentPaymentTotal)}
+                                </span>
+                              )}
+                            </button>
+
+                            <div class="hidden-popover-form-holder">
+                              <div class="payment-confirmation-popover">
+                                <div class="payment-confirmation-popover__summary">
+                                  <span>Awaiting confirmation</span>
+                                  <strong>
+                                    {formatCurrency(pendingAgentPaymentTotal)}
+                                  </strong>
+                                </div>
+
+                                <div class="payment-confirmation-popover__list">
+                                  {pendingAgentPayments.map((payment) => (
+                                    <article class="payment-confirmation-item">
+                                      <div class="payment-confirmation-item__content">
+                                        <div class="payment-confirmation-item__details">
+                                          <span class="payment-confirmation-item__method">
+                                            {payment.payment_method}
+                                          </span>
+                                          <span class="payment-confirmation-item__date">
+                                            {formatDate(payment.payment_date)}
+                                            {" by "}
+                                            {payment.agent?.display_name ??
+                                              agentName}
+                                          </span>
+                                        </div>
+                                        <strong class="payment-confirmation-item__amount">
+                                          {formatCurrency(payment.amount)}
+                                        </strong>
+                                      </div>
+                                      <p class="payment-confirmation-item__meta">
+                                        {payment.reference_number
+                                          ? `Reference: ${payment.reference_number}`
+                                          : "No reference number"}
+                                        {" - "}
+                                        {payment.notes ?? "No notes"}
+                                      </p>
+                                      <form
+                                        method="post"
+                                        class="payment-confirmation-item__actions"
+                                      >
+                                        <input
+                                          type="hidden"
+                                          name="action"
+                                          value="confirm-agent-payment"
+                                        />
+                                        <input
+                                          type="hidden"
+                                          name="agentPaymentId"
+                                          value={payment.id}
+                                        />
+                                        <button
+                                          type="submit"
+                                          class="payment-confirmation-submit"
+                                          disabled={!hasSalesInvoice}
+                                        >
+                                          Confirm Payment Received
+                                        </button>
+                                      </form>
+                                    </article>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <ViewButton
+                            href={`/admin/orders/customer/${order.id}?returnTo=${agentOrderReturnTo}`}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )
+      }
+    </div>
+  </div>
+
+  <AgentOrderAttachCustomerSheet
+    agentOrderId={agentOrder.id}
+    customers={attachCustomerCustomers}
+    products={attachCustomerProducts}
+    mode="admin"
+    canAttachCustomer={canAttachCustomer}
+  />
+</AdminNotificationsPageLayout>
+
+<script>
+  import { initAgentOrderCustomerBulkPdf } from "@/lib/client/admin-order-bulk-pdf";
+
+  function initAgentOrderCustomerBulkPdfControls() {
+    initAgentOrderCustomerBulkPdf();
+  }
+
+  document.addEventListener("DOMContentLoaded", initAgentOrderCustomerBulkPdfControls);
+  document.addEventListener("astro:after-swap", initAgentOrderCustomerBulkPdfControls);
+  if (document.readyState !== "loading") {
+    initAgentOrderCustomerBulkPdfControls();
+  }
+</script>
+
+<style>
+  .agent-record-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    max-width: 100%;
+  }
+
+  .record-heading-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+  }
+
+  .assigned-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 1rem;
+  }
+
+  .detail-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
+    padding: 1rem;
+  }
+
+  .detail-field-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--color-brand-muted-black);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .detail-field-value {
+    font-size: 1.35rem;
+    line-height: 1.15;
+    color: #111827;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .amount-ratio {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0;
+    white-space: nowrap;
+  }
+
+  .amount-ratio__paid {
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+  }
+
+  .amount-ratio__total {
+    font-size: 0.78em;
+    font-weight: 500;
+    color: #9ca3af;
+  }
+
+  .record-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .section-line-heading {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0;
+    padding: 1.35rem 0;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: rgba(17, 24, 39, 0.42);
+  }
+
+  .section-line-heading__line {
+    flex: 1;
+    height: 1px;
+    background: rgba(17, 24, 39, 0.12);
+  }
+
+  .section-line-heading__label {
+    flex-shrink: 0;
+    white-space: nowrap;
+    color: rgba(17, 24, 39, 0.45);
+  }
+
+  .order-record-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+  }
+
+  .order-record-table-wrap .agent-customers-table {
+    margin: 0;
+    border: 0;
+  }
+
+  .agent-customers-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .agent-customers-table th,
+  .agent-customers-table td {
+    padding: 1.1rem 0.75rem;
+    vertical-align: middle;
+  }
+
+  .agent-order-products-table {
+    min-width: 760px;
+  }
+
+  .agent-order-products-table__meta {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.8rem;
+    color: var(--color-brand-muted-black);
+  }
+
+  .agent-order-customer-orders-table {
+    min-width: 1060px;
+  }
+
+  .agent-order-customer-orders-table .amount-ratio {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .agent-order-customer-orders-table .amount-ratio__total {
+    font-size: 0.82em;
+  }
+
+  .agent-order-customer-orders-table .dashboard-table__select-column {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    max-width: 2.75rem;
+    padding-left: 0.75rem;
+    padding-right: 0.5rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .agent-order-customer-orders-table .dashboard-table__select-all,
+  .agent-order-customer-orders-table .dashboard-table__row-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+  }
+
+  .agent-order-customer-orders-table .dashboard-table__select-column input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--color-brand-red);
+    cursor: pointer;
+  }
+
+  .customer-orders-table-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid rgba(17, 24, 39, 0.1);
+    border-radius: 0.75rem;
+    background: #ffffff;
+    padding: 0.85rem 1rem;
+  }
+
+  .customer-orders-table-toolbar__summary {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .customer-orders-table-toolbar__summary span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .customer-orders-table-toolbar__summary strong {
+    color: #111827;
+    font-size: 1.05rem;
+    line-height: 1.2;
+  }
+
+  .customer-orders-table-toolbar__action {
+    flex-shrink: 0;
+  }
+
+  .customer-orders-table-toolbar__actions {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .customer-orders-table-toolbar__document-menu {
+    min-height: 2.35rem;
+  }
+
+  .customer-orders-table-toolbar__add-customer {
+    white-space: nowrap;
+  }
+
+  .customer-orders-table-toolbar__add-customer:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .payment-confirmation-cell {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+
+  .payment-confirmation-trigger {
+    display: inline-flex;
+    min-height: 2.35rem;
+    width: 100%;
+    max-width: 11rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.55rem;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    border-radius: 0.5rem;
+    background: #ffffff;
+    color: #111827;
+    padding: 0.45rem 0.65rem;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    cursor: pointer;
+  }
+
+  .payment-confirmation-trigger:hover:not(:disabled),
+  .payment-confirmation-trigger:focus-visible {
+    border-color: rgba(102, 24, 24, 0.28);
+    background: #fff7f7;
+    color: var(--color-brand-red);
+  }
+
+  .payment-confirmation-trigger:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
+  }
+
+  .payment-confirmation-trigger--empty {
+    justify-content: center;
+    color: rgba(17, 24, 39, 0.55);
+  }
+
+  .payment-confirmation-trigger--toolbar {
+    max-width: none;
+    width: auto;
+    min-width: 8.5rem;
+    justify-content: center;
+  }
+
+  .payment-confirmation-trigger__label,
+  .payment-confirmation-trigger__meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .payment-confirmation-trigger__meta {
+    flex-shrink: 0;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.74rem;
+    font-weight: 700;
+  }
+
+  .payment-confirmation-popover {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .payment-confirmation-popover__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.75rem;
+    background: #f9fafb;
+    padding: 0.8rem 0.9rem;
+  }
+
+  .payment-confirmation-popover__summary span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .payment-confirmation-popover__summary strong {
+    color: #111827;
+    font-size: 1rem;
+    white-space: nowrap;
+  }
+
+  .payment-confirmation-popover__list {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .payment-confirmation-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .payment-confirmation-item:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .payment-confirmation-item__content {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 0.75rem;
+  }
+
+  .payment-confirmation-item--compact {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .payment-confirmation-item__customer {
+    min-width: 0;
+    overflow: hidden;
+    color: #111827;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .payment-confirmation-item__details {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .payment-confirmation-item__method {
+    color: #111827;
+    font-weight: 700;
+  }
+
+  .payment-confirmation-item__date,
+  .payment-confirmation-item__meta {
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.82rem;
+    line-height: 1.35;
+  }
+
+  .payment-confirmation-item__amount {
+    color: #111827;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+
+  .payment-confirmation-item__meta {
+    margin: 0;
+    word-break: break-word;
+  }
+
+  .payment-confirmation-item__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0;
+  }
+
+  .payment-confirmation-popover__confirm-all {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0.75rem 0 0;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .payment-confirmation-submit {
+    min-height: 2.35rem;
+    border: none;
+    border-radius: 0.55rem;
+    background: #111827;
+    color: #ffffff;
+    padding: 0.45rem 0.75rem;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    cursor: pointer;
+  }
+
+  .payment-confirmation-submit:hover:not(:disabled) {
+    background: var(--color-brand-red);
+  }
+
+  .payment-confirmation-submit--all {
+    min-width: 8rem;
+  }
+
+  .payment-confirmation-submit:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .agent-order-commission-form {
+    display: grid;
+    grid-template-columns: minmax(6rem, 1fr) auto;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .agent-order-quantity-form {
+    display: grid;
+    grid-template-columns: minmax(6rem, 1fr) auto;
+    gap: 0.4rem;
+    align-items: center;
+  }
+
+  .agent-order-commission-form input,
+  .agent-order-quantity-form input {
+    min-height: 2.35rem;
+    width: 100%;
+    border: 1px solid rgba(17, 24, 39, 0.14);
+    border-radius: 0.5rem;
+    background: #ffffff;
+    padding: 0.45rem 0.65rem;
+    font: inherit;
+  }
+
+  .agent-order-commission-form button,
+  .agent-order-quantity-form button {
+    min-height: 2.35rem;
+    border: 1px solid rgba(17, 24, 39, 0.12);
+    border-radius: 0.5rem;
+    background: #111827;
+    color: #ffffff;
+    padding: 0.45rem 0.65rem;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .agent-order-commission-form :disabled,
+  .agent-order-quantity-form :disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .pending-indicator {
+    margin-left: 0.35rem;
+    color: #b45309;
+    font-size: 0.82em;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 640px) {
+    .customer-orders-table-toolbar {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .customer-orders-table-toolbar__action,
+    .payment-confirmation-trigger--toolbar {
+      width: 100%;
+    }
+
+    .payment-confirmation-item--compact {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .payment-confirmation-item--compact .payment-confirmation-item__actions {
+      grid-column: 1 / -1;
+    }
+
+    .payment-confirmation-submit,
+    .payment-confirmation-submit--all {
+      width: 100%;
+    }
+  }
+</style>

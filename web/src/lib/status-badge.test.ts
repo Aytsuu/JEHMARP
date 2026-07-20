@@ -5,6 +5,8 @@ import { resolveStatusBadgeVariant } from "./status-badge";
 describe("resolveStatusBadgeVariant", () => {
   it("maps order and payment statuses to semantic variants", () => {
     expect(resolveStatusBadgeVariant("order", "pending")).toBe("warning");
+    expect(resolveStatusBadgeVariant("order", "pending_customers")).toBe("warning");
+    expect(resolveStatusBadgeVariant("order", "pending_order")).toBe("warning");
     expect(resolveStatusBadgeVariant("order", "processing")).toBe("info");
     expect(resolveStatusBadgeVariant("payment", "unpaid")).toBe("danger");
     expect(resolveStatusBadgeVariant("payment", "paid")).toBe("success");

@@ -5,6 +5,7 @@ import {
   parseResellerApplicationFormData,
   submitResellerApplication,
 } from "@/lib/public-website/reseller-applications";
+import { getClientIp } from "@/lib/security/client-ip";
 
 export const prerender = false;
 
@@ -52,10 +53,4 @@ function redirectWithError(
   });
 
   return redirect(`${returnPath}?${params.toString()}`, 303);
-}
-
-function getClientIp(headers: Headers): string | null {
-  const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-
-  return headers.get("cf-connecting-ip") ?? forwardedFor ?? headers.get("x-real-ip");
 }

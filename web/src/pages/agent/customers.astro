@@ -1,6 +1,6 @@
 ---
 import AgentCustomers from "@/components/agent/AgentCustomers.astro";
-import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
 import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
 import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
@@ -17,7 +17,7 @@ const data = await loadAgentDashboardData(Astro, agentRoute.userId);
 const feedback = formatAgentActionFeedback(Astro.url);
 ---
 
-<AgentPageFrame
+<AgentRecordPageLayout
   title="Agent Customers - JEHMARP"
   description="Customer records for the signed-in agent."
   heading="Customers"
@@ -26,4 +26,4 @@ const feedback = formatAgentActionFeedback(Astro.url);
   dashboardData={data}
 >
   <AgentCustomers data={data} />
-</AgentPageFrame>
+</AgentRecordPageLayout>

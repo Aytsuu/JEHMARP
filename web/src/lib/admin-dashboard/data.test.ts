@@ -9,6 +9,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 type MockResponse = {
   data: unknown[];
   error: null;
+  count?: number | null;
 };
 
 const emptyResponse: MockResponse = {
@@ -20,6 +21,8 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    neq: vi.fn(() => builder),
+    in: vi.fn(() => builder),
     gte: vi.fn(() => builder),
     lte: vi.fn(() => builder),
     or: vi.fn(() => builder),
@@ -29,6 +32,7 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
     })),
     order: vi.fn(() => builder),
     limit: vi.fn(() => Promise.resolve(response)),
+    range: vi.fn(() => Promise.resolve(response)),
     then: (resolve: (value: MockResponse) => unknown) => resolve(response),
   };
 
@@ -38,6 +42,7 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
 function createMockOrder(overrides: Record<string, unknown> = {}) {
   return {
     id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    agent_order_id: null,
     customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
     agent_id: null,
     source: "guest_shop",
@@ -117,7 +122,7 @@ describe("loadAdminDashboardData", () => {
   });
 
   it("loads product management data without loading the rest of the dashboard", async () => {
-    const productBuilder = createQueryBuilder();
+    const productBuilder = createQueryBuilder({ data: [], error: null, count: 37 });
     const from = vi.fn(() => productBuilder);
     createSupabaseAdminClient.mockReturnValue({ from });
     const { loadAdminProductManagementData } = await import("./data");
@@ -130,8 +135,18 @@ describe("loadAdminDashboardData", () => {
     expect(from).toHaveBeenCalledTimes(1);
     expect(from).toHaveBeenNthCalledWith(1, "product");
     expect(productBuilder.or).toHaveBeenCalledWith("name.ilike.%belly%,description.ilike.%belly%");
+    expect(productBuilder.select).toHaveBeenCalledWith(expect.any(String), { count: "exact" });
+    expect(productBuilder.range).toHaveBeenCalledWith(0, 9);
     expect(result).toEqual({
       products: [],
+      pagination: {
+        page: 1,
+        pageSize: 10,
+        totalRows: 37,
+        totalPages: 4,
+        fromRow: 1,
+        toRow: 10,
+      },
     });
   });
 
@@ -156,112 +171,117 @@ describe("loadAdminDashboardData", () => {
     expect(orderBuilder.eq).toHaveBeenCalledWith("payment_status", "partial");
   });
 
-  it("filters admin orders by search on the server", async () => {
-    const matchingOrder = createMockOrder();
-    const lowTotalOrder = createMockOrder({
-      id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-      customer: {
-        id: "c10bb955-d8b1-4a26-a6e2-928fd33949e1",
-        first_name: "Maria",
-        last_name: "Santos",
-        phone_number: "09171111111",
-        email: "santos@example.test",
-        address: "Makati",
-        is_reseller: false,
-      },
-      customer_order_item: [
-        {
-          id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
-          product_id: "p10bb955-d8b1-4a26-a6e2-928fd33949e1",
-          partial_quantity: 1,
-          final_quantity: 1,
-          unit_price: 200,
-          price_type: "retail",
-          add_details: null,
-          agent_commission_amount: 0,
-          agent_commission_paid: false,
-          product: null,
-        },
-      ],
-    });
-    const unrelatedOrder = createMockOrder({
-      id: "69d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-      customer: {
-        id: "d10bb955-d8b1-4a26-a6e2-928fd33949e1",
-        first_name: "Juan",
-        last_name: "Reyes",
-        phone_number: "09172222222",
-        email: "juan@example.test",
-        address: "Pasig",
-        is_reseller: false,
-      },
-    });
-    const orderBuilder = createQueryBuilder({
-      data: [matchingOrder, lowTotalOrder, unrelatedOrder],
-      error: null,
-    });
+  it("loads admin order management rows through the paginated order RPC", async () => {
+    const orderRow = {
+      id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      row_type: "customer",
+      created_at: "2026-07-03T00:00:00.000Z",
+      status: "pending",
+      customer_label: "Maria Cruz",
+      source_label: "Shop",
+      payment_status: "partial",
+      total_amount: "1200.00",
+      href: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      linked_customer_count: null,
+    };
+    const orderBuilder = createQueryBuilder();
     const from = vi.fn((table: string) => (
       table === "customer_order" ? orderBuilder : createQueryBuilder()
     ));
-    createSupabaseAdminClient.mockReturnValue({ from });
+    const rpc = vi.fn(() => Promise.resolve({
+      data: [{ records: [orderRow], total_rows: "1" }],
+      error: null,
+    }));
+    createSupabaseAdminClient.mockReturnValue({ from, rpc });
     const { loadAdminOrderManagementData } = await import("./data");
 
     const result = await loadAdminOrderManagementData({
       search: "maria",
+      source: "guest_shop",
+      orderStatus: "pending",
+      paymentStatus: "partial",
     });
 
-    expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id, lowTotalOrder.id]);
+    expect(rpc).toHaveBeenCalledWith("list_admin_order_rows", {
+      search_query: "maria",
+      source_filter: "guest_shop",
+      order_status_filter: "pending",
+      payment_status_filter: "partial",
+      page_number: 1,
+      page_size: 10,
+    });
+    expect(result.orderRows).toEqual([{
+      ...orderRow,
+      release_date: null,
+      total_amount: 1200,
+    }]);
+    expect(result.pagination.totalRows).toBe(1);
   });
 
-  it("filters admin invoices by invoice number, customer name, and balance status", async () => {
-    const matchingOrder = createMockOrder({
-      payment_status: "partial",
-      invoice: {
-        id: "7c66f907-8324-473c-b0b5-d017a4728121",
-        order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-        invoice_number: "INV-00000042",
-        status: "issued",
-        issued_at: "2026-07-03T00:00:00.000Z",
-        due_at: null,
-        created_at: "2026-07-03T00:00:00.000Z",
-        updated_at: "2026-07-03T00:00:00.000Z",
-      },
-    });
-    const wrongBalanceOrder = createMockOrder({
-      id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+  it("loads admin sales rows through the paginated sales RPC", async () => {
+    const salesRow = {
+      id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      created_at: "2026-07-03T00:00:00.000Z",
+      sale_date: "2026-07-06",
+      release_date: "2026-07-05",
+      customer_label: "Maria Cruz",
+      source_label: "Shop",
+      order_status: "closed",
       payment_status: "paid",
-      invoice: {
-        id: "8c66f907-8324-473c-b0b5-d017a4728121",
-        order_id: "59d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-        invoice_number: "INV-00000043",
-        status: "issued",
-        issued_at: "2026-07-03T00:00:00.000Z",
-        due_at: null,
-        created_at: "2026-07-03T00:00:00.000Z",
-        updated_at: "2026-07-03T00:00:00.000Z",
-      },
-    });
-    const noInvoiceOrder = createMockOrder({
-      id: "69d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-      customer: {
-        id: "d10bb955-d8b1-4a26-a6e2-928fd33949e1",
-        first_name: "Juan",
-        last_name: "Reyes",
-        phone_number: "09172222222",
-        email: "juan@example.test",
-        address: "Pasig",
-        is_reseller: false,
-      },
-      invoice: [],
-    });
-    const orderBuilder = createQueryBuilder({
-      data: [matchingOrder, wrongBalanceOrder, noInvoiceOrder],
+      invoice_number: "INV-00000042",
+      order_total: "1200.00",
+      paid_total: "1200.00",
+      balance: "0.00",
+      href: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    };
+    const rpc = vi.fn(() => Promise.resolve({
+      data: [{ records: [salesRow], total_rows: "1" }],
       error: null,
+    }));
+    createSupabaseAdminClient.mockReturnValue({ rpc });
+    const { loadAdminSalesManagementData } = await import("./data");
+
+    const result = await loadAdminSalesManagementData({
+      search: "maria",
+      source: "guest_shop",
+      orderStatus: "closed",
+      paymentStatus: "paid",
     });
-    const from = vi.fn((table: string) => (
-      table === "customer_order" ? orderBuilder : createQueryBuilder()
-    ));
-    createSupabaseAdminClient.mockReturnValue({ from });
+
+    expect(rpc).toHaveBeenCalledWith("list_admin_sales_rows", {
+      search_query: "maria",
+      source_filter: "guest_shop",
+      order_status_filter: "closed",
+      payment_status_filter: "paid",
+      page_number: 1,
+      page_size: 10,
+    });
+    expect(result.salesRows).toEqual([{
+      ...salesRow,
+      order_total: 1200,
+      paid_total: 1200,
+      balance: 0,
+    }]);
+    expect(result.pagination.totalRows).toBe(1);
+  });
+
+  it("loads admin invoice rows through the paginated invoice RPC", async () => {
+    const invoiceRow = {
+      order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      invoice_id: "7c66f907-8324-473c-b0b5-d017a4728121",
+      invoice_number: "INV-00000042",
+      customer_label: "Maria Cruz",
+      invoice_created_at: "2026-07-03T00:00:00.000Z",
+      invoice_total: "1200.00",
+      paid_total: "400.00",
+      balance: "800.00",
+      payment_status: "partial",
+    };
+    const rpc = vi.fn(() => Promise.resolve({
+      data: [{ records: [invoiceRow], total_rows: 1 }],
+      error: null,
+    }));
+    createSupabaseAdminClient.mockReturnValue({ rpc });
     const { loadAdminInvoiceManagementData } = await import("./data");
 
     const result = await loadAdminInvoiceManagementData({
@@ -269,69 +289,45 @@ describe("loadAdminDashboardData", () => {
       balanceStatus: "partial",
     });
 
-    expect(result.orders.map((order) => order.id)).toEqual([matchingOrder.id]);
+    expect(rpc).toHaveBeenCalledWith("list_admin_invoice_rows", {
+      search_query: "inv-00000042 maria",
+      balance_status_filter: "partial",
+      page_number: 1,
+      page_size: 10,
+    });
+    expect(result.invoiceRows).toEqual([{
+      ...invoiceRow,
+      invoice_total: 1200,
+      paid_total: 400,
+      balance: 800,
+    }]);
+    expect(result.pagination.totalRows).toBe(1);
   });
 
-  it("filters admin customers by name, email, contact, assigned agent, and type", async () => {
-    const customerBuilder = createQueryBuilder({
-      data: [
-        {
-          id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
-          first_name: "Maria",
-          last_name: "Cruz",
-          phone_number: "09170000000",
-          email: "maria@example.test",
-          address: "Quezon City",
-          assigned_agent_id: "agent-1",
-          is_reseller: true,
-          created_at: "2026-07-03T00:00:00.000Z",
-          updated_at: "2026-07-03T00:00:00.000Z",
-        },
-        {
-          id: "c10bb955-d8b1-4a26-a6e2-928fd33949e1",
-          first_name: "Ana",
-          last_name: "Reyes",
-          phone_number: "09171111111",
-          email: "ana@example.test",
-          address: "Makati",
-          assigned_agent_id: null,
-          is_reseller: false,
-          created_at: "2026-07-03T00:00:00.000Z",
-          updated_at: "2026-07-03T00:00:00.000Z",
-        },
-      ],
+  it("loads admin customer rows through the paginated customer RPC", async () => {
+    const customerRow = {
+      id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+      first_name: "Maria",
+      last_name: "Cruz",
+      phone_number: "09170000000",
+      email: "maria@example.test",
+      address: "Quezon City",
+      assigned_agent_id: "agent-1",
+      assigned_agent_name: "Carlos Dela Cruz",
+      is_reseller: true,
+      is_agent: false,
+      credit_limit: 1500,
+      credit_limit_exceeded: true,
+      outstanding_credit_balance: 1800,
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+    };
+    const rpc = vi.fn(() => Promise.resolve({
+      data: [{ records: [customerRow], total_rows: 1 }],
       error: null,
-    });
-    const agentBuilder = createQueryBuilder({
-      data: [
-        {
-          id: "agent-1",
-          display_name: "Carlos Dela Cruz",
-        },
-      ],
-      error: null,
-    });
-    const from = vi.fn((table: string) => {
-      if (table === "customer") return customerBuilder;
-      if (table === "agent_profile") return agentBuilder;
-      return createQueryBuilder();
-    });
-    createSupabaseAdminClient.mockReturnValue({
-      from,
-      auth: {
-        admin: {
-          listUsers: vi.fn(() => Promise.resolve({
-            data: {
-              users: [{
-                id: "user-1",
-                email: "carlos@example.test",
-              }],
-            },
-            error: null,
-          })),
-        },
-      },
-    });
+    }));
+    const from = vi.fn(() => createQueryBuilder());
+    createSupabaseAdminClient.mockReturnValue({ rpc, from });
     const { loadAdminCustomerManagementData } = await import("./data");
 
     const result = await loadAdminCustomerManagementData({
@@ -339,70 +335,37 @@ describe("loadAdminDashboardData", () => {
       customerType: "reseller",
     });
 
-    expect(result.customers.map((customer) => customer.id)).toEqual([
-      "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
-    ]);
-    expect(result.agents).toEqual([
-      {
-        id: "agent-1",
-        display_name: "Carlos Dela Cruz",
-        email: null,
-        contact: null,
-      },
-    ]);
+    expect(rpc).toHaveBeenCalledWith("list_admin_customer_rows", {
+      search_query: "maria carlos 0917",
+      customer_type_filter: "reseller",
+      page_number: 1,
+      page_size: 10,
+    });
+    expect(from).toHaveBeenCalledWith("agent_profile");
+    expect(result.customers).toEqual([customerRow]);
+    expect(result.agents).toEqual([]);
+    expect(result.pagination.totalRows).toBe(1);
   });
 
-  it("filters admin agents by display name, email, contact, and status", async () => {
-    const agentBuilder = createQueryBuilder({
-      data: [
-        {
-          id: "agent-1",
-          user_id: "user-1",
-          display_name: "Carlos Dela Cruz",
-          status: "active",
-          email: "carlos@example.test",
-          contact: "09170000000",
-          created_at: "2026-07-03T00:00:00.000Z",
-          updated_at: "2026-07-03T00:00:00.000Z",
-        },
-        {
-          id: "agent-2",
-          user_id: "user-2",
-          display_name: "Ana Reyes",
-          status: "inactive",
-          email: "ana@example.test",
-          contact: "09171111111",
-          created_at: "2026-07-03T00:00:00.000Z",
-          updated_at: "2026-07-03T00:00:00.000Z",
-        },
-      ],
+  it("loads admin agent rows through the paginated agent RPC", async () => {
+    const agentRow = {
+      id: "agent-1",
+      user_id: "user-1",
+      employee_id: "EMP-001",
+      first_name: "Carlos",
+      last_name: "Dela Cruz",
+      display_name: "Carlos Dela Cruz",
+      status: "active",
+      email: "carlos@example.test",
+      contact: "09170000000",
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+    };
+    const rpc = vi.fn(() => Promise.resolve({
+      data: [{ records: [agentRow], total_rows: 1 }],
       error: null,
-    });
-    const from = vi.fn((table: string) => (
-      table === "agent_profile" ? agentBuilder : createQueryBuilder()
-    ));
-    createSupabaseAdminClient.mockReturnValue({
-      from,
-      auth: {
-        admin: {
-          listUsers: vi.fn(() => Promise.resolve({
-            data: {
-              users: [
-                {
-                  id: "user-1",
-                  email: "carlos@example.test",
-                },
-                {
-                  id: "user-2",
-                  email: "ana@example.test",
-                },
-              ],
-            },
-            error: null,
-          })),
-        },
-      },
-    });
+    }));
+    createSupabaseAdminClient.mockReturnValue({ rpc });
     const { loadAdminAgentManagementData } = await import("./data");
 
     const result = await loadAdminAgentManagementData({
@@ -410,10 +373,17 @@ describe("loadAdminDashboardData", () => {
       status: "active",
     });
 
+    expect(rpc).toHaveBeenCalledWith("list_admin_agent_rows", {
+      search_query: "carlos",
+      status_filter: "active",
+      page_number: 1,
+      page_size: 10,
+    });
     expect(result.agents.map((agent) => agent.id)).toEqual(["agent-1"]);
+    expect(result.pagination.totalRows).toBe(1);
   });
 
-  it("filters admin reseller applications by applicant, email, contact, and status", async () => {
+  it("applies reseller application filters and pagination to the database query", async () => {
     const resellerBuilder = createQueryBuilder({
       data: [
         {
@@ -433,25 +403,9 @@ describe("loadAdminDashboardData", () => {
           created_at: "2026-07-03T00:00:00.000Z",
           updated_at: "2026-07-03T00:00:00.000Z",
         },
-        {
-          id: "application-2",
-          name: "Ana Reyes",
-          email: "ana@example.test",
-          contact_number: "09171111111",
-          planned_transaction_type: "Wholesale",
-          expected_quantity_per_week: "20kg",
-          message: null,
-          application_status: "contacted",
-          email_delivery_status: "sent",
-          price_list_sent_at: null,
-          email_error: null,
-          admin_read_at: null,
-          admin_read_by: null,
-          created_at: "2026-07-03T00:00:00.000Z",
-          updated_at: "2026-07-03T00:00:00.000Z",
-        },
       ],
       error: null,
+      count: 1,
     });
     const from = vi.fn((table: string) => (
       table === "reseller_application" ? resellerBuilder : createQueryBuilder()
@@ -464,10 +418,16 @@ describe("loadAdminDashboardData", () => {
       status: "submitted",
     });
 
+    expect(resellerBuilder.or).toHaveBeenCalledWith(
+      "name.ilike.%maria 0917%,email.ilike.%maria 0917%,contact_number.ilike.%maria 0917%",
+    );
+    expect(resellerBuilder.eq).toHaveBeenCalledWith("application_status", "submitted");
+    expect(resellerBuilder.range).toHaveBeenCalledWith(0, 9);
     expect(result.resellerApplications.map((application) => application.id)).toEqual(["application-1"]);
+    expect(result.pagination?.totalRows).toBe(1);
   });
 
-  it("filters admin inquiries by name, email, contact, and status", async () => {
+  it("applies inquiry filters and pagination to the database query", async () => {
     const inquiryBuilder = createQueryBuilder({
       data: [
         {
@@ -483,21 +443,9 @@ describe("loadAdminDashboardData", () => {
           created_at: "2026-07-03T00:00:00.000Z",
           updated_at: "2026-07-03T00:00:00.000Z",
         },
-        {
-          id: "inquiry-2",
-          name: "Ana Reyes",
-          email: "ana@example.test",
-          phone_number: "09171111111",
-          message: "Hello",
-          inquiry_status: "closed",
-          internal_notes: null,
-          admin_read_at: null,
-          admin_read_by: null,
-          created_at: "2026-07-03T00:00:00.000Z",
-          updated_at: "2026-07-03T00:00:00.000Z",
-        },
       ],
       error: null,
+      count: 1,
     });
     const from = vi.fn((table: string) => (
       table === "contact_inquiry" ? inquiryBuilder : createQueryBuilder()
@@ -510,7 +458,13 @@ describe("loadAdminDashboardData", () => {
       status: "reviewing",
     });
 
+    expect(inquiryBuilder.or).toHaveBeenCalledWith(
+      "name.ilike.%maria 0917%,email.ilike.%maria 0917%,phone_number.ilike.%maria 0917%",
+    );
+    expect(inquiryBuilder.eq).toHaveBeenCalledWith("inquiry_status", "reviewing");
+    expect(inquiryBuilder.range).toHaveBeenCalledWith(0, 9);
     expect(result.contactInquiries.map((inquiry) => inquiry.id)).toEqual(["inquiry-1"]);
+    expect(result.pagination?.totalRows).toBe(1);
   });
 
   it("normalizes nullable order child relations to empty arrays", async () => {
@@ -761,8 +715,24 @@ describe("loadAdminDashboardData", () => {
       ],
       error: null,
     });
+    const agentOrderBuilder = createQueryBuilder({
+      data: [
+        { order_status: "pending_customers" },
+        { order_status: "processing" },
+      ],
+      error: null,
+    });
+    const agentBuilder = createQueryBuilder({
+      data: [
+        { id: "agent-1" },
+        { id: "agent-2" },
+      ],
+      error: null,
+    });
     const from = vi.fn((table: string) => {
       if (table === "customer_order") return orderBuilder;
+      if (table === "agent_order") return agentOrderBuilder;
+      if (table === "agent_profile") return agentBuilder;
       if (table === "customer") return customerBuilder;
       if (table === "contact_inquiry") return inquiryBuilder;
       if (table === "product") return productBuilder;
@@ -775,7 +745,10 @@ describe("loadAdminDashboardData", () => {
     const result = await loadAdminDashboardSummaryData();
 
     expect(result).toEqual({
-      orders: 2,
+      totalOrders: 4,
+      pendingOrders: 2,
+      processingOrders: 1,
+      agents: 2,
       inquiries: 2,
       customers: 1,
       products: 2,

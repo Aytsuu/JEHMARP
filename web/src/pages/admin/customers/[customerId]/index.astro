@@ -1,13 +1,18 @@
 ---
 import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import ViewButton from "@/components/ViewButton.astro";
-import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import {
+  formatAdminActionFeedback,
+  handleAdminDashboardAction,
+} from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import {
   formatCurrency,
+  formatCompactCurrency,
   formatDate,
   fullName,
+  orderBalance,
   orderTotal,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
@@ -21,6 +26,15 @@ if (!adminRoute.ready) {
 }
 
 const { customerId } = Astro.params;
+
+if (Astro.request.method === "POST") {
+  return handleAdminDashboardAction(
+    Astro,
+    adminRoute.userId,
+    `/admin/customers/${customerId}`,
+  );
+}
+
 const data = await loadAdminDashboardData();
 const customer = data.customers.find((c) => c.id === customerId);
 
@@ -32,6 +46,9 @@ const customerOrders = data.orders.filter((order) => order.customer_id === custo
 const pendingOrders = customerOrders.filter((order) => order.order_status !== "closed");
 const historicalOrders = customerOrders.filter((order) => order.order_status === "closed");
 const assignedAgent = data.agents.find((agent) => agent.id === customer.assigned_agent_id);
+const linkedAgent = data.agents.find((agent) => agent.customer_id === customer.id);
+const pendingTotalBalance = pendingOrders.reduce((total, order) => total + orderBalance(order), 0);
+const today = new Date().toISOString().slice(0, 10);
 const feedback = formatAdminActionFeedback(Astro.url);
 const customerName = fullName(customer);
 const customerReturnTo = encodeURIComponent(`/admin/customers/${customer.id}`);
@@ -90,6 +107,16 @@ const backLabel = backUrl.startsWith("/admin/agents/")
         {assignedAgent ? assignedAgent.display_name : "No assigned agent"}
       </span>
     </li>
+    <li class="record-meta__item">
+      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M20 21v-2a4 4 0 0 0-4-4h-1"></path>
+        <path d="M4 21v-2a4 4 0 0 1 4-4h1"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+      <span class="record-meta__text">
+        {linkedAgent ? `Agent profile: ${linkedAgent.display_name}` : "Not an agent"}
+      </span>
+    </li>
     <li class="record-meta__item record-meta__item--wide">
       <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
@@ -114,9 +141,55 @@ const backLabel = backUrl.startsWith("/admin/agents/")
         </div>
 
         <div class="detail-field">
+          <span class="detail-field-label">Pending balance</span>
+          <div class="detail-field-value">{formatCurrency(pendingTotalBalance)}</div>
+        </div>
+
+        <div class="detail-field">
+          <span class="detail-field-label">Credit limit</span>
+          <div class="detail-field-value">{formatCompactCurrency(customer.credit_limit)}</div>
+        </div>
+
+        <div class="detail-field">
+          <span class="detail-field-label">Credit status</span>
+          <div class="detail-field-value">
+            {customer.credit_limit_exceeded ? "Exceeded" : "Within limit"}
+          </div>
+        </div>
+
+        <div class="detail-field">
           <span class="detail-field-label">Historical orders</span>
           <div class="detail-field-value">{historicalOrders.length}</div>
         </div>
+      </div>
+
+      <form method="post" class="customer-credit-form">
+        <input type="hidden" name="action" value="save-customer" />
+        <input type="hidden" name="customerId" value={customer.id} />
+        <input type="hidden" name="firstName" value={customer.first_name} />
+        <input type="hidden" name="lastName" value={customer.last_name} />
+        <input type="hidden" name="phoneNumber" value={customer.phone_number} />
+        <input type="hidden" name="email" value={customer.email ?? ""} />
+        <input type="hidden" name="address" value={customer.address} />
+        <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
+        {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
+        <label>
+          <span>Credit limit</span>
+          <input name="creditLimit" type="number" min="0" step="1" value={customer.credit_limit} required />
+        </label>
+        <button type="submit" class="btn-table-manage">Save Credit</button>
+      </form>
+
+      <div class="customer-record-actions">
+        {linkedAgent ? (
+          <a href={`/admin/agents/${linkedAgent.id}`} class="btn-table-manage">View Agent</a>
+        ) : (
+          <form method="post">
+            <input type="hidden" name="action" value="promote-customer-to-agent" />
+            <input type="hidden" name="customerId" value={customer.id} />
+            <button type="submit" class="btn-table-manage">Promote to Agent</button>
+          </form>
+        )}
       </div>
     </div>
 
@@ -126,6 +199,49 @@ const backLabel = backUrl.startsWith("/admin/agents/")
         pendingOrders.length === 0 ? (
           <p class="empty-state">No pending orders found for this customer.</p>
         ) : (
+          <>
+          <div class="pending-payment-summary">
+            <strong>Total to be paid</strong>
+            <span>{formatCurrency(pendingTotalBalance)}</span>
+          </div>
+          <form method="post" class="customer-payment-distribution-form">
+            <input type="hidden" name="action" value="apply-customer-payment" />
+            <input type="hidden" name="customerId" value={customer.id} />
+            <label>
+              <span>Received payment</span>
+              <input name="amount" type="number" min="0.01" step="0.01" max={pendingTotalBalance} required />
+            </label>
+            <label>
+              <span>Payment method</span>
+              <select name="paymentMethod" required>
+                <option value="">Select method</option>
+                <option value="Cash" selected>Cash</option>
+                <option value="Check">Check</option>
+              </select>
+            </label>
+            <label>
+              <span>Payment terms</span>
+              <select name="paymentTerms" required>
+                <option value="">Select payment terms</option>
+                <option value="Cash on Delivery (COD)" selected>Cash on Delivery (COD)</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Gcash">Gcash</option>
+              </select>
+            </label>
+            <label>
+              <span>Payment date</span>
+              <input name="paymentDate" type="date" value={today} required />
+            </label>
+            <label>
+              <span>Reference</span>
+              <input name="referenceNumber" />
+            </label>
+            <label class="customer-payment-distribution-form__notes">
+              <span>Notes</span>
+              <textarea name="notes" rows="2"></textarea>
+            </label>
+            <button type="submit" class="btn-table-manage">Distribute Payment</button>
+          </form>
           <div class="table-wrap">
             <table style="table-layout: fixed; width: 100%;">
               <thead>
@@ -134,15 +250,14 @@ const backLabel = backUrl.startsWith("/admin/agents/")
                   <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Source</th>
                   <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Status</th>
                   <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Payment Status</th>
-                  <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Total</th>
+                  <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Balance</th>
                   <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {
                   pendingOrders.map((order) => {
-                    const invoice = order.invoice[0];
-                    const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
+                    const balance = orderBalance(order);
                     return (
                       <tr>
                         <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
@@ -158,11 +273,11 @@ const backLabel = backUrl.startsWith("/admin/agents/")
                           {autoCapitalize(order.payment_status)}
                         </td>
                         <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {formatCurrency(total)}
+                          {formatCurrency(balance)}
                         </td>
                         <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                           <ViewButton
-                            href={`/admin/orders/${order.id}?returnTo=${customerReturnTo}`}
+                            href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`}
                           />
                         </td>
                       </tr>
@@ -172,6 +287,7 @@ const backLabel = backUrl.startsWith("/admin/agents/")
               </tbody>
             </table>
           </div>
+          </>
         )
       }
     </div>
@@ -220,7 +336,7 @@ const backLabel = backUrl.startsWith("/admin/agents/")
                         </td>
                         <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
                           <ViewButton
-                            href={`/admin/orders/${order.id}?returnTo=${customerReturnTo}`}
+                            href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`}
                           />
                         </td>
                       </tr>
@@ -258,6 +374,76 @@ const backLabel = backUrl.startsWith("/admin/agents/")
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
+  }
+
+  .customer-record-actions {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .customer-credit-form {
+    display: flex;
+    align-items: end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background-color: #f9fafb;
+    padding: 0.75rem 1rem;
+  }
+
+  .customer-credit-form label {
+    display: flex;
+    min-width: min(100%, 16rem);
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-brand-muted-black);
+  }
+
+  .customer-credit-form input {
+    width: 100%;
+  }
+
+  .pending-payment-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background-color: #f9fafb;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .customer-payment-distribution-form {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.75rem;
+    align-items: end;
+    margin-bottom: 1rem;
+  }
+
+  .customer-payment-distribution-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--color-brand-muted-black);
+  }
+
+  .customer-payment-distribution-form input,
+  .customer-payment-distribution-form textarea {
+    width: 100%;
+  }
+
+  .customer-payment-distribution-form__notes {
+    grid-column: span 2;
   }
 
   .detail-field {

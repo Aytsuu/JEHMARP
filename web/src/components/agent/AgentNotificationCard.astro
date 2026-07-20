@@ -1,0 +1,421 @@
+---
+import type { AgentNotification } from "@/lib/agent-dashboard/notifications";
+import { formatDateTime } from "@/lib/admin-dashboard/view";
+
+type Props = {
+  notification: AgentNotification;
+};
+
+const { notification: notif } = Astro.props;
+const isSystem = notif.type === "System";
+const isNavigable = !isSystem && !notif.registrationUrl;
+
+function notificationIcon(type: string) {
+  switch (type) {
+    case "Order Status":
+    case "Payment Alert":
+      return "cart";
+    case "Customer Registration":
+      return "users";
+    case "Commission Alert":
+      return "system";
+    default:
+      return "system";
+  }
+}
+
+const icon = notificationIcon(notif.type);
+---
+
+<article
+  class:list={[
+    "notification-item",
+    isSystem ? "notification-item--read" : "notification-item--unread",
+    isNavigable && "notification-item--navigable",
+  ]}
+  data-notification-id={notif.id}
+  data-notification-system={isSystem ? "true" : undefined}
+>
+  {
+    isNavigable && (
+      <>
+        <a
+          href={notif.link}
+          class="notification-item__overlay"
+          aria-label={`View ${notif.title}`}
+        />
+        <span class="notification-item__hover-action" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M15 3h6v6" />
+            <path d="M10 14 21 3" />
+            <path d="M21 14v4a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3h4" />
+          </svg>
+        </span>
+      </>
+    )
+  }
+
+  <div class="notification-item__content">
+    <div class="notification-item__meta">
+      <span class={`notification-item__type notification-item__type--${notif.severity}`}>
+        {
+          icon === "cart" && (
+            <svg class="notification-item__type-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+          )
+        }
+        {
+          icon === "users" && (
+            <svg class="notification-item__type-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          )
+        }
+        {
+          icon === "system" && (
+            <svg class="notification-item__type-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+          )
+        }
+        <span>{notif.type}</span>
+      </span>
+      <time class="notification-item__time" datetime={notif.date}>
+        {formatDateTime(notif.date)}
+      </time>
+      {
+        !isSystem && (
+          <span class="notification-item__status">
+            <span class="notification-item__status-dot" aria-hidden="true" />
+            Unread
+          </span>
+        )
+      }
+    </div>
+
+    <h3 class="notification-item__title">{notif.title}</h3>
+    <p class="notification-item__message">{notif.message}</p>
+
+    <div class="notification-item__footer">
+      {
+        notif.registrationUrl && (
+          <button
+            type="button"
+            class="notification-action notification-action--secondary notification-action--compact"
+            data-open-registration-link
+            data-registration-url={notif.registrationUrl}
+            data-registration-expires-at={notif.expiresAt ?? ""}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 13a5 5 0 0 0 7.07 0l2.12-2.12a5 5 0 0 0-7.07-7.07L11 4.93" />
+              <path d="M14 11a5 5 0 0 0-7.07 0L4.81 13.12a5 5 0 0 0 7.07 7.07L13 19.07" />
+            </svg>
+            <span>View Link</span>
+          </button>
+        )
+      }
+      {
+        isSystem ? (
+          <span class="notification-item__read-state">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            Read
+          </span>
+        ) : (
+          <>
+            <button
+              type="button"
+              class="notification-action notification-action--secondary notification-action--compact"
+              data-mark-read
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>Mark as read</span>
+            </button>
+            <span class="notification-item__read-state" hidden>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Read
+            </span>
+          </>
+        )
+      }
+    </div>
+  </div>
+</article>
+
+<style>
+  .notification-item {
+    position: relative;
+    padding: 1rem 1rem 0.9rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    transition:
+      border-color 0.2s ease,
+      opacity 0.2s ease;
+  }
+
+  .notification-item:hover {
+    border-color: #d1d5db;
+  }
+
+  .notification-item--navigable {
+    cursor: pointer;
+  }
+
+  .notification-item--navigable:hover {
+    border-color: rgba(102, 24, 24, 0.22);
+  }
+
+  .notification-item__overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: inherit;
+    text-decoration: none;
+  }
+
+  .notification-item__overlay:focus-visible {
+    outline: 2px solid var(--color-brand-red);
+    outline-offset: 2px;
+  }
+
+  .notification-item__hover-action {
+    position: absolute;
+    top: 0.85rem;
+    right: 0.85rem;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-brand-red);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .notification-item--navigable:hover .notification-item__hover-action,
+  .notification-item--navigable:focus-within .notification-item__hover-action {
+    opacity: 1;
+  }
+
+  .notification-item__hover-action svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .notification-item--unread {
+    border-color: rgba(180, 137, 43, 0.35);
+    background: linear-gradient(180deg, #fffdf8 0%, #ffffff 100%);
+  }
+
+  .notification-item--read {
+    opacity: 0.82;
+  }
+
+  .notification-item__content {
+    position: relative;
+    z-index: 0;
+    display: grid;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  .notification-item__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem 0.65rem;
+    padding-right: 2rem;
+  }
+
+  .notification-item__type {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.18rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .notification-item__type-icon {
+    width: 0.75rem;
+    height: 0.75rem;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .notification-item__type--warning {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .notification-item__type--info {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .notification-item__type--success {
+    background: #d1fae5;
+    color: #065f46;
+  }
+
+  .notification-item__time {
+    font-size: 0.78rem;
+    color: #6b7280;
+    font-weight: 500;
+  }
+
+  .notification-item__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #b45309;
+  }
+
+  .notification-item--read .notification-item__status {
+    display: none;
+  }
+
+  .notification-item__status-dot {
+    width: 0.42rem;
+    height: 0.42rem;
+    border-radius: 50%;
+    background: var(--color-brand-gold);
+  }
+
+  .notification-item__title {
+    margin: 0;
+    font-size: 0.98rem;
+    line-height: 1.35;
+    font-weight: 700;
+    color: #111827;
+    letter-spacing: -0.01em;
+  }
+
+  .notification-item--read .notification-item__title {
+    color: #374151;
+    font-weight: 600;
+  }
+
+  .notification-item__message {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: #4b5563;
+  }
+
+  .notification-item__footer {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-top: 0.2rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .notification-item--read [data-mark-read] {
+    display: none;
+  }
+
+  .notification-item--read .notification-item__read-state {
+    display: inline-flex;
+  }
+
+  .notification-item__read-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.76rem;
+    font-weight: 400;
+    color: #9ca3af;
+  }
+
+  .notification-item__read-state svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .notification-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    border: 1px solid transparent;
+    border-radius: 0.375rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .notification-action svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.25;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .notification-action--secondary {
+    background-color: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #4b5563;
+  }
+
+  .notification-action--secondary:hover,
+  .notification-action--secondary:focus-visible {
+    background-color: #e5e7eb;
+    border-color: #d1d5db;
+    color: #374151;
+    outline: none;
+  }
+
+  .notification-action--compact {
+    min-height: 1.75rem;
+    padding: 0.28rem 0.55rem;
+    font-size: 0.78rem;
+  }
+</style>

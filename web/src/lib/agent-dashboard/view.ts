@@ -1,4 +1,4 @@
-import type { AgentDashboardData, AgentOrder, AgentPaymentSummary } from "./data";
+import type { AgentDashboardData, AgentOrder, AgentOrderCluster, AgentPaymentSummary } from "./data";
 
 export function fullName(customer: { first_name: string; last_name: string } | null) {
   return customer ? `${customer.first_name} ${customer.last_name}` : "Unassigned customer";
@@ -36,6 +36,32 @@ export function orderTotal(order: AgentOrder, quantityKey: "partial_quantity" | 
   return roundCurrency(subtotal);
 }
 
+export function agentOrderTotal(order: AgentOrderCluster) {
+  const subtotal = order.agent_order_item.reduce((total, item) => {
+    return total + item.quantity * (item.product?.default_price ?? 0);
+  }, 0);
+
+  return roundCurrency(subtotal);
+}
+
+export function agentOrderPaymentStatus(
+  order: Pick<AgentOrderCluster, "customer_order">,
+): AgentOrder["payment_status"] {
+  if (order.customer_order.length === 0) {
+    return "unpaid";
+  }
+
+  if (order.customer_order.every((customerOrder) => customerOrder.payment_status === "paid")) {
+    return "paid";
+  }
+
+  if (order.customer_order.every((customerOrder) => customerOrder.payment_status === "unpaid")) {
+    return "unpaid";
+  }
+
+  return "partial";
+}
+
 export function orderPaymentTotal(order: AgentOrder) {
   return roundCurrency(order.payment.reduce((total, payment) => total + payment.amount, 0));
 }
@@ -66,7 +92,7 @@ export function orderEarnedCommission(order: AgentOrder) {
 }
 
 export function buildAgentSummary(
-  data: Pick<AgentDashboardData, "agent" | "customers" | "orders">,
+  data: Pick<AgentDashboardData, "agent" | "customers" | "agentOrders" | "orders">,
   now = new Date(),
 ) {
   const agentOrders = data.orders.filter((order) => order.agent_id === data.agent.id);
@@ -75,7 +101,7 @@ export function buildAgentSummary(
 
   return {
     assignedCustomers: data.customers.length,
-    submittedOrders: agentOrders.filter((order) => order.source === "agent_submitted").length,
+    submittedOrders: data.agentOrders.length,
     monthlyEarnings: roundCurrency(agentOrders
       .filter((order) => monthIdentifier(new Date(order.created_at)) === monthKey)
       .reduce((total, order) => total + orderEarnedCommission(order), 0)),

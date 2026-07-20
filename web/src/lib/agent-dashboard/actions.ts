@@ -2,12 +2,26 @@ import type { APIContext } from "astro";
 import { z } from "zod";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { canAttachCustomerToAgentOrder } from "@/lib/agent-order-distribution";
+import {
+  parseAttachCustomerEntriesJson,
+  type AgentOrderAttachEntry,
+} from "@/lib/agent-order-attach";
+import {
+  executeAgentProfileUpdate,
+  parseAgentProfileUpdateFields,
+  createAgentProfileAdminClient,
+} from "@/lib/agent-profile-update";
 import { loadAgentDashboardData } from "./data";
 
 const uuidSchema = z.uuid();
+const agentOrderSubmissionModes = ["distribution", "personal"] as const;
+const paymentMethods = ["Cash", "Check"] as const;
+const paymentTermsOptions = ["Cash on Delivery (COD)", "Bank Transfer", "Gcash"] as const;
 
 type AgentDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect">;
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
+type AgentOrderSubmissionMode = (typeof agentOrderSubmissionModes)[number];
 
 type AgentOrderItemPayload = {
   productId: string;
@@ -15,30 +29,52 @@ type AgentOrderItemPayload = {
   addDetails: string | null;
 };
 
-type NewAgentCustomerPayload = {
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-  email: string | null;
-  address: string;
-};
-
 export type AgentAction =
   | {
       type: "create-agent-order";
       agentId: string;
       payload: {
-        customer:
-          | {
-              type: "existing";
-              customerId: string;
-            }
-          | {
-              type: "new";
-              payload: NewAgentCustomerPayload;
-            };
+        mode: AgentOrderSubmissionMode;
+        releaseDate: string | null;
         items: AgentOrderItemPayload[];
       };
+    }
+  | {
+      type: "record-agent-payment";
+      agentId: string;
+      payload: {
+        orderId: string;
+        amount: number;
+        paymentMethod: string;
+        paymentTerms: string;
+        paymentDate: string;
+        referenceNumber: string | null;
+        notes: string | null;
+      };
+    }
+  | {
+      type: "record-agent-payment-distribution";
+      agentId: string;
+      payload: {
+        orderIds: string[];
+        amount: number;
+        paymentMethod: string;
+        paymentTerms: string;
+        paymentDate: string;
+        referenceNumber: string | null;
+        notes: string | null;
+      };
+    }
+  | {
+      type: "attach-agent-order-customer";
+      agentOrderId: string;
+      entries: AgentOrderAttachEntry[];
+      requireApproval: boolean;
+    }
+  | {
+      type: "update-agent-profile";
+      agentId: string;
+      payload: ReturnType<typeof parseAgentProfileUpdateFields>;
     };
 
 type ParseSuccess = {
@@ -57,28 +93,93 @@ export function parseAgentActionFormData(
   formData: FormData,
   _agentUserId: string,
   agentId: string,
-  assignedCustomerIds: ReadonlySet<string>,
+  _assignedCustomerIds: ReadonlySet<string>,
 ): AgentActionParseResult {
+  void _agentUserId;
+  const assignedCustomerIds = _assignedCustomerIds;
+
   try {
     const action = requiredString(formData, "action");
 
-    if (action !== "create-agent-order") {
-      throw new Error("Unknown agent action.");
+    if (action === "create-agent-order") {
+      return {
+        success: true,
+        action: {
+          type: "create-agent-order",
+          agentId,
+          payload: {
+            mode: enumValue(formData, "orderSubmissionMode", agentOrderSubmissionModes),
+            releaseDate: optionalDateString(formData, "releaseDate"),
+            items: parseOrderItems(formData),
+          },
+        },
+      };
     }
 
-    const customer = parseOrderCustomer(formData, assignedCustomerIds);
-
-    return {
-      success: true,
-      action: {
-        type: "create-agent-order",
-        agentId,
-        payload: {
-          customer,
-          items: parseOrderItems(formData),
+    if (action === "record-agent-payment") {
+      return {
+        success: true,
+        action: {
+          type: "record-agent-payment",
+          agentId,
+          payload: {
+            orderId: uuidSchema.parse(requiredString(formData, "orderId")),
+            amount: positiveNumber(formData, "amount"),
+            paymentMethod: enumValue(formData, "paymentMethod", paymentMethods),
+            paymentTerms: enumValue(formData, "paymentTerms", paymentTermsOptions),
+            paymentDate: dateString(formData, "paymentDate"),
+            referenceNumber: optionalString(formData, "referenceNumber"),
+            notes: optionalString(formData, "notes"),
+          },
         },
-      },
-    };
+      };
+    }
+
+    if (action === "record-agent-payment-distribution") {
+      return {
+        success: true,
+        action: {
+          type: "record-agent-payment-distribution",
+          agentId,
+          payload: {
+            orderIds: requiredUuidList(formData, "orderId", "At least one customer order is required."),
+            amount: positiveNumber(formData, "amount"),
+            paymentMethod: enumValue(formData, "paymentMethod", paymentMethods),
+            paymentTerms: enumValue(formData, "paymentTerms", paymentTermsOptions),
+            paymentDate: dateString(formData, "paymentDate"),
+            referenceNumber: optionalString(formData, "referenceNumber"),
+            notes: optionalString(formData, "notes"),
+          },
+        },
+      };
+    }
+
+    if (action === "attach-agent-order-customer") {
+      const entriesJson = requiredString(formData, "attachCustomerEntries");
+
+      return {
+        success: true,
+        action: {
+          type: "attach-agent-order-customer",
+          agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
+          entries: parseAttachCustomerEntriesJson(entriesJson, { assignedCustomerIds }),
+          requireApproval: true,
+        },
+      };
+    }
+
+    if (action === "update-agent-profile") {
+      return {
+        success: true,
+        action: {
+          type: "update-agent-profile",
+          agentId,
+          payload: parseAgentProfileUpdateFields(formData),
+        },
+      };
+    }
+
+    throw new Error("Unknown agent action.");
   } catch (error) {
     return {
       success: false,
@@ -126,11 +227,13 @@ export async function executeAgentAction(
 ): Promise<void> {
   switch (action.type) {
     case "create-agent-order": {
-      const customer = action.payload.customer;
       const { data, error } = await supabase.rpc("submit_agent_order", {
-        target_customer_id: customer.type === "existing" ? customer.customerId : null,
+        target_customer_id: null,
         item_payload: action.payload.items,
-        customer_payload: customer.type === "new" ? customer.payload : null,
+        customer_payload: getAgentOrderCustomerPayload(
+          action.payload.mode,
+          action.payload.releaseDate,
+        ),
       });
 
       if (error || typeof data !== "string") {
@@ -139,6 +242,138 @@ export async function executeAgentAction(
 
       return;
     }
+    case "record-agent-payment": {
+      const { data, error } = await supabase.rpc("submit_agent_received_payment", {
+        target_order_id: action.payload.orderId,
+        payment_amount: action.payload.amount,
+        payment_method_value: action.payload.paymentMethod,
+        payment_terms_value: action.payload.paymentTerms,
+        payment_date_value: action.payload.paymentDate,
+        reference_number_value: action.payload.referenceNumber,
+        notes_value: action.payload.notes,
+      });
+
+      if (error || typeof data !== "string") {
+        throw new Error("Unable to record received payment.");
+      }
+
+      return;
+    }
+    case "record-agent-payment-distribution": {
+      const { data, error } = await supabase.rpc("submit_agent_received_payment_distribution", {
+        target_order_ids: action.payload.orderIds,
+        payment_amount: action.payload.amount,
+        payment_method_value: action.payload.paymentMethod,
+        payment_terms_value: action.payload.paymentTerms,
+        payment_date_value: action.payload.paymentDate,
+        reference_number_value: action.payload.referenceNumber,
+        notes_value: action.payload.notes,
+      });
+
+      if (error || !Array.isArray(data)) {
+        throw new Error("Unable to distribute received payment.");
+      }
+
+      return;
+    }
+    case "attach-agent-order-customer": {
+      await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
+
+      for (const entry of action.entries) {
+        const { data, error } = await supabase.rpc("attach_customer_to_agent_order", {
+          target_agent_order_id: action.agentOrderId,
+          target_customer_id: entry.customer.type === "existing" ? entry.customer.customerId : null,
+          item_payload: entry.items,
+          customer_payload: entry.customer.type === "new"
+            ? {
+                firstName: entry.customer.payload.firstName,
+                lastName: entry.customer.payload.lastName,
+                phoneNumber: entry.customer.payload.phoneNumber,
+                email: entry.customer.payload.email,
+                address: entry.customer.payload.address,
+              }
+            : null,
+          require_approval: action.requireApproval,
+        });
+
+        if (error || typeof data !== "string") {
+          throw new Error(error?.message || "Unable to attach customer order.");
+        }
+      }
+
+      return;
+    }
+    case "update-agent-profile": {
+      const adminClient = createAgentProfileAdminClient();
+      const { data: currentProfile, error } = await adminClient
+        .from("agent_profile")
+        .select("status")
+        .eq("id", action.agentId)
+        .maybeSingle();
+
+      if (error || !currentProfile) {
+        throw new Error("Unable to load agent profile.");
+      }
+
+      await executeAgentProfileUpdate(adminClient, action.agentId, {
+        ...action.payload,
+        status: currentProfile.status,
+      });
+      return;
+    }
+  }
+}
+
+function getAgentOrderCustomerPayload(
+  mode: AgentOrderSubmissionMode,
+  releaseDate: string | null,
+) {
+  switch (mode) {
+    case "distribution":
+      return releaseDate
+        ? {
+            releaseDate,
+          }
+        : null;
+    case "personal":
+      return {
+        orderFor: "personal",
+        releaseDate,
+      };
+  }
+}
+
+async function assertAgentOrderAllowsCustomerAttach(
+  supabase: SupabaseServerClient,
+  agentOrderId: string,
+) {
+  const { data, error } = await supabase
+    .from("agent_order")
+    .select("order_status, customer_order ( payment_status )")
+    .eq("id", agentOrderId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Unable to verify agent order status before attaching a customer.");
+  }
+
+  if (!data) {
+    throw new Error("Agent order was not found.");
+  }
+
+  const customerOrders = Array.isArray(data.customer_order)
+    ? data.customer_order
+    : data.customer_order
+      ? [data.customer_order]
+      : [];
+
+  if (!canAttachCustomerToAgentOrder({
+    order_status: String(data.order_status),
+    customer_order: customerOrders.map((order) => ({
+      payment_status: String((order as { payment_status?: unknown }).payment_status ?? "unpaid"),
+    })),
+  })) {
+    throw new Error("Completed and paid agent orders cannot accept new customers.");
   }
 }
 
@@ -163,37 +398,6 @@ function parseOrderItems(formData: FormData) {
   }
 
   return parsedItems;
-}
-
-function parseOrderCustomer(
-  formData: FormData,
-  assignedCustomerIds: ReadonlySet<string>,
-): AgentAction["payload"]["customer"] {
-  const selectedCustomerId = optionalString(formData, "customerId");
-
-  if (selectedCustomerId) {
-    const customerId = uuidSchema.parse(selectedCustomerId);
-
-    if (!assignedCustomerIds.has(customerId)) {
-      throw new Error("Selected customer is not assigned to this agent.");
-    }
-
-    return {
-      type: "existing",
-      customerId,
-    };
-  }
-
-  return {
-    type: "new",
-    payload: {
-      firstName: requiredString(formData, "firstName"),
-      lastName: requiredString(formData, "lastName"),
-      phoneNumber: requiredString(formData, "phoneNumber"),
-      email: optionalEmail(formData, "email"),
-      address: requiredString(formData, "address"),
-    },
-  };
 }
 
 function parseOrderItem(
@@ -238,16 +442,70 @@ function requiredString(formData: FormData, key: string) {
   return value;
 }
 
+function requiredUuidList(formData: FormData, key: string, emptyMessage: string) {
+  const values = formData
+    .getAll(key)
+    .map((value) => normalizeFormDataEntry(value))
+    .filter((value) => value.length > 0);
+
+  if (values.length === 0) {
+    throw new Error(emptyMessage);
+  }
+
+  return [...new Set(values.map((value) => uuidSchema.parse(value)))];
+}
+
+function enumValue<T extends string>(
+  formData: FormData,
+  key: string,
+  values: readonly T[],
+): T {
+  const value = requiredString(formData, key);
+  const found = values.find((item) => item === value);
+
+  if (!found) {
+    throw new Error(`${toSentenceLabel(key)} is not supported.`);
+  }
+
+  return found;
+}
+
+function optionalDateString(formData: FormData, key: string) {
+  const value = optionalString(formData, key);
+
+  if (!value) return null;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${toSentenceLabel(key)} must be a date.`);
+  }
+
+  return value;
+}
+
+function dateString(formData: FormData, key: string) {
+  const value = requiredString(formData, key);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error(`${toSentenceLabel(key)} must be a date.`);
+  }
+
+  return value;
+}
+
+function positiveNumber(formData: FormData, key: string) {
+  const value = Number(requiredString(formData, key));
+
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${toSentenceLabel(key)} must be greater than zero.`);
+  }
+
+  return value;
+}
+
 function optionalString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
 
   return value.length > 0 ? value : null;
-}
-
-function optionalEmail(formData: FormData, key: string) {
-  const value = optionalString(formData, key);
-
-  return value ? z.email().parse(value) : null;
 }
 
 function normalizeFormDataEntry(value: FormDataEntryValue | undefined) {
@@ -258,6 +516,16 @@ function getActionSuccessMessage(action: AgentAction) {
   switch (action.type) {
     case "create-agent-order":
       return "Order submitted.";
+    case "record-agent-payment":
+      return "Payment recorded for admin confirmation.";
+    case "record-agent-payment-distribution":
+      return "Payments recorded for admin confirmation.";
+    case "attach-agent-order-customer":
+      return action.entries.length > 1
+        ? "Customer orders submitted for admin approval."
+        : "Customer order submitted for admin approval.";
+    case "update-agent-profile":
+      return "Profile updated.";
   }
 }
 

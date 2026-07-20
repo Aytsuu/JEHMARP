@@ -1,5 +1,6 @@
 import type { ProductCategory, StockStatus } from "./actions";
-import { getProductCategories, getStockStatuses } from "./actions";
+import { getStockStatuses } from "./actions";
+import { normalizeProductOptionValue } from "./product-options";
 
 export type AdminProductFilters = {
   search?: string;
@@ -10,7 +11,7 @@ export type AdminProductFilters = {
 export function parseAdminProductFilters(url: URL): AdminProductFilters {
   return {
     ...optionalSearchFilter(url.searchParams.get("search")),
-    ...optionalFilter("category", url.searchParams.get("category"), getProductCategories()),
+    ...optionalCategoryFilter(url.searchParams.get("category")),
     ...optionalFilter("stockStatus", url.searchParams.get("stockStatus"), getStockStatuses()),
   };
 }
@@ -29,6 +30,12 @@ function optionalSearchFilter(value: string | null) {
   const normalized = value?.trim().replace(/\s+/g, " ").slice(0, 80);
 
   return normalized ? { search: normalized } : {};
+}
+
+function optionalCategoryFilter(value: string | null) {
+  const normalized = normalizeProductOptionValue(value).slice(0, 60);
+
+  return normalized ? { category: normalized } : {};
 }
 
 function optionalFilter<T extends string>(

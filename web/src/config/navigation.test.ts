@@ -29,6 +29,7 @@ describe("dashboard routes", () => {
       { label: "Customers", href: "/admin/customers" },
       { label: "Agents", href: "/admin/agents" },
       { label: "Orders", href: "/admin/orders" },
+      { label: "Sales", href: "/admin/sales" },
       { label: "Invoices", href: "/admin/invoices" },
       { label: "Inquiries", href: "/admin/inquiries" },
       { label: "Reseller Applications", href: "/admin/reseller-applications" },
@@ -48,11 +49,10 @@ describe("dashboard routes", () => {
   it("defines agent operations separately from public navigation", () => {
     expect(agentDashboardRoutes).toEqual([
       { label: "Dashboard", href: "/agent" },
-      { label: "Earnings", href: "/agent/earnings" },
       { label: "Customers", href: "/agent/customers" },
-      { label: "Orders", href: "/agent/orders" },
-      { label: "Payments", href: "/agent/payments" },
+      { label: "My Orders", href: "/agent/orders" },
       { label: "Notifications", href: "/agent/notifications" },
+      { label: "Profile", href: "/agent/profile" },
     ]);
   });
 

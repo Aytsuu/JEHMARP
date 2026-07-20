@@ -7,7 +7,7 @@ import {
   getUnreadAdminResellerApplicationIds,
 } from "@/lib/admin-dashboard/notifications";
 import { adminDashboardRoutes } from "@/config/navigation";
-import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import AdminContentDashboardLayout from "@/layouts/AdminContentDashboardLayout.astro";
 
 type Props = {
   title: string;
@@ -26,7 +26,7 @@ const unreadNotificationCount =
   unreadOrderCount + unreadInquiryCount + unreadResellerApplicationCount;
 ---
 
-<DashboardLayout
+<AdminContentDashboardLayout
   title={title}
   description={description}
   navLabel="Admin operations"
@@ -46,7 +46,7 @@ const unreadNotificationCount =
     },
   }}
 >
-  <div class="admin-content-page" data-admin-content-page>
+  <div class="admin-content-page">
     {
       feedback?.status && (
         <p class="admin-content-page__feedback status-message" role="status">
@@ -63,7 +63,7 @@ const unreadNotificationCount =
     }
     <slot />
   </div>
-</DashboardLayout>
+</AdminContentDashboardLayout>
 
 {
   feedback?.cleanPath && (
@@ -76,27 +76,6 @@ const unreadNotificationCount =
 }
 
 <style>
-  :global(.dashboard-body:has([data-admin-content-page])) {
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  :global(.dashboard-frame:has([data-admin-content-page])) {
-    height: 100vh;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  :global(.dashboard-main:has([data-admin-content-page])) {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    min-height: 0;
-    max-height: 100vh;
-    overflow: hidden;
-    padding: 0;
-  }
-
   .admin-content-page {
     display: flex;
     flex: 1;

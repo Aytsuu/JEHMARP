@@ -51,6 +51,7 @@ const unreadNotificationCount =
 const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
 const isPageReady = pageAvailability.status === "ready";
 const hasHeadingMeta = Astro.slots.has("heading-meta");
+const hasHeadingAside = Astro.slots.has("heading-aside");
 ---
 
 <DashboardLayout
@@ -91,15 +92,29 @@ const hasHeadingMeta = Astro.slots.has("heading-meta");
             {backUrl && (
               <RouteBackButton href={backUrl} label={backLabel ?? `Back from ${heading}`} />
             )}
-            <div class="admin-notifications-page__heading-copy">
-              <h1 id={headingId} class="admin-notifications-page__title">{heading}</h1>
+            <div
+              class:list={[
+                "admin-notifications-page__heading-main",
+                hasHeadingAside && "admin-notifications-page__heading-main--with-aside",
+              ]}
+            >
+              <div class="admin-notifications-page__heading-copy">
+                <h1 id={headingId} class="admin-notifications-page__title">{heading}</h1>
+                {
+                  hasHeadingMeta ? (
+                    <div class="admin-notifications-page__heading-meta">
+                      <slot name="heading-meta" />
+                    </div>
+                  ) : (
+                    intro && <p class="admin-notifications-page__intro">{intro}</p>
+                  )
+                }
+              </div>
               {
-                hasHeadingMeta ? (
-                  <div class="admin-notifications-page__heading-meta">
-                    <slot name="heading-meta" />
+                hasHeadingAside && (
+                  <div class="admin-notifications-page__heading-aside">
+                    <slot name="heading-aside" />
                   </div>
-                ) : (
-                  intro && <p class="admin-notifications-page__intro">{intro}</p>
                 )
               }
             </div>
@@ -218,9 +233,31 @@ const hasHeadingMeta = Astro.slots.has("heading-meta");
     gap: 0.85rem;
   }
 
+  .admin-notifications-page__heading-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .admin-notifications-page__heading-main--with-aside {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
   .admin-notifications-page__heading-copy {
     min-width: 0;
     flex: 1;
+  }
+
+  .admin-notifications-page__heading-aside {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    padding-top: 0.15rem;
   }
 
   .admin-notifications-page__title {

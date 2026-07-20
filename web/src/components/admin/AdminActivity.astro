@@ -1,242 +1,92 @@
 ---
-import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
-import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import AdminActivityCard from "@/components/admin/AdminActivityCard.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
-import StatusBadge from "@/components/dashboard/StatusBadge.astro";
-import { buildAdminActivityItems, filterAdminActivityItems } from "@/lib/admin-dashboard/activity";
 import type { AdminActivityFilters } from "@/lib/admin-dashboard/activity-filters";
-import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
-import { formatDateTime } from "@/lib/admin-dashboard/view";
+import type { AdminActivityManagementData } from "@/lib/admin-dashboard/data";
 
 type Props = {
-  data: AdminDashboardData;
+  data: AdminActivityManagementData;
   activeFilters: AdminActivityFilters;
   filterQuery: string;
 };
 
 const { data, activeFilters, filterQuery } = Astro.props;
-const activityItems = filterAdminActivityItems(
-  buildAdminActivityItems(data),
-  activeFilters,
-);
-const skeletonRows = Array.from({ length: 6 });
+const activityItems = data.activityItems;
+const skeletonItems = Array.from({ length: 4 });
+const totalRows = data.pagination.totalRows;
 const emptyMessage = activeFilters.search
   ? "No activity matches the selected filters."
   : "No admin activity is available yet.";
+const summaryLabel =
+  totalRows === 0
+    ? "No activity yet"
+    : `${totalRows} activity ${totalRows === 1 ? "entry" : "entries"}`;
 ---
 
-<section class="admin-panel" aria-labelledby="admin-activity-title">
-  <div data-interactive-table class="dashboard-interactive-table">
-    <div class="table-filters order-management-toolbar">
+<section id="admin-activity" class="admin-activity" aria-labelledby="activity-title">
+  <div data-interactive-table data-server-pagination="true" class="admin-activity__feed">
+    <div class="admin-activity__toolbar">
       <form
         method="get"
         action="/admin/activity"
-        class="order-filter-form"
+        class="admin-activity__search-form"
         data-activity-filter-form
         data-current-filter-query={filterQuery}
         aria-label="Filter activity"
       >
-        <div class="order-filter-form__field order-filter-form__field--search">
-          <input
-            name="search"
-            type="search"
-            value={activeFilters.search ?? ""}
-            placeholder="Search activity, details, or category..."
-            autocomplete="off"
-            aria-label="Search activity"
-            data-activity-search-input
-          />
-        </div>
+        <input
+          name="search"
+          type="search"
+          value={activeFilters.search ?? ""}
+          placeholder="Search activity, details, or category..."
+          autocomplete="off"
+          aria-label="Search activity"
+          data-activity-search-input
+        />
       </form>
-      <div class="order-management-toolbar__actions"></div>
+      <p class="admin-activity__summary">{summaryLabel}</p>
     </div>
 
-    <div data-activity-table-shell class="dashboard-interactive-table__surface">
-      <DashboardTableBoard>
-        <table class="dashboard-table">
-          <thead>
-            <tr>
-              <th scope="col">Activity</th>
-              <th scope="col">Details</th>
-              <th scope="col">Category</th>
-              <th scope="col">Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {activityItems.length === 0 ? (
-              <DashboardTableEmptyState colspan={4} message={emptyMessage} />
-            ) : activityItems.map((item) => (
-              <tr data-status={item.category}>
-                <td class="dashboard-table__cell--truncate">{item.title}</td>
-                <td class="dashboard-table__cell--truncate">{item.detail}</td>
-                <td><StatusBadge kind="activity" status={item.category} /></td>
-                <td>
-                  <time datetime={item.occurredAt}>{formatDateTime(item.occurredAt)}</time>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </DashboardTableBoard>
+    <div data-activity-list-shell class="admin-activity__list">
+      {
+        activityItems.length === 0 ? (
+          <p class="admin-activity__empty">{emptyMessage}</p>
+        ) : (
+          activityItems.map((item) => <AdminActivityCard item={item} />)
+        )
+      }
     </div>
 
-    <DashboardTablePagination />
+    <DashboardTablePagination pagination={data.pagination} />
   </div>
 
   <template data-activity-filter-skeleton>
-    <DashboardTableBoard aria-busy="true" aria-live="polite">
-      <table class="product-table-skeleton dashboard-table">
-        <caption class="sr-only">Loading filtered activity</caption>
-        <thead>
-          <tr>
-            <th scope="col">Activity</th>
-            <th scope="col">Details</th>
-            <th scope="col">Category</th>
-            <th scope="col">Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {skeletonRows.map(() => (
-            <tr>
-              <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--wide"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
-              <td><span class="table-skeleton-block"></span></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </DashboardTableBoard>
+    <div class="admin-activity__list" aria-busy="true" aria-live="polite">
+      {skeletonItems.map(() => (
+        <article class="admin-activity__skeleton-card">
+          <span class="table-skeleton-block table-skeleton-block--short"></span>
+          <span class="table-skeleton-block"></span>
+          <span class="table-skeleton-block table-skeleton-block--wide"></span>
+        </article>
+      ))}
+    </div>
   </template>
 </section>
 
 <script>
+  import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
+
   function initAdminActivityFilters() {
-    const form = document.querySelector<HTMLFormElement>("[data-activity-filter-form]");
-    const tableShell = document.querySelector<HTMLElement>("[data-activity-table-shell]");
-    const skeletonTemplate = document.querySelector<HTMLTemplateElement>("[data-activity-filter-skeleton]");
-    if (!form || !tableShell || !skeletonTemplate) return;
-    if (form.dataset.activityFilterInitialized === "true") return;
-    form.dataset.activityFilterInitialized = "true";
-
-    const activeForm = form;
-    const activeTableShell = tableShell;
-    const activeSkeletonTemplate = skeletonTemplate;
-    const cacheKey = "admin-activity-filter-cache-v1";
-    const fragmentPath = "/admin/activity-fragment";
-    const filterKeys = ["search"] as const;
-    const searchInput = activeForm.querySelector<HTMLInputElement>("[data-activity-search-input]");
-    let submitTimer: number | undefined;
-    let searchTimer: number | undefined;
-    let activeFetchController: AbortController | undefined;
-
-    function readCache(): string[] {
-      try {
-        const parsed = JSON.parse(sessionStorage.getItem(cacheKey) || "[]");
-        return Array.isArray(parsed)
-          ? parsed.filter((value): value is string => typeof value === "string")
-          : [];
-      } catch {
-        return [];
-      }
-    }
-
-    function writeCache(values: string[]) {
-      sessionStorage.setItem(cacheKey, JSON.stringify([...new Set(values)]));
-    }
-
-    function normalizeParams(params: URLSearchParams) {
-      const normalized = new URLSearchParams();
-
-      filterKeys.forEach((key) => {
-        const value = params.get(key)?.trim();
-        if (value) normalized.set(key, value);
-      });
-
-      return normalized.toString();
-    }
-
-    function normalizeFormQuery() {
-      const params = new URLSearchParams();
-      const formData = new FormData(activeForm);
-
-      filterKeys.forEach((key) => {
-        const value = formData.get(key);
-        if (typeof value === "string" && value.trim()) params.set(key, value.trim());
-      });
-
-      return params.toString();
-    }
-
-    function buildUrl(path: string, targetQuery: string) {
-      return targetQuery ? `${path}?${targetQuery}` : path;
-    }
-
-    function showSkeletonForQuery(targetQuery: string) {
-      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
-      const cachedQueries = readCache();
-      if (targetQuery === currentQuery || cachedQueries.includes(targetQuery)) return;
-
-      const skeleton = activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
-      if (skeleton) activeTableShell.replaceChildren(skeleton);
-    }
-
-    function replaceFragment(fragmentHtml: string) {
-      const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html");
-      const nextTableShell = parsed.querySelector<HTMLElement>("[data-activity-table-shell]");
-      if (!nextTableShell) throw new Error("Activity fragment did not include a table.");
-
-      activeTableShell.innerHTML = nextTableShell.innerHTML;
-      document.dispatchEvent(new Event("dashboard:interactive-table-updated"));
-    }
-
-    async function applyFilters(targetQuery: string) {
-      const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
-      if (targetQuery === currentQuery) return;
-
-      showSkeletonForQuery(targetQuery);
-      activeFetchController?.abort();
-      const fetchController = new AbortController();
-      activeFetchController = fetchController;
-
-      try {
-        const response = await fetch(buildUrl(fragmentPath, targetQuery), {
-          headers: { "X-Requested-With": "fetch" },
-          signal: fetchController.signal,
-        });
-        const fragmentHtml = await window.readDashboardFragmentResponse(response);
-
-        window.history.replaceState(
-          { activityFilterQuery: targetQuery },
-          "",
-          buildUrl("/admin/activity", targetQuery),
-        );
-        replaceFragment(fragmentHtml);
-        activeForm.dataset.currentFilterQuery = targetQuery;
-        writeCache([...readCache(), targetQuery]);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return;
-        window.location.href = buildUrl("/admin/activity", targetQuery);
-      } finally {
-        if (activeFetchController === fetchController) activeFetchController = undefined;
-      }
-    }
-
-    function submitFilters() {
-      window.clearTimeout(submitTimer);
-      submitTimer = window.setTimeout(() => {
-        void applyFilters(normalizeFormQuery());
-      }, 120);
-    }
-
-    writeCache([...readCache(), normalizeParams(new URLSearchParams(window.location.search))]);
-    activeForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      void applyFilters(normalizeFormQuery());
-    });
-    searchInput?.addEventListener("input", () => {
-      window.clearTimeout(searchTimer);
-      searchTimer = window.setTimeout(submitFilters, 450);
+    initDashboardFragmentTable({
+      cacheKey: "admin-activity-filter-cache-v3",
+      fragmentPath: "/admin/activity-fragment",
+      pagePath: "/admin/activity",
+      formSelector: "[data-activity-filter-form]",
+      tableShellSelector: "[data-activity-list-shell]",
+      skeletonTemplateSelector: "[data-activity-filter-skeleton]",
+      filterKeys: ["search"],
+      searchInputSelector: "[data-activity-search-input]",
+      historyStateKey: "activityFilterQuery",
     });
   }
 
@@ -246,3 +96,84 @@ const emptyMessage = activeFilters.search
     initAdminActivityFilters();
   }
 </script>
+
+<style>
+  .admin-activity__feed {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .admin-activity__toolbar {
+    display: grid;
+    gap: 0.85rem;
+    margin-bottom: 0.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .admin-activity__search-form {
+    margin: 0;
+  }
+
+  .admin-activity__search-form input {
+    width: 100%;
+    min-height: 2.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    padding: 0.55rem 0.75rem;
+    font: inherit;
+    font-size: 0.92rem;
+    color: #111827;
+  }
+
+  .admin-activity__search-form input:focus {
+    outline: 2px solid rgb(102 24 24 / 0.18);
+    border-color: var(--color-brand-red);
+  }
+
+  .admin-activity__summary {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: #4b5563;
+  }
+
+  .admin-activity__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  .admin-activity__empty {
+    margin: 0;
+    padding: 1.5rem 1rem;
+    border: 1px dashed #d1d5db;
+    border-radius: 0.75rem;
+    background: #f9fafb;
+    color: #6b7280;
+    font-size: 0.92rem;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  .admin-activity__skeleton-card {
+    display: grid;
+    gap: 0.65rem;
+    padding: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .admin-activity :global(.dashboard-interactive-table__footer) {
+    border-top: 1px solid #e5e7eb;
+    background: transparent;
+    min-height: 0;
+  }
+
+  .admin-activity :global(.dashboard-interactive-table__footer .table-pagination) {
+    margin-top: 0;
+    padding: 0.75rem 0 0;
+  }
+</style>

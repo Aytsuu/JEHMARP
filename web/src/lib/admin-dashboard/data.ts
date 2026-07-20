@@ -1,17 +1,27 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { throwLoadError } from "@/lib/load-error";
 
+import type { AdminActivityFilters } from "./activity-filters";
 import type { AdminAgentFilters } from "./agent-filters";
 import type { AdminCustomerFilters } from "./customer-filters";
 import type { AdminInvoiceFilters } from "./invoice-filters";
 import type { AdminInquiryFilters } from "./inquiry-filters";
 import type { AdminOrderFilters } from "./order-filters";
+import {
+  adminPaginationRange,
+  buildAdminPagination,
+  defaultAdminPagination,
+  type AdminPaginatedResult,
+  type AdminPaginationParams,
+} from "./pagination";
 import type { AdminProductFilters } from "./product-filters";
 import type { AdminResellerApplicationFilters } from "./reseller-application-filters";
+import { computeAdminOrderStatusCounts, type AdminOrderStatusCounts } from "./summary";
 import type {
   InquiryStatus,
   InvoiceStatus,
   OrderStatus,
+  ProductAmountType,
   PageStatus,
   ProductCategory,
   StockStatus,
@@ -19,13 +29,18 @@ import type {
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
+const customerOrderStatuses = new Set(["pending", "processing", "closed"]);
+const agentOrderStatuses = new Set(["pending_customers", "pending_order", "processing", "closed"]);
+
 const adminOrderSelect = `
   id,
+  agent_order_id,
   customer_id,
   agent_id,
   source,
   order_status,
   payment_status,
+  release_date,
   notes,
   approved_at,
   admin_read_at,
@@ -41,6 +56,8 @@ const adminOrderSelect = `
     address,
     is_reseller,
     assigned_agent_id,
+    credit_limit,
+    credit_limit_exceeded,
     assigned_agent:assigned_agent_id (
       id,
       user_id,
@@ -68,23 +85,46 @@ const adminOrderSelect = `
     unit_price,
     price_type,
     add_details,
+    agent_order_quantity_increase,
     agent_commission_amount,
     agent_commission_paid,
     product:product_id (
       id,
       name,
       unit_label,
-      default_price
+      default_price,
+      agent_commission_type,
+      agent_commission_value
     )
   ),
   payment (
     id,
     amount,
     payment_method,
+    payment_terms,
     payment_date,
     reference_number,
     notes,
     created_at
+  ),
+  agent_received_payment (
+    id,
+    order_id,
+    agent_id,
+    amount,
+    payment_method,
+    payment_terms,
+    payment_date,
+    reference_number,
+    notes,
+    status,
+    confirmed_at,
+    created_at,
+    updated_at,
+    agent:agent_id (
+      id,
+      display_name
+    )
   ),
   invoice (
     id,
@@ -102,6 +142,160 @@ const adminOrderSelect = `
     to_status,
     changed_at,
     notes
+  )
+`;
+
+const adminAgentOrderSelect = `
+  id,
+  agent_id,
+  order_status,
+  notes,
+  submitted_by,
+  admin_read_at,
+  admin_read_by,
+  created_at,
+  updated_at,
+  agent:agent_id (
+    id,
+    user_id,
+    display_name,
+    contact,
+    status,
+    created_at,
+    updated_at
+  ),
+  agent_order_item (
+    id,
+    product_id,
+    quantity,
+    add_details,
+    agent_commission_amount,
+    agent_commission_updated_by,
+    agent_commission_updated_at,
+    created_at,
+    updated_at,
+    product:product_id (
+      id,
+      name,
+      unit_label,
+      default_price,
+      reseller_price,
+      agent_commission_type,
+      agent_commission_value
+    )
+  ),
+  customer_order (
+    id,
+    agent_order_id,
+    customer_id,
+    agent_id,
+    source,
+    order_status,
+    payment_status,
+    release_date,
+    notes,
+    approved_at,
+    admin_read_at,
+    admin_read_by,
+    created_at,
+    updated_at,
+    customer:customer_id (
+      id,
+      first_name,
+      last_name,
+      phone_number,
+      email,
+      address,
+      is_reseller,
+      assigned_agent_id,
+      credit_limit,
+      credit_limit_exceeded,
+      assigned_agent:assigned_agent_id (
+        id,
+        user_id,
+        display_name,
+        contact,
+        status,
+        created_at,
+        updated_at
+      )
+    ),
+    agent:agent_id (
+      id,
+      user_id,
+      display_name,
+      contact,
+      status,
+      created_at,
+      updated_at
+    ),
+    customer_order_item (
+      id,
+      product_id,
+      partial_quantity,
+      final_quantity,
+      unit_price,
+      price_type,
+      add_details,
+      agent_order_quantity_increase,
+      agent_commission_amount,
+      agent_commission_paid,
+      product:product_id (
+        id,
+        name,
+        unit_label,
+        default_price,
+        reseller_price,
+        agent_commission_type,
+        agent_commission_value
+      )
+    ),
+    payment (
+      id,
+      amount,
+      payment_method,
+      payment_terms,
+      payment_date,
+      reference_number,
+      notes,
+      created_at
+    ),
+    agent_received_payment (
+      id,
+      order_id,
+      agent_id,
+      amount,
+      payment_method,
+      payment_terms,
+      payment_date,
+      reference_number,
+      notes,
+      status,
+      confirmed_at,
+      created_at,
+      updated_at,
+      agent:agent_id (
+        id,
+        display_name
+      )
+    ),
+    invoice (
+      id,
+      order_id,
+      invoice_number,
+      status,
+      issued_at,
+      due_at,
+      created_at,
+      updated_at
+    ),
+    customer_order_status_history (
+      id,
+      from_status,
+      to_status,
+      changed_at,
+      notes
+    )
   )
 `;
 
@@ -134,6 +328,10 @@ export type AdminProduct = {
   unit_label: string;
   default_price: number;
   reseller_price: number;
+  reseller_deduction_type: ProductAmountType;
+  reseller_deduction_value: number;
+  agent_commission_type: ProductAmountType;
+  agent_commission_value: number;
   stock_status: StockStatus;
   image_path: string | null;
   is_active: boolean;
@@ -143,7 +341,11 @@ export type AdminProduct = {
 
 export type AdminAgent = {
   id: string;
-  user_id: string;
+  user_id: string | null;
+  customer_id?: string | null;
+  employee_id: string | null;
+  first_name: string;
+  last_name: string;
   display_name: string;
   status: "active" | "inactive" | "suspended";
   email: string | null;
@@ -161,6 +363,8 @@ export type AdminCustomer = {
   address: string;
   assigned_agent_id: string | null;
   is_reseller: boolean;
+  credit_limit: number;
+  credit_limit_exceeded: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -180,15 +384,19 @@ export type AdminOrderItem = {
   unit_price: number;
   price_type: "retail" | "reseller";
   add_details: string | null;
+  agent_order_quantity_increase?: number;
   agent_commission_amount: number;
   agent_commission_paid: boolean;
-  product: Pick<AdminProduct, "id" | "name" | "unit_label" | "default_price"> | null;
+  product: (Pick<AdminProduct, "id" | "name" | "unit_label" | "default_price" | "agent_commission_type" | "agent_commission_value"> & {
+    reseller_price?: number;
+  }) | null;
 };
 
 export type AdminPayment = {
   id: string;
   amount: number;
   payment_method: string;
+  payment_terms: string;
   payment_date: string;
   reference_number: string | null;
   notes: string | null;
@@ -214,13 +422,51 @@ export type AdminOrderStatusHistory = {
   notes: string | null;
 };
 
+export type AdminAgentReceivedPayment = {
+  id: string;
+  order_id: string;
+  agent_id: string;
+  amount: number;
+  payment_method: string;
+  payment_terms: string;
+  payment_date: string;
+  reference_number: string | null;
+  notes: string | null;
+  status: "pending_admin_confirmation" | "confirmed" | "rejected";
+  confirmed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  agent: Pick<AdminAgent, "id" | "display_name"> | null;
+};
+
+export type AdminAgentOrderStatus =
+  | "pending_customers"
+  | "pending_order"
+  | "processing"
+  | "closed";
+
+export type AdminAgentOrderItem = {
+  id: string;
+  product_id: string;
+  quantity: number;
+  add_details: string | null;
+  agent_commission_amount: number;
+  agent_commission_updated_by: string | null;
+  agent_commission_updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+  product: Pick<AdminProduct, "id" | "name" | "unit_label" | "default_price" | "agent_commission_type" | "agent_commission_value"> | null;
+};
+
 export type AdminOrder = {
   id: string;
+  agent_order_id?: string | null;
   customer_id: string;
   agent_id: string | null;
   source: "guest_shop" | "agent_submitted" | "admin_manual";
   order_status: OrderStatus;
   payment_status: "unpaid" | "partial" | "paid" | "refunded";
+  release_date?: string | null;
   notes: string | null;
   approved_at: string | null;
   admin_read_at?: string | null;
@@ -231,8 +477,88 @@ export type AdminOrder = {
   agent: Pick<AdminAgent, "id" | "display_name" | "email" | "contact"> | null;
   customer_order_item: AdminOrderItem[];
   payment: AdminPayment[];
+  agent_received_payment?: AdminAgentReceivedPayment[];
   invoice: AdminInvoice[];
   customer_order_status_history: AdminOrderStatusHistory[];
+};
+
+export type AdminAgentOrder = {
+  id: string;
+  agent_id: string;
+  order_status: AdminAgentOrderStatus;
+  notes: string | null;
+  submitted_by: string | null;
+  admin_read_at?: string | null;
+  admin_read_by?: string | null;
+  created_at: string;
+  updated_at: string;
+  agent: (Pick<AdminAgent, "id" | "display_name" | "email" | "contact"> & { user_id?: string }) | null;
+  agent_order_item: AdminAgentOrderItem[];
+  customer_order: AdminOrder[];
+};
+
+export type AdminOrderTableRow = {
+  id: string;
+  row_type: "agent" | "customer";
+  created_at: string;
+  status: string;
+  customer_label: string;
+  source_label: string;
+  payment_status: AdminOrder["payment_status"];
+  release_date?: string | null;
+  total_amount: number;
+  href: string;
+  linked_customer_count: number | null;
+};
+
+export type AdminSalesTableRow = {
+  id: string;
+  created_at: string;
+  sale_date: string;
+  release_date: string | null;
+  customer_label: string;
+  source_label: string;
+  order_status: OrderStatus;
+  payment_status: AdminOrder["payment_status"];
+  invoice_number: string | null;
+  order_total: number;
+  paid_total: number;
+  balance: number;
+  href: string;
+};
+
+export type AdminInvoiceTableRow = {
+  order_id: string;
+  invoice_id: string;
+  invoice_number: string;
+  customer_label: string;
+  invoice_created_at: string;
+  invoice_total: number;
+  paid_total: number;
+  balance: number;
+  payment_status: AdminOrder["payment_status"];
+};
+
+export type AdminCustomerTableRow = AdminCustomer & {
+  assigned_agent_name: string | null;
+  is_agent: boolean;
+  outstanding_credit_balance: number;
+};
+
+export type AdminCustomerRegistrationLink = {
+  id: string;
+  token: string;
+  expires_at: string;
+  created_at: string;
+  use_count: number;
+};
+
+export type AdminActivityTableRow = {
+  id: string;
+  category: "order" | "customer" | "product" | "invoice" | "content" | "inquiry" | "reseller";
+  title: string;
+  detail: string;
+  occurredAt: string;
 };
 
 export type AdminContactInquiry = {
@@ -273,14 +599,15 @@ export type AdminDashboardData = {
   products: AdminProduct[];
   agents: AdminAgent[];
   customers: AdminCustomer[];
+  agentOrders: AdminAgentOrder[];
   orders: AdminOrder[];
   contactInquiries: AdminContactInquiry[];
   resellerApplications: AdminResellerApplication[];
   summary: AdminDashboardSummary;
 };
 
-export type AdminDashboardSummary = {
-  orders: number;
+export type AdminDashboardSummary = AdminOrderStatusCounts & {
+  agents: number;
   inquiries: number;
   customers: number;
   products: number;
@@ -298,34 +625,68 @@ export type AdminDashboardDataOptions = {
 export type AdminProductManagementData = Pick<
   AdminDashboardData,
   "products"
->;
+> & {
+  pagination: AdminPaginatedResult<AdminProduct>["pagination"];
+};
 
 export type AdminOrderManagementData = Pick<
   AdminDashboardData,
-  "agents" | "customers" | "orders" | "products"
->;
+  "agents" | "customers" | "agentOrders" | "orders" | "products"
+> & {
+  orderRows: AdminOrderTableRow[];
+  customerBalances: Record<string, number>;
+  pagination: AdminPaginatedResult<AdminOrderTableRow>["pagination"];
+};
 
-export type AdminCustomerManagementData = Pick<
-  AdminDashboardData,
-  "agents" | "customers"
->;
+export type AdminCustomerManagementData = {
+  customers: AdminCustomerTableRow[];
+  agents: AdminAgent[];
+  pagination: AdminPaginatedResult<AdminCustomerTableRow>["pagination"];
+};
 
 export type AdminAgentManagementData = Pick<
   AdminDashboardData,
   "agents"
->;
+> & {
+  pagination: AdminPaginatedResult<AdminAgent>["pagination"];
+};
 
-export type AdminInvoiceManagementData = Pick<AdminDashboardData, "orders">;
+export type AdminInvoiceManagementData = {
+  invoiceRows: AdminInvoiceTableRow[];
+  pagination: AdminPaginatedResult<AdminInvoiceTableRow>["pagination"];
+};
+
+export type AdminSalesManagementData = {
+  salesRows: AdminSalesTableRow[];
+  pagination: AdminPaginatedResult<AdminSalesTableRow>["pagination"];
+};
 
 export type AdminInquiryManagementData = Pick<
   AdminDashboardData,
   "contactInquiries"
->;
+> & {
+  pagination?: AdminPaginatedResult<AdminContactInquiry>["pagination"];
+};
 
 export type AdminResellerApplicationManagementData = Pick<
   AdminDashboardData,
   "resellerApplications"
->;
+> & {
+  pagination?: AdminPaginatedResult<AdminResellerApplication>["pagination"];
+};
+
+export type AdminActivityManagementData = {
+  activityItems: AdminActivityTableRow[];
+  pagination: AdminPaginatedResult<AdminActivityTableRow>["pagination"];
+};
+
+export type AdminAgentDetailsData = {
+  agent: AdminAgent;
+  assignedCustomers: AdminCustomer[];
+  customerOrders: AdminOrder[];
+  agentOrders: AdminAgentOrder[];
+  remainingBalance: number;
+};
 
 export async function loadAdminDashboardData(
   options: AdminDashboardDataOptions = {},
@@ -340,6 +701,7 @@ export async function loadAdminDashboardData(
     products,
     agents,
     customers,
+    agentOrders,
     orders,
     contactInquiries,
     resellerApplications,
@@ -349,6 +711,7 @@ export async function loadAdminDashboardData(
     loadProducts(supabase, options.productFilters),
     loadAgents(supabase),
     loadCustomers(supabase),
+    loadAgentOrders(supabase, options.orderLimit ?? 50, options.orderFilters),
     loadOrders(supabase, options.orderLimit ?? 50, options.orderFilters),
     loadContactInquiries(supabase, options.contactInquiryLimit ?? 50),
     loadResellerApplications(supabase, options.resellerApplicationLimit ?? 50),
@@ -360,123 +723,195 @@ export async function loadAdminDashboardData(
     products,
     agents,
     customers,
+    agentOrders,
     orders,
     contactInquiries,
     resellerApplications,
     summary: buildAdminDashboardSummary({
       orders,
+      agentOrders,
       customers,
       products,
       contactInquiries,
       resellerApplications,
+      agents,
     }),
   };
 }
 
 export async function loadAdminDashboardSummaryData(): Promise<AdminDashboardSummary> {
   const supabase = createSupabaseAdminClient();
-  const [orders, customers, products, contactInquiries, resellerApplications] = await Promise.all([
-    loadDashboardSummaryOrders(supabase),
-    loadDashboardSummaryCustomers(supabase),
-    loadDashboardSummaryProducts(supabase),
-    loadDashboardSummaryContactInquiries(supabase),
-    loadDashboardSummaryResellerApplications(supabase),
-  ]);
+  const [orders, agentOrders, customers, products, contactInquiries, resellerApplications, agents] =
+    await Promise.all([
+      loadDashboardSummaryOrders(supabase),
+      loadDashboardSummaryAgentOrders(supabase),
+      loadDashboardSummaryCustomers(supabase),
+      loadDashboardSummaryProducts(supabase),
+      loadDashboardSummaryContactInquiries(supabase),
+      loadDashboardSummaryResellerApplications(supabase),
+      loadDashboardSummaryAgents(supabase),
+    ]);
 
   return buildAdminDashboardSummary({
     orders,
+    agentOrders,
     customers,
     products,
     contactInquiries,
     resellerApplications,
+    agents,
   });
 }
 
 export async function loadAdminOrderManagementData(
   orderFilters: AdminOrderFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminOrderManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [products, agents, customers, orders] = await Promise.all([
+  const [products, agents, customers, orderRows, orders, customerBalances] = await Promise.all([
     loadProducts(supabase),
     loadAgents(supabase),
     loadCustomers(supabase),
-    loadOrders(supabase, 50, orderFilters),
+    loadPaginatedAdminOrderRows(supabase, orderFilters, pagination),
+    loadOrders(supabase, 50),
+    loadCustomerOutstandingBalances(supabase),
   ]);
 
   return {
     products,
     agents,
     customers,
+    agentOrders: [],
     orders,
+    orderRows: orderRows.records,
+    customerBalances,
+    pagination: orderRows.pagination,
   };
 }
 
 export async function loadAdminProductManagementData(
   productFilters: AdminProductFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminProductManagementData> {
   // Product filtering is used by the products fragment endpoint. Keep the query
   // server-side without loading the rest of the dashboard page payload.
   const supabase = createSupabaseAdminClient();
-  const products = await loadProducts(supabase, productFilters);
+  const products = await loadPaginatedProducts(supabase, productFilters, pagination);
 
   return {
-    products,
+    products: products.records,
+    pagination: products.pagination,
+  };
+}
+
+export async function loadAdminProductOptionData(): Promise<Pick<AdminDashboardData, "products">> {
+  const supabase = createSupabaseAdminClient();
+
+  return {
+    products: await loadProducts(supabase),
   };
 }
 
 export async function loadAdminInvoiceManagementData(
   invoiceFilters: AdminInvoiceFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminInvoiceManagementData> {
   const supabase = createSupabaseAdminClient();
-  const orders = await loadInvoices(supabase, 50, invoiceFilters);
+  const invoices = await loadPaginatedAdminInvoiceRows(supabase, invoiceFilters, pagination);
 
   return {
-    orders,
+    invoiceRows: invoices.records,
+    pagination: invoices.pagination,
+  };
+}
+
+export async function loadAdminSalesManagementData(
+  salesFilters: AdminOrderFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
+): Promise<AdminSalesManagementData> {
+  const supabase = createSupabaseAdminClient();
+  const sales = await loadPaginatedAdminSalesRows(supabase, salesFilters, pagination);
+
+  return {
+    salesRows: sales.records,
+    pagination: sales.pagination,
   };
 }
 
 export async function loadAdminCustomerManagementData(
   customerFilters: AdminCustomerFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminCustomerManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [agents, customers] = await Promise.all([
+  const [customers, agents] = await Promise.all([
+    loadPaginatedAdminCustomerRows(supabase, customerFilters, pagination),
     loadAgents(supabase),
-    loadCustomers(supabase, customerFilters),
   ]);
 
   return {
+    customers: customers.records,
     agents,
-    customers,
+    pagination: customers.pagination,
   };
 }
 
 export async function loadAdminAgentManagementData(
   agentFilters: AdminAgentFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminAgentManagementData> {
   const supabase = createSupabaseAdminClient();
+  const agents = await loadPaginatedAgents(supabase, agentFilters, pagination);
 
   return {
-    agents: await loadAgents(supabase, agentFilters),
+    agents: agents.records,
+    pagination: agents.pagination,
   };
 }
 
 export async function loadAdminInquiryManagementData(
   inquiryFilters: AdminInquiryFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminInquiryManagementData> {
   const supabase = createSupabaseAdminClient();
+  const inquiries = await loadPaginatedContactInquiries(
+    supabase,
+    inquiryFilters,
+    pagination,
+  );
 
   return {
-    contactInquiries: await loadContactInquiries(supabase, 50, inquiryFilters),
+    contactInquiries: inquiries.records,
+    pagination: inquiries.pagination,
   };
 }
 
 export async function loadAdminResellerApplicationManagementData(
   resellerApplicationFilters: AdminResellerApplicationFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminResellerApplicationManagementData> {
   const supabase = createSupabaseAdminClient();
+  const applications = await loadPaginatedResellerApplications(
+    supabase,
+    resellerApplicationFilters,
+    pagination,
+  );
 
   return {
-    resellerApplications: await loadResellerApplications(supabase, 50, resellerApplicationFilters),
+    resellerApplications: applications.records,
+    pagination: applications.pagination,
+  };
+}
+
+export async function loadAdminActivityManagementData(
+  activityFilters: AdminActivityFilters = {},
+  pagination: AdminPaginationParams = defaultAdminPagination,
+): Promise<AdminActivityManagementData> {
+  const supabase = createSupabaseAdminClient();
+  const activity = await loadPaginatedAdminActivityRows(supabase, activityFilters, pagination);
+
+  return {
+    activityItems: activity.records,
+    pagination: activity.pagination,
   };
 }
 
@@ -496,6 +931,55 @@ export async function loadAdminOrder(orderId: string): Promise<AdminOrder | null
 
   const [order] = await enrichOrdersWithAgentEmails(supabase, [normalizeAdminOrder(data)]);
   return order ?? null;
+}
+
+export async function loadAdminAgentOrder(agentOrderId: string): Promise<AdminAgentOrder | null> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("agent_order")
+    .select(adminAgentOrderSelect)
+    .eq("id", agentOrderId)
+    .maybeSingle();
+
+  if (error) throwLoadError("Unable to load admin agent order.");
+
+  if (!data) {
+    return null;
+  }
+
+  const [agentOrder] = await enrichAgentOrdersWithAgentEmails(
+    supabase,
+    [normalizeAdminAgentOrder(data)],
+  );
+  return agentOrder ?? null;
+}
+
+export async function loadAdminAgentDetailsData(
+  agentId: string,
+): Promise<AdminAgentDetailsData | null> {
+  const supabase = createSupabaseAdminClient();
+  const agent = await loadAgentById(supabase, agentId);
+
+  if (!agent) {
+    return null;
+  }
+
+  const assignedCustomers = await loadCustomersForAgent(supabase, agentId);
+  const [customerOrders, agentOrders] = await Promise.all([
+    loadOrdersForCustomers(supabase, assignedCustomers.map((customer) => customer.id)),
+    loadAgentOrdersForAgent(supabase, agentId),
+  ]);
+
+  return {
+    agent,
+    assignedCustomers,
+    customerOrders,
+    agentOrders,
+    remainingBalance: customerOrders.reduce(
+      (total, order) => total + adminOrderRemainingBalance(order),
+      0,
+    ),
+  };
 }
 
 async function loadPages(supabase: SupabaseAdminClient) {
@@ -527,7 +1011,7 @@ async function loadProducts(
   let query = supabase
     .from("product")
     .select(
-      "id, name, category, description, unit_label, default_price, reseller_price, stock_status, image_path, is_active, created_at, updated_at",
+      "id, name, category, description, unit_label, default_price, reseller_price, reseller_deduction_type, reseller_deduction_value, agent_commission_type, agent_commission_value, stock_status, image_path, is_active, created_at, updated_at",
     );
 
   if (filters.search) {
@@ -552,8 +1036,280 @@ async function loadProducts(
   return (data ?? []) as AdminProduct[];
 }
 
+async function loadPaginatedProducts(
+  supabase: SupabaseAdminClient,
+  filters: AdminProductFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminProduct>> {
+  let query = supabase
+    .from("product")
+    .select(
+      "id, name, category, description, unit_label, default_price, reseller_price, reseller_deduction_type, reseller_deduction_value, agent_commission_type, agent_commission_value, stock_status, image_path, is_active, created_at, updated_at",
+      { count: "exact" },
+    );
+
+  if (filters.search) {
+    const escapedSearch = escapePostgrestFilterValue(filters.search);
+    query = query.or(`name.ilike.%${escapedSearch}%,description.ilike.%${escapedSearch}%`);
+  }
+
+  if (filters.category) {
+    query = query.eq("category", filters.category);
+  }
+
+  if (filters.stockStatus) {
+    query = query.eq("stock_status", filters.stockStatus);
+  }
+
+  const { from, to } = adminPaginationRange(pagination);
+  const { data, error, count } = await query
+    .order("is_active", { ascending: false })
+    .order("name", { ascending: true })
+    .range(from, to);
+
+  if (error) throwLoadError("Unable to load admin products.");
+
+  return {
+    records: (data ?? []) as AdminProduct[],
+    pagination: buildAdminPagination(count ?? 0, pagination),
+  };
+}
+
+type AdminPaginatedRpcResponse = {
+  records?: unknown;
+  total_rows?: number | string | null;
+};
+
+function readPaginatedRpcResponse<T>(
+  data: unknown,
+  pagination: AdminPaginationParams,
+): AdminPaginatedResult<T> {
+  const rpcRow = Array.isArray(data)
+    ? data[0] as AdminPaginatedRpcResponse | undefined
+    : data as AdminPaginatedRpcResponse | undefined;
+  const rawRecords = Array.isArray(rpcRow?.records) ? rpcRow.records : [];
+  const totalRows = Number(rpcRow?.total_rows ?? rawRecords.length);
+
+  return {
+    records: rawRecords as T[],
+    pagination: buildAdminPagination(Number.isFinite(totalRows) ? totalRows : 0, pagination),
+  };
+}
+
+async function loadPaginatedAdminOrderRows(
+  supabase: SupabaseAdminClient,
+  filters: AdminOrderFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminOrderTableRow>> {
+  const { data, error } = await supabase.rpc("list_admin_order_rows", {
+    search_query: filters.search ?? null,
+    source_filter: filters.source ?? null,
+    order_status_filter: filters.orderStatus ?? null,
+    payment_status_filter: filters.paymentStatus ?? null,
+    page_number: pagination.page,
+    page_size: pagination.pageSize,
+  });
+
+  if (error) throwLoadError("Unable to load admin order rows.");
+
+  const result = readPaginatedRpcResponse<AdminOrderTableRow>(data, pagination);
+
+  return {
+    ...result,
+    records: result.records.map((row) => ({
+      ...row,
+      release_date: row.release_date ?? null,
+      total_amount: Number(row.total_amount ?? 0),
+      linked_customer_count: row.linked_customer_count === null
+        ? null
+        : Number(row.linked_customer_count),
+    })),
+  };
+}
+
+async function loadPaginatedAdminInvoiceRows(
+  supabase: SupabaseAdminClient,
+  filters: AdminInvoiceFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminInvoiceTableRow>> {
+  const { data, error } = await supabase.rpc("list_admin_invoice_rows", {
+    search_query: filters.search ?? null,
+    balance_status_filter: filters.balanceStatus ?? null,
+    page_number: pagination.page,
+    page_size: pagination.pageSize,
+  });
+
+  if (error) throwLoadError("Unable to load admin invoice rows.");
+
+  const result = readPaginatedRpcResponse<AdminInvoiceTableRow>(data, pagination);
+
+  return {
+    ...result,
+    records: result.records.map((row) => ({
+      ...row,
+      invoice_total: Number(row.invoice_total ?? 0),
+      paid_total: Number(row.paid_total ?? 0),
+      balance: Number(row.balance ?? 0),
+    })),
+  };
+}
+
+async function loadPaginatedAdminSalesRows(
+  supabase: SupabaseAdminClient,
+  filters: AdminOrderFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminSalesTableRow>> {
+  const { data, error } = await supabase.rpc("list_admin_sales_rows", {
+    search_query: filters.search ?? null,
+    source_filter: filters.source ?? null,
+    order_status_filter: filters.orderStatus ?? null,
+    payment_status_filter: filters.paymentStatus ?? null,
+    page_number: pagination.page,
+    page_size: pagination.pageSize,
+  });
+
+  if (error) throwLoadError("Unable to load admin sales rows.");
+
+  const result = readPaginatedRpcResponse<AdminSalesTableRow>(data, pagination);
+
+  return {
+    ...result,
+    records: result.records.map((row) => ({
+      ...row,
+      sale_date: row.sale_date ?? row.created_at,
+      release_date: row.release_date ?? null,
+      invoice_number: row.invoice_number ?? null,
+      order_total: Number(row.order_total ?? 0),
+      paid_total: Number(row.paid_total ?? 0),
+      balance: Number(row.balance ?? 0),
+    })),
+  };
+}
+
+async function loadPaginatedAdminCustomerRows(
+  supabase: SupabaseAdminClient,
+  filters: AdminCustomerFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminCustomerTableRow>> {
+  const { data, error } = await supabase.rpc("list_admin_customer_rows", {
+    search_query: filters.search ?? null,
+    customer_type_filter: filters.customerType ?? null,
+    page_number: pagination.page,
+    page_size: pagination.pageSize,
+  });
+
+  if (error) throwLoadError("Unable to load admin customer rows.");
+
+  const result = readPaginatedRpcResponse<AdminCustomerTableRow>(data, pagination);
+
+  return {
+    ...result,
+    records: result.records.map((row) => ({
+      ...row,
+      credit_limit: Number(row.credit_limit ?? 1000),
+      credit_limit_exceeded: Boolean(row.credit_limit_exceeded),
+      outstanding_credit_balance: Number(row.outstanding_credit_balance ?? 0),
+    })),
+  };
+}
+
+async function loadPaginatedAdminActivityRows(
+  supabase: SupabaseAdminClient,
+  filters: AdminActivityFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminActivityTableRow>> {
+  const { data, error } = await supabase.rpc("list_admin_activity_rows", {
+    search_query: filters.search ?? null,
+    page_number: pagination.page,
+    page_size: pagination.pageSize,
+  });
+
+  if (error) throwLoadError("Unable to load admin activity rows.");
+
+  const result = readPaginatedRpcResponse<AdminActivityTableRow & { occurred_at?: string }>(
+    data,
+    pagination,
+  );
+
+  return {
+    ...result,
+    records: result.records.map((row) => ({
+      id: row.id,
+      category: row.category,
+      title: row.title,
+      detail: row.detail,
+      occurredAt: row.occurredAt ?? row.occurred_at ?? "",
+    })),
+  };
+}
+
+async function loadCustomerOutstandingBalances(
+  supabase: SupabaseAdminClient,
+): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from("customer_order")
+    .select(`
+      id,
+      customer_id,
+      order_status,
+      payment_status,
+      customer_order_item (
+        final_quantity,
+        unit_price
+      ),
+      payment (
+        amount
+      )
+    `)
+    .neq("order_status", "closed")
+    .in("payment_status", ["unpaid", "partial"]);
+
+  if (error) throwLoadError("Unable to load customer outstanding balances.");
+
+  return ((data ?? []) as Array<{
+    customer_id?: unknown;
+    customer_order_item?: Array<{ final_quantity?: unknown; unit_price?: unknown }> | null;
+    payment?: Array<{ amount?: unknown }> | null;
+  }>).reduce<Record<string, number>>((balances, order) => {
+    if (typeof order.customer_id !== "string") return balances;
+
+    const orderTotal = (order.customer_order_item ?? []).reduce((total, item) => {
+      const quantity = Number(item.final_quantity ?? 0);
+      const unitPrice = Number(item.unit_price ?? 0);
+      return total + (Number.isFinite(quantity) && Number.isFinite(unitPrice) ? quantity * unitPrice : 0);
+    }, 0);
+    const paidTotal = (order.payment ?? []).reduce((total, payment) => {
+      const amount = Number(payment.amount ?? 0);
+      return total + (Number.isFinite(amount) ? amount : 0);
+    }, 0);
+    const balance = Math.max(roundCurrency(orderTotal - paidTotal), 0);
+
+    return {
+      ...balances,
+      [order.customer_id]: roundCurrency((balances[order.customer_id] ?? 0) + balance),
+    };
+  }, {});
+}
+
 function escapePostgrestFilterValue(value: string) {
   return value.replace(/[%_,.]/g, (character) => `\\${character}`);
+}
+
+async function loadPaginatedAgents(
+  supabase: SupabaseAdminClient,
+  filters: AdminAgentFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminAgent>> {
+  const { data, error } = await supabase.rpc("list_admin_agent_rows", {
+    search_query: filters.search ?? null,
+    status_filter: filters.status ?? null,
+    page_number: pagination.page,
+    page_size: pagination.pageSize,
+  });
+
+  if (error) throwLoadError("Unable to load admin agents.");
+
+  return readPaginatedRpcResponse<AdminAgent>(data, pagination);
 }
 
 async function loadAgents(
@@ -562,7 +1318,7 @@ async function loadAgents(
 ) {
   const { data, error } = await supabase
     .from("agent_profile")
-    .select("id, user_id, display_name, contact, status, created_at, updated_at")
+    .select("id, user_id, customer_id, employee_id, first_name, last_name, display_name, contact, status, created_at, updated_at")
     .order("display_name", { ascending: true });
 
   if (error) throwLoadError("Unable to load admin agents.");
@@ -572,12 +1328,12 @@ async function loadAgents(
   >;
   const emailByUserId = await loadAuthEmailsByUserId(
     supabase,
-    baseAgents.map((agent) => agent.user_id),
+    baseAgents.map((agent) => agent.user_id).filter((userId): userId is string => Boolean(userId)),
   );
 
   const agents = baseAgents.map((agent) => ({
     ...agent,
-    email: emailByUserId.get(agent.user_id) ?? null,
+    email: agent.user_id ? emailByUserId.get(agent.user_id) ?? null : null,
     contact: agent.contact ?? null,
   })) as AdminAgent[];
 
@@ -588,6 +1344,89 @@ async function loadAgents(
   return filterAdminAgents(agents, filters);
 }
 
+async function loadAgentById(
+  supabase: SupabaseAdminClient,
+  agentId: string,
+): Promise<AdminAgent | null> {
+  const { data, error } = await supabase
+    .from("agent_profile")
+    .select("id, user_id, customer_id, employee_id, first_name, last_name, display_name, contact, status, created_at, updated_at")
+    .eq("id", agentId)
+    .maybeSingle();
+
+  if (error) throwLoadError("Unable to load admin agent.");
+  if (!data) return null;
+
+  const agent = data as Omit<AdminAgent, "email"> & { email?: never };
+  const emailByUserId = await loadAuthEmailsByUserId(
+    supabase,
+    agent.user_id ? [agent.user_id] : [],
+  );
+
+  return {
+    ...agent,
+    email: agent.user_id ? emailByUserId.get(agent.user_id) ?? null : null,
+    contact: agent.contact ?? null,
+  };
+}
+
+async function loadCustomersForAgent(
+  supabase: SupabaseAdminClient,
+  agentId: string,
+) {
+  const { data, error } = await supabase
+    .from("customer")
+    .select(
+      "id, first_name, last_name, phone_number, email, address, assigned_agent_id, is_reseller, credit_limit, credit_limit_exceeded, created_at, updated_at",
+    )
+    .eq("assigned_agent_id", agentId)
+    .order("created_at", { ascending: false });
+
+  if (error) throwLoadError("Unable to load assigned customers.");
+
+  return ((data ?? []) as AdminCustomer[]).map(normalizeAdminCustomer);
+}
+
+async function loadOrdersForCustomers(
+  supabase: SupabaseAdminClient,
+  customerIds: string[],
+) {
+  if (customerIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from("customer_order")
+    .select(adminOrderSelect)
+    .in("customer_id", customerIds)
+    .order("created_at", { ascending: false });
+
+  if (error) throwLoadError("Unable to load assigned customer orders.");
+
+  return enrichOrdersWithAgentEmails(
+    supabase,
+    ((data ?? []) as unknown[]).map(normalizeAdminOrder),
+  );
+}
+
+async function loadAgentOrdersForAgent(
+  supabase: SupabaseAdminClient,
+  agentId: string,
+) {
+  const { data, error } = await supabase
+    .from("agent_order")
+    .select(adminAgentOrderSelect)
+    .eq("agent_id", agentId)
+    .order("created_at", { ascending: false });
+
+  if (error) throwLoadError("Unable to load admin agent orders.");
+
+  return enrichAgentOrdersWithAgentEmails(
+    supabase,
+    ((data ?? []) as unknown[]).map(normalizeAdminAgentOrder),
+  );
+}
+
 async function loadCustomers(
   supabase: SupabaseAdminClient,
   filters: AdminCustomerFilters = {},
@@ -595,13 +1434,13 @@ async function loadCustomers(
   const { data, error } = await supabase
     .from("customer")
     .select(
-      "id, first_name, last_name, phone_number, email, address, assigned_agent_id, is_reseller, created_at, updated_at",
+      "id, first_name, last_name, phone_number, email, address, assigned_agent_id, is_reseller, credit_limit, credit_limit_exceeded, created_at, updated_at",
     )
     .order("created_at", { ascending: false });
 
   if (error) throwLoadError("Unable to load admin customers.");
 
-  const customers = (data ?? []) as AdminCustomer[];
+  const customers = ((data ?? []) as AdminCustomer[]).map(normalizeAdminCustomer);
 
   if (!filters.search && !filters.customerType) {
     return customers;
@@ -645,6 +1484,10 @@ async function loadOrders(
   }
 
   if (filters.orderStatus) {
+    if (!customerOrderStatuses.has(filters.orderStatus)) {
+      return [];
+    }
+
     query = query.eq("order_status", filters.orderStatus);
   }
 
@@ -674,6 +1517,66 @@ async function loadOrders(
   return filteredOrders.slice(0, limit);
 }
 
+function adminOrderRemainingBalance(order: AdminOrder) {
+  const invoiceTotal = order.customer_order_item.reduce((total, item) => {
+    return total + item.final_quantity * item.unit_price;
+  }, 0);
+  const paymentTotal = order.payment.reduce((total, payment) => total + payment.amount, 0);
+
+  return Math.max(invoiceTotal - paymentTotal, 0);
+}
+
+function roundCurrency(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+async function loadAgentOrders(
+  supabase: SupabaseAdminClient,
+  limit: number,
+  filters: AdminOrderFilters = {},
+) {
+  if (filters.source && filters.source !== "agent_submitted") {
+    return [];
+  }
+
+  if (filters.paymentStatus) {
+    return [];
+  }
+
+  let query = supabase
+    .from("agent_order")
+    .select(adminAgentOrderSelect);
+
+  if (filters.orderStatus) {
+    if (!agentOrderStatuses.has(filters.orderStatus)) {
+      return [];
+    }
+
+    query = query.eq("order_status", filters.orderStatus);
+  }
+
+  const shouldPostFilter = hasComputedOrderFilters(filters);
+  let orderedQuery = query.order("created_at", { ascending: false });
+
+  if (!shouldPostFilter) {
+    orderedQuery = orderedQuery.limit(limit);
+  }
+
+  const { data, error } = await orderedQuery;
+
+  if (error) throwLoadError("Unable to load admin agent orders.");
+
+  const agentOrders = await enrichAgentOrdersWithAgentEmails(
+    supabase,
+    ((data ?? []) as unknown[]).map(normalizeAdminAgentOrder),
+  );
+  const filteredAgentOrders = shouldPostFilter
+    ? filterAdminAgentOrders(agentOrders, filters)
+    : agentOrders;
+
+  return filteredAgentOrders.slice(0, limit);
+}
+
 function normalizeAdminOrder(order: unknown): AdminOrder {
   const adminOrder = order as AdminOrder;
 
@@ -681,9 +1584,35 @@ function normalizeAdminOrder(order: unknown): AdminOrder {
     ...adminOrder,
     customer_order_item: Array.isArray(adminOrder.customer_order_item) ? adminOrder.customer_order_item : [],
     payment: Array.isArray(adminOrder.payment) ? adminOrder.payment : [],
+    agent_received_payment: Array.isArray(adminOrder.agent_received_payment)
+      ? adminOrder.agent_received_payment
+      : [],
     invoice: normalizeRelationArray(adminOrder.invoice),
     customer_order_status_history: Array.isArray(adminOrder.customer_order_status_history)
       ? adminOrder.customer_order_status_history
+      : [],
+  };
+}
+
+function normalizeAdminCustomer(customer: AdminCustomer): AdminCustomer {
+  return {
+    ...customer,
+    credit_limit: Number(customer.credit_limit ?? 1000),
+    credit_limit_exceeded: Boolean(customer.credit_limit_exceeded),
+  };
+}
+
+function normalizeAdminAgentOrder(order: unknown): AdminAgentOrder {
+  const adminAgentOrder = order as AdminAgentOrder;
+
+  return {
+    ...adminAgentOrder,
+    agent: adminAgentOrder.agent,
+    agent_order_item: Array.isArray(adminAgentOrder.agent_order_item)
+      ? adminAgentOrder.agent_order_item
+      : [],
+    customer_order: Array.isArray(adminAgentOrder.customer_order)
+      ? adminAgentOrder.customer_order.map(normalizeAdminOrder)
       : [],
   };
 }
@@ -702,24 +1631,14 @@ function filterAdminOrders(orders: AdminOrder[], filters: AdminOrderFilters) {
   });
 }
 
-async function loadInvoices(
-  supabase: SupabaseAdminClient,
-  limit: number,
-  filters: AdminInvoiceFilters = {},
-) {
-  const { data, error } = await supabase
-    .from("customer_order")
-    .select(adminOrderSelect)
-    .order("created_at", { ascending: false });
+function filterAdminAgentOrders(agentOrders: AdminAgentOrder[], filters: AdminOrderFilters) {
+  const search = filters.search?.toLowerCase();
 
-  if (error) throwLoadError("Unable to load admin invoices.");
+  return agentOrders.filter((order) => {
+    const matchesSearch = !search || getAdminAgentOrderSearchText(order).includes(search);
 
-  const orders = await enrichOrdersWithAgentEmails(
-    supabase,
-    ((data ?? []) as unknown[]).map(normalizeAdminOrder),
-  );
-
-  return filterAdminInvoices(orders, filters).slice(0, limit);
+    return matchesSearch;
+  });
 }
 
 function filterAdminAgents(agents: AdminAgent[], filters: AdminAgentFilters) {
@@ -729,7 +1648,7 @@ function filterAdminAgents(agents: AdminAgent[], filters: AdminAgentFilters) {
     .filter((term) => term.length > 0);
 
   return agents.filter((agent) => {
-    const searchText = [agent.display_name, agent.email, agent.contact]
+    const searchText = [agent.employee_id, agent.first_name, agent.last_name, agent.display_name, agent.email, agent.contact]
       .filter((value): value is string => typeof value === "string" && value.length > 0)
       .join(" ")
       .toLowerCase();
@@ -737,22 +1656,6 @@ function filterAdminAgents(agents: AdminAgent[], filters: AdminAgentFilters) {
     const matchesStatus = !filters.status || agent.status === filters.status;
 
     return matchesSearch && matchesStatus;
-  });
-}
-
-function filterAdminInvoices(orders: AdminOrder[], filters: AdminInvoiceFilters) {
-  const search = filters.search?.toLowerCase();
-
-  return orders.filter((order) => {
-    if (!hasInvoice(order)) {
-      return false;
-    }
-
-    const matchesSearch = !search || getAdminInvoiceSearchText(order).includes(search);
-    const matchesBalanceStatus =
-      !filters.balanceStatus || order.payment_status === filters.balanceStatus;
-
-    return matchesSearch && matchesBalanceStatus;
   });
 }
 
@@ -802,14 +1705,22 @@ function getAdminOrderSearchText(order: AdminOrder) {
     .toLowerCase();
 }
 
-function getAdminInvoiceSearchText(order: AdminOrder) {
-  const customer = order.customer;
-  const invoice = order.invoice[0];
+function getAdminAgentOrderSearchText(order: AdminAgentOrder) {
   const values = [
-    invoice?.invoice_number,
-    customer?.first_name,
-    customer?.last_name,
-    `${customer?.first_name ?? ""} ${customer?.last_name ?? ""}`.trim(),
+    order.order_status,
+    order.agent?.display_name,
+    order.agent?.email,
+    ...order.agent_order_item.flatMap((item) => [
+      item.product?.name,
+      item.product?.unit_label,
+    ]),
+    ...order.customer_order.flatMap((customerOrder) => [
+      customerOrder.customer?.first_name,
+      customerOrder.customer?.last_name,
+      customerOrder.customer?.phone_number,
+      customerOrder.customer?.email,
+      customerOrder.customer?.address,
+    ]),
   ];
 
   return values
@@ -832,10 +1743,6 @@ function getAdminCustomerSearchText(customer: AdminCustomer, assignedAgent: stri
     .filter((value): value is string => typeof value === "string" && value.length > 0)
     .join(" ")
     .toLowerCase();
-}
-
-function hasInvoice(order: AdminOrder) {
-  return order.invoice.length > 0;
 }
 
 function normalizeRelationArray<T>(value: T[] | T | null | undefined): T[] {
@@ -910,6 +1817,63 @@ async function enrichOrdersWithAgentEmails(
   }));
 }
 
+async function enrichAgentOrdersWithAgentEmails(
+  supabase: SupabaseAdminClient,
+  agentOrders: AdminAgentOrder[],
+): Promise<AdminAgentOrder[]> {
+  const agentUserIds = agentOrders
+    .flatMap((order) => [
+      order.agent,
+      ...order.customer_order.flatMap((customerOrder) => [
+        customerOrder.agent,
+        customerOrder.customer?.assigned_agent ?? null,
+      ]),
+    ])
+    .filter((agent): agent is NonNullable<AdminOrder["agent"]> & { user_id?: string } => Boolean(agent))
+    .map((agent) => agent.user_id)
+    .filter((userId): userId is string => typeof userId === "string" && userId.length > 0);
+
+  const emailByUserId = await loadAuthEmailsByUserId(supabase, agentUserIds);
+
+  return agentOrders.map((order) => ({
+    ...order,
+    agent: order.agent
+      ? {
+          id: order.agent.id,
+          display_name: order.agent.display_name,
+          email: emailByUserId.get((order.agent as { user_id?: string }).user_id ?? "") ?? null,
+          contact: order.agent.contact ?? null,
+        }
+      : null,
+    customer_order: order.customer_order.map((customerOrder) => ({
+      ...customerOrder,
+      agent: customerOrder.agent
+        ? {
+            id: customerOrder.agent.id,
+            display_name: customerOrder.agent.display_name,
+            email: emailByUserId.get((customerOrder.agent as { user_id?: string }).user_id ?? "") ?? null,
+            contact: customerOrder.agent.contact ?? null,
+          }
+        : null,
+      customer: customerOrder.customer
+        ? {
+            ...customerOrder.customer,
+            assigned_agent: customerOrder.customer.assigned_agent
+              ? {
+                  id: customerOrder.customer.assigned_agent.id,
+                  display_name: customerOrder.customer.assigned_agent.display_name,
+                  email: emailByUserId.get(
+                    (customerOrder.customer.assigned_agent as { user_id?: string }).user_id ?? "",
+                  ) ?? null,
+                  contact: customerOrder.customer.assigned_agent.contact ?? null,
+                }
+              : null,
+          }
+        : null,
+    })),
+  }));
+}
+
 async function loadAuthEmailsByUserId(
   supabase: SupabaseAdminClient,
   userIds: string[],
@@ -977,6 +1941,40 @@ async function loadContactInquiries(
   });
 }
 
+async function loadPaginatedContactInquiries(
+  supabase: SupabaseAdminClient,
+  filters: AdminInquiryFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminContactInquiry>> {
+  let query = supabase
+    .from("contact_inquiry")
+    .select(
+      "id, name, email, phone_number, message, inquiry_status, internal_notes, admin_read_at, admin_read_by, created_at, updated_at",
+      { count: "exact" },
+    );
+
+  if (filters.search) {
+    const escapedSearch = escapePostgrestFilterValue(filters.search);
+    query = query.or(`name.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%,phone_number.ilike.%${escapedSearch}%`);
+  }
+
+  if (filters.status) {
+    query = query.eq("inquiry_status", filters.status);
+  }
+
+  const { from, to } = adminPaginationRange(pagination);
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throwLoadError("Unable to load admin contact inquiries.");
+
+  return {
+    records: (data ?? []) as AdminContactInquiry[],
+    pagination: buildAdminPagination(count ?? 0, pagination),
+  };
+}
+
 async function loadResellerApplications(
   supabase: SupabaseAdminClient,
   limit: number,
@@ -1015,18 +2013,60 @@ async function loadResellerApplications(
   });
 }
 
+async function loadPaginatedResellerApplications(
+  supabase: SupabaseAdminClient,
+  filters: AdminResellerApplicationFilters,
+  pagination: AdminPaginationParams,
+): Promise<AdminPaginatedResult<AdminResellerApplication>> {
+  let query = supabase
+    .from("reseller_application")
+    .select(
+      "id, name, email, contact_number, planned_transaction_type, expected_quantity_per_week, message, application_status, email_delivery_status, price_list_sent_at, email_error, admin_read_at, admin_read_by, created_at, updated_at",
+      { count: "exact" },
+    );
+
+  if (filters.search) {
+    const escapedSearch = escapePostgrestFilterValue(filters.search);
+    query = query.or(`name.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%,contact_number.ilike.%${escapedSearch}%`);
+  }
+
+  if (filters.status) {
+    query = query.eq("application_status", filters.status);
+  }
+
+  const { from, to } = adminPaginationRange(pagination);
+  const { data, error, count } = await query
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (error) throwLoadError("Unable to load admin reseller applications.");
+
+  return {
+    records: (data ?? []) as AdminResellerApplication[],
+    pagination: buildAdminPagination(count ?? 0, pagination),
+  };
+}
+
 function buildAdminDashboardSummary({
   orders,
+  agentOrders,
   customers,
   products,
   contactInquiries,
   resellerApplications,
-}: Pick<
-  AdminDashboardData,
-  "orders" | "customers" | "products" | "contactInquiries" | "resellerApplications"
->): AdminDashboardSummary {
+  agents,
+}: {
+  orders: Array<Pick<AdminOrder, "order_status">>;
+  agentOrders: Array<Pick<AdminAgentOrder, "order_status">>;
+  customers: Array<Pick<AdminCustomer, "id">>;
+  products: Array<Pick<AdminProduct, "id">>;
+  contactInquiries: Array<Pick<AdminContactInquiry, "id">>;
+  resellerApplications: Array<Pick<AdminResellerApplication, "id">>;
+  agents: Array<Pick<AdminAgent, "id">>;
+}): AdminDashboardSummary {
   return {
-    orders: orders.length,
+    ...computeAdminOrderStatusCounts(orders, agentOrders),
+    agents: agents.length,
     inquiries: contactInquiries.length,
     customers: customers.length,
     products: products.length,
@@ -1036,15 +2076,38 @@ function buildAdminDashboardSummary({
 
 async function loadDashboardSummaryOrders(
   supabase: SupabaseAdminClient,
-): Promise<AdminOrder[]> {
+): Promise<Array<Pick<AdminOrder, "order_status">>> {
   const { data, error } = await supabase
     .from("customer_order")
-    .select("id, customer_order_item(id), invoice(id)")
-    .order("created_at", { ascending: false });
+    .select("order_status");
 
   if (error) throwLoadError("Unable to load admin orders.");
 
-  return ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+  return (data ?? []) as Array<Pick<AdminOrder, "order_status">>;
+}
+
+async function loadDashboardSummaryAgentOrders(
+  supabase: SupabaseAdminClient,
+): Promise<Array<Pick<AdminAgentOrder, "order_status">>> {
+  const { data, error } = await supabase
+    .from("agent_order")
+    .select("order_status");
+
+  if (error) throwLoadError("Unable to load admin agent orders.");
+
+  return (data ?? []) as Array<Pick<AdminAgentOrder, "order_status">>;
+}
+
+async function loadDashboardSummaryAgents(
+  supabase: SupabaseAdminClient,
+): Promise<AdminAgent[]> {
+  const { data, error } = await supabase
+    .from("agent_profile")
+    .select("id");
+
+  if (error) throwLoadError("Unable to load admin agents.");
+
+  return (data ?? []) as AdminAgent[];
 }
 
 async function loadDashboardSummaryCustomers(

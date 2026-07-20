@@ -1,6 +1,9 @@
 ---
 import AdminCharts from "@/components/admin/AdminCharts";
+import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
+import { computeAdminOrderStatusCounts } from "@/lib/admin-dashboard/summary";
+import { formatCurrency } from "@/lib/admin-dashboard/view";
 
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 
@@ -10,41 +13,101 @@ type Props = {
 
 const { data } = Astro.props;
 const analytics = buildAdminAnalytics(data);
+const pendingCustomerBalances = analytics.pendingCustomerBalances;
+const orderCounts = computeAdminOrderStatusCounts(data.orders, data.agentOrders);
+const numberFormatter = new Intl.NumberFormat("en-PH");
 ---
 
 <section class="admin-summary-grid" aria-label="Dashboard summary">
-  <article class="admin-summary-card" data-summary-card="orders">
+  <article class="admin-summary-card admin-summary-card--brand">
+    <h2>Gross Sales</h2>
+    <p>{formatCurrency(analytics.summary.grossSales)}</p>
+    <a href="/admin/sales">Review sales</a>
+  </article>
+  <article class="admin-summary-card" data-summary-card="pendingOrderPayments">
+    <h2>Receivables</h2>
+    <p>{formatCurrency(analytics.summary.pendingOrderPayments)}</p>
+    <button
+      type="button"
+      class="admin-summary-card__link"
+      data-open-dashboard-modal="pending-payments-modal"
+      aria-haspopup="dialog"
+      aria-controls="pending-payments-modal"
+    >
+      View unpaid customers
+    </button>
+  </article>
+  <article class="admin-summary-card admin-summary-card--cluster" data-summary-card="orderCluster">
     <h2>Orders</h2>
-    <p data-summary-value>{data.summary.orders}</p>
+    <dl class="admin-summary-cluster">
+      <div class="admin-summary-cluster__item">
+        <dt>Total</dt>
+        <dd data-summary-metric="totalOrders">{numberFormatter.format(orderCounts.totalOrders)}</dd>
+      </div>
+      <div class="admin-summary-cluster__item">
+        <dt>Pending</dt>
+        <dd data-summary-metric="pendingOrders">{numberFormatter.format(orderCounts.pendingOrders)}</dd>
+      </div>
+      <div class="admin-summary-cluster__item">
+        <dt>Processing</dt>
+        <dd data-summary-metric="processingOrders">{numberFormatter.format(orderCounts.processingOrders)}</dd>
+      </div>
+    </dl>
     <a href="/admin/orders">Review orders</a>
   </article>
-  <article class="admin-summary-card" data-summary-card="inquiries">
-    <h2>Inquiries</h2>
-    <p data-summary-value>{data.summary.inquiries}</p>
-    <a href="/admin/inquiries">Manage inquiries</a>
+  <article class="admin-summary-card" data-summary-card="agents">
+    <h2>Agents</h2>
+    <p data-summary-value>{numberFormatter.format(data.summary.agents)}</p>
+    <a href="/admin/agents">Manage agents</a>
   </article>
   <article class="admin-summary-card" data-summary-card="customers">
     <h2>Customers</h2>
-    <p data-summary-value>{data.summary.customers}</p>
+    <p data-summary-value>{numberFormatter.format(data.summary.customers)}</p>
     <a href="/admin/customers">Manage customers</a>
   </article>
   <article class="admin-summary-card" data-summary-card="products">
     <h2>Products</h2>
-    <p data-summary-value>{data.summary.products}</p>
+    <p data-summary-value>{numberFormatter.format(data.summary.products)}</p>
     <a href="/admin/products">Manage products</a>
   </article>
-  <article class="admin-summary-card" data-summary-card="resellerApplications">
-    <h2>Reselller Applications</h2>
-    <p data-summary-value>{data.summary.resellerApplications}</p>
-    <a href="/admin/reseller-applications">Review applications</a>
-  </article>
 </section>
+
+<DashboardModal
+  id="pending-payments-modal"
+  title="Receivables"
+  description={`${formatCurrency(analytics.summary.pendingOrderPayments)} total unpaid balance`}
+>
+  {
+    pendingCustomerBalances.length > 0 ? (
+      <div class="pending-payments-list">
+        {pendingCustomerBalances.map((customer) => (
+          <a
+            class="pending-payments-list__row"
+            href={`/admin/customers/${customer.customerId}`}
+          >
+            <span>
+              <strong>{customer.customerName}</strong>
+              <small>
+                {customer.orderCount} unpaid {customer.orderCount === 1 ? "order" : "orders"}
+              </small>
+            </span>
+            <b>{formatCurrency(customer.unpaidBalance)}</b>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <p class="dashboard-modal__empty">No customer unpaid balances.</p>
+    )
+  }
+</DashboardModal>
 
 <section aria-label="Analytics Visualization">
   <AdminCharts client:only="react" analytics={analytics} />
 </section>
 
 <script>
+  const orderClusterMetrics = ["totalOrders", "pendingOrders", "processingOrders"] as const;
+
   function initAdminDashboardSummary() {
     const summaryCards = Array.from(
       document.querySelectorAll<HTMLElement>("[data-summary-card]"),
@@ -79,8 +142,23 @@ const analytics = buildAdminAnalytics(data);
         }
 
         const summary = await response.json() as Record<string, number>;
+        const numberFormatter = new Intl.NumberFormat("en-PH");
 
         cardByKey.forEach((card, key) => {
+          if (key === "orderCluster") {
+            orderClusterMetrics.forEach((metricKey) => {
+              const value = summary[metricKey];
+              const valueNode = card.querySelector<HTMLElement>(`[data-summary-metric="${metricKey}"]`);
+
+              if (!valueNode || typeof value !== "number" || Number.isNaN(value)) {
+                return;
+              }
+
+              valueNode.textContent = numberFormatter.format(value);
+            });
+            return;
+          }
+
           const value = summary[key];
           const valueNode = card.querySelector<HTMLElement>("[data-summary-value]");
 
@@ -88,7 +166,7 @@ const analytics = buildAdminAnalytics(data);
             return;
           }
 
-          valueNode.textContent = new Intl.NumberFormat("en-PH").format(value);
+          valueNode.textContent = numberFormatter.format(value);
         });
       } catch {
         // Keep the server-rendered values if the refresh fails.

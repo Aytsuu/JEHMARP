@@ -10,6 +10,10 @@ import {
   parseAdminInvoiceFilters,
   serializeAdminInvoiceFilters,
 } from "@/lib/admin-dashboard/invoice-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -21,10 +25,14 @@ if (!adminRoute.ready) {
 }
 
 const invoiceFilters = parseAdminInvoiceFilters(Astro.url);
-const invoiceFilterQuery = serializeAdminInvoiceFilters(invoiceFilters);
+const invoicePagination = parseAdminPagination(Astro.url);
+const invoiceFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminInvoiceFilters(invoiceFilters),
+  invoicePagination,
+);
 const [dashboardData, data] = await Promise.all([
   loadAdminDashboardData(),
-  loadAdminInvoiceManagementData(invoiceFilters),
+  loadAdminInvoiceManagementData(invoiceFilters, invoicePagination),
 ]);
 const feedback = formatAdminActionFeedback(Astro.url);
 ---

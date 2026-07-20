@@ -10,6 +10,7 @@ import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 type Props = {
   filters: ShopFilters;
   products: PublicProduct[];
+  orderableProducts: PublicProduct[];
   pagination: ProductPagination;
   orderStatus: string | null;
   orderReference: string | null;
@@ -22,6 +23,7 @@ type Props = {
 const {
   filters,
   products,
+  orderableProducts,
   pagination,
   orderStatus,
   orderReference,
@@ -45,6 +47,20 @@ function getProductImage(name: string): string {
 function getResolvedProductImage(imagePath: string | null, name: string) {
   return resolvePublicStorageUrl(imagePath) ?? getProductImage(name);
 }
+
+const orderCatalog = orderableProducts.map((product) => ({
+  id: product.id,
+  name: product.name,
+  defaultPrice: product.default_price,
+  unitLabel: product.unit_label,
+  stockStatus: product.stock_status,
+  imageUrl: getResolvedProductImage(product.image_path, product.name),
+}));
+
+const availableOrderProducts = orderableProducts.filter(
+  (product) => product.stock_status !== "out_of_stock",
+);
+const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSiteKey);
 ---
 
 <div
@@ -329,10 +345,22 @@ function getResolvedProductImage(imagePath: string | null, name: string) {
 </section>
 
 <section class="shop-guest-order-section" aria-labelledby="guest-order">
-  <h2 id="guest-order" class="page-title-brand">ORDER FORM</h2>
-  <form class="form-grid" method="post" action="/api/guest-orders">
+  <header class="shop-guest-order-section__header">
+    <h2 id="guest-order" class="page-title-brand">ORDER FORM</h2>
+    <p class="shop-guest-order-section__intro">
+      Complete your details below, add products individually, then submit for review.
+    </p>
+  </header>
+  <form class="shop-guest-order-form form-grid" method="post" action="/api/guest-orders">
     {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
-    <fieldset class="fieldset-block">
+
+    <script
+      type="application/json"
+      data-shop-order-catalog
+      set:html={JSON.stringify(orderCatalog)}
+    />
+
+    <fieldset class="shop-guest-order-form__panel">
       <legend>Customer details</legend>
       <div class="form-grid form-grid--two-column">
         <div class="field-row">
@@ -367,72 +395,153 @@ function getResolvedProductImage(imagePath: string | null, name: string) {
           <input id="email" name="email" type="email" autocomplete="email" />
         </div>
       </div>
-      <div class="field-row">
+      <div class="field-row shop-guest-order-form__address">
         <label for="address">Delivery address</label>
         <textarea
           id="address"
           name="address"
           required
-          autocomplete="street-address"></textarea>
+          autocomplete="street-address"
+          rows="4"></textarea>
       </div>
     </fieldset>
 
-    <fieldset class="fieldset-block">
+    <fieldset class="shop-guest-order-form__panel">
       <legend>Order items</legend>
+      <p class="shop-guest-order-form__items-hint">
+        Add products one at a time. You can include optional notes for each item.
+      </p>
+
       {
-        products.length > 0 ? (
-          <div class="order-items-grid">
-            {products.map((product) => (
-              <section
-                class="product-order-item"
-                aria-labelledby={`order-product-${product.id}`}
-              >
-                <h3 id={`order-product-${product.id}`}>{product.name}</h3>
-                <p>
-                  {Number(product.default_price).toFixed(2)} per{" "}
-                  {product.unit_label}
-                </p>
-                <div class="field-row">
-                  <label for={`quantity-${product.id}`}>Quantity</label>
-                  <input
-                    id={`quantity-${product.id}`}
-                    name={`quantity:${product.id}`}
-                    type="number"
-                    min="0"
-                    step="0.001"
-                  />
-                </div>
-                <div class="field-row">
-                  <label for={`details-${product.id}`}>Item details</label>
-                  <input
-                    id={`details-${product.id}`}
-                    name={`details:${product.id}`}
-                  />
-                </div>
-              </section>
-            ))}
+        availableOrderProducts.length > 0 ? (
+          <div class="shop-guest-order-form__add-item">
+            <p class="shop-guest-order-form__add-item-label">Add a product</p>
+            <div class="shop-guest-order-form__add-item-controls">
+              <div class="field-row shop-guest-order-form__product-picker">
+                <label for="shop-order-product-select">Product</label>
+                <select id="shop-order-product-select" data-shop-order-product-select>
+                  <option value="">Select a product</option>
+                  {availableOrderProducts.map((product) => (
+                    <option value={product.id}>
+                      {product.name} — PHP {Number(product.default_price).toFixed(2)} /{" "}
+                      {product.unit_label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button type="button" class="shop-guest-order-form__add-button" data-shop-order-add-item>
+                Add item
+              </button>
+            </div>
           </div>
         ) : (
-          <p>No active products are available for guest ordering.</p>
+          <p class="shop-guest-order-form__empty">
+            No active products are available for guest ordering.
+          </p>
         )
       }
+
+      <h3 class="shop-guest-order-form__lines-heading">Your items</h3>
+
+      <div class="shop-order-lines" data-shop-order-lines>
+        <p class="shop-guest-order-form__empty-state" data-shop-order-empty>
+          No items added yet.
+        </p>
+      </div>
+
+      <template data-shop-order-line-template>
+        <article class="shop-order-line" data-shop-order-line>
+          <div class="shop-order-line__media">
+            <img src="" alt="" loading="lazy" data-shop-order-line-image />
+          </div>
+          <div class="shop-order-line__body">
+            <div class="shop-order-line__header">
+              <h3 data-shop-order-line-name></h3>
+              <button
+                type="button"
+                class="shop-order-line__remove"
+                data-shop-order-remove-item
+                aria-label="Remove item"
+              >
+                Remove
+              </button>
+            </div>
+            <p class="shop-order-line__price" data-shop-order-line-price></p>
+            <div class="shop-order-line__quantity">
+              <label data-shop-order-line-quantity-label>Quantity</label>
+              <div class="shop-order-line__quantity-controls">
+                <button
+                  type="button"
+                  class="shop-order-line__qty-step"
+                  data-shop-order-qty-step="down"
+                  aria-label="Decrease quantity"
+                >
+                  -
+                </button>
+                <input
+                  type="number"
+                  min="0.001"
+                  step="0.001"
+                  inputmode="decimal"
+                  value="1"
+                  required
+                  data-shop-order-quantity
+                />
+                <button
+                  type="button"
+                  class="shop-order-line__qty-step"
+                  data-shop-order-qty-step="up"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <div class="field-row shop-order-line__details">
+              <label data-shop-order-line-details-label>Item notes (optional)</label>
+              <input
+                type="text"
+                placeholder="Cut preference, packaging, etc."
+                data-shop-order-details
+              />
+            </div>
+            <p class="shop-order-line__subtotal">
+              Line total:
+              <strong data-shop-order-line-total>PHP 0.00</strong>
+            </p>
+          </div>
+        </article>
+      </template>
+
+      <div class="shop-guest-order-form__total" aria-live="polite">
+        <span class="shop-guest-order-form__total-label">Order total</span>
+        <strong class="shop-guest-order-form__total-value" data-shop-order-total-value>
+          PHP 0.00
+        </strong>
+      </div>
     </fieldset>
 
-    <div class="turnstile-container">
-      {
-        turnstileSiteKey ? (
-          <div class="cf-turnstile" data-sitekey={turnstileSiteKey} />
-        ) : (
-          <p class="error-message">Guest order verification is not configured.</p>
-        )
-      }
-    </div>
+    <div class="shop-guest-order-form__footer">
+      <div class="turnstile-container shop-guest-order-form__turnstile">
+        {
+          turnstileSiteKey ? (
+            <div class="cf-turnstile" data-sitekey={turnstileSiteKey} />
+          ) : (
+            <p class="error-message">Guest order verification is not configured.</p>
+          )
+        }
+      </div>
 
-    <div class="button-row">
-      <button
-        type="submit"
-        disabled={products.length === 0 || !turnstileSiteKey}>Submit order</button
-      >
+      <div class="button-row shop-guest-order-form__submit">
+        <button
+          type="submit"
+          disabled={!canSubmitOrder}
+          data-shop-order-submit
+          data-shop-order-submit-locked={!canSubmitOrder ? "true" : undefined}
+        >
+          Submit order
+        </button>
+      </div>
     </div>
   </form>
 </section>
@@ -449,6 +558,8 @@ function getResolvedProductImage(imagePath: string | null, name: string) {
 }
 
 <script>
+  import { initShopGuestOrderForm } from "@/lib/client/shop-guest-order-form";
+
   function initPriceSliders() {
     const minInput = document.getElementById(
       "minPrice",
@@ -480,13 +591,18 @@ function getResolvedProductImage(imagePath: string | null, name: string) {
     }
   }
 
-  document.addEventListener("DOMContentLoaded", initPriceSliders);
-  document.addEventListener("astro:after-swap", initPriceSliders);
+  function initShopPageScripts() {
+    initPriceSliders();
+    initShopGuestOrderForm();
+  }
+
+  document.addEventListener("DOMContentLoaded", initShopPageScripts);
+  document.addEventListener("astro:after-swap", initShopPageScripts);
 
   if (
     document.readyState === "complete" ||
     document.readyState === "interactive"
   ) {
-    initPriceSliders();
+    initShopPageScripts();
   }
 </script>

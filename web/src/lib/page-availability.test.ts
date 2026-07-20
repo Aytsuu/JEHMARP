@@ -40,7 +40,7 @@ describe("getDashboardPageAvailability", () => {
 
   it("inherits status for child detail pages from the nearest sidebar route", () => {
     expect(
-      getDashboardPageAvailability("/admin/orders/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb", {
+      getDashboardPageAvailability("/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb", {
         PAGE_STATUS_ADMIN_ORDERS: "not ready",
       }),
     ).toMatchObject({
@@ -68,7 +68,7 @@ describe("getDashboardRouteStatuses", () => {
       getDashboardRouteStatuses({
         PAGE_STATUS_ADMIN_DASHBOARD: "ready",
         PAGE_STATUS_ADMIN_ORDERS: "maintenance",
-        PAGE_STATUS_AGENT_PAYMENTS: "not_ready",
+        PAGE_STATUS_AGENT_PROFILE: "not_ready",
       }),
     ).toMatchObject({
       "/admin": {
@@ -79,9 +79,9 @@ describe("getDashboardRouteStatuses", () => {
         status: "maintenance",
         envKey: "PAGE_STATUS_ADMIN_ORDERS",
       },
-      "/agent/payments": {
+      "/agent/profile": {
         status: "not_ready",
-        envKey: "PAGE_STATUS_AGENT_PAYMENTS",
+        envKey: "PAGE_STATUS_AGENT_PROFILE",
       },
     });
   });

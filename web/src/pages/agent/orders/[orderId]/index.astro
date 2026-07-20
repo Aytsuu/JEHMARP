@@ -1,7 +1,12 @@
 ---
-import AgentPageFrame from "@/components/agent/AgentPageFrame.astro";
+import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
-import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
+import {
+  formatAgentActionFeedback,
+  handleAgentDashboardAction,
+} from "@/lib/agent-dashboard/actions";
 import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
 import {
@@ -25,6 +30,19 @@ if (!agentRoute.ready) {
 }
 
 const { orderId } = Astro.params;
+
+if (!orderId) {
+  return Astro.redirect("/agent/orders", 302);
+}
+
+if (Astro.request.method === "POST") {
+  return handleAgentDashboardAction(
+    Astro,
+    agentRoute.userId,
+    `/agent/orders/${orderId}`,
+  );
+}
+
 const data = await loadAgentDashboardData(Astro, agentRoute.userId);
 const order = data.orders.find((o) => o.id === orderId);
 
@@ -33,9 +51,23 @@ if (!order) {
 }
 
 const feedback = formatAgentActionFeedback(Astro.url);
+const agentReceivedPayments = order.agent_received_payment ?? [];
+const pendingAgentReceivedPayments = agentReceivedPayments.filter(
+  (payment) => payment.status === "pending_admin_confirmation",
+);
+const pendingAgentReceivedTotal = pendingAgentReceivedPayments.reduce(
+  (total, payment) => total + payment.amount,
+  0,
+);
+const remainingRecordableBalance = Math.max(
+  orderBalance(order) - pendingAgentReceivedTotal,
+  0,
+);
+const canRecordAgentPayment = remainingRecordableBalance > 0;
+const todayDate = new Date().toISOString().slice(0, 10);
 ---
 
-<AgentPageFrame
+<AgentRecordPageLayout
   title={`Order Details #${order.id.slice(0, 8)} - JEHMARP`}
   description="Agent order detail view, commissions, and PDFs."
   heading="Order Details"
@@ -45,91 +77,97 @@ const feedback = formatAgentActionFeedback(Astro.url);
   backUrl="/agent/orders"
   backLabel="Back to orders"
 >
-  <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 100%;">
-    <!-- 1. Order Information -->
+  <div class="dashboard-detail-stack">
     <div class="content-section">
-      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Order Information</h3>
+      <h3>Order Information</h3>
       
-      <div class="order-info-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Customer</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+      <div class="dashboard-detail-grid dashboard-detail-grid--compact">
+        <div class="detail-field">
+          <span class="detail-field-label">Customer</span>
+          <div class="detail-field-value">
             {order.customer ? fullName(order.customer) : "Guest"}
           </div>
         </div>
         
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Source</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+        <div class="detail-field">
+          <span class="detail-field-label">Source</span>
+          <div class="detail-field-value">
             {formatOrderSource(order.source)}
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Order Status</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {autoCapitalize(order.order_status)}
+        <div class="detail-field">
+          <span class="detail-field-label">Order Status</span>
+          <div class="detail-field-value">
+            <StatusBadge kind="order" status={order.order_status} label={autoCapitalize(order.order_status)} />
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Payment Status</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
-            {autoCapitalize(order.payment_status)}
+        <div class="detail-field">
+          <span class="detail-field-label">Payment Status</span>
+          <div class="detail-field-value">
+            <StatusBadge kind="payment" status={order.payment_status} label={autoCapitalize(order.payment_status)} />
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Order Total</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+        <div class="detail-field">
+          <span class="detail-field-label">Order Total</span>
+          <div class="detail-field-value">
             {formatCurrency(orderTotal(order, "partial_quantity"))}
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Invoice Total</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+        <div class="detail-field">
+          <span class="detail-field-label">Invoice Total</span>
+          <div class="detail-field-value">
             {formatCurrency(orderTotal(order, "final_quantity"))}
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Paid</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+        <div class="detail-field">
+          <span class="detail-field-label">Paid</span>
+          <div class="detail-field-value">
             {formatCurrency(orderPaymentTotal(order))}
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Balance</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+        <div class="detail-field">
+          <span class="detail-field-label">Agent Received</span>
+          <div class="detail-field-value">
+            {formatCurrency(pendingAgentReceivedTotal)}
+          </div>
+        </div>
+
+        <div class="detail-field">
+          <span class="detail-field-label">Balance</span>
+          <div class="detail-field-value">
             {formatCurrency(orderBalance(order))}
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Expected Commission</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+        <div class="detail-field">
+          <span class="detail-field-label">Expected Commission</span>
+          <div class="detail-field-value">
             {formatCurrency(orderExpectedCommission(order))}
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Earned Commission</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+        <div class="detail-field">
+          <span class="detail-field-label">Earned Commission</span>
+          <div class="detail-field-value">
             {formatCurrency(orderEarnedCommission(order))}
           </div>
         </div>
 
-        <div class="detail-field" style="display: flex; flex-direction: column; gap: 0.25rem; background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem; padding: 0.5rem 0.75rem;">
-          <span class="detail-field-label" style="font-size: 0.75rem; font-weight: 700; color: var(--color-brand-muted-black); text-transform: uppercase; letter-spacing: 0.05em;">Approved At</span>
-          <div class="detail-field-value" style="font-size: 1rem; color: #111827; font-weight: 500;">
+        <div class="detail-field">
+          <span class="detail-field-label">Approved At</span>
+          <div class="detail-field-value">
             {formatDate(order.approved_at)}
           </div>
         </div>
       </div>
 
-      <div class="pdf-links-container" style="margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center; border-top: 1px solid #e5e7eb; padding-top: 1.25rem; flex-wrap: wrap;">
+      <div class="pdf-links-container">
         <OrderPdfLinks
           orderId={order.id}
           basePath="/agent/orders"
@@ -138,48 +176,132 @@ const feedback = formatAgentActionFeedback(Astro.url);
       </div>
     </div>
 
-    <!-- 2. Order Items -->
     <div class="content-section">
-      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Order Items</h3>
-      <div class="table-wrap">
-        <table>
+      <h3>Order Items</h3>
+      <DashboardTableBoard>
+        <table class="dashboard-table">
           <thead>
             <tr>
-              <th scope="col" style="width: 40%; padding: 0.75rem;">Product</th>
-              <th scope="col" style="width: 30%; padding: 0.75rem;">Quantity</th>
-              <th scope="col" style="width: 30%; padding: 0.75rem;">Commission</th>
+              <th scope="col">Product</th>
+              <th scope="col">Quantity</th>
+              <th scope="col">Commission</th>
             </tr>
           </thead>
           <tbody>
             {order.customer_order_item.map((item) => (
               <tr>
-                <td style="vertical-align: middle;">
+                <td>
                   {item.product?.name ?? "Missing product"}<br />
-                  <span style="font-size: 0.85rem; color: var(--color-brand-muted-black); font-weight: 500;">
+                  <span class="dashboard-table__muted-line">
                     {formatCurrency(item.unit_price)} {item.price_type}
                   </span>
                 </td>
-                <td style="vertical-align: middle;">
+                <td>
                   {item.partial_quantity}
                 </td>
-                <td style="vertical-align: middle;">{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_paid ? "Paid" : "Unpaid"}</td>
+                <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_paid ? "Paid" : "Unpaid"}</td>
               </tr>
             ))}
           </tbody>
         </table>
-      </div>
+      </DashboardTableBoard>
     </div>
 
-    <!-- 3. Payment History (Read-only) -->
     <div class="content-section">
-      <h3 style="margin-top: 0; margin-bottom: 1.5rem;">Payment History</h3>
+      <h3>Payment History</h3>
+      <form method="post" class="agent-payment-form">
+        <input type="hidden" name="action" value="record-agent-payment" />
+        <input type="hidden" name="orderId" value={order.id} />
+        <div class="agent-payment-form__grid">
+          <label>
+            <span>Amount</span>
+            <input
+              type="number"
+              name="amount"
+              min="0.01"
+              step="0.01"
+              max={canRecordAgentPayment ? remainingRecordableBalance : undefined}
+              value={canRecordAgentPayment ? remainingRecordableBalance.toFixed(2) : undefined}
+              disabled={!canRecordAgentPayment}
+              required
+            />
+          </label>
+          <label>
+            <span>Method</span>
+            <select
+              name="paymentMethod"
+              disabled={!canRecordAgentPayment}
+              required
+            >
+              <option value="">Select method</option>
+              <option value="Cash">Cash</option>
+              <option value="Check">Check</option>
+            </select>
+          </label>
+          <label>
+            <span>Payment Terms</span>
+            <select
+              name="paymentTerms"
+              disabled={!canRecordAgentPayment}
+              required
+            >
+              <option value="">Select payment terms</option>
+              <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Gcash">Gcash</option>
+            </select>
+          </label>
+          <label>
+            <span>Date</span>
+            <input
+              type="date"
+              name="paymentDate"
+              value={todayDate}
+              disabled={!canRecordAgentPayment}
+              required
+            />
+          </label>
+          <label>
+            <span>Reference</span>
+            <input
+              type="text"
+              name="referenceNumber"
+              disabled={!canRecordAgentPayment}
+            />
+          </label>
+        </div>
+        <label class="agent-payment-form__notes">
+          <span>Notes</span>
+          <textarea
+            name="notes"
+            rows="2"
+            disabled={!canRecordAgentPayment}
+          ></textarea>
+        </label>
+        <button type="submit" disabled={!canRecordAgentPayment}>
+          Submit for admin confirmation
+        </button>
+      </form>
+      {pendingAgentReceivedPayments.length > 0 && (
+        <ul class="compact-list dashboard-payment-list agent-received-list">
+          {pendingAgentReceivedPayments.map((payment) => (
+            <li>
+              <span>
+                {payment.payment_method} - {payment.payment_terms} on {formatDate(payment.payment_date)}
+                {" - pending admin confirmation"}
+              </span>
+              <strong>{formatCurrency(payment.amount)}</strong>
+            </li>
+          ))}
+        </ul>
+      )}
       {order.payment.length === 0 ? (
         <p class="empty-state">No payments recorded.</p>
       ) : (
-        <ul class="compact-list" style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; margin: 0;">
+        <ul class="compact-list dashboard-payment-list">
           {order.payment.map((payment) => (
-            <li style="padding: 0.75rem 1rem; background-color: var(--color-brand-cream); border-radius: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
-              <span>{payment.payment_method} on {formatDate(payment.payment_date)}</span>
+            <li>
+              <span>{payment.payment_method} - {payment.payment_terms} on {formatDate(payment.payment_date)}</span>
               <strong>{formatCurrency(payment.amount)}</strong>
             </li>
           ))}
@@ -187,33 +309,84 @@ const feedback = formatAgentActionFeedback(Astro.url);
       )}
     </div>
   </div>
-</AgentPageFrame>
+</AgentRecordPageLayout>
 
 <style>
-  /* Remove shadows on cards, add matching gray border and border-radius */
-  .content-section {
-    box-shadow: none !important;
-    border: 1px solid #d1d5db !important;
-    border-radius: 0.75rem !important;
+  .agent-payment-form {
+    display: grid;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid rgba(17, 24, 39, 0.1);
+    border-radius: 0.9rem;
+    background: #f9fafb;
   }
-  
-  /* PDF Links aesthetics */
-  .pdf-links-container a {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.5rem 1rem;
-    border: 1px solid rgba(102, 24, 24, 0.15);
-    border-radius: 0.375rem;
-    font-size: 0.85rem;
-    font-weight: 600;
-    text-decoration: none;
-    color: var(--color-brand-muted-black);
-    background-color: #ffffff;
-    transition: all 0.2s ease;
+
+  .agent-payment-form__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.85rem;
   }
-  .pdf-links-container a:hover {
-    background-color: #f3f4f6;
-    border-color: var(--color-brand-muted-black);
+
+  .agent-payment-form label {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .agent-payment-form span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+
+  .agent-payment-form input,
+  .agent-payment-form textarea {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid rgba(17, 24, 39, 0.14);
+    border-radius: 0.55rem;
+    background: #ffffff;
     color: #111827;
+    padding: 0.6rem 0.75rem;
+    font: inherit;
+  }
+
+  .agent-payment-form textarea {
+    resize: vertical;
+  }
+
+  .agent-payment-form button {
+    justify-self: end;
+    min-height: 2.45rem;
+    border: 0;
+    border-radius: 0.55rem;
+    background: #111827;
+    color: #ffffff;
+    padding: 0.5rem 0.85rem;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .agent-payment-form :disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .agent-received-list {
+    margin-bottom: 1rem;
+  }
+
+  @media (max-width: 720px) {
+    .agent-payment-form__grid {
+      grid-template-columns: 1fr;
+    }
+
+    .agent-payment-form button {
+      justify-self: stretch;
+    }
   }
 </style>

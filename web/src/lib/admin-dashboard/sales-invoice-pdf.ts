@@ -3,9 +3,9 @@ import {
   buildSalesInvoiceLayout,
   getBrandLines,
 } from "@/lib/order-documents/layout";
+import { buildPdfDocument, pdfPageWidth } from "@/lib/order-documents/pdf-document";
 
-const pageWidth = 595;
-const pageHeight = 842;
+const pageWidth = pdfPageWidth;
 const marginX = 40;
 const tableRowsPerPage = 10;
 
@@ -20,13 +20,26 @@ type SalesInvoicePage = {
   pageCount: number;
 };
 
-export function buildSalesInvoicePdf(order: DocumentOrder): Uint8Array {
+export function buildSalesInvoiceContentStreams(order: DocumentOrder): string[] {
   const pages = chunkOrderItems(order.customer_order_item);
-  const contentStreams = pages.map((items, index) => buildSalesInvoicePageContent(order, {
+
+  return pages.map((items, index) => buildSalesInvoicePageContent(order, {
     items,
     pageNumber: index + 1,
     pageCount: pages.length,
   }));
+}
+
+export function buildSalesInvoicePdf(order: DocumentOrder): Uint8Array {
+  return buildPdfDocument(buildSalesInvoiceContentStreams(order));
+}
+
+export function buildBulkSalesInvoicePdf(orders: DocumentOrder[]): Uint8Array {
+  const contentStreams = orders.flatMap((order) => buildSalesInvoiceContentStreams(order));
+
+  if (contentStreams.length === 0) {
+    throw new Error("No sales invoice pages to generate.");
+  }
 
   return buildPdfDocument(contentStreams);
 }
@@ -47,7 +60,7 @@ function buildSalesInvoicePageContent(order: DocumentOrder, page: SalesInvoicePa
   drawInvoiceFields(commands, order);
   const tableBottomY = drawItemsTable(commands, page.items);
   drawInvoiceTotal(commands, order, tableBottomY);
-  drawPaymentAndIssuer(commands);
+  drawPaymentAndIssuer(commands, order);
 
   return commands.join("\n");
 }
@@ -134,69 +147,20 @@ function drawInvoiceTotal(commands: string[], order: DocumentOrder, tableBottomY
   drawLine(commands, 430, totalY - 4, 555, totalY - 4);
 }
 
-function drawPaymentAndIssuer(commands: string[]) {
-  const layout = buildSalesInvoiceLayout({
-    id: "",
-    created_at: "",
-    customer: null,
-    agent: null,
-    customer_order_item: [],
-    invoice: [],
-  });
+function drawPaymentAndIssuer(commands: string[], order: DocumentOrder) {
+  const layout = buildSalesInvoiceLayout(order);
 
   addText(commands, 40, 348, "Delivery Preference", { size: 10 });
   addText(commands, 40, 330, layout.paymentLines[0], { size: 9 });
-  addText(commands, 40, 312, layout.paymentLines[1], { size: 9 });
+  addTextWithVectorCheckmarks(commands, 40, 312, layout.paymentLines[1], { size: 9 });
 
   addText(commands, 40, 277, layout.paymentHeading, { size: 10 });
-  addText(commands, 40, 259, layout.paymentLines[2], { size: 9 });
+  addTextWithVectorCheckmarks(commands, 40, 259, layout.paymentLines[2], { size: 9 });
 
   addText(commands, 405, 184, layout.issuerHeading, { size: 10 });
   addText(commands, 340, 156, layout.issuerName, { size: 10 });
   drawLine(commands, 330, 152, 555, 152);
   addText(commands, 360, 136, layout.issuerSubline, { size: 9 });
-}
-
-function buildPdfDocument(contentStreams: string[]) {
-  const fontObjectId = 3;
-  const pageObjectIds = contentStreams.map((_, index) => 4 + index * 2);
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    `<< /Type /Pages /Kids [${pageObjectIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${contentStreams.length} >>`,
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    ...contentStreams.flatMap((content, index) => {
-      const pageObjectId = pageObjectIds[index];
-      const contentObjectId = pageObjectId + 1;
-      const contentLength = new TextEncoder().encode(content).length;
-
-      return [
-        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] /Resources << /Font << /F1 ${fontObjectId} 0 R >> >> /Contents ${contentObjectId} 0 R >>`,
-        `<< /Length ${contentLength} >>\nstream\n${content}\nendstream`,
-      ];
-    }),
-  ];
-
-  return encodePdfObjects(objects);
-}
-
-function encodePdfObjects(objects: string[]) {
-  const chunks = ["%PDF-1.4\n"];
-  const offsets = [0];
-
-  objects.forEach((object, index) => {
-    offsets.push(byteLength(chunks.join("")));
-    chunks.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
-  });
-
-  const xrefOffset = byteLength(chunks.join(""));
-  chunks.push(`xref\n0 ${objects.length + 1}\n`);
-  chunks.push("0000000000 65535 f \n");
-  offsets.slice(1).forEach((offset) => {
-    chunks.push(`${String(offset).padStart(10, "0")} 00000 n \n`);
-  });
-  chunks.push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
-
-  return new TextEncoder().encode(chunks.join(""));
 }
 
 function addText(commands: string[], x: number, y: number, value: string, options: TextOptions = {}) {
@@ -205,6 +169,39 @@ function addText(commands: string[], x: number, y: number, value: string, option
   const adjustedX = getAlignedX(x, text, size, options.align ?? "left");
 
   commands.push(`BT /F1 ${size} Tf 1 0 0 1 ${formatNumber(adjustedX)} ${formatNumber(y)} Tm (${escapePdfText(text)}) Tj ET`);
+}
+
+function addTextWithVectorCheckmarks(
+  commands: string[],
+  x: number,
+  y: number,
+  value: string,
+  options: TextOptions = {},
+) {
+  const size = options.size ?? 10;
+  const displayText = value.replaceAll("✓", " ");
+  const sanitizedText = sanitizePdfText(displayText);
+  const adjustedX = getAlignedX(x, sanitizedText, size, options.align ?? "left");
+
+  addText(commands, x, y, displayText, options);
+
+  Array.from(value.matchAll(/✓/g)).forEach((match) => {
+    if (typeof match.index !== "number") return;
+    drawCheckmark(commands, adjustedX + match.index * size * 0.52, y, size);
+  });
+}
+
+function drawCheckmark(commands: string[], x: number, y: number, size: number) {
+  const startX = x - size * 0.08;
+  const startY = y + size * 0.25;
+  const middleX = x + size * 0.18;
+  const middleY = y - size * 0.05;
+  const endX = x + size * 0.7;
+  const endY = y + size * 0.55;
+
+  commands.push(
+    `${formatNumber(startX)} ${formatNumber(startY)} m ${formatNumber(middleX)} ${formatNumber(middleY)} l ${formatNumber(endX)} ${formatNumber(endY)} l S`,
+  );
 }
 
 function getAlignedX(x: number, value: string, size: number, align: "left" | "center" | "right") {
@@ -255,8 +252,4 @@ function escapePdfText(value: string) {
 
 function formatNumber(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
-}
-
-function byteLength(value: string) {
-  return new TextEncoder().encode(value).length;
 }

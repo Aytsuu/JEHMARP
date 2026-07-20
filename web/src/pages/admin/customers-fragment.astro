@@ -5,6 +5,10 @@ import {
   parseAdminCustomerFilters,
   serializeAdminCustomerFilters,
 } from "@/lib/admin-dashboard/customer-filters";
+import {
+  mergeAdminPaginationQuery,
+  parseAdminPagination,
+} from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 
 export const prerender = false;
@@ -16,8 +20,12 @@ if (!adminRoute.ready) {
 }
 
 const customerFilters = parseAdminCustomerFilters(Astro.url);
-const customerFilterQuery = serializeAdminCustomerFilters(customerFilters);
-const data = await loadAdminCustomerManagementData(customerFilters);
+const customerPagination = parseAdminPagination(Astro.url);
+const customerFilterQuery = mergeAdminPaginationQuery(
+  serializeAdminCustomerFilters(customerFilters),
+  customerPagination,
+);
+const data = await loadAdminCustomerManagementData(customerFilters, customerPagination);
 ---
 
 <AdminCustomerManagement

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  agentOrderPaymentStatus,
   buildAgentPaymentSummary,
   buildAgentSummary,
   formatCurrency,
@@ -11,13 +12,29 @@ import {
   orderPaymentTotal,
   orderTotal,
 } from "./view";
-import type { AgentDashboardData, AgentOrder } from "./data";
+import type { AgentDashboardData, AgentOrder, AgentProfile } from "./data";
 
 const agentId = "64568f81-108b-42bd-b926-7e825dad67c6";
+
+function createAgentProfile(overrides: Partial<AgentProfile> = {}): AgentProfile {
+  return {
+    id: agentId,
+    user_id: "22222222-2222-2222-2222-222222222222",
+    employee_id: "EMP-001",
+    first_name: "NMC",
+    last_name: "Agent",
+    display_name: "NMC Agent",
+    contact: "09170000001",
+    email: "agent@example.test",
+    status: "active",
+    ...overrides,
+  };
+}
 
 function createOrder(overrides: Partial<AgentOrder> = {}): AgentOrder {
   return {
     id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    agent_order_id: null,
     customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
     agent_id: agentId,
     source: "agent_submitted",
@@ -76,6 +93,7 @@ function createOrder(overrides: Partial<AgentOrder> = {}): AgentOrder {
         id: "f31976e6-b478-41b6-9b85-9b830154f962",
         amount: 187.5,
         payment_method: "cash",
+        payment_terms: "Cash on Delivery (COD)",
         payment_date: "2026-07-03",
         reference_number: null,
         notes: null,
@@ -101,12 +119,7 @@ describe("agent dashboard calculations", () => {
   it("counts monthly and daily earnings for the current agent only", () => {
     const now = new Date("2026-07-03T10:00:00.000Z");
     const data = {
-      agent: {
-        id: agentId,
-        user_id: "22222222-2222-2222-2222-222222222222",
-        display_name: "NMC Agent",
-        status: "active",
-      },
+      agent: createAgentProfile(),
       customers: [
         {
           id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
@@ -121,6 +134,10 @@ describe("agent dashboard calculations", () => {
           updated_at: "2026-07-01T00:00:00.000Z",
         },
       ],
+      agentOrders: [
+        { id: "11111111-1111-4111-8111-111111111111" },
+        { id: "22222222-2222-4222-8222-222222222222" },
+      ],
       orders: [
         createOrder(),
         createOrder({
@@ -134,7 +151,7 @@ describe("agent dashboard calculations", () => {
           created_at: "2026-06-30T00:00:00.000Z",
         }),
       ],
-    } as Pick<AgentDashboardData, "agent" | "customers" | "orders">;
+    } as Pick<AgentDashboardData, "agent" | "customers" | "agentOrders" | "orders">;
 
     expect(buildAgentSummary(data, now)).toEqual({
       assignedCustomers: 1,
@@ -149,13 +166,9 @@ describe("agent dashboard calculations", () => {
   it("keeps closed unpaid orders in aggregate outstanding balance", () => {
     const now = new Date("2026-07-03T10:00:00.000Z");
     const data = {
-      agent: {
-        id: agentId,
-        user_id: "22222222-2222-2222-2222-222222222222",
-        display_name: "NMC Agent",
-        status: "active",
-      },
+      agent: createAgentProfile(),
       customers: [],
+      agentOrders: [],
       orders: [
         createOrder(),
         createOrder({
@@ -165,7 +178,7 @@ describe("agent dashboard calculations", () => {
           payment: [],
         }),
       ],
-    } as Pick<AgentDashboardData, "agent" | "customers" | "orders">;
+    } as Pick<AgentDashboardData, "agent" | "customers" | "agentOrders" | "orders">;
 
     expect(buildAgentSummary(data, now).outstandingBalance).toBe(612.5);
   });
@@ -183,6 +196,34 @@ describe("agent dashboard calculations", () => {
       paid: 1,
       refunded: 1,
     });
+  });
+
+  it("aggregates agent order payment status from linked customer orders", () => {
+    expect(agentOrderPaymentStatus({ customer_order: [] })).toBe("unpaid");
+    expect(agentOrderPaymentStatus({
+      customer_order: [
+        createOrder({ payment_status: "unpaid" }),
+        createOrder({ payment_status: "unpaid" }),
+      ],
+    })).toBe("unpaid");
+    expect(agentOrderPaymentStatus({
+      customer_order: [
+        createOrder({ payment_status: "unpaid" }),
+        createOrder({ payment_status: "partial" }),
+      ],
+    })).toBe("partial");
+    expect(agentOrderPaymentStatus({
+      customer_order: [
+        createOrder({ payment_status: "paid" }),
+        createOrder({ payment_status: "unpaid" }),
+      ],
+    })).toBe("partial");
+    expect(agentOrderPaymentStatus({
+      customer_order: [
+        createOrder({ payment_status: "paid" }),
+        createOrder({ payment_status: "paid" }),
+      ],
+    })).toBe("paid");
   });
 
   it("formats payment statuses for balance tracking tables", () => {
