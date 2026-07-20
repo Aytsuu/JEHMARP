@@ -165,6 +165,7 @@ select public.submit_agent_received_payment_distribution(
   ],
   3500,
   'Cash',
+  'Cash on Delivery (COD)',
   '2026-07-18'::date,
   'PHASE8-3500',
   'Phase 8 distribution test'
@@ -232,6 +233,7 @@ begin
       ],
       10000,
       'Cash',
+      'Cash on Delivery (COD)',
       '2026-07-18'::date
     );
   exception

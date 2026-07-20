@@ -79,9 +79,7 @@ export function parseShopFilters(url: URL): ShopFilters {
   };
 }
 
-export async function listOrderablePublicProducts(
-  _context: Pick<APIContext, "cookies" | "request">,
-): Promise<PublicProduct[]> {
+export async function listOrderablePublicProducts(): Promise<PublicProduct[]> {
   const supabase = createSupabasePublicClient();
 
   const { data, error } = await supabase

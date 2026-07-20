@@ -508,20 +508,6 @@ function optionalString(formData: FormData, key: string) {
   return value.length > 0 ? value : null;
 }
 
-function optionalUuid(formData: FormData, key: string) {
-  const value = optionalString(formData, key);
-
-  return value ? uuidSchema.parse(value) : null;
-}
-
-function optionalEmail(formData: FormData, key: string) {
-  const value = optionalString(formData, key);
-
-  if (!value) return null;
-
-  return z.email().parse(value);
-}
-
 function normalizeFormDataEntry(value: FormDataEntryValue | undefined) {
   return typeof value === "string" ? value.trim() : "";
 }

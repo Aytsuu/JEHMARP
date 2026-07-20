@@ -2496,14 +2496,6 @@ function parseOrderItems(formData: FormData) {
   return parsedItems;
 }
 
-function parseAttachAgentOrderItems(formData: FormData) {
-  return parseOrderItems(formData).map((item) => ({
-    productId: item.product_id,
-    quantity: item.partial_quantity,
-    addDetails: item.add_details,
-  }));
-}
-
 function parseCreateAgentPayload(
   formData: FormData,
 ): Extract<AdminAction, { type: "create-agent" }>["payload"] {

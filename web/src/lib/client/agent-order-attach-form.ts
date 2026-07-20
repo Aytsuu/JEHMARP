@@ -84,12 +84,18 @@ export function initAgentOrderAttachForm() {
     return;
   }
 
+  const attachForm = form;
+  const entriesContainer = customerEntries;
+  const entryTemplate = customerEntryTemplate;
+  const optionTemplate = customerOptionTemplate;
+  const itemTemplate = orderItemTemplate;
+
   const entryControllers: CustomerEntryController[] = [];
 
   function updateTotal() {
     if (!totalValue) return;
 
-    const items = Array.from(form.querySelectorAll<HTMLElement>("[data-order-item-row]")).map((row) => {
+    const items = Array.from(attachForm.querySelectorAll<HTMLElement>("[data-order-item-row]")).map((row) => {
       const select = row.querySelector<HTMLSelectElement>("[data-order-product-select]");
       const quantityInput = row.querySelector<HTMLInputElement>("[data-order-quantity]");
       const selectedOption = select?.selectedOptions?.[0];
@@ -130,7 +136,7 @@ export function initAgentOrderAttachForm() {
 
     const picker = initOrderCustomerPicker({
       scope: entry,
-      customerOptionTemplate,
+      customerOptionTemplate: optionTemplate,
       newCustomerFields,
       onChange: () => {
         refreshTitle();
@@ -149,7 +155,7 @@ export function initAgentOrderAttachForm() {
     });
 
     addOrderItemButton?.addEventListener("click", () => {
-      const templateItem = orderItemTemplate.content.firstElementChild;
+      const templateItem = itemTemplate.content.firstElementChild;
       if (!orderItems || !templateItem) return;
       const clonedItem = templateItem.cloneNode(true);
       orderItems.append(clonedItem);
@@ -204,7 +210,7 @@ export function initAgentOrderAttachForm() {
   }
 
   function updateRemoveCustomerButtons() {
-    const entries = customerEntries.querySelectorAll<HTMLElement>("[data-customer-entry]");
+    const entries = entriesContainer.querySelectorAll<HTMLElement>("[data-customer-entry]");
     const showRemove = entries.length > 1;
     entries.forEach((entry) => {
       const removeButton = entry.querySelector<HTMLButtonElement>("[data-remove-customer-entry]");
@@ -215,18 +221,18 @@ export function initAgentOrderAttachForm() {
   }
 
   function addCustomerEntry(open = true) {
-    const templateEntry = customerEntryTemplate.content.firstElementChild;
+    const templateEntry = entryTemplate.content.firstElementChild;
     if (!templateEntry) return;
     const clonedEntry = templateEntry.cloneNode(true);
     if (!(clonedEntry instanceof HTMLElement)) return;
-    customerEntries.append(clonedEntry);
+    entriesContainer.append(clonedEntry);
     if (clonedEntry instanceof HTMLDetailsElement && open) {
       clonedEntry.open = true;
     }
     registerCustomerEntry(clonedEntry);
   }
 
-  customerEntries.querySelectorAll<HTMLElement>("[data-customer-entry]").forEach((entry) => {
+  entriesContainer.querySelectorAll<HTMLElement>("[data-customer-entry]").forEach((entry) => {
     registerCustomerEntry(entry);
   });
 
@@ -234,7 +240,7 @@ export function initAgentOrderAttachForm() {
     addCustomerEntry(true);
   });
 
-  customerEntries.addEventListener("click", (event) => {
+  entriesContainer.addEventListener("click", (event) => {
     const target = event.target;
     const removeButton = target instanceof HTMLElement
       ? target.closest<HTMLButtonElement>("[data-remove-customer-entry]")
@@ -247,7 +253,7 @@ export function initAgentOrderAttachForm() {
     const entry = removeButton.closest<HTMLElement>("[data-customer-entry]");
     if (!entry) return;
 
-    const remainingEntries = customerEntries.querySelectorAll("[data-customer-entry]").length;
+    const remainingEntries = entriesContainer.querySelectorAll("[data-customer-entry]").length;
     if (remainingEntries <= 1) return;
 
     const controllerIndex = entryControllers.findIndex((controller) => controller.root === entry);
@@ -265,10 +271,10 @@ export function initAgentOrderAttachForm() {
     entryControllers.forEach((controller) => {
       controller.picker.refresh();
     });
-    revealInvalidFields(form);
+    revealInvalidFields(attachForm);
 
     const entries = Array.from(
-      customerEntries.querySelectorAll<HTMLElement>("[data-customer-entry]"),
+      entriesContainer.querySelectorAll<HTMLElement>("[data-customer-entry]"),
     ).map((entry) => serializeCustomerEntry(entry));
 
     if (attachEntriesInput) {
@@ -276,11 +282,11 @@ export function initAgentOrderAttachForm() {
     }
   }
 
-  form.addEventListener("invalid", () => {
-    revealInvalidFields(form);
+  attachForm.addEventListener("invalid", () => {
+    revealInvalidFields(attachForm);
   }, true);
 
-  form.addEventListener("submit", () => {
+  attachForm.addEventListener("submit", () => {
     prepareFormForSubmit();
   });
 

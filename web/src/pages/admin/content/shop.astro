@@ -24,7 +24,7 @@ const shopPath = `${ADMIN_CONTENT_PREVIEW_ROOT}/shop`;
 const filters = parseShopFilters(Astro.url);
 const [{ products, pagination }, orderableProducts] = await Promise.all([
   listPublicProducts(Astro, filters),
-  listOrderablePublicProducts(Astro),
+  listOrderablePublicProducts(),
 ]);
 const orderStatus = Astro.url.searchParams.get("order");
 const orderReference = Astro.url.searchParams.get("reference");

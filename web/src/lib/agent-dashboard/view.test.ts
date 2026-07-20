@@ -12,9 +12,24 @@ import {
   orderPaymentTotal,
   orderTotal,
 } from "./view";
-import type { AgentDashboardData, AgentOrder } from "./data";
+import type { AgentDashboardData, AgentOrder, AgentProfile } from "./data";
 
 const agentId = "64568f81-108b-42bd-b926-7e825dad67c6";
+
+function createAgentProfile(overrides: Partial<AgentProfile> = {}): AgentProfile {
+  return {
+    id: agentId,
+    user_id: "22222222-2222-2222-2222-222222222222",
+    employee_id: "EMP-001",
+    first_name: "NMC",
+    last_name: "Agent",
+    display_name: "NMC Agent",
+    contact: "09170000001",
+    email: "agent@example.test",
+    status: "active",
+    ...overrides,
+  };
+}
 
 function createOrder(overrides: Partial<AgentOrder> = {}): AgentOrder {
   return {
@@ -104,12 +119,7 @@ describe("agent dashboard calculations", () => {
   it("counts monthly and daily earnings for the current agent only", () => {
     const now = new Date("2026-07-03T10:00:00.000Z");
     const data = {
-      agent: {
-        id: agentId,
-        user_id: "22222222-2222-2222-2222-222222222222",
-        display_name: "NMC Agent",
-        status: "active",
-      },
+      agent: createAgentProfile(),
       customers: [
         {
           id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
@@ -156,12 +166,7 @@ describe("agent dashboard calculations", () => {
   it("keeps closed unpaid orders in aggregate outstanding balance", () => {
     const now = new Date("2026-07-03T10:00:00.000Z");
     const data = {
-      agent: {
-        id: agentId,
-        user_id: "22222222-2222-2222-2222-222222222222",
-        display_name: "NMC Agent",
-        status: "active",
-      },
+      agent: createAgentProfile(),
       customers: [],
       agentOrders: [],
       orders: [

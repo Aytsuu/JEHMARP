@@ -4,9 +4,6 @@ on:
   pull_request:
     paths:
       - "supabase/**"
-  push:
-    paths:
-      - "supabase/**"
 
 permissions:
   contents: read

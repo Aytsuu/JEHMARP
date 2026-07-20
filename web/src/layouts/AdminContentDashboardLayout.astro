@@ -38,7 +38,9 @@ const { title, description, navLabel, sidebarUnreadBadges = {} } = Astro.props;
         if (localStorage.getItem("dashboard-sidebar-collapsed") === "true") {
           document.documentElement.classList.add("dashboard-sidebar-collapsed");
         }
-      } catch {}
+      } catch {
+        void 0;
+      }
     </script>
     <style is:global>
       ::view-transition-old(root),

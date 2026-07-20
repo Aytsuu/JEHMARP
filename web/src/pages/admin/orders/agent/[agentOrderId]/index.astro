@@ -24,7 +24,6 @@ import {
   orderTotal,
 } from "@/lib/admin-dashboard/view";
 import {
-  buildAgentOrderProductDistributions,
   canAttachCustomerToAgentOrder,
   buildAttachCustomerProductOptions,
   formatPendingIndicator,
@@ -86,7 +85,6 @@ const canAttachCustomer = canAttachCustomerToAgentOrder(agentOrder);
 const isQuantityEditable = agentOrderPaymentState === "unpaid" || agentOrderPaymentState === "partial";
 const totalAmount = agentOrderTotal(agentOrder);
 const pendingCustomerOrderAmount = sumPendingCustomerOrderAmount(agentOrder);
-const productDistributions = buildAgentOrderProductDistributions(agentOrder);
 const attachCustomerProducts = buildAttachCustomerProductOptions({
   agentOrder,
   products: dashboardData.products,
