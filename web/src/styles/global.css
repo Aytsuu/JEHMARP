@@ -1965,6 +1965,40 @@
     font-weight: 600;
   }
 
+  .admin-summary-card--cluster {
+    grid-column: span 2;
+  }
+
+  .admin-summary-cluster {
+    @apply mt-3 grid gap-3;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-summary-cluster__item {
+    @apply min-w-0;
+  }
+
+  .admin-summary-cluster dt {
+    @apply m-0 text-[0.65rem] font-semibold uppercase tracking-wider text-gray-500;
+    line-height: 1.25;
+  }
+
+  .admin-summary-cluster dd {
+    @apply m-0 mt-1 text-[1.35rem] font-semibold text-gray-900;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+
+  @media (max-width: 48rem) {
+    .admin-summary-card--cluster {
+      grid-column: span 1;
+    }
+
+    .admin-summary-cluster {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .dashboard-modal {
     position: fixed;
     inset: 0;

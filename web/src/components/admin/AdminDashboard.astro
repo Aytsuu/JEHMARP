@@ -2,6 +2,7 @@
 import AdminCharts from "@/components/admin/AdminCharts";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
+import { computeAdminOrderStatusCounts } from "@/lib/admin-dashboard/summary";
 import { formatCurrency } from "@/lib/admin-dashboard/view";
 
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
@@ -13,6 +14,8 @@ type Props = {
 const { data } = Astro.props;
 const analytics = buildAdminAnalytics(data);
 const pendingCustomerBalances = analytics.pendingCustomerBalances;
+const orderCounts = computeAdminOrderStatusCounts(data.orders, data.agentOrders);
+const numberFormatter = new Intl.NumberFormat("en-PH");
 ---
 
 <section class="admin-summary-grid" aria-label="Dashboard summary">
@@ -22,7 +25,7 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
     <a href="/admin/sales">Review sales</a>
   </article>
   <article class="admin-summary-card" data-summary-card="pendingOrderPayments">
-    <h2>Pending Payments</h2>
+    <h2>Receivables</h2>
     <p>{formatCurrency(analytics.summary.pendingOrderPayments)}</p>
     <button
       type="button"
@@ -34,26 +37,44 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
       View unpaid customers
     </button>
   </article>
-  <article class="admin-summary-card" data-summary-card="orders">
+  <article class="admin-summary-card admin-summary-card--cluster" data-summary-card="orderCluster">
     <h2>Orders</h2>
-    <p data-summary-value>{data.summary.orders}</p>
+    <dl class="admin-summary-cluster">
+      <div class="admin-summary-cluster__item">
+        <dt>Total</dt>
+        <dd data-summary-metric="totalOrders">{numberFormatter.format(orderCounts.totalOrders)}</dd>
+      </div>
+      <div class="admin-summary-cluster__item">
+        <dt>Pending</dt>
+        <dd data-summary-metric="pendingOrders">{numberFormatter.format(orderCounts.pendingOrders)}</dd>
+      </div>
+      <div class="admin-summary-cluster__item">
+        <dt>Processing</dt>
+        <dd data-summary-metric="processingOrders">{numberFormatter.format(orderCounts.processingOrders)}</dd>
+      </div>
+    </dl>
     <a href="/admin/orders">Review orders</a>
+  </article>
+  <article class="admin-summary-card" data-summary-card="agents">
+    <h2>Agents</h2>
+    <p data-summary-value>{numberFormatter.format(data.summary.agents)}</p>
+    <a href="/admin/agents">Manage agents</a>
   </article>
   <article class="admin-summary-card" data-summary-card="customers">
     <h2>Customers</h2>
-    <p data-summary-value>{data.summary.customers}</p>
+    <p data-summary-value>{numberFormatter.format(data.summary.customers)}</p>
     <a href="/admin/customers">Manage customers</a>
   </article>
   <article class="admin-summary-card" data-summary-card="products">
     <h2>Products</h2>
-    <p data-summary-value>{data.summary.products}</p>
+    <p data-summary-value>{numberFormatter.format(data.summary.products)}</p>
     <a href="/admin/products">Manage products</a>
   </article>
 </section>
 
 <DashboardModal
   id="pending-payments-modal"
-  title="Pending Customer Payments"
+  title="Receivables"
   description={`${formatCurrency(analytics.summary.pendingOrderPayments)} total unpaid balance`}
 >
   {
@@ -85,6 +106,8 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
 </section>
 
 <script>
+  const orderClusterMetrics = ["totalOrders", "pendingOrders", "processingOrders"] as const;
+
   function initAdminDashboardSummary() {
     const summaryCards = Array.from(
       document.querySelectorAll<HTMLElement>("[data-summary-card]"),
@@ -119,8 +142,23 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
         }
 
         const summary = await response.json() as Record<string, number>;
+        const numberFormatter = new Intl.NumberFormat("en-PH");
 
         cardByKey.forEach((card, key) => {
+          if (key === "orderCluster") {
+            orderClusterMetrics.forEach((metricKey) => {
+              const value = summary[metricKey];
+              const valueNode = card.querySelector<HTMLElement>(`[data-summary-metric="${metricKey}"]`);
+
+              if (!valueNode || typeof value !== "number" || Number.isNaN(value)) {
+                return;
+              }
+
+              valueNode.textContent = numberFormatter.format(value);
+            });
+            return;
+          }
+
           const value = summary[key];
           const valueNode = card.querySelector<HTMLElement>("[data-summary-value]");
 
@@ -128,7 +166,7 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
             return;
           }
 
-          valueNode.textContent = new Intl.NumberFormat("en-PH").format(value);
+          valueNode.textContent = numberFormatter.format(value);
         });
       } catch {
         // Keep the server-rendered values if the refresh fails.

@@ -325,7 +325,10 @@ function createAnalyticsData(): AdminDashboardData {
       updated_at: "2026-07-04T08:30:00.000Z",
     }],
     summary: {
-      orders: 3,
+      totalOrders: 3,
+      pendingOrders: 1,
+      processingOrders: 1,
+      agents: 0,
       inquiries: 1,
       customers: 3,
       products: 2,

@@ -16,6 +16,7 @@ import {
 } from "./pagination";
 import type { AdminProductFilters } from "./product-filters";
 import type { AdminResellerApplicationFilters } from "./reseller-application-filters";
+import { computeAdminOrderStatusCounts, type AdminOrderStatusCounts } from "./summary";
 import type {
   InquiryStatus,
   InvoiceStatus,
@@ -605,8 +606,8 @@ export type AdminDashboardData = {
   summary: AdminDashboardSummary;
 };
 
-export type AdminDashboardSummary = {
-  orders: number;
+export type AdminDashboardSummary = AdminOrderStatusCounts & {
+  agents: number;
   inquiries: number;
   customers: number;
   products: number;
@@ -728,30 +729,37 @@ export async function loadAdminDashboardData(
     resellerApplications,
     summary: buildAdminDashboardSummary({
       orders,
+      agentOrders,
       customers,
       products,
       contactInquiries,
       resellerApplications,
+      agents,
     }),
   };
 }
 
 export async function loadAdminDashboardSummaryData(): Promise<AdminDashboardSummary> {
   const supabase = createSupabaseAdminClient();
-  const [orders, customers, products, contactInquiries, resellerApplications] = await Promise.all([
-    loadDashboardSummaryOrders(supabase),
-    loadDashboardSummaryCustomers(supabase),
-    loadDashboardSummaryProducts(supabase),
-    loadDashboardSummaryContactInquiries(supabase),
-    loadDashboardSummaryResellerApplications(supabase),
-  ]);
+  const [orders, agentOrders, customers, products, contactInquiries, resellerApplications, agents] =
+    await Promise.all([
+      loadDashboardSummaryOrders(supabase),
+      loadDashboardSummaryAgentOrders(supabase),
+      loadDashboardSummaryCustomers(supabase),
+      loadDashboardSummaryProducts(supabase),
+      loadDashboardSummaryContactInquiries(supabase),
+      loadDashboardSummaryResellerApplications(supabase),
+      loadDashboardSummaryAgents(supabase),
+    ]);
 
   return buildAdminDashboardSummary({
     orders,
+    agentOrders,
     customers,
     products,
     contactInquiries,
     resellerApplications,
+    agents,
   });
 }
 
@@ -2041,16 +2049,24 @@ async function loadPaginatedResellerApplications(
 
 function buildAdminDashboardSummary({
   orders,
+  agentOrders,
   customers,
   products,
   contactInquiries,
   resellerApplications,
-}: Pick<
-  AdminDashboardData,
-  "orders" | "customers" | "products" | "contactInquiries" | "resellerApplications"
->): AdminDashboardSummary {
+  agents,
+}: {
+  orders: Array<Pick<AdminOrder, "order_status">>;
+  agentOrders: Array<Pick<AdminAgentOrder, "order_status">>;
+  customers: Array<Pick<AdminCustomer, "id">>;
+  products: Array<Pick<AdminProduct, "id">>;
+  contactInquiries: Array<Pick<AdminContactInquiry, "id">>;
+  resellerApplications: Array<Pick<AdminResellerApplication, "id">>;
+  agents: Array<Pick<AdminAgent, "id">>;
+}): AdminDashboardSummary {
   return {
-    orders: orders.length,
+    ...computeAdminOrderStatusCounts(orders, agentOrders),
+    agents: agents.length,
     inquiries: contactInquiries.length,
     customers: customers.length,
     products: products.length,
@@ -2060,15 +2076,38 @@ function buildAdminDashboardSummary({
 
 async function loadDashboardSummaryOrders(
   supabase: SupabaseAdminClient,
-): Promise<AdminOrder[]> {
+): Promise<Array<Pick<AdminOrder, "order_status">>> {
   const { data, error } = await supabase
     .from("customer_order")
-    .select("id, customer_order_item(id), invoice(id)")
-    .order("created_at", { ascending: false });
+    .select("order_status");
 
   if (error) throwLoadError("Unable to load admin orders.");
 
-  return ((data ?? []) as unknown[]).map(normalizeAdminOrder);
+  return (data ?? []) as Array<Pick<AdminOrder, "order_status">>;
+}
+
+async function loadDashboardSummaryAgentOrders(
+  supabase: SupabaseAdminClient,
+): Promise<Array<Pick<AdminAgentOrder, "order_status">>> {
+  const { data, error } = await supabase
+    .from("agent_order")
+    .select("order_status");
+
+  if (error) throwLoadError("Unable to load admin agent orders.");
+
+  return (data ?? []) as Array<Pick<AdminAgentOrder, "order_status">>;
+}
+
+async function loadDashboardSummaryAgents(
+  supabase: SupabaseAdminClient,
+): Promise<AdminAgent[]> {
+  const { data, error } = await supabase
+    .from("agent_profile")
+    .select("id");
+
+  if (error) throwLoadError("Unable to load admin agents.");
+
+  return (data ?? []) as AdminAgent[];
 }
 
 async function loadDashboardSummaryCustomers(

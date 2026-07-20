@@ -181,7 +181,10 @@ function createAdminDashboardData(): AdminDashboardData {
       updated_at: "2026-07-04T14:00:00.000Z",
     }],
     summary: {
-      orders: 1,
+      totalOrders: 1,
+      pendingOrders: 0,
+      processingOrders: 1,
+      agents: 0,
       inquiries: 1,
       customers: 1,
       products: 1,

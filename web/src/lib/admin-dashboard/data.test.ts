@@ -715,8 +715,24 @@ describe("loadAdminDashboardData", () => {
       ],
       error: null,
     });
+    const agentOrderBuilder = createQueryBuilder({
+      data: [
+        { order_status: "pending_customers" },
+        { order_status: "processing" },
+      ],
+      error: null,
+    });
+    const agentBuilder = createQueryBuilder({
+      data: [
+        { id: "agent-1" },
+        { id: "agent-2" },
+      ],
+      error: null,
+    });
     const from = vi.fn((table: string) => {
       if (table === "customer_order") return orderBuilder;
+      if (table === "agent_order") return agentOrderBuilder;
+      if (table === "agent_profile") return agentBuilder;
       if (table === "customer") return customerBuilder;
       if (table === "contact_inquiry") return inquiryBuilder;
       if (table === "product") return productBuilder;
@@ -729,7 +745,10 @@ describe("loadAdminDashboardData", () => {
     const result = await loadAdminDashboardSummaryData();
 
     expect(result).toEqual({
-      orders: 2,
+      totalOrders: 4,
+      pendingOrders: 2,
+      processingOrders: 1,
+      agents: 2,
       inquiries: 2,
       customers: 1,
       products: 2,
