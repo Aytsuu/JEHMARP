@@ -3,10 +3,14 @@ begin;
 do $$
 declare
   test_product_id uuid;
+  test_customer_profile_id uuid;
   test_customer_id uuid;
+  test_agent_profile_id uuid;
+  test_agent_id uuid;
   test_order_id uuid;
   test_item_id uuid;
   test_invoice_id uuid;
+  reseller_customer_profile_id uuid;
   reseller_customer_id uuid;
   reseller_order_id uuid;
   reseller_item_id uuid;
@@ -36,7 +40,7 @@ begin
   )
   returning id into test_product_id;
 
-  insert into public.customer (
+  insert into public.profile (
     first_name,
     last_name,
     phone_number,
@@ -48,15 +52,49 @@ begin
     '0000000000',
     'Temporary test address'
   )
+  returning id into test_customer_profile_id;
+
+  insert into public.customer (
+    profile_id
+  )
+  values (
+    test_customer_profile_id
+  )
   returning id into test_customer_id;
+
+  insert into public.profile (
+    first_name,
+    last_name,
+    phone_number,
+    address
+  )
+  values (
+    'Phase',
+    'Four Agent',
+    '0000000001',
+    'Temporary agent address'
+  )
+  returning id into test_agent_profile_id;
+
+  insert into public.agent (
+    profile_id,
+    status
+  )
+  values (
+    test_agent_profile_id,
+    'active'
+  )
+  returning id into test_agent_id;
 
   insert into public.customer_order (
     customer_id,
+    agent_id,
     source,
     order_status
   )
   values (
     test_customer_id,
+    test_agent_id,
     'admin_manual',
     'pending'
   )
@@ -203,8 +241,8 @@ begin
   select public.compute_payment_balance(test_order_id)
   into numeric_result;
 
-  if numeric_result <> 400 then
-    raise exception 'Expected unpaid balance 400, got %', numeric_result;
+  if numeric_result <> 320 then
+    raise exception 'Expected commission-adjusted unpaid balance 320, got %', numeric_result;
   end if;
 
   select payment_status
@@ -252,15 +290,15 @@ begin
   select public.compute_payment_balance(test_order_id)
   into numeric_result;
 
-  if numeric_result <> 202.50 then
-    raise exception 'Expected balance 202.50 after first payment, got %', numeric_result;
+  if numeric_result <> 122.50 then
+    raise exception 'Expected balance 122.50 after first payment, got %', numeric_result;
   end if;
 
   select public.compute_earned_commission(test_order_id)
   into numeric_result;
 
-  if numeric_result <> 39.5 then
-    raise exception 'Expected earned commission 39.5 after partial payment, got %', numeric_result;
+  if numeric_result <> 49.38 then
+    raise exception 'Expected earned commission 49.38 after partial payment, got %', numeric_result;
   end if;
 
   blocked := false;
@@ -286,7 +324,7 @@ begin
   )
   values (
     test_order_id,
-    202.50,
+    122.50,
     'Cash',
     'Cash on Delivery (COD)',
     'phase-4-payment-2'
@@ -331,18 +369,26 @@ begin
     raise exception 'Expected earned commission 80 after full payment, got %', numeric_result;
   end if;
 
-  insert into public.customer (
+  insert into public.profile (
     first_name,
     last_name,
     phone_number,
-    address,
-    is_reseller
+    address
   )
   values (
     'Phase',
     'Reseller',
     '09990000000',
-    'Temporary reseller address',
+    'Temporary reseller address'
+  )
+  returning id into reseller_customer_profile_id;
+
+  insert into public.customer (
+    profile_id,
+    is_reseller
+  )
+  values (
+    reseller_customer_profile_id,
     true
   )
   returning id into reseller_customer_id;

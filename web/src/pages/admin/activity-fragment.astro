@@ -10,6 +10,7 @@ import {
   parseAdminPagination,
 } from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { setDashboardFragmentResponseHeaders } from "@/lib/dashboard/fragment-response";
 
 export const prerender = false;
 
@@ -18,6 +19,8 @@ const adminRoute = await requireAdminRoute(Astro);
 if (!adminRoute.ready) {
   return adminRoute.response;
 }
+
+setDashboardFragmentResponseHeaders(Astro);
 
 const activityFilters = parseAdminActivityFilters(Astro.url);
 const activityPagination = parseAdminPagination(Astro.url);

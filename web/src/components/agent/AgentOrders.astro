@@ -11,6 +11,7 @@ import {
   formatCurrency,
   formatDate,
   fullName,
+  isAgentMyStandaloneOrder,
   orderTotal,
 } from "@/lib/agent-dashboard/view";
 import { autoCapitalize } from "@/lib/formatters";
@@ -21,7 +22,7 @@ type Props = {
 
 const { data } = Astro.props;
 const canSubmitOrder = data.products.length > 0;
-const standaloneOrders = data.orders.filter((order) => !order.agent_order_id);
+const standaloneOrders = data.orders.filter((order) => isAgentMyStandaloneOrder(order, data.agent));
 const orderRows = [
   ...data.agentOrders.map((order) => ({
     id: order.id,
@@ -112,14 +113,26 @@ const orderRows = [
           <h3 class="order-create-section__title">Release</h3>
         </div>
         <div class="order-create-section__body">
-          <label class="field-row field-row--date">
-            <span>Release date</span>
-            <input
-              name="releaseDate"
-              type="date"
-              disabled={!canSubmitOrder}
-            />
-          </label>
+          <div class="field-row-group field-row-group--datetime">
+            <label class="field-row field-row--date">
+              <span>Release date</span>
+              <input
+                name="releaseDate"
+                type="date"
+                required
+                disabled={!canSubmitOrder}
+              />
+            </label>
+            <label class="field-row field-row--time">
+              <span>Release time</span>
+              <input
+                name="releaseTime"
+                type="time"
+                required
+                disabled={!canSubmitOrder}
+              />
+            </label>
+          </div>
         </div>
       </section>
 
@@ -379,10 +392,6 @@ const orderRows = [
       </div>
     </div>
 
-    <div class="agent-orders__pagination-summary">
-      <DashboardTablePagination variant="summary" />
-    </div>
-
     <div class="agent-record-list agent-orders__list" data-interactive-cards>
       {
         orderRows.length === 0 ? (
@@ -416,8 +425,8 @@ const orderRows = [
       }
     </div>
 
-    <div class="agent-orders__pagination-controls">
-      <DashboardTablePagination variant="controls" />
+    <div class="agent-orders__pagination">
+      <DashboardTablePagination />
     </div>
   </div>
 </section>
@@ -570,35 +579,21 @@ const orderRows = [
     margin-top: 0.85rem;
   }
 
-  .agent-orders__pagination-summary {
-    margin-top: 0.85rem;
-  }
-
-  .agent-orders__pagination-controls {
+  .agent-orders__pagination {
     margin-top: 1rem;
   }
 
-  .agent-orders__pagination-summary :global(.dashboard-interactive-table__footer),
-  .agent-orders__pagination-controls :global(.dashboard-interactive-table__footer) {
+  .agent-orders__pagination :global(.dashboard-interactive-table__footer) {
     position: static;
     border-top: 0;
     background: transparent;
     min-height: 0;
   }
 
-  .agent-orders__pagination-summary :global(.table-pagination),
-  .agent-orders__pagination-controls :global(.table-pagination) {
-    padding-inline: 0;
-  }
-
-  .agent-orders__pagination-summary :global(.table-pagination) {
-    justify-content: space-between;
-    margin-top: 0;
-  }
-
-  .agent-orders__pagination-controls :global(.table-pagination) {
+  .agent-orders__pagination :global(.table-pagination) {
     justify-content: center;
     margin-top: 0;
+    padding-inline: 0;
   }
 
   @media (max-width: 47.99rem) {

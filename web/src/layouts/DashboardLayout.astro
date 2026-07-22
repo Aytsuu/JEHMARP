@@ -5,6 +5,8 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar.astro";
 import type { DashboardSidebarUnreadBadge } from "@/lib/dashboard/sidebar-navigation";
 import Sheet from "@/components/ui/Sheet.astro";
 import { ClientRouter } from "astro:transitions";
+import { getDashboardPageTransitionName } from "@/lib/dashboard/page-transition";
+import { isAgentMobilePrimaryRoute } from "@/lib/dashboard/agent-navigation";
 import "@/styles/global.css";
 
 type Props = {
@@ -17,6 +19,8 @@ type Props = {
 
 const { title, description, navLabel, sidebarUnreadBadges = {} } = Astro.props;
 const isAgentDashboard = navLabel === "Agent operations";
+const isAgentMobilePrimary = isAgentDashboard && isAgentMobilePrimaryRoute(Astro.url.pathname);
+const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pathname);
 ---
 
 <!doctype html>
@@ -79,10 +83,26 @@ const isAgentDashboard = navLabel === "Agent operations";
       }
     </style>
   </head>
-  <body class:list={["dashboard-body", isAgentDashboard && "dashboard-body--agent"]}>
+  <body
+    class:list={[
+      "dashboard-body",
+      isAgentDashboard && "dashboard-body--agent",
+      isAgentMobilePrimary && "dashboard-body--agent-mobile-primary",
+    ]}
+  >
     <script is:inline>
       if (location.pathname.startsWith("/agent")) {
         document.body.classList.add("dashboard-body--agent");
+        const primaryRoutes = [
+          "/agent",
+          "/agent/customers",
+          "/agent/orders",
+          "/agent/notifications",
+          "/agent/profile",
+        ];
+        if (primaryRoutes.includes(location.pathname)) {
+          document.body.classList.add("dashboard-body--agent-mobile-primary");
+        }
       }
     </script>
     {
@@ -126,7 +146,7 @@ const isAgentDashboard = navLabel === "Agent operations";
           ) : (
             <div
               class="dashboard-main__content"
-              transition:name="dashboard-main"
+              transition:name={dashboardPageTransitionName}
               transition:animate="fade"
             >
               <slot />
@@ -196,9 +216,16 @@ const isAgentDashboard = navLabel === "Agent operations";
       import { initDashboardSidebarUnreadBadges } from "@/lib/client/dashboard-sidebar-badges";
       import { initDashboardSidebarCollapse } from "@/lib/client/dashboard-sidebar";
       import { initOrderDetailTabs } from "@/lib/client/order-detail-tabs";
+      import { initDashboardRecordPageRefresh } from "@/lib/client/order-detail-page";
+      import { initDashboardDetailLinkPrefetchOptOut } from "@/lib/client/dashboard-prefetch";
+      import { initOrderProductQuantityForms } from "@/lib/client/order-product-quantity-form";
       import { initOrderPaymentFormToggle } from "@/lib/client/order-payment-form";
       import { initOrderStatusAutoSave } from "@/lib/client/order-status-auto-save";
       import { initTableActionMenus } from "@/lib/client/table-action-menu";
+      import { clearDashboardFragmentCaches } from "@/lib/client/dashboard-fragment-cache";
+      import { initFormSubmissionState } from "@/lib/client/form-submission-state";
+      import { clearSystemIssueRetryState } from "@/lib/client/system-issue-retry";
+      import { formatRecordCount } from "@/lib/admin-dashboard/pagination";
 
       function initSidebarUnreadBadges() {
         initDashboardSidebarUnreadBadges();
@@ -285,8 +312,14 @@ const isAgentDashboard = navLabel === "Agent operations";
           const nextBtn = container.querySelector<HTMLButtonElement>(
             "[data-pagination-next]",
           );
-          const numbersContainer = container.querySelector<HTMLElement>(
-            "[data-pagination-numbers]",
+          const pageInput = container.querySelector<HTMLInputElement>(
+            "[data-pagination-page-input]",
+          );
+          const totalPagesEl = container.querySelector<HTMLElement>(
+            "[data-total-pages]",
+          );
+          const totalRecordsEl = container.querySelector<HTMLElement>(
+            "[data-total-records]",
           );
           const cardsContainer = container.querySelector<HTMLElement>(
             "[data-interactive-cards]",
@@ -348,10 +381,14 @@ const isAgentDashboard = navLabel === "Agent operations";
             const start = (currentPage - 1) * limit;
             const end = start + limit;
 
-            // Update page info display
-            const pageInfo = container.querySelector("[data-page-info]");
-            if (pageInfo) {
-              pageInfo.textContent = `${currentPage} of ${totalPages} pages`;
+            if (pageInput && document.activeElement !== pageInput) {
+              pageInput.value = String(currentPage);
+            }
+            if (totalPagesEl) {
+              totalPagesEl.textContent = String(totalPages);
+            }
+            if (totalRecordsEl) {
+              totalRecordsEl.textContent = formatRecordCount(totalRows);
             }
 
             // Hide/Show rows
@@ -363,26 +400,13 @@ const isAgentDashboard = navLabel === "Agent operations";
               row.style.display = "";
             });
 
-            // Update pagination controls
-            if (prevBtn) prevBtn.disabled = currentPage === 1;
-            if (nextBtn) nextBtn.disabled = currentPage === totalPages;
-
-            // Generate numbered page buttons
-            if (numbersContainer) {
-              numbersContainer.innerHTML = "";
-              for (let i = 1; i <= totalPages; i++) {
-                const btn = document.createElement("button");
-                btn.type = "button";
-                btn.textContent = String(i);
-                btn.className = i === currentPage
-                  ? "table-pagination__page-button btn-active-page"
-                  : "table-pagination__page-button";
-                btn.addEventListener("click", () => {
-                  currentPage = i;
-                  updateTable();
-                });
-                numbersContainer.appendChild(btn);
-              }
+            if (prevBtn) {
+              prevBtn.disabled = currentPage === 1;
+              prevBtn.dataset.page = String(Math.max(currentPage - 1, 1));
+            }
+            if (nextBtn) {
+              nextBtn.disabled = currentPage === totalPages;
+              nextBtn.dataset.page = String(Math.min(currentPage + 1, totalPages));
             }
 
             window.requestAnimationFrame(() => {
@@ -436,6 +460,27 @@ const isAgentDashboard = navLabel === "Agent operations";
             }
           });
 
+          function applyPageInput() {
+            if (!isCurrentGeneration() || !pageInput) return;
+
+            const totalPages = Math.ceil(filteredRows.length / limit) || 1;
+            const requestedPage = Number(pageInput.value);
+            const nextPage = Number.isInteger(requestedPage) && requestedPage > 0
+              ? Math.min(requestedPage, totalPages)
+              : 1;
+
+            currentPage = nextPage;
+            pageInput.value = String(nextPage);
+            updateTable();
+          }
+
+          pageInput?.addEventListener("change", applyPageInput);
+          pageInput?.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            applyPageInput();
+          });
+
           // Initial update
           updateTable();
         });
@@ -468,58 +513,14 @@ const isAgentDashboard = navLabel === "Agent operations";
         });
       }
 
-      function clearDashboardFragmentCaches() {
-        try {
-          Object.keys(sessionStorage)
-            .filter((key) => key.startsWith("dashboard-fragment-cache:"))
-            .forEach((key) => {
-              sessionStorage.removeItem(key);
+      function initDashboardFormSubmissionState() {
+        initFormSubmissionState(document, {
+          onSubmit: (form) => {
+            clearDashboardFragmentCaches({
+              markRefreshNeeded: !form.hasAttribute("data-astro-reload"),
             });
-        } catch {
-          // sessionStorage can be unavailable in strict browser privacy modes.
-        }
-      }
-
-      function initFormSubmissionState() {
-        const dashboardWindow = window as Window & {
-          dashboardFormSubmissionStateInitialized?: boolean;
-        };
-        if (dashboardWindow.dashboardFormSubmissionStateInitialized) return;
-        dashboardWindow.dashboardFormSubmissionStateInitialized = true;
-
-        document.addEventListener("submit", (event) => {
-          const form = event.target;
-          if (!(form instanceof HTMLFormElement)) return;
-          if ((form.getAttribute("method") || "get").toLowerCase() !== "post") return;
-          if (form.dataset.skipSubmitState === "true") return;
-
-          if (form.dataset.isSubmitting === "true") {
-            event.preventDefault();
-            return;
-          }
-
-          form.dataset.isSubmitting = "true";
-          clearDashboardFragmentCaches();
-
-          const submitButtons = Array.from(
-            form.querySelectorAll<HTMLButtonElement>('button[type="submit"]'),
-          );
-          const submitter = event.submitter instanceof HTMLButtonElement
-            ? event.submitter
-            : null;
-
-          const buttonsToDisable = new Set(submitButtons);
-          if (submitter) buttonsToDisable.add(submitter);
-
-          buttonsToDisable.forEach((button) => {
-            button.disabled = true;
-          });
-
-          if (submitter) {
-            submitter.classList.add("form-submit-button--loading");
-            submitter.setAttribute("aria-busy", "true");
-          }
-        }, true);
+          },
+        });
       }
 
       function initDashboardPostFormReloadOptOut() {
@@ -535,7 +536,9 @@ const isAgentDashboard = navLabel === "Agent operations";
       }
 
       function initDashboardFeatures() {
+        clearSystemIssueRetryState();
         initDashboardPostFormReloadOptOut();
+        initDashboardDetailLinkPrefetchOptOut();
         initDashboardSidebarCollapse();
         initAgentMobileNavigation();
         initDashboardNavNavigation();
@@ -547,8 +550,10 @@ const isAgentDashboard = navLabel === "Agent operations";
         initDashboardTableBoardAlignment();
         initInteractiveTables();
         initDigitsOnlyInputs();
-        initFormSubmissionState();
+        initDashboardFormSubmissionState();
         initOrderDetailTabs();
+        initDashboardRecordPageRefresh();
+        initOrderProductQuantityForms();
         initOrderPaymentFormToggle();
         initOrderStatusAutoSave();
         initTableActionMenus();

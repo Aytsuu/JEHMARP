@@ -39,7 +39,7 @@ const { currentPath, sidebarUnreadBadges = {} } = Astro.props;
               data-dashboard-nav-link
               data-agent-nav-link
               data-astro-transition="none"
-              data-astro-prefetch="viewport"
+              data-astro-prefetch="false"
             >
               <span class="agent-mobile-nav__icon" set:html={item.icon} />
               <span class="agent-mobile-nav__label">{item.label}</span>

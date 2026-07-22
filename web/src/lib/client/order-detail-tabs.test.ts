@@ -135,4 +135,21 @@ describe("initOrderDetailTabs", () => {
     expect(replaceStateSpy).toHaveBeenCalledTimes(1);
     replaceStateSpy.mockRestore();
   });
+
+  it("rebinds tab listeners when navigating to a different order detail page", () => {
+    renderTabs();
+    initOrderDetailTabs();
+
+    window.history.replaceState(
+      null,
+      "",
+      "/admin/orders/customer/order-2",
+    );
+    renderTabs();
+    initOrderDetailTabs();
+    getTrigger("payment-record").click();
+
+    expect(getPanel("payment-record").hidden).toBe(false);
+    expect(window.location.search).toBe("?tab=payment-record");
+  });
 });

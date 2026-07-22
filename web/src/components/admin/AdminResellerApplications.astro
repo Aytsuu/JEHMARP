@@ -6,7 +6,7 @@ import ResellerEmailDeliveryStatus from "@/components/admin/ResellerEmailDeliver
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminResellerApplicationManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminResellerApplicationFilters } from "@/lib/admin-dashboard/reseller-application-filters";
-import { selected } from "@/lib/admin-dashboard/view";
+import { formatDate, selected } from "@/lib/admin-dashboard/view";
 import { autoCapitalize } from "@/lib/formatters";
 
 type Props = {
@@ -44,6 +44,7 @@ const skeletonRows = Array.from({ length: 6 });
         <table class="dashboard-table">
           <thead>
             <tr>
+              <th scope="col">Date Created</th>
               <th scope="col">Applicant</th>
               <th scope="col">Email</th>
               <th scope="col">Contact</th>
@@ -56,7 +57,7 @@ const skeletonRows = Array.from({ length: 6 });
           <tbody>
             {data.resellerApplications.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={7}
+                colspan={8}
                 message="No reseller applications match the selected filters."
               />
             ) : data.resellerApplications.map((application) => {
@@ -67,6 +68,7 @@ const skeletonRows = Array.from({ length: 6 });
                   data-application-id={application.id}
                   {...(isUnread ? { "data-reseller-unread": "true" } : {})}
                 >
+                  <td>{formatDate(application.created_at)}</td>
                   <td class="dashboard-table__cell--truncate">{application.name}</td>
                   <td class="dashboard-table__cell--truncate">{application.email}</td>
                   <td class="dashboard-table__cell--truncate">{application.contact_number}</td>
@@ -122,6 +124,7 @@ const skeletonRows = Array.from({ length: 6 });
         <caption class="sr-only">Loading filtered reseller applications</caption>
         <thead>
           <tr>
+            <th scope="col">Date Created</th>
             <th scope="col">Applicant</th>
             <th scope="col">Email</th>
             <th scope="col">Contact</th>
@@ -134,6 +137,7 @@ const skeletonRows = Array.from({ length: 6 });
         <tbody>
           {skeletonRows.map(() => (
             <tr>
+              <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>

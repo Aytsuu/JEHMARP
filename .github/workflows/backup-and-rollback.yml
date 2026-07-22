@@ -86,7 +86,6 @@ jobs:
           supabase db query --linked --output csv "select * from public.reseller_application order by created_at;" > "backups/reseller-application-${{ github.run_id }}.csv"
           supabase db query --linked --output csv "select * from public.page order by slug;" > "backups/page-${{ github.run_id }}.csv"
           supabase db query --linked --output csv "select * from public.page_section order by page_id, sort_order;" > "backups/page-section-${{ github.run_id }}.csv"
-          supabase db query --linked --output csv "select * from public.media_asset order by created_at;" > "backups/media-asset-${{ github.run_id }}.csv"
           supabase db query --linked --output csv "select * from public.analytics_daily order by day;" > "backups/analytics-daily-${{ github.run_id }}.csv"
           supabase db query --linked --output csv "select * from public.analytics_product_daily order by day, product_id;" > "backups/analytics-product-daily-${{ github.run_id }}.csv"
           supabase db query --linked --output csv "select * from public.analytics_agent_daily order by day, agent_id;" > "backups/analytics-agent-daily-${{ github.run_id }}.csv"

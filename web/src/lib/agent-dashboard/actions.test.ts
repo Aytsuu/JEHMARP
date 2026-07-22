@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { combineDateAndTime } from "@/lib/datetime";
+
 import {
   executeAgentAction,
   parseAgentActionFormData,
@@ -14,6 +16,7 @@ describe("parseAgentActionFormData", () => {
     formData.set("action", "create-agent-order");
     formData.set("orderSubmissionMode", "distribution");
     formData.set("releaseDate", "2026-07-21");
+    formData.set("releaseTime", "14:30");
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "2");
     formData.append("addDetails", "  Slice thin  ");
@@ -29,6 +32,7 @@ describe("parseAgentActionFormData", () => {
         payload: {
           mode: "distribution",
           releaseDate: "2026-07-21",
+          releaseTime: "14:30",
           items: [
             {
               productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -45,6 +49,8 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "create-agent-order");
     formData.set("orderSubmissionMode", "distribution");
+    formData.set("releaseDate", "2026-07-21");
+    formData.set("releaseTime", "14:30");
     formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
     formData.set("firstName", "  Liza  ");
     formData.set("lastName", "Reyes");
@@ -62,7 +68,8 @@ describe("parseAgentActionFormData", () => {
         agentId,
         payload: {
           mode: "distribution",
-          releaseDate: null,
+          releaseDate: "2026-07-21",
+          releaseTime: "14:30",
           items: [
             {
               productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -79,6 +86,8 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "create-agent-order");
     formData.set("orderSubmissionMode", "distribution");
+    formData.set("releaseDate", "2026-07-21");
+    formData.set("releaseTime", "14:30");
     formData.append("productId", "");
     formData.append("quantity", "");
     formData.append("addDetails", "");
@@ -93,6 +102,8 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "create-agent-order");
     formData.set("orderSubmissionMode", "personal");
+    formData.set("releaseDate", "2026-07-21");
+    formData.set("releaseTime", "14:30");
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "3");
     formData.append("addDetails", "For my household");
@@ -104,7 +115,8 @@ describe("parseAgentActionFormData", () => {
         agentId,
         payload: {
           mode: "personal",
-          releaseDate: null,
+          releaseDate: "2026-07-21",
+          releaseTime: "14:30",
           items: [
             {
               productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -121,6 +133,8 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "create-agent-order");
     formData.set("orderSubmissionMode", "customer-drop");
+    formData.set("releaseDate", "2026-07-21");
+    formData.set("releaseTime", "14:30");
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "3");
     formData.append("addDetails", "");
@@ -136,13 +150,29 @@ describe("parseAgentActionFormData", () => {
     formData.set("action", "create-agent-order");
     formData.set("orderSubmissionMode", "distribution");
     formData.set("releaseDate", "07/21/2026");
+    formData.set("releaseTime", "14:30");
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "3");
     formData.append("addDetails", "");
 
     expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
       success: false,
-      errors: ["Release date must be a date."],
+      errors: ["Date must use YYYY-MM-DD format."],
+    });
+  });
+
+  it("rejects agent orders without a release time", () => {
+    const formData = new FormData();
+    formData.set("action", "create-agent-order");
+    formData.set("orderSubmissionMode", "distribution");
+    formData.set("releaseDate", "2026-07-21");
+    formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.append("quantity", "3");
+    formData.append("addDetails", "");
+
+    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
+      success: false,
+      errors: ["Release time is required."],
     });
   });
 
@@ -167,7 +197,7 @@ describe("parseAgentActionFormData", () => {
           amount: 725.5,
           paymentMethod: "Cash",
           paymentTerms: "Gcash",
-          paymentDate: "2026-07-18",
+          paymentDate: combineDateAndTime("2026-07-18"),
           referenceNumber: "REF-725",
           notes: "Received by agent at pickup",
         },
@@ -217,7 +247,7 @@ describe("parseAgentActionFormData", () => {
           amount: 3500,
           paymentMethod: "Cash",
           paymentTerms: "Bank Transfer",
-          paymentDate: "2026-07-18",
+          paymentDate: combineDateAndTime("2026-07-18"),
           referenceNumber: "REMIT-001",
           notes: "Customer batch payment",
         },
@@ -244,6 +274,8 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+    formData.set("releaseDate", "2026-07-22");
+    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -280,6 +312,10 @@ describe("parseAgentActionFormData", () => {
             ],
           },
         ],
+        releaseSchedule: {
+          date: "2026-07-22",
+          time: "08:30",
+        },
         requireApproval: true,
       },
     });
@@ -289,6 +325,8 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+    formData.set("releaseDate", "2026-07-22");
+    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -336,6 +374,10 @@ describe("parseAgentActionFormData", () => {
             ],
           },
         ],
+        releaseSchedule: {
+          date: "2026-07-22",
+          time: "08:30",
+        },
         requireApproval: true,
       },
     });
@@ -345,6 +387,8 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+    formData.set("releaseDate", "2026-07-22");
+    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -369,6 +413,75 @@ describe("parseAgentActionFormData", () => {
 });
 
 describe("executeAgentAction", () => {
+  it("attaches a customer order after verifying agent order status with explicit queries", async () => {
+    const agentOrderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { order_status: "pending_customers" },
+      error: null,
+    }));
+    const agentOrderEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
+    const agentOrderSelect = vi.fn(() => ({ eq: agentOrderEq }));
+    const customerOrderEq = vi.fn(() => Promise.resolve({
+      data: [],
+      error: null,
+    }));
+    const customerOrderSelect = vi.fn(() => ({ eq: customerOrderEq }));
+    const rpc = vi.fn(() => Promise.resolve({
+      data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      error: null,
+    }));
+    const from = vi.fn((table: string) => {
+      if (table === "agent_order") return { select: agentOrderSelect };
+      if (table === "customer_order") return { select: customerOrderSelect };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAgentAction({ from, rpc } as never, {
+      type: "attach-agent-order-customer",
+      agentOrderId: "11111111-1111-4111-8111-111111111111",
+      entries: [
+        {
+          customer: {
+            type: "existing",
+            customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+          },
+          items: [
+            {
+              productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+              quantity: 2,
+              addDetails: null,
+            },
+          ],
+        },
+      ],
+      releaseSchedule: {
+        date: "2026-07-22",
+        time: "08:30",
+      },
+      requireApproval: true,
+    });
+
+    expect(agentOrderSelect).toHaveBeenCalledWith("order_status");
+    expect(agentOrderEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
+    expect(customerOrderSelect).toHaveBeenCalledWith("payment_status");
+    expect(customerOrderEq).toHaveBeenCalledWith("agent_order_id", "11111111-1111-4111-8111-111111111111");
+    expect(rpc).toHaveBeenCalledWith("attach_customer_to_agent_order", {
+      target_agent_order_id: "11111111-1111-4111-8111-111111111111",
+      target_customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+      item_payload: [
+        {
+          productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          quantity: 2,
+          addDetails: null,
+        },
+      ],
+      customer_payload: {
+        releaseDate: "2026-07-22",
+        releaseTime: "08:30",
+      },
+      require_approval: true,
+    });
+  });
+
   it("submits product-first agent orders through the trusted RPC", async () => {
     const rpc = vi.fn(() => Promise.resolve({
       data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
@@ -381,6 +494,7 @@ describe("executeAgentAction", () => {
       payload: {
         mode: "distribution",
         releaseDate: "2026-07-21",
+        releaseTime: "14:30",
         items: [
           {
             productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -402,6 +516,7 @@ describe("executeAgentAction", () => {
       ],
       customer_payload: {
         releaseDate: "2026-07-21",
+        releaseTime: "14:30",
       },
     });
   });
@@ -418,6 +533,7 @@ describe("executeAgentAction", () => {
       payload: {
         mode: "personal",
         releaseDate: "2026-07-21",
+        releaseTime: "14:30",
         items: [
           {
             productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -440,6 +556,7 @@ describe("executeAgentAction", () => {
       customer_payload: {
         orderFor: "personal",
         releaseDate: "2026-07-21",
+        releaseTime: "14:30",
       },
     });
   });
@@ -455,7 +572,8 @@ describe("executeAgentAction", () => {
       agentId,
       payload: {
         mode: "distribution",
-        releaseDate: null,
+        releaseDate: "2026-07-21",
+        releaseTime: "14:30",
         items: [
           {
             productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
@@ -481,7 +599,7 @@ describe("executeAgentAction", () => {
         amount: 725.5,
         paymentMethod: "Cash",
         paymentTerms: "Gcash",
-        paymentDate: "2026-07-18",
+        paymentDate: combineDateAndTime("2026-07-18"),
         referenceNumber: "REF-725",
         notes: "Received by agent at pickup",
       },
@@ -492,7 +610,7 @@ describe("executeAgentAction", () => {
       payment_amount: 725.5,
       payment_method_value: "Cash",
       payment_terms_value: "Gcash",
-      payment_date_value: "2026-07-18",
+      payment_date_value: combineDateAndTime("2026-07-18"),
       reference_number_value: "REF-725",
       notes_value: "Received by agent at pickup",
     });
@@ -512,7 +630,7 @@ describe("executeAgentAction", () => {
         amount: 725.5,
         paymentMethod: "Cash",
         paymentTerms: "Gcash",
-        paymentDate: "2026-07-18",
+        paymentDate: combineDateAndTime("2026-07-18"),
         referenceNumber: null,
         notes: null,
       },
@@ -539,7 +657,7 @@ describe("executeAgentAction", () => {
         amount: 3500,
         paymentMethod: "Cash",
         paymentTerms: "Bank Transfer",
-        paymentDate: "2026-07-18",
+        paymentDate: combineDateAndTime("2026-07-18"),
         referenceNumber: "REMIT-001",
         notes: "Customer batch payment",
       },
@@ -553,7 +671,7 @@ describe("executeAgentAction", () => {
       payment_amount: 3500,
       payment_method_value: "Cash",
       payment_terms_value: "Bank Transfer",
-      payment_date_value: "2026-07-18",
+      payment_date_value: combineDateAndTime("2026-07-18"),
       reference_number_value: "REMIT-001",
       notes_value: "Customer batch payment",
     });
@@ -576,7 +694,7 @@ describe("executeAgentAction", () => {
         amount: 3500,
         paymentMethod: "Cash",
         paymentTerms: "Cash on Delivery (COD)",
-        paymentDate: "2026-07-18",
+        paymentDate: combineDateAndTime("2026-07-18"),
         referenceNumber: null,
         notes: null,
       },

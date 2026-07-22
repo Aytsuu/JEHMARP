@@ -10,6 +10,7 @@ type DashboardFragmentCacheStore = {
 };
 
 const cachePrefix = "dashboard-fragment-cache:";
+const refreshFlagKey = "dashboard-fragment-refresh-needed";
 const defaultMaxEntries = 12;
 
 function storageKeyFor(cacheKey: string) {
@@ -72,7 +73,32 @@ export function writeDashboardFragmentCache(
   writeStore(cacheKey, { version: 1, entries: nextEntries });
 }
 
-export function clearDashboardFragmentCaches() {
+export function markDashboardFragmentRefreshNeeded() {
+  try {
+    sessionStorage.setItem(refreshFlagKey, "true");
+  } catch {
+    // Browsers can reject sessionStorage writes in private mode or quota pressure.
+  }
+}
+
+export function consumeDashboardFragmentRefreshNeeded(): boolean {
+  try {
+    const shouldRefresh = sessionStorage.getItem(refreshFlagKey) === "true";
+    if (shouldRefresh) {
+      sessionStorage.removeItem(refreshFlagKey);
+    }
+
+    return shouldRefresh;
+  } catch {
+    return false;
+  }
+}
+
+export function clearDashboardFragmentCaches(options: { markRefreshNeeded?: boolean } = {}) {
+  if (options.markRefreshNeeded ?? true) {
+    markDashboardFragmentRefreshNeeded();
+  }
+
   try {
     Object.keys(sessionStorage)
       .filter((key) => key.startsWith(cachePrefix))

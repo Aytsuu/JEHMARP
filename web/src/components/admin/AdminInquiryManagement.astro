@@ -5,7 +5,7 @@ import DashboardTablePagination from "@/components/dashboard/DashboardTablePagin
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminInquiryManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminInquiryFilters } from "@/lib/admin-dashboard/inquiry-filters";
-import { selected } from "@/lib/admin-dashboard/view";
+import { formatDate, selected } from "@/lib/admin-dashboard/view";
 import { autoCapitalize } from "@/lib/formatters";
 
 type Props = {
@@ -43,6 +43,7 @@ const skeletonRows = Array.from({ length: 6 });
         <table class="dashboard-table">
           <thead>
             <tr>
+              <th scope="col">Date Created</th>
               <th scope="col">Name</th>
               <th scope="col">Email</th>
               <th scope="col">Contact</th>
@@ -53,11 +54,12 @@ const skeletonRows = Array.from({ length: 6 });
           <tbody>
             {data.contactInquiries.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={5}
+                colspan={6}
                 message="No inquiries match the selected filters."
               />
             ) : data.contactInquiries.map((inquiry) => (
                 <tr data-status={inquiry.inquiry_status}>
+                  <td>{formatDate(inquiry.created_at)}</td>
                   <td class="dashboard-table__cell--truncate">{inquiry.name}</td>
                   <td class="dashboard-table__cell--truncate">{inquiry.email ?? "-"}</td>
                   <td class="dashboard-table__cell--truncate">{inquiry.phone_number ?? "-"}</td>
@@ -104,6 +106,7 @@ const skeletonRows = Array.from({ length: 6 });
         <caption class="sr-only">Loading filtered inquiries</caption>
         <thead>
           <tr>
+            <th scope="col">Date Created</th>
             <th scope="col">Name</th>
             <th scope="col">Email</th>
             <th scope="col">Contact</th>
@@ -114,6 +117,7 @@ const skeletonRows = Array.from({ length: 6 });
         <tbody>
           {skeletonRows.map(() => (
             <tr>
+              <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>

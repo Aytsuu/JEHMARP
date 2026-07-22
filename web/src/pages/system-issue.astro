@@ -31,7 +31,7 @@ const homePath = getSystemIssueHomePath(returnTo);
       <p>Please try again in a moment. If the problem continues, contact support.</p>
 
       <div class="system-issue__actions">
-        <a class="system-issue__button system-issue__button--primary" href={returnTo}>
+        <a class="system-issue__button system-issue__button--primary" href={returnTo} data-system-issue-retry>
           Try again
         </a>
         <a class="system-issue__button system-issue__button--secondary" href={homePath}>
@@ -123,3 +123,17 @@ const homePath = getSystemIssueHomePath(returnTo);
     color: #111827;
   }
 </style>
+
+<script>
+  import { initSystemIssueAutoRetryFromDocument } from "@/lib/client/system-issue-retry";
+
+  function bootSystemIssuePage() {
+    initSystemIssueAutoRetryFromDocument();
+  }
+
+  document.addEventListener("DOMContentLoaded", bootSystemIssuePage);
+  document.addEventListener("astro:page-load", bootSystemIssuePage);
+  if (document.readyState !== "loading") {
+    bootSystemIssuePage();
+  }
+</script>

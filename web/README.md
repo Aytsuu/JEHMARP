@@ -57,7 +57,7 @@ In development, the app prefers the local Supabase stack automatically and will 
 
 Schema history lives in `supabase/migrations/` for local and remote environments.
 
-Auth users are not seeded on `supabase db reset`. Create local login accounts in Studio under **Authentication → Users**, then map `public.admin_role` / `public.agent_profile` as needed.
+Auth users are not seeded on `supabase db reset`. Create local login accounts in Studio under **Authentication → Users**, then map `public.admin_role` / `public.agent` as needed.
 
 Do not edit already-applied migration files to change local credentials or dashboard fixtures. Use a new migration for production-bound database changes.
 

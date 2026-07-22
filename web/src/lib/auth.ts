@@ -17,7 +17,7 @@ export async function getSignedInUser(context: RequestContext) {
       return null;
     }
 
-    throwLoadError("Unable to load the signed-in user.");
+    throwLoadError("Unable to load the signed-in user.", error);
   }
 
   return data.user;
@@ -44,7 +44,7 @@ export async function getDashboardRoleWithClient(
     .maybeSingle();
 
   if (adminError) {
-    throwLoadError("Unable to load admin role.");
+    throwLoadError("Unable to load admin role.", adminError);
   }
 
   if (adminRole) {
@@ -52,14 +52,14 @@ export async function getDashboardRoleWithClient(
   }
 
   const { data: agentProfile, error: agentError } = await supabase
-    .from("agent_profile")
+    .from("agent")
     .select("id")
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle();
 
   if (agentError) {
-    throwLoadError("Unable to load agent profile.");
+    throwLoadError("Unable to load agent profile.", agentError);
   }
 
   if (!agentProfile) {

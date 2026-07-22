@@ -10,10 +10,10 @@ import DashboardTablePagination from "@/components/dashboard/DashboardTablePagin
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
 import { getAdminOrderStatusFilters, orderSources, paymentStatuses } from "@/lib/admin-dashboard/order-filters";
+import { buildAdminOrderTargetOptions } from "@/lib/admin-dashboard/order-target-options";
 import {
   formatCurrency,
   formatDate,
-  fullName,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 
@@ -24,6 +24,12 @@ type Props = {
 };
 
 const { data, activeFilters, filterQuery } = Astro.props;
+const defaultTime = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Manila",
+}).format(new Date());
 const activeProducts = data.products.filter((product) => product.is_active);
 const canCreateOrder = activeProducts.length > 0;
 const customerPaymentNoticeMap = new Map<string, "unpaid" | "partial">();
@@ -40,17 +46,26 @@ for (const order of data.orders) {
   }
 }
 
-const customerOptions = data.customers.map((customer) => ({
-  customer,
-  label: fullName(customer),
-  paymentNotice: customerPaymentNoticeMap.get(customer.id) ?? "",
-  balance: data.customerBalances[customer.id] ?? 0,
-  creditLimit: customer.credit_limit,
-  creditExceeded: customer.credit_limit_exceeded,
-}));
+const orderTargetOptions = buildAdminOrderTargetOptions({
+  customers: data.customers,
+  agents: data.agents,
+  customerPaymentNoticeById: customerPaymentNoticeMap,
+  customerBalances: data.customerBalances,
+});
 const orderStatuses = getAdminOrderStatusFilters();
 const skeletonRows = Array.from({ length: 6 });
 const orderRows = data.orderRows;
+const orderActionPath = filterQuery ? `/admin/orders?${filterQuery}` : "/admin/orders";
+
+function isPendingCustomerOrderRow(order: (typeof orderRows)[number]) {
+  return order.row_type === "customer" && order.status === "pending";
+}
+
+function pendingCustomerOrderLabel(count: number) {
+  return count === 1
+    ? "1 customer order awaiting acceptance"
+    : `${count} customer orders awaiting acceptance`;
+}
 ---
 
 <section id="admin-orders" class="admin-panel" aria-labelledby="admin-orders-title">
@@ -61,7 +76,7 @@ const orderRows = data.orderRows;
         Select an existing customer or enter new customer details, then add the order items below.
       </p>
     </div>
-    <form id="create-order-form" method="post" class="order-create-form" aria-label="Create order">
+    <form id="create-order-form" method="post" class="order-create-form" aria-label="Create order" data-astro-reload>
       <input type="hidden" name="action" value="create-order" />
 
       {!canCreateOrder && (
@@ -83,8 +98,8 @@ const orderRows = data.orderRows;
                 <input
                   name="customerLookup"
                   autocomplete="off"
-                  placeholder="Type a customer name"
-                  aria-label="Search customer"
+                  placeholder="Type a customer or agent name"
+                  aria-label="Search customer or agent"
                   data-customer-search
                   data-customer-search-input
                 />
@@ -113,36 +128,78 @@ const orderRows = data.orderRows;
                 <div class="order-customer-picker__menu" hidden data-customer-picker-menu>
                   <div class="order-customer-picker__options" data-customer-options></div>
                   <p class="order-customer-picker__empty" hidden data-customer-options-empty>
-                    No customers found.
+                    No customers or agents found.
                   </p>
                 </div>
               </div>
               <input type="hidden" name="customerId" data-customer-id />
+              <input type="hidden" name="agentId" data-agent-order-agent-id />
             </label>
           </div>
           <template data-customer-option-template>
-            {customerOptions.map(({ customer, label, paymentNotice, balance, creditLimit, creditExceeded }) => (
-              <button
-                type="button"
-                class="order-customer-picker__option"
-                data-customer-id={customer.id}
-                data-customer-label={label}
-                data-customer-first-name={customer.first_name}
-                data-customer-last-name={customer.last_name}
-                data-customer-phone-number={customer.phone_number}
-                data-customer-email={customer.email ?? ""}
-                data-customer-address={customer.address}
-                data-customer-assigned-agent-id={customer.assigned_agent_id ?? ""}
-                data-customer-is-reseller={String(customer.is_reseller)}
-                data-customer-payment-notice={paymentNotice}
-                data-customer-balance={balance}
-                data-customer-credit-limit={creditLimit}
-                data-customer-credit-exceeded={String(creditExceeded)}
-              >
-                {label}
-              </button>
+            {orderTargetOptions.map((target) => (
+              target.type === "customer" ? (
+                <button
+                  type="button"
+                  class="order-customer-picker__option"
+                  data-order-target-option
+                  data-order-target-type="customer"
+                  data-customer-id={target.customer.id}
+                  data-customer-label={target.label}
+                  data-customer-first-name={target.customer.first_name}
+                  data-customer-last-name={target.customer.last_name}
+                  data-customer-phone-number={target.customer.phone_number}
+                  data-customer-email={target.customer.email ?? ""}
+                  data-customer-address={target.customer.address}
+                  data-customer-assigned-agent-id={target.customer.assigned_agent_id ?? ""}
+                  data-customer-is-reseller={String(target.customer.is_reseller)}
+                  data-customer-payment-notice={target.paymentNotice}
+                  data-customer-balance={target.balance}
+                  data-customer-credit-limit={target.creditLimit}
+                  data-customer-credit-exceeded={String(target.creditExceeded)}
+                >
+                  {target.label} - Customer
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  class="order-customer-picker__option"
+                  data-order-target-option
+                  data-order-target-type="agent"
+                  data-agent-id={target.agent.id}
+                  data-customer-id=""
+                  data-customer-label={target.label}
+                  data-customer-phone-number={target.agent.contact ?? ""}
+                  data-customer-email={target.agent.email ?? ""}
+                  data-customer-first-name=""
+                  data-customer-last-name=""
+                  data-customer-address=""
+                  data-customer-assigned-agent-id=""
+                  data-customer-is-reseller="false"
+                  data-customer-payment-notice=""
+                  data-customer-balance="0"
+                  data-customer-credit-limit="0"
+                  data-customer-credit-exceeded="false"
+                >
+                  {target.label} - Agent
+                </button>
+              )
             ))}
           </template>
+        </div>
+      </section>
+
+      <section class="order-create-section">
+        <div class="order-create-section__body">
+          <div class="admin-form-grid">
+            <label class="field-row" hidden data-agent-order-fields>
+              <span>Order type</span>
+              <select name="agentOrderType" data-agent-order-type disabled>
+                <option value="personal">Personal</option>
+                <option value="distribution">Distribution</option>
+              </select>
+            </label>
+          </div>
         </div>
       </section>
 
@@ -179,10 +236,16 @@ const orderRows = data.orderRows;
           <h3 class="order-create-section__title">Release and payment</h3>
         </div>
         <div class="order-create-section__body">
-          <label class="field-row">
-            <span>Release date</span>
-            <input name="releaseDate" type="date" data-release-date />
-          </label>
+          <div class="field-row-group field-row-group--datetime">
+            <label class="field-row field-row--date">
+              <span>Release date</span>
+              <input name="releaseDate" type="date" required data-release-date />
+            </label>
+            <label class="field-row field-row--time">
+              <span>Release time</span>
+              <input name="releaseTime" type="time" required data-release-time />
+            </label>
+          </div>
         </div>
       </section>
 
@@ -352,7 +415,7 @@ const orderRows = data.orderRows;
         </details>
       </template>
 
-      <section class="order-create-section">
+      <section class="order-create-section" data-downpayment-section>
         <div class="order-create-section__header">
           <h3 class="order-create-section__title">Downpayment</h3>
         </div>
@@ -377,10 +440,16 @@ const orderRows = data.orderRows;
                 <option value="Gcash">Gcash</option>
               </select>
             </label>
-            <label class="field-row">
-              <span>Payment date</span>
-              <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
-            </label>
+            <div class="field-row-group field-row-group--datetime">
+              <label class="field-row field-row--date">
+                <span>Payment date</span>
+                <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
+              </label>
+              <label class="field-row field-row--time">
+                <span>Payment time</span>
+                <input name="downpaymentTime" type="time" value={defaultTime} data-downpayment-time />
+              </label>
+            </div>
             <label class="field-row">
               <span>Reference</span>
               <input name="downpaymentReferenceNumber" data-downpayment-reference />
@@ -496,19 +565,20 @@ const orderRows = data.orderRows;
                   <input type="checkbox" data-order-select-all />
                 </label>
               </th>
+              <th scope="col">Date Created</th>
               <th scope="col">Customer</th>
-              <th scope="col">Date</th>
               <th scope="col">Source</th>
               <th scope="col">Order Status</th>
               <th scope="col">Payment Status</th>
               <th scope="col">Order Total</th>
+              <th scope="col">Remaining Receivable</th>
               <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
             {orderRows.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={8}
+                colspan={9}
                 message="No orders match the selected filters."
               />
             ) : orderRows.map((order) => {
@@ -525,6 +595,7 @@ const orderRows = data.orderRows;
                       />
                     </label>
                   </td>
+                  <td>{formatDate(order.created_at)}</td>
                   <td class="dashboard-table__cell--truncate">
                     <span class="order-customer-cell">
                       <span class="order-customer-cell__name">{order.customer_label}</span>
@@ -541,9 +612,24 @@ const orderRows = data.orderRows;
                     )}
                     </span>
                   </td>
-                  <td>{formatDate(order.created_at)}</td>
                   <td>{order.source_label}</td>
-                  <td><StatusBadge kind="order" status={order.status} label={autoCapitalize(order.status)} /></td>
+                  <td>
+                    <span class="order-status-cell">
+                      <StatusBadge kind="order" status={order.status} label={autoCapitalize(order.status)} />
+                      {
+                        order.row_type === "agent"
+                          && (order.pending_customer_order_count ?? 0) > 0 && (
+                          <span
+                            class="order-pending-customer-badge"
+                            title={pendingCustomerOrderLabel(order.pending_customer_order_count ?? 0)}
+                            aria-label={pendingCustomerOrderLabel(order.pending_customer_order_count ?? 0)}
+                          >
+                            {order.pending_customer_order_count} pending
+                          </span>
+                        )
+                      }
+                    </span>
+                  </td>
                   <td>
                     {order.payment_status ? (
                       <StatusBadge kind="payment" status={order.payment_status} />
@@ -552,8 +638,27 @@ const orderRows = data.orderRows;
                     )}
                   </td>
                   <td>{formatCurrency(order.total_amount)}</td>
+                  <td>{formatCurrency(order.remaining_receivable)}</td>
                   <td>
-                    <ViewButton href={order.href} />
+                    {
+                      isPendingCustomerOrderRow(order) ? (
+                        <form
+                          method="post"
+                          action={orderActionPath}
+                          class="order-table-action-form"
+                          data-astro-reload
+                        >
+                          <input type="hidden" name="action" value="update-order-status" />
+                          <input type="hidden" name="orderId" value={order.id} />
+                          <input type="hidden" name="orderStatus" value="processing" />
+                          <button type="submit" class="btn-table-manage">
+                            Accept order
+                          </button>
+                        </form>
+                      ) : (
+                        <ViewButton href={order.href} data-astro-prefetch="false" />
+                      )
+                    }
                   </td>
                 </tr>
               );
@@ -575,12 +680,13 @@ const orderRows = data.orderRows;
             <th scope="col" class="dashboard-table__select-column">
               <span class="table-skeleton-block table-skeleton-block--short"></span>
             </th>
+            <th scope="col">Date Created</th>
             <th scope="col">Customer</th>
-            <th scope="col">Date</th>
             <th scope="col">Source</th>
             <th scope="col">Order Status</th>
             <th scope="col">Payment Status</th>
             <th scope="col">Order Total</th>
+            <th scope="col">Remaining Receivable</th>
             <th scope="col">Action</th>
           </tr>
         </thead>
@@ -594,6 +700,7 @@ const orderRows = data.orderRows;
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
             </tr>
           ))}
@@ -604,8 +711,12 @@ const orderRows = data.orderRows;
 </section>
 
 <script>
+  import { resetFormSubmissionState } from "@/lib/client/form-submission-state";
   import { initAdminOrderBulkPdf } from "@/lib/client/admin-order-bulk-pdf";
   import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
+  import { getOrderCreditLimitWarning } from "@/lib/client/order-credit-limit";
+
+  const defaultNewCustomerCreditLimit = 1000;
 
   function initCreateOrderSheet() {
     const form = document.querySelector<HTMLFormElement>("#create-order-form");
@@ -629,7 +740,12 @@ const orderRows = data.orderRows;
       document.querySelectorAll<HTMLElement>("#create-order-sheet [data-order-total-value]"),
     );
     const releaseDateInput = form.querySelector<HTMLInputElement>("[data-release-date]");
+    const releaseTimeInput = form.querySelector<HTMLInputElement>("[data-release-time]");
     const downpaymentAmountInput = form.querySelector<HTMLInputElement>("[data-downpayment-amount]");
+    const downpaymentSection = form.querySelector<HTMLElement>("[data-downpayment-section]");
+    const agentOrderAgentInput = form.querySelector<HTMLInputElement>("[data-agent-order-agent-id]");
+    const agentOrderFields = form.querySelector<HTMLElement>("[data-agent-order-fields]");
+    const agentOrderTypeSelect = form.querySelector<HTMLSelectElement>("[data-agent-order-type]");
     const newCustomerFields = form.querySelector<HTMLElement>("[data-new-customer-fields]");
     const firstNameInput = form.querySelector<HTMLInputElement>("input[data-customer-first-name]");
     const lastNameInput = form.querySelector<HTMLInputElement>("input[data-customer-last-name]");
@@ -639,7 +755,7 @@ const orderRows = data.orderRows;
     const assignedAgentSelect = form.querySelector<HTMLSelectElement>("select[data-customer-assigned-agent-id]");
     const isResellerCheckbox = form.querySelector<HTMLInputElement>("input[data-customer-is-reseller]");
     const customerOptionNodes = Array.from(
-      customerOptionTemplate?.content.querySelectorAll<HTMLButtonElement>("[data-customer-id]") ?? [],
+      customerOptionTemplate?.content.querySelectorAll<HTMLButtonElement>("[data-order-target-option]") ?? [],
     );
     const customerSearchCache = new Map<string, HTMLButtonElement[]>();
     let customerSearchTimer: number | undefined;
@@ -679,7 +795,7 @@ const orderRows = data.orderRows;
 
       const normalizedSearch = searchTerm.trim().toLowerCase();
       if (normalizedSearch.length === 0) {
-        showCustomerPickerMessage("Try entering customer name");
+        showCustomerPickerMessage("Try entering a customer or agent name");
         return;
       }
 
@@ -712,14 +828,28 @@ const orderRows = data.orderRows;
 
     function getRenderedCustomerOptions() {
       return Array.from(
-        customerOptionsContainer?.querySelectorAll<HTMLButtonElement>("[data-customer-id]") ?? [],
+        customerOptionsContainer?.querySelectorAll<HTMLButtonElement>("[data-order-target-option]") ?? [],
+      );
+    }
+
+    function getSelectedOrderTarget() {
+      return getRenderedCustomerOptions().find(
+        (option) => option.dataset.customerLabel === customerSearch?.value,
       );
     }
 
     function getSelectedCustomer() {
-      return getRenderedCustomerOptions().find(
-        (option) => option.dataset.customerLabel === customerSearch?.value,
-      );
+      const selectedTarget = getSelectedOrderTarget();
+      return selectedTarget?.dataset.orderTargetType === "customer"
+        ? selectedTarget
+        : undefined;
+    }
+
+    function getSelectedAgentId() {
+      const selectedTarget = getSelectedOrderTarget();
+      return selectedTarget?.dataset.orderTargetType === "agent"
+        ? selectedTarget.dataset.agentId ?? ""
+        : "";
     }
 
     function fillCustomerFields(customer: HTMLElement | undefined) {
@@ -781,27 +911,38 @@ const orderRows = data.orderRows;
 
     function refreshCustomerMode() {
       const selectedCustomer = getSelectedCustomer();
-      const selectedCustomerId = selectedCustomer?.dataset.customerId ?? "";
+      const selectedAgentId = getSelectedAgentId();
+      const hasAgentTarget = selectedAgentId.length > 0;
+      const selectedCustomerId = hasAgentTarget
+        ? ""
+        : selectedCustomer?.dataset.customerId ?? "";
 
       if (customerIdInput) {
         customerIdInput.value = selectedCustomerId;
       }
+      if (agentOrderAgentInput) {
+        agentOrderAgentInput.value = selectedAgentId;
+      }
 
-      fillCustomerFields(selectedCustomer);
-      updateCustomerOrderNotice(selectedCustomer);
+      fillCustomerFields(hasAgentTarget ? undefined : selectedCustomer);
+      updateCustomerOrderNotice(hasAgentTarget ? undefined : selectedCustomer);
 
       const fields = newCustomerFields?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
         "input, select, textarea",
       );
       fields?.forEach((field) => {
         if (field === customerIdInput) return;
-        field.disabled = selectedCustomerId.length > 0;
+        field.disabled = hasAgentTarget || selectedCustomerId.length > 0;
       });
-      newCustomerFields?.toggleAttribute("data-disabled", selectedCustomerId.length > 0);
+      newCustomerFields?.toggleAttribute("data-disabled", hasAgentTarget || selectedCustomerId.length > 0);
       updateOrderTotal();
     }
 
     function selectedCustomerIsReseller() {
+      if (agentOrderAgentInput?.value) {
+        return false;
+      }
+
       const selectedCustomer = getSelectedCustomer();
 
       if (selectedCustomer) {
@@ -874,39 +1015,56 @@ const orderRows = data.orderRows;
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const releaseDate = new Date(`${releaseDateInput.value}T00:00:00`);
+      const releaseDate = new Date(`${releaseDateInput.value}T${releaseTimeInput?.value || "00:00"}:00`);
       const difference = Math.round((releaseDate.getTime() - today.getTime()) / 86_400_000);
 
       return Number.isFinite(difference) ? difference : null;
     }
 
     function shouldConfirmCreditLimit() {
-      const selectedCustomer = getSelectedCustomer();
-      if (!selectedCustomer) return null;
+      if (agentOrderAgentInput?.value) return null;
 
-      const currentBalance = Number(selectedCustomer.dataset.customerBalance ?? 0);
-      const creditLimit = Number(selectedCustomer.dataset.customerCreditLimit ?? 1000);
+      const selectedCustomer = getSelectedCustomer();
       const orderTotal = calculateOrderTotal();
       const downpaymentAmount = Number(downpaymentAmountInput?.value ?? 0);
-      const addedBalance = Math.max(orderTotal - (Number.isFinite(downpaymentAmount) ? downpaymentAmount : 0), 0);
-      const projectedBalance = currentBalance + addedBalance;
 
-      if (
-        !Number.isFinite(currentBalance) ||
-        !Number.isFinite(creditLimit) ||
-        !Number.isFinite(orderTotal) ||
-        projectedBalance <= 0 ||
-        projectedBalance < creditLimit
-      ) {
-        return null;
+      return getOrderCreditLimitWarning({
+        currentBalance: selectedCustomer
+          ? Number(selectedCustomer.dataset.customerBalance ?? 0)
+          : 0,
+        creditLimit: selectedCustomer
+          ? Number(selectedCustomer.dataset.customerCreditLimit ?? defaultNewCustomerCreditLimit)
+          : defaultNewCustomerCreditLimit,
+        orderTotal,
+        downpaymentAmount,
+        isAgentOrder: false,
+      });
+    }
+
+    function cancelOrderSubmit(event: SubmitEvent) {
+      event.preventDefault();
+      resetFormSubmissionState(orderForm);
+    }
+
+    function refreshAgentOrderMode() {
+      refreshCustomerMode();
+
+      const hasAgentTarget = Boolean(agentOrderAgentInput?.value);
+      const isDistributionOrder = hasAgentTarget && agentOrderTypeSelect?.value === "distribution";
+
+      if (agentOrderFields) agentOrderFields.hidden = !hasAgentTarget;
+      if (agentOrderTypeSelect) agentOrderTypeSelect.disabled = !hasAgentTarget;
+
+      const paymentFields = downpaymentSection?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
+        "input, select, textarea",
+      );
+      paymentFields?.forEach((field) => {
+        field.disabled = isDistributionOrder;
+      });
+      downpaymentSection?.toggleAttribute("data-disabled", isDistributionOrder);
+      if (isDistributionOrder && downpaymentAmountInput) {
+        downpaymentAmountInput.value = "";
       }
-
-      return {
-        currentBalance,
-        creditLimit,
-        addedBalance,
-        projectedBalance,
-      };
     }
 
     form.addEventListener("submit", (event) => {
@@ -924,7 +1082,7 @@ const orderRows = data.orderRows;
         );
 
         if (!shouldProceed) {
-          event.preventDefault();
+          cancelOrderSubmit(event);
           return;
         }
       }
@@ -944,7 +1102,7 @@ const orderRows = data.orderRows;
         );
 
         if (!shouldProceed) {
-          event.preventDefault();
+          cancelOrderSubmit(event);
         }
       }
     });
@@ -1006,6 +1164,7 @@ const orderRows = data.orderRows;
     });
 
     isResellerCheckbox?.addEventListener("change", updateOrderTotal);
+    agentOrderTypeSelect?.addEventListener("change", refreshAgentOrderMode);
 
     customerSearch?.addEventListener("input", () => {
       window.clearTimeout(customerSearchTimer);
@@ -1014,14 +1173,15 @@ const orderRows = data.orderRows;
       const searchValue = customerSearch.value;
       if (searchValue.trim().length === 0) {
         renderCustomerOptions("");
-        refreshCustomerMode();
+        refreshAgentOrderMode();
         return;
       }
 
+      refreshAgentOrderMode();
       showCustomerPickerSkeleton();
       customerSearchTimer = window.setTimeout(() => {
         renderCustomerOptions(searchValue);
-        refreshCustomerMode();
+        refreshAgentOrderMode();
       }, 450);
     });
 
@@ -1039,13 +1199,13 @@ const orderRows = data.orderRows;
     customerOptionsContainer?.addEventListener("click", (event) => {
       const target = event.target;
       const option = target instanceof HTMLElement
-        ? target.closest<HTMLButtonElement>("[data-customer-id]")
+        ? target.closest<HTMLButtonElement>("[data-order-target-option]")
         : null;
 
       if (!option || !customerSearch) return;
 
       customerSearch.value = option.dataset.customerLabel ?? "";
-      refreshCustomerMode();
+      refreshAgentOrderMode();
       setCustomerPickerOpen(false);
     });
 
@@ -1058,7 +1218,7 @@ const orderRows = data.orderRows;
 
     renderCustomerOptions(customerSearch?.value ?? "");
     setCustomerPickerOpen(false);
-    refreshCustomerMode();
+    refreshAgentOrderMode();
     updateOrderTotal();
   }
 
@@ -1158,5 +1318,26 @@ const orderRows = data.orderRows;
     margin: 0;
     accent-color: var(--color-brand-red);
     cursor: pointer;
+  }
+
+  .order-status-cell {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  .order-pending-customer-badge {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: #fff7ed;
+    border: 1px solid rgba(180, 83, 9, 0.22);
+    color: #b45309;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.28rem 0.5rem;
+    white-space: nowrap;
   }
 </style>

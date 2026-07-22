@@ -1,3 +1,5 @@
+import { initAgentOrderAttachForm } from "@/lib/client/agent-order-attach-form";
+
 const OPEN_BODY_CLASS = "sheet-open";
 
 let currentFormParent: HTMLElement | null = null;
@@ -113,6 +115,7 @@ function openCreateSheet(trigger: HTMLElement) {
       titleElement.textContent = targetTitle;
     }
     openDrawer(targetDrawer);
+    initAgentOrderAttachForm(targetDrawer);
     return;
   }
 

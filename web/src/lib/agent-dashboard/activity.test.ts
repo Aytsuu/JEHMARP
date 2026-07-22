@@ -75,6 +75,8 @@ function createAgentDashboardData(): AgentDashboardData {
       address: "Manila",
       assigned_agent_id: "agent-1",
       is_reseller: false,
+      credit_limit: 1000,
+      credit_limit_exceeded: false,
       created_at: "2026-07-10T08:00:00.000Z",
       updated_at: "2026-07-10T08:00:00.000Z",
     }],

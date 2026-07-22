@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { combineDateAndTime } from "@/lib/datetime";
+
 const mocks = vi.hoisted(() => ({
   createSupabaseAdminClient: vi.fn(),
   createSupabaseServerClient: vi.fn(),
@@ -145,6 +147,8 @@ describe("parseAdminActionFormData", () => {
     formData.set("action", "create-order");
     formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
     formData.set("agentId", "  ");
+    formData.set("releaseDate", "2026-07-18");
+    formData.set("releaseTime", "09:30");
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "2");
     formData.append("addDetails", "  Slice thin  ");
@@ -163,12 +167,13 @@ describe("parseAdminActionFormData", () => {
           type: "existing",
           customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
         },
+        agentOrderType: null,
         payload: {
           agent_id: null,
           source: "admin_manual",
           order_status: "processing",
           payment_status: "unpaid",
-          release_date: null,
+          release_date: combineDateAndTime("2026-07-18", "09:30"),
           submitted_by: adminUserId,
           updated_at: expect.any(String),
         },
@@ -195,6 +200,8 @@ describe("parseAdminActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "create-order");
     formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
+    formData.set("releaseDate", "2026-07-18");
+    formData.set("releaseTime", "09:30");
     formData.append("productId", "");
     formData.append("quantity", "");
     formData.append("addDetails", "");
@@ -205,11 +212,40 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("rejects admin-created orders without a release date", () => {
+    const formData = new FormData();
+    formData.set("action", "create-order");
+    formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
+    formData.set("releaseTime", "09:30");
+    formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.append("quantity", "2");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Release date is required."],
+    });
+  });
+
+  it("rejects admin-created orders without a release time", () => {
+    const formData = new FormData();
+    formData.set("action", "create-order");
+    formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
+    formData.set("releaseDate", "2026-07-18");
+    formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.append("quantity", "2");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Release time is required."],
+    });
+  });
+
   it("parses admin-created order release date and downpayment fields", () => {
     const formData = new FormData();
     formData.set("action", "create-order");
     formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
     formData.set("releaseDate", "2026-07-18");
+    formData.set("releaseTime", "10:45");
     formData.set("downpaymentAmount", "700");
     formData.set("downpaymentMethod", "Cash");
     formData.set("downpaymentTerms", "Gcash");
@@ -225,13 +261,13 @@ describe("parseAdminActionFormData", () => {
       action: {
         type: "create-order",
         payload: {
-          release_date: "2026-07-18",
+          release_date: combineDateAndTime("2026-07-18", "10:45"),
         },
         payment: {
           amount: 700,
           payment_method: "Cash",
           payment_terms: "Gcash",
-          payment_date: "2026-07-16",
+          payment_date: combineDateAndTime("2026-07-16"),
           recorded_by: adminUserId,
           reference_number: "REF-700",
           notes: "Downpayment before release",
@@ -264,6 +300,138 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("parses admin-created personal orders for an agent", () => {
+    const agentId = "64568f81-108b-42bd-b926-7e825dad67c6";
+    const formData = new FormData();
+    formData.set("action", "create-order");
+    formData.set("agentId", agentId);
+    formData.set("agentOrderType", "personal");
+    formData.set("releaseDate", "2026-07-18");
+    formData.set("releaseTime", "11:15");
+    formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.append("quantity", "3");
+    formData.append("addDetails", "");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "create-order",
+        customer: {
+          type: "agent",
+          agentId,
+        },
+        agentOrderType: "personal",
+        payload: {
+          agent_id: agentId,
+          source: "admin_manual",
+          order_status: "processing",
+          payment_status: "unpaid",
+          release_date: combineDateAndTime("2026-07-18", "11:15"),
+          submitted_by: adminUserId,
+          updated_at: expect.any(String),
+        },
+        payment: null,
+        items: [
+          {
+            product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+            partial_quantity: 3,
+            final_quantity: 3,
+            add_details: null,
+          },
+        ],
+      },
+    });
+  });
+
+  it("parses admin-created distribution orders for an agent", () => {
+    const agentId = "64568f81-108b-42bd-b926-7e825dad67c6";
+    const formData = new FormData();
+    formData.set("action", "create-order");
+    formData.set("agentId", agentId);
+    formData.set("agentOrderType", "distribution");
+    formData.set("releaseDate", "2026-07-18");
+    formData.set("releaseTime", "11:15");
+    formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.append("quantity", "3");
+    formData.append("addDetails", "For agent customers");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "create-order",
+        customer: {
+          type: "agent",
+          agentId,
+        },
+        agentOrderType: "distribution",
+        payload: {
+          agent_id: agentId,
+          source: "admin_manual",
+          order_status: "processing",
+          payment_status: "unpaid",
+          release_date: combineDateAndTime("2026-07-18", "11:15"),
+          submitted_by: adminUserId,
+          updated_at: expect.any(String),
+        },
+        payment: null,
+        items: [
+          {
+            product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+            partial_quantity: 3,
+            final_quantity: 3,
+            add_details: "For agent customers",
+          },
+        ],
+      },
+    });
+  });
+
+  it("rejects downpayments for admin-created distribution orders", () => {
+    const formData = new FormData();
+    formData.set("action", "create-order");
+    formData.set("agentId", "64568f81-108b-42bd-b926-7e825dad67c6");
+    formData.set("agentOrderType", "distribution");
+    formData.set("releaseDate", "2026-07-18");
+    formData.set("releaseTime", "11:15");
+    formData.set("downpaymentAmount", "100");
+    formData.set("downpaymentMethod", "Cash");
+    formData.set("downpaymentTerms", "Cash on Delivery (COD)");
+    formData.set("downpaymentDate", "2026-07-22");
+    formData.set("downpaymentTime", "10:00");
+    formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.append("quantity", "3");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Downpayment is not supported for agent distribution orders."],
+    });
+  });
+
+  it("rejects zero quantities when adding order products", () => {
+    const formData = new FormData();
+    formData.set("action", "add-order-item");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.set("quantity", "0");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Quantity must be greater than zero."],
+    });
+  });
+
+  it("rejects zero quantities when updating order products", () => {
+    const formData = new FormData();
+    formData.set("action", "update-order-item-quantity");
+    formData.set("orderItemId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
+    formData.set("quantity", "0");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Quantity must be greater than zero."],
+    });
+  });
+
   it("parses order product removal requests", () => {
     const formData = new FormData();
     formData.set("action", "remove-order-item");
@@ -288,6 +456,8 @@ describe("parseAdminActionFormData", () => {
     formData.set("address", "  Stall 8  ");
     formData.set("assignedAgentId", "64568f81-108b-42bd-b926-7e825dad67c6");
     formData.set("isReseller", "on");
+    formData.set("releaseDate", "2026-07-18");
+    formData.set("releaseTime", "09:30");
     formData.append("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
     formData.append("quantity", "3");
     formData.append("addDetails", "");
@@ -311,12 +481,13 @@ describe("parseAdminActionFormData", () => {
             updated_at: expect.any(String),
           },
         },
+        agentOrderType: null,
         payload: {
           agent_id: null,
           source: "admin_manual",
           order_status: "processing",
           payment_status: "unpaid",
-          release_date: null,
+          release_date: combineDateAndTime("2026-07-18", "09:30"),
           submitted_by: adminUserId,
           updated_at: expect.any(String),
         },
@@ -604,6 +775,83 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("parses promote-customer-to-agent actions with account credentials", () => {
+    const formData = new FormData();
+    formData.set("action", "promote-customer-to-agent");
+    formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
+    formData.set("email", "agent@example.com");
+    formData.set("password", "password123");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "promote-customer-to-agent",
+        customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        account: {
+          email: "agent@example.com",
+          password: "password123",
+          employee_id: null,
+        },
+      },
+    });
+  });
+
+  it("parses promote-customer-to-agent actions with an optional employee ID", () => {
+    const formData = new FormData();
+    formData.set("action", "promote-customer-to-agent");
+    formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
+    formData.set("email", "agent@example.com");
+    formData.set("password", "password123");
+    formData.set("employeeId", " EMP-001 ");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "promote-customer-to-agent",
+        customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        account: {
+          email: "agent@example.com",
+          password: "password123",
+          employee_id: "EMP-001",
+        },
+      },
+    });
+  });
+
+  it("parses promote-customer-to-agent actions using an existing customer email", () => {
+    const formData = new FormData();
+    formData.set("action", "promote-customer-to-agent");
+    formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
+    formData.set("existingEmail", "Existing@Example.com");
+    formData.set("password", "password123");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "promote-customer-to-agent",
+        customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+        account: {
+          email: "existing@example.com",
+          password: "password123",
+          employee_id: null,
+        },
+      },
+    });
+  });
+
+  it("rejects promote-customer-to-agent actions without a valid password", () => {
+    const formData = new FormData();
+    formData.set("action", "promote-customer-to-agent");
+    formData.set("customerId", "b10bb955-d8b1-4a26-a6e2-928fd33949e1");
+    formData.set("email", "agent@example.com");
+    formData.set("password", "short");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Password must be at least 8 characters."],
+    });
+  });
+
   it("rejects malformed page section JSON before writing", () => {
     const formData = new FormData();
     formData.set("action", "save-page-section");
@@ -682,6 +930,24 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("parses total order commission updates from the order information card", () => {
+    const formData = new FormData();
+    formData.set("action", "update-order-total-commission");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("amount", "60");
+
+    const result = parseAdminActionFormData(formData, adminUserId);
+
+    expect(result).toEqual({
+      success: true,
+      action: {
+        type: "update-order-total-commission",
+        orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        amount: 60,
+      },
+    });
+  });
+
   it("parses agent order commission updates as a single amount", () => {
     const formData = new FormData();
     formData.set("action", "update-agent-order-commission");
@@ -704,6 +970,21 @@ describe("parseAdminActionFormData", () => {
     }
   });
 
+  it("parses agent order approval actions", () => {
+    const formData = new FormData();
+    formData.set("action", "approve-agent-order");
+    formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "approve-agent-order",
+        agentOrderId: "11111111-1111-4111-8111-111111111111",
+        approvedBy: adminUserId,
+      },
+    });
+  });
+
   it("parses invoice saves without date or status fields", () => {
     const formData = new FormData();
     formData.set("action", "save-invoice");
@@ -724,6 +1005,18 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("rejects zero quantities when updating invoice products", () => {
+    const formData = new FormData();
+    formData.set("action", "update-invoice-item-quantity");
+    formData.set("orderItemId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
+    formData.set("quantity", "0");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Quantity must be greater than zero."],
+    });
+  });
+
   it("parses payment records with a selected customer type", () => {
     const formData = new FormData();
     formData.set("action", "record-payment");
@@ -733,18 +1026,20 @@ describe("parseAdminActionFormData", () => {
     formData.set("paymentTerms", "Bank Transfer");
     formData.set("paymentDate", "2026-07-16");
     formData.set("customerType", "reseller");
+    formData.set("returnTo", "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?tab=payment-record");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
       success: true,
       action: {
         type: "record-payment",
+        returnTo: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?tab=payment-record",
         customerType: "reseller",
         payload: {
           order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
           amount: 230,
           payment_method: "Cash",
           payment_terms: "Bank Transfer",
-          payment_date: "2026-07-16",
+          payment_date: combineDateAndTime("2026-07-16"),
           recorded_by: adminUserId,
           reference_number: null,
           notes: null,
@@ -852,6 +1147,86 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("rejects unsupported return paths for payment records", () => {
+    const formData = new FormData();
+    formData.set("action", "record-payment");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("amount", "230");
+    formData.set("paymentMethod", "Cash");
+    formData.set("paymentTerms", "Bank Transfer");
+    formData.set("paymentDate", "2026-07-16");
+    formData.set("customerType", "regular");
+    formData.set("returnTo", "https://example.test/admin/orders");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Return path is not supported."],
+    });
+  });
+
+  it("parses promoted customer order conversion actions with an admin return path", () => {
+    const formData = new FormData();
+    formData.set("action", "convert-customer-order-to-agent-distribution");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("returnTo", "/admin/agents/1b1e62e9-8203-4bfd-884e-4f64d4ed5f89");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "convert-customer-order-to-agent-distribution",
+        orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        returnTo: "/admin/agents/1b1e62e9-8203-4bfd-884e-4f64d4ed5f89",
+      },
+    });
+  });
+
+  it("parses admin agent order payment distributions in selected order", () => {
+    const formData = new FormData();
+    formData.set("action", "record-admin-agent-payment-distribution");
+    formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+    formData.append("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.append("orderId", "0d805818-837b-42d9-996e-79a6a3559f9b");
+    formData.set("amount", "550.25");
+    formData.set("paymentMethod", "Cash");
+    formData.set("paymentTerms", "Bank Transfer");
+    formData.set("paymentDate", "2026-07-18");
+    formData.set("referenceNumber", "  ADMIN-REMIT-001  ");
+    formData.set("notes", "  Admin collected batch payment  ");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "record-admin-agent-payment-distribution",
+        agentOrderId: "11111111-1111-4111-8111-111111111111",
+        payload: {
+          orderIds: [
+            "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+            "0d805818-837b-42d9-996e-79a6a3559f9b",
+          ],
+          amount: 550.25,
+          payment_method: "Cash",
+          payment_terms: "Bank Transfer",
+          payment_date: combineDateAndTime("2026-07-18"),
+          recorded_by: adminUserId,
+          reference_number: "ADMIN-REMIT-001",
+          notes: "Admin collected batch payment",
+        },
+      },
+    });
+  });
+
+  it("rejects promoted customer order conversion return paths outside the admin dashboard", () => {
+    const formData = new FormData();
+    formData.set("action", "convert-customer-order-to-agent-distribution");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("returnTo", "//example.test/admin/agents");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: false,
+      errors: ["Return path is not supported."],
+    });
+  });
+
   it("rejects removed order adjustment saves", () => {
     const formData = new FormData();
     formData.set("action", "update-order-adjustments");
@@ -919,13 +1294,626 @@ describe("markViewedResellerApplicationsRead", () => {
 });
 
 describe("executeAdminAction", () => {
+  function createApproveAgentOrderClient(linkedCustomerOrders: Array<{ id: string }> = []) {
+    const customerOrderLimit = vi.fn(async () => ({
+      data: linkedCustomerOrders,
+      error: null,
+    }));
+    const customerOrderEq = vi.fn(() => ({ limit: customerOrderLimit }));
+    const customerOrderSelect = vi.fn(() => ({ eq: customerOrderEq }));
+    const agentOrderStatusEq = vi.fn(async () => ({ error: null }));
+    const agentOrderIdEq = vi.fn(() => ({ eq: agentOrderStatusEq }));
+    const agentOrderUpdate = vi.fn(() => ({ eq: agentOrderIdEq }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer_order") return { select: customerOrderSelect };
+      if (table === "agent_order") return { update: agentOrderUpdate };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    return {
+      client: { from },
+      from,
+      customerOrderSelect,
+      customerOrderEq,
+      customerOrderLimit,
+      agentOrderUpdate,
+      agentOrderIdEq,
+      agentOrderStatusEq,
+    };
+  }
+
+  it("approves pending agent orders without customers into pending customers status", async () => {
+    const db = createApproveAgentOrderClient();
+
+    await executeAdminAction(db.client as never, {
+      type: "approve-agent-order",
+      agentOrderId: "11111111-1111-4111-8111-111111111111",
+      approvedBy: adminUserId,
+    }, adminUserId);
+
+    expect(db.customerOrderSelect).toHaveBeenCalledWith("id");
+    expect(db.customerOrderEq).toHaveBeenCalledWith("agent_order_id", "11111111-1111-4111-8111-111111111111");
+    expect(db.customerOrderLimit).toHaveBeenCalledWith(1);
+    expect(db.agentOrderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      order_status: "pending_customers",
+      admin_read_by: adminUserId,
+      admin_read_at: expect.any(String),
+      updated_at: expect.any(String),
+    }));
+    expect(db.agentOrderIdEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
+    expect(db.agentOrderStatusEq).toHaveBeenCalledWith("order_status", "pending_order");
+  });
+
+  it("approves pending agent orders with linked customers into processing status", async () => {
+    const db = createApproveAgentOrderClient([
+      { id: "22222222-2222-4222-8222-222222222222" },
+    ]);
+
+    await executeAdminAction(db.client as never, {
+      type: "approve-agent-order",
+      agentOrderId: "11111111-1111-4111-8111-111111111111",
+      approvedBy: adminUserId,
+    }, adminUserId);
+
+    expect(db.agentOrderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      order_status: "processing",
+      admin_read_by: adminUserId,
+    }));
+  });
+
+  it("attaches a customer order after verifying agent order status with explicit queries", async () => {
+    const agentOrderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { order_status: "processing" },
+      error: null,
+    }));
+    const agentOrderEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
+    const agentOrderSelect = vi.fn(() => ({ eq: agentOrderEq }));
+    const customerOrderEq = vi.fn(() => Promise.resolve({
+      data: [{ payment_status: "partial" }],
+      error: null,
+    }));
+    const customerOrderSelect = vi.fn(() => ({ eq: customerOrderEq }));
+    const rpc = vi.fn(() => Promise.resolve({
+      data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      error: null,
+    }));
+    const from = vi.fn((table: string) => {
+      if (table === "agent_order") return { select: agentOrderSelect };
+      if (table === "customer_order") return { select: customerOrderSelect };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from, rpc } as never, {
+      type: "attach-agent-order-customer",
+      agentOrderId: "11111111-1111-4111-8111-111111111111",
+      entries: [
+        {
+          customer: {
+            type: "existing",
+            customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+          },
+          items: [
+            {
+              productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+              quantity: 2,
+              addDetails: null,
+            },
+          ],
+        },
+      ],
+      releaseSchedule: {
+        date: "2026-07-18",
+        time: "09:30",
+      },
+      requireApproval: false,
+    }, adminUserId);
+
+    expect(agentOrderSelect).toHaveBeenCalledWith("order_status");
+    expect(agentOrderEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
+    expect(customerOrderSelect).toHaveBeenCalledWith("payment_status");
+    expect(customerOrderEq).toHaveBeenCalledWith("agent_order_id", "11111111-1111-4111-8111-111111111111");
+    expect(rpc).toHaveBeenCalledWith("attach_customer_to_agent_order", {
+      target_agent_order_id: "11111111-1111-4111-8111-111111111111",
+      target_customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+      item_payload: [
+        {
+          productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          quantity: 2,
+          addDetails: null,
+        },
+      ],
+      customer_payload: {
+        releaseDate: "2026-07-18",
+        releaseTime: "09:30",
+      },
+      require_approval: false,
+    });
+  });
+
+  function createAgentPaymentConfirmationSupabase(rpc: ReturnType<typeof vi.fn>) {
+    return {
+      rpc,
+      from(table: string) {
+        if (table === "agent_received_payment") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: { order_id: "order-id", amount: 100 },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        if (table === "invoice") {
+          return {
+            select: () => ({
+              eq: () => ({
+                limit: () => ({
+                  maybeSingle: async () => ({
+                    data: { id: "invoice-id" },
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    };
+  }
+
+  it("converts promoted customer orders through the trusted RPC", async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: "1b1e62e9-8203-4bfd-884e-4f64d4ed5f89",
+      error: null,
+    }));
+
+    const result = await executeAdminAction({ rpc } as never, {
+      type: "convert-customer-order-to-agent-distribution",
+      orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      returnTo: "/admin/agents/1b1e62e9-8203-4bfd-884e-4f64d4ed5f89",
+    }, adminUserId);
+
+    expect(rpc).toHaveBeenCalledWith("convert_customer_order_to_agent_distribution_order", {
+      target_order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    });
+    expect(result).toEqual({
+      redirectPath: "/admin/orders/agent/1b1e62e9-8203-4bfd-884e-4f64d4ed5f89",
+    });
+  });
+
+  it("surfaces customer order conversion RPC errors", async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: null,
+      error: { message: "Only unpaid customer orders can be converted." },
+    }));
+
+    await expect(executeAdminAction({ rpc } as never, {
+      type: "convert-customer-order-to-agent-distribution",
+      orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    }, adminUserId)).rejects.toThrow("Only unpaid customer orders can be converted.");
+  });
+
+  it("updates a customer order total commission across its order items", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const firstItemId = "11111111-1111-4111-8111-111111111111";
+    const secondItemId = "22222222-2222-4222-8222-222222222222";
+    const itemsEq = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: firstItemId,
+          final_quantity: 3,
+          unit_price: 300,
+        },
+        {
+          id: secondItemId,
+          final_quantity: 1,
+          unit_price: 100,
+        },
+      ],
+      error: null,
+    }));
+    const itemSelect = vi.fn(() => ({ eq: itemsEq }));
+    const itemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const itemUpdate = vi.fn(() => ({ eq: itemUpdateEq }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer_order_item") {
+        return {
+          select: itemSelect,
+          update: itemUpdate,
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from } as never, {
+      type: "update-order-total-commission",
+      orderId,
+      amount: 60,
+    }, adminUserId);
+
+    expect(itemSelect).toHaveBeenCalledWith("id, final_quantity, unit_price");
+    expect(itemsEq).toHaveBeenCalledWith("order_id", orderId);
+    expect(itemUpdate).toHaveBeenNthCalledWith(1, {
+      agent_commission_amount: 54,
+      agent_commission_paid: false,
+      agent_commission_set_by: adminUserId,
+      agent_commission_set_at: expect.any(String),
+      updated_at: expect.any(String),
+    });
+    expect(itemUpdateEq).toHaveBeenNthCalledWith(1, "id", firstItemId);
+    expect(itemUpdate).toHaveBeenNthCalledWith(2, {
+      agent_commission_amount: 6,
+      agent_commission_paid: false,
+      agent_commission_set_by: adminUserId,
+      agent_commission_set_at: expect.any(String),
+      updated_at: expect.any(String),
+    });
+    expect(itemUpdateEq).toHaveBeenNthCalledWith(2, "id", secondItemId);
+  });
+
+  it("promotes a customer to an agent, attaches existing orders, and marks the customer promoted", async () => {
+    const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
+    const customerProfileId = "5d676243-8403-40e3-8281-819983892f62";
+    const agentId = "1b1e62e9-8203-4bfd-884e-4f64d4ed5f89";
+    const userId = "35ca1c8d-d92e-4d36-a14f-8be4bb616a40";
+    const customerRow = {
+      id: customerId,
+      profile_id: customerProfileId,
+      assigned_agent_id: null,
+      is_reseller: false,
+      credit_limit: 1000,
+      credit_limit_exceeded: false,
+      created_at: "2026-07-01T00:00:00.000Z",
+      updated_at: "2026-07-01T00:00:00.000Z",
+      profile: {
+        first_name: "Ana",
+        last_name: "Buyer",
+        display_name: "Ana Buyer",
+        email: "ana@example.test",
+        phone_number: "09170000000",
+        address: "Market stall 12",
+      },
+    };
+    const customerMaybeSingle = vi.fn(() => Promise.resolve({
+      data: customerRow,
+      error: null,
+    }));
+    const customerPromotionEq = vi.fn(() => Promise.resolve({ error: null }));
+    const customerUpdate = vi.fn(() => ({ eq: customerPromotionEq }));
+    const customerDelete = vi.fn(() => {
+      throw new Error("Customer records should not be deleted during promotion.");
+    });
+    const customerEq = vi.fn(() => ({ maybeSingle: customerMaybeSingle }));
+    const customerSelect = vi.fn(() => ({ eq: customerEq }));
+    const existingAgentMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
+    const existingAgentLimit = vi.fn(() => ({ maybeSingle: existingAgentMaybeSingle }));
+    const existingAgentEq = vi.fn(() => ({ limit: existingAgentLimit }));
+    const agentSelect = vi.fn(() => ({ eq: existingAgentEq }));
+    const agentInsertSingle = vi.fn(() => Promise.resolve({
+      data: { id: agentId },
+      error: null,
+    }));
+    const agentInsertSelect = vi.fn(() => ({ single: agentInsertSingle }));
+    const agentInsert = vi.fn(() => ({ select: agentInsertSelect }));
+    const orderProcessingStatusEq = vi.fn(() => Promise.resolve({
+      data: [{ id: "6cc25f47-3798-401a-a341-9f1454aa56e1" }],
+      error: null,
+    }));
+    const orderProcessingCustomerEq = vi.fn(() => ({ eq: orderProcessingStatusEq }));
+    const orderSelect = vi.fn(() => ({ eq: orderProcessingCustomerEq }));
+    const orderStatusUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const orderCustomerEq = vi.fn(() => ({ eq: orderStatusUpdateEq }));
+    const orderUpdate = vi.fn(() => ({ eq: orderCustomerEq }));
+    const orderItemRows = [{
+      id: "f3c0566d-f334-4a20-b4ee-e98c06034d31",
+      final_quantity: 3,
+      partial_quantity: 3,
+      unit_price: 300,
+      product: {
+        agent_commission_type: "value",
+        agent_commission_value: 20,
+      },
+    }];
+    const orderItemIn = vi.fn(() => Promise.resolve({
+      data: orderItemRows,
+      error: null,
+    }));
+    const orderItemSelect = vi.fn(() => ({ in: orderItemIn }));
+    const orderItemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const orderItemUpdate = vi.fn(() => ({ eq: orderItemUpdateEq }));
+    const duplicateProfileMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { id: customerProfileId },
+      error: null,
+    }));
+    const excludedProfileMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
+    const profileLookupNeqLimit = vi.fn(() => ({ maybeSingle: excludedProfileMaybeSingle }));
+    const profileLookupNeq = vi.fn(() => ({ limit: profileLookupNeqLimit }));
+    const profileLookupLimit = vi.fn(() => ({ maybeSingle: duplicateProfileMaybeSingle }));
+    const profileLookupEq = vi.fn(() => ({
+      limit: profileLookupLimit,
+      neq: profileLookupNeq,
+    }));
+    const profileSelect = vi.fn(() => ({ eq: profileLookupEq }));
+    const listUsers = vi.fn(() => Promise.resolve({
+      data: { users: [] },
+      error: null,
+    }));
+    const createUser = vi.fn(() => Promise.resolve({
+      data: { user: { id: userId } },
+      error: null,
+    }));
+    const deleteUser = vi.fn();
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return { select: customerSelect, update: customerUpdate, delete: customerDelete };
+      if (table === "agent") return { select: agentSelect, insert: agentInsert };
+      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "customer_order_item") return { select: orderItemSelect, update: orderItemUpdate };
+      if (table === "profile") return { select: profileSelect };
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({
+      auth: {
+        admin: {
+          createUser,
+          deleteUser,
+          listUsers,
+        },
+      },
+      from,
+    });
+
+    await executeAdminAction({ from: vi.fn() } as never, {
+      type: "promote-customer-to-agent",
+      customerId,
+      account: {
+        email: "ana@example.test",
+        password: "password123",
+        employee_id: "EMP-001",
+      },
+    }, adminUserId);
+
+    expect(profileLookupEq).toHaveBeenCalledWith("phone_number", "09170000000");
+    expect(profileLookupNeq).toHaveBeenCalledWith("id", customerProfileId);
+    expect(duplicateProfileMaybeSingle).not.toHaveBeenCalled();
+    expect(createUser).toHaveBeenCalledWith({
+      email: "ana@example.test",
+      password: "password123",
+      email_confirm: true,
+    });
+    expect(agentInsert).toHaveBeenCalledWith(expect.objectContaining({
+      customer_id: customerId,
+      profile_id: customerProfileId,
+      employee_id: "EMP-001",
+      promoted_from_customer_id: customerId,
+      promoted_from_customer_at: expect.any(String),
+      user_id: userId,
+    }));
+    expect(agentInsertSelect).toHaveBeenCalledWith("id");
+    expect(orderUpdate).toHaveBeenCalledWith({
+      agent_id: agentId,
+      updated_at: expect.any(String),
+    });
+    expect(orderSelect).toHaveBeenCalledWith("id");
+    expect(orderProcessingCustomerEq).toHaveBeenCalledWith("customer_id", customerId);
+    expect(orderProcessingStatusEq).toHaveBeenCalledWith("order_status", "processing");
+    expect(orderCustomerEq).toHaveBeenCalledWith("customer_id", customerId);
+    expect(orderStatusUpdateEq).toHaveBeenCalledWith("order_status", "processing");
+    expect(orderItemSelect).toHaveBeenCalledWith(`
+      id,
+      final_quantity,
+      partial_quantity,
+      unit_price,
+      product:product_id (
+        agent_commission_type,
+        agent_commission_value
+      )
+    `);
+    expect(orderItemIn).toHaveBeenCalledWith("order_id", ["6cc25f47-3798-401a-a341-9f1454aa56e1"]);
+    expect(orderItemUpdate).toHaveBeenCalledWith({
+      agent_commission_amount: 60,
+      agent_commission_paid: false,
+      agent_commission_set_by: null,
+      agent_commission_set_at: null,
+      updated_at: expect.any(String),
+    });
+    expect(orderItemUpdateEq).toHaveBeenCalledWith("id", "f3c0566d-f334-4a20-b4ee-e98c06034d31");
+    expect(customerUpdate).toHaveBeenCalledWith({
+      promoted_to_agent_id: agentId,
+      promoted_to_agent_at: expect.any(String),
+      updated_at: expect.any(String),
+    });
+    expect(customerPromotionEq).toHaveBeenCalledWith("id", customerId);
+    expect(customerDelete).not.toHaveBeenCalled();
+    expect(deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("reuses an unlinked auth account when retrying customer promotion", async () => {
+    const customerId = "fb24371e-49b7-43ac-95f0-60efde316b0f";
+    const customerProfileId = "f92f64e8-e68f-4725-8a05-6066c77c9922";
+    const agentId = "f27e928f-47ac-40eb-aaf5-a5efeffa1666";
+    const existingUserId = "5653cb27-c224-44d6-9a3c-8978570de62f";
+    const customerRow = {
+      id: customerId,
+      profile_id: customerProfileId,
+      assigned_agent_id: null,
+      is_reseller: false,
+      credit_limit: 1000,
+      credit_limit_exceeded: false,
+      created_at: "2026-07-01T00:00:00.000Z",
+      updated_at: "2026-07-01T00:00:00.000Z",
+      profile: {
+        first_name: "Paolo",
+        last_name: "Araneta",
+        display_name: "Paolo Araneta",
+        email: "paoloaraneta008@gmail.com",
+        phone_number: "09170000000",
+        address: "Market stall 12",
+      },
+    };
+    const customerMaybeSingle = vi.fn(() => Promise.resolve({
+      data: customerRow,
+      error: null,
+    }));
+    const customerPromotionEq = vi.fn(() => Promise.resolve({ error: null }));
+    const customerUpdate = vi.fn(() => ({ eq: customerPromotionEq }));
+    const customerDelete = vi.fn(() => {
+      throw new Error("Customer records should not be deleted during promotion.");
+    });
+    const customerEq = vi.fn(() => ({ maybeSingle: customerMaybeSingle }));
+    const customerSelect = vi.fn(() => ({ eq: customerEq }));
+    const existingCustomerAgentMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
+    const existingCustomerAgentLimit = vi.fn(() => ({
+      maybeSingle: existingCustomerAgentMaybeSingle,
+    }));
+    const linkedAgentMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
+    const linkedAgentLimit = vi.fn(() => ({ maybeSingle: linkedAgentMaybeSingle }));
+    const agentEq = vi.fn((field: string, value: string) => {
+      if (field === "customer_id" && value === customerId) {
+        return { limit: existingCustomerAgentLimit };
+      }
+
+      if (field === "user_id" && value === existingUserId) {
+        return { limit: linkedAgentLimit };
+      }
+
+      throw new Error(`Unexpected eq on agent: ${field}=${value}`);
+    });
+    const agentSelect = vi.fn(() => ({ eq: agentEq }));
+    const agentInsertSingle = vi.fn(() => Promise.resolve({
+      data: { id: agentId },
+      error: null,
+    }));
+    const agentInsertSelect = vi.fn(() => ({ single: agentInsertSingle }));
+    const agentInsert = vi.fn(() => ({ select: agentInsertSelect }));
+    const adminRoleMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
+    const adminRoleLimit = vi.fn(() => ({ maybeSingle: adminRoleMaybeSingle }));
+    const adminRoleEq = vi.fn((field: string, value: string) => {
+      if (field === "user_id" && value === existingUserId) {
+        return { limit: adminRoleLimit };
+      }
+
+      throw new Error(`Unexpected eq on admin_role: ${field}=${value}`);
+    });
+    const adminRoleSelect = vi.fn(() => ({ eq: adminRoleEq }));
+    const orderProcessingStatusEq = vi.fn(() => Promise.resolve({
+      data: [],
+      error: null,
+    }));
+    const orderProcessingCustomerEq = vi.fn(() => ({ eq: orderProcessingStatusEq }));
+    const orderSelect = vi.fn(() => ({ eq: orderProcessingCustomerEq }));
+    const orderStatusUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const orderCustomerEq = vi.fn(() => ({ eq: orderStatusUpdateEq }));
+    const orderUpdate = vi.fn(() => ({ eq: orderCustomerEq }));
+    const excludedProfileMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
+    const profileLookupNeqLimit = vi.fn(() => ({ maybeSingle: excludedProfileMaybeSingle }));
+    const profileLookupNeq = vi.fn(() => ({ limit: profileLookupNeqLimit }));
+    const profileLookupEq = vi.fn(() => ({
+      neq: profileLookupNeq,
+    }));
+    const profileSelect = vi.fn(() => ({ eq: profileLookupEq }));
+    const listUsers = vi.fn(() => Promise.resolve({
+      data: {
+        users: [{
+          id: existingUserId,
+          email: "paoloaraneta008@gmail.com",
+        }],
+      },
+      error: null,
+    }));
+    const createUser = vi.fn();
+    const updateUserById = vi.fn(() => Promise.resolve({
+      data: { user: { id: existingUserId } },
+      error: null,
+    }));
+    const deleteUser = vi.fn();
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return { select: customerSelect, update: customerUpdate, delete: customerDelete };
+      if (table === "agent") return { select: agentSelect, insert: agentInsert };
+      if (table === "admin_role") return { select: adminRoleSelect };
+      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "profile") return { select: profileSelect };
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({
+      auth: {
+        admin: {
+          createUser,
+          deleteUser,
+          listUsers,
+          updateUserById,
+        },
+      },
+      from,
+    });
+
+    await executeAdminAction({ from: vi.fn() } as never, {
+      type: "promote-customer-to-agent",
+      customerId,
+      account: {
+        email: "paoloaraneta008@gmail.com",
+        password: "password123",
+        employee_id: null,
+      },
+    }, adminUserId);
+
+    expect(createUser).not.toHaveBeenCalled();
+    expect(updateUserById).toHaveBeenCalledWith(existingUserId, {
+      password: "password123",
+      email_confirm: true,
+    });
+    expect(agentInsert).toHaveBeenCalledWith(expect.objectContaining({
+      customer_id: customerId,
+      profile_id: customerProfileId,
+      promoted_from_customer_id: customerId,
+      promoted_from_customer_at: expect.any(String),
+      user_id: existingUserId,
+    }));
+    expect(orderCustomerEq).toHaveBeenCalledWith("customer_id", customerId);
+    expect(orderStatusUpdateEq).toHaveBeenCalledWith("order_status", "processing");
+    expect(customerUpdate).toHaveBeenCalledWith({
+      promoted_to_agent_id: agentId,
+      promoted_to_agent_at: expect.any(String),
+      updated_at: expect.any(String),
+    });
+    expect(customerPromotionEq).toHaveBeenCalledWith("id", customerId);
+    expect(customerDelete).not.toHaveBeenCalled();
+    expect(deleteUser).not.toHaveBeenCalled();
+  });
+
   it("confirms agent received payments through the trusted RPC", async () => {
     const rpc = vi.fn(() => Promise.resolve({
       data: "1b1e62e9-8203-4bfd-884e-4f64d4ed5f89",
       error: null,
     }));
 
-    await executeAdminAction({ rpc } as never, {
+    await executeAdminAction(
+      createAgentPaymentConfirmationSupabase(rpc) as never,
+      {
       type: "confirm-agent-payment",
       agentPaymentId: "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
       recordedBy: adminUserId,
@@ -943,7 +1931,9 @@ describe("executeAdminAction", () => {
       error: { message: "Only pending agent received payments can be confirmed." },
     }));
 
-    await expect(executeAdminAction({ rpc } as never, {
+    await expect(executeAdminAction(
+      createAgentPaymentConfirmationSupabase(rpc) as never,
+      {
       type: "confirm-agent-payment",
       agentPaymentId: "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
       recordedBy: adminUserId,
@@ -956,7 +1946,9 @@ describe("executeAdminAction", () => {
       error: null,
     }));
 
-    await executeAdminAction({ rpc } as never, {
+    await executeAdminAction(
+      createAgentPaymentConfirmationSupabase(rpc) as never,
+      {
       type: "confirm-agent-payments",
       agentPaymentIds: [
         "9ff2f3cf-14a3-4208-8e6b-886d4a6c8d74",
@@ -973,6 +1965,113 @@ describe("executeAdminAction", () => {
     expect(rpc).toHaveBeenNthCalledWith(2, "confirm_agent_received_payment", {
       agent_payment_id: "12468070-4044-4788-8c5d-2c4471f2aef6",
       recorded_by_value: adminUserId,
+    });
+  });
+
+  it("distributes admin-recorded agent order payments directly to selected customer orders", async () => {
+    const agentOrderId = "11111111-1111-4111-8111-111111111111";
+    const firstOrderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const secondOrderId = "0d805818-837b-42d9-996e-79a6a3559f9b";
+    const paymentInsert = vi.fn(async () => ({ error: null }));
+    const markReadEq = vi.fn(async () => ({ error: null }));
+    const markReadUpdate = vi.fn(() => ({ eq: markReadEq }));
+    const invoiceMaybeSingle = vi.fn(async () => ({ data: null, error: null }));
+    const invoiceLimit = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceEq = vi.fn(() => ({ limit: invoiceLimit }));
+    const invoiceSelect = vi.fn(() => ({ eq: invoiceEq }));
+    const serverFrom = vi.fn((table: string) => {
+      if (table === "payment") return { insert: paymentInsert };
+      if (table === "invoice") return { select: invoiceSelect };
+      if (table === "customer_order") return { update: markReadUpdate };
+      throw new Error(`Unexpected server table ${table}`);
+    });
+    const balanceByOrderId = new Map([
+      [firstOrderId, 500],
+      [secondOrderId, 200],
+    ]);
+    const adminRpc = vi.fn(async (_name: string, params: { target_order_id: string }) => ({
+      data: balanceByOrderId.get(params.target_order_id) ?? 0,
+      error: null,
+    }));
+    const selectedOrdersIn = vi.fn(async () => ({
+      data: [
+        { id: firstOrderId, agent_order_id: agentOrderId },
+        { id: secondOrderId, agent_order_id: agentOrderId },
+      ],
+      error: null,
+    }));
+    const selectedOrdersSelect = vi.fn(() => ({ in: selectedOrdersIn }));
+    const invoiceBalanceMaybeSingle = vi.fn(async () => ({
+      data: {
+        order_status: "pending",
+        agent_id: null,
+        agent_order_id: agentOrderId,
+        converted_to_agent_order_id: null,
+        payment: [],
+        customer_order_item: [],
+      },
+      error: null,
+    }));
+    const invoiceBalanceEq = vi.fn(() => ({ maybeSingle: invoiceBalanceMaybeSingle }));
+    const invoiceBalanceSelect = vi.fn(() => ({ eq: invoiceBalanceEq }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table !== "customer_order") {
+        throw new Error(`Unexpected admin table ${table}`);
+      }
+
+      return {
+        select: (columns: string) => columns === "id, agent_order_id"
+          ? selectedOrdersSelect()
+          : invoiceBalanceSelect(),
+      };
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({
+      from: adminFrom,
+      rpc: adminRpc,
+    });
+
+    await executeAdminAction({
+      from: serverFrom,
+    } as never, {
+      type: "record-admin-agent-payment-distribution",
+      agentOrderId,
+      payload: {
+        orderIds: [firstOrderId, secondOrderId],
+        amount: 550.25,
+        payment_method: "Cash",
+        payment_terms: "Bank Transfer",
+        payment_date: combineDateAndTime("2026-07-18"),
+        recorded_by: adminUserId,
+        reference_number: "ADMIN-REMIT-001",
+        notes: "Admin collected batch payment",
+      },
+    }, adminUserId);
+
+    expect(paymentInsert).toHaveBeenNthCalledWith(1, {
+      order_id: firstOrderId,
+      amount: 500,
+      payment_method: "Cash",
+      payment_terms: "Bank Transfer",
+      payment_date: combineDateAndTime("2026-07-18"),
+      recorded_by: adminUserId,
+      reference_number: "ADMIN-REMIT-001",
+      notes: "Admin collected batch payment",
+    });
+    expect(paymentInsert).toHaveBeenNthCalledWith(2, {
+      order_id: secondOrderId,
+      amount: 50.25,
+      payment_method: "Cash",
+      payment_terms: "Bank Transfer",
+      payment_date: combineDateAndTime("2026-07-18"),
+      recorded_by: adminUserId,
+      reference_number: "ADMIN-REMIT-001",
+      notes: "Admin collected batch payment",
+    });
+    expect(adminRpc).toHaveBeenCalledWith("compute_payment_balance", {
+      target_order_id: firstOrderId,
+    });
+    expect(adminRpc).toHaveBeenCalledWith("compute_payment_balance", {
+      target_order_id: secondOrderId,
     });
   });
 
@@ -1016,7 +2115,8 @@ describe("executeAdminAction", () => {
       },
     }, adminUserId)).rejects.toThrow("Reseller customer payments must use reseller pricing.");
 
-    expect(orderSelect).toHaveBeenCalledWith("customer:customer_id ( is_reseller )");
+    expect(orderSelect).toHaveBeenCalledWith(expect.stringContaining("customer:customer_id"));
+    expect(orderSelect).toHaveBeenCalledWith(expect.stringContaining("agent_id"));
     expect(orderEq).toHaveBeenCalledWith("id", orderId);
     expect(paymentInsert).not.toHaveBeenCalled();
     expect(itemUpdate).not.toHaveBeenCalled();
@@ -1068,13 +2168,36 @@ describe("executeAdminAction", () => {
           id: productId,
           default_price: 100,
           reseller_price: 80,
+          agent_commission_type: "value",
+          agent_commission_value: 0,
         },
       ],
       error: null,
     }));
     const productSelect = vi.fn(() => ({ in: productIn }));
+    const invoiceBalanceMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        order_status: "processing",
+        agent_id: null,
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        payment: [{ amount: 100 }],
+        customer_order_item: [
+          {
+            final_quantity: 2,
+            unit_price: 100,
+            agent_commission_amount: 0,
+            product: null,
+          },
+        ],
+      },
+      error: null,
+    }));
+    const adminOrderEq = vi.fn(() => ({ maybeSingle: invoiceBalanceMaybeSingle }));
+    const adminOrderSelect = vi.fn(() => ({ eq: adminOrderEq }));
     const adminFrom = vi.fn((table: string) => {
       if (table === "product") return { select: productSelect };
+      if (table === "customer_order") return { select: adminOrderSelect };
       throw new Error(`Unexpected admin table ${table}`);
     });
     const from = vi.fn((table: string) => {
@@ -1105,7 +2228,8 @@ describe("executeAdminAction", () => {
     expect(itemSelect).not.toHaveBeenCalledWith(expect.stringContaining("product:product_id"));
     expect(from).not.toHaveBeenCalledWith("product");
     expect(adminFrom).toHaveBeenCalledWith("product");
-    expect(productSelect).toHaveBeenCalledWith("id, default_price, reseller_price");
+    expect(productSelect).toHaveBeenCalledWith(expect.stringContaining("default_price"));
+    expect(productSelect).toHaveBeenCalledWith(expect.stringContaining("agent_commission_value"));
     expect(productIn).toHaveBeenCalledWith("id", [productId]);
     expect(itemUpdate).toHaveBeenCalledWith({
       price_type: "retail",
@@ -1125,6 +2249,380 @@ describe("executeAdminAction", () => {
     expect(orderUpdateEq).toHaveBeenCalledWith("id", orderId);
   });
 
+  it("creates a sales invoice after a payment record fulfills the computed order balance", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const productId = "4f65578f-3f1f-4216-9fc2-013ef06661d1";
+    const orderItemId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
+    const invoiceMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
+    const invoiceLimit = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceEq = vi.fn(() => ({ limit: invoiceLimit }));
+    const invoiceSelect = vi.fn(() => ({ eq: invoiceEq }));
+    const invoiceInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const pricingOrderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        customer: { is_reseller: false },
+      },
+      error: null,
+    }));
+    const orderStatusMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { order_status: "processing" },
+      error: null,
+    }));
+    const invoiceBalanceMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        order_status: "processing",
+        agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        payment: [{ amount: 840 }],
+        customer_order_item: [
+          {
+            final_quantity: 3,
+            unit_price: 300,
+            agent_commission_amount: 0,
+            product: {
+              agent_commission_type: "value",
+              agent_commission_value: 20,
+            },
+          },
+        ],
+      },
+      error: null,
+    }));
+    const pricingOrderEq = vi.fn(() => ({ maybeSingle: pricingOrderMaybeSingle }));
+    const orderStatusEq = vi.fn(() => ({ maybeSingle: orderStatusMaybeSingle }));
+    const invoiceBalanceEq = vi.fn(() => ({ maybeSingle: invoiceBalanceMaybeSingle }));
+    const orderSelect = vi.fn((columns: string) => ({
+      eq: columns.includes("customer:customer_id")
+        ? pricingOrderEq
+        : columns.includes("customer_order_item")
+        ? invoiceBalanceEq
+        : orderStatusEq,
+    }));
+    const orderUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const orderUpdate = vi.fn(() => ({ eq: orderUpdateEq }));
+    const paymentSelectEq = vi.fn(() => Promise.resolve({
+      data: [],
+      error: null,
+    }));
+    const paymentSelect = vi.fn(() => ({ eq: paymentSelectEq }));
+    const paymentInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const itemSelectEq = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: orderItemId,
+          product_id: productId,
+          final_quantity: 3,
+          price_type: "retail",
+          unit_price: 300,
+          agent_commission_amount: 0,
+        },
+      ],
+      error: null,
+    }));
+    const itemSelect = vi.fn(() => ({ eq: itemSelectEq }));
+    const itemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const itemUpdate = vi.fn(() => ({ eq: itemUpdateEq }));
+    const productIn = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: productId,
+          default_price: 300,
+          reseller_price: 280,
+          agent_commission_type: "value",
+          agent_commission_value: 20,
+        },
+      ],
+      error: null,
+    }));
+    const productSelect = vi.fn(() => ({ in: productIn }));
+    const adminInvoiceBalanceEq = vi.fn(() => ({ maybeSingle: invoiceBalanceMaybeSingle }));
+    const adminOrderSelect = vi.fn(() => ({ eq: adminInvoiceBalanceEq }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "product") return { select: productSelect };
+      if (table === "customer_order") return { select: adminOrderSelect };
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+    const rpc = vi.fn(() => Promise.resolve({ data: 0, error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "invoice") return { select: invoiceSelect, insert: invoiceInsert };
+      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "payment") return { select: paymentSelect, insert: paymentInsert };
+      if (table === "customer_order_item") return { select: itemSelect, update: itemUpdate };
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
+
+    await executeAdminAction({ from, rpc } as never, {
+      type: "record-payment",
+      customerType: "regular",
+      payload: {
+        order_id: orderId,
+        amount: 840,
+        payment_method: "Cash",
+        payment_terms: "Cash on Delivery (COD)",
+        payment_date: "2026-07-18",
+        recorded_by: adminUserId,
+        reference_number: null,
+        notes: null,
+      },
+    }, adminUserId);
+
+    expect(paymentInsert).toHaveBeenCalledWith(expect.objectContaining({
+      order_id: orderId,
+      amount: 840,
+    }));
+    expect(rpc).not.toHaveBeenCalled();
+    expect(invoiceInsert).toHaveBeenCalledWith(expect.objectContaining({
+      order_id: orderId,
+      status: "issued",
+      due_at: null,
+    }));
+    expect(orderUpdateEq).toHaveBeenCalledWith("id", orderId);
+  });
+
+  it("rejects zero payment amounts before saving payment records", async () => {
+    const from = vi.fn();
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "record-payment",
+      customerType: "regular",
+      payload: {
+        order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        amount: 0,
+        payment_method: "Cash",
+        payment_terms: "Cash on Delivery (COD)",
+        payment_date: "2026-07-18",
+        recorded_by: adminUserId,
+        reference_number: null,
+        notes: null,
+      },
+    }, adminUserId)).rejects.toThrow("Payment amount must be greater than zero.");
+
+    expect(from).not.toHaveBeenCalled();
+  });
+
+  it("rejects payment amounts above the commission-adjusted balance", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const productId = "4f65578f-3f1f-4216-9fc2-013ef06661d1";
+    const orderItemId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
+    const invoiceSelect = vi.fn();
+    const orderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        customer: { is_reseller: false },
+      },
+      error: null,
+    }));
+    const orderSelectEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
+    const orderSelect = vi.fn(() => ({ eq: orderSelectEq }));
+    const paymentSelectEq = vi.fn(() => Promise.resolve({
+      data: [],
+      error: null,
+    }));
+    const paymentSelect = vi.fn(() => ({ eq: paymentSelectEq }));
+    const paymentInsert = vi.fn();
+    const itemSelectEq = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: orderItemId,
+          product_id: productId,
+          final_quantity: 3,
+          price_type: "retail",
+          unit_price: 300,
+          agent_commission_amount: 0,
+        },
+      ],
+      error: null,
+    }));
+    const itemSelect = vi.fn(() => ({ eq: itemSelectEq }));
+    const itemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const itemUpdate = vi.fn(() => ({ eq: itemUpdateEq }));
+    const productIn = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: productId,
+          default_price: 300,
+          reseller_price: 280,
+          agent_commission_type: "value",
+          agent_commission_value: 20,
+        },
+      ],
+      error: null,
+    }));
+    const productSelect = vi.fn(() => ({ in: productIn }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "product") return { select: productSelect };
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+    const from = vi.fn((table: string) => {
+      if (table === "invoice") return { select: invoiceSelect };
+      if (table === "customer_order") return { select: orderSelect };
+      if (table === "payment") return { select: paymentSelect, insert: paymentInsert };
+      if (table === "customer_order_item") return { select: itemSelect, update: itemUpdate };
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "record-payment",
+      customerType: "regular",
+      payload: {
+        order_id: orderId,
+        amount: 900,
+        payment_method: "Cash",
+        payment_terms: "Cash on Delivery (COD)",
+        payment_date: "2026-07-18",
+        recorded_by: adminUserId,
+        reference_number: null,
+        notes: null,
+      },
+    }, adminUserId)).rejects.toThrow("Payment amount cannot exceed the remaining balance.");
+
+    expect(orderSelect).toHaveBeenCalledWith(expect.stringContaining("agent_id"));
+    expect(itemSelect).toHaveBeenCalledWith(expect.stringContaining("agent_commission_amount"));
+    expect(productSelect).toHaveBeenCalledWith(expect.stringContaining("agent_commission_value"));
+    expect(paymentInsert).not.toHaveBeenCalled();
+  });
+
+  it("accepts full gross payment for direct customer orders with an assigned agent", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const productId = "4f65578f-3f1f-4216-9fc2-013ef06661d1";
+    const orderItemId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
+    const invoiceMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const invoiceLimit = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceSelectEq = vi.fn(() => ({ limit: invoiceLimit }));
+    const invoiceSelect = vi.fn(() => ({ eq: invoiceSelectEq }));
+    const invoiceInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const pricingOrderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        agent_id: null,
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        customer: {
+          is_reseller: false,
+          assigned_agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+        },
+      },
+      error: null,
+    }));
+    const orderStatusMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { order_status: "processing" },
+      error: null,
+    }));
+    const invoiceBalanceMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        order_status: "processing",
+        agent_id: null,
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        payment: [{ amount: 900 }],
+        customer_order_item: [
+          {
+            final_quantity: 3,
+            unit_price: 300,
+            agent_commission_amount: 0,
+            product: {
+              agent_commission_type: "value",
+              agent_commission_value: 20,
+            },
+          },
+        ],
+      },
+      error: null,
+    }));
+    const pricingOrderEq = vi.fn(() => ({ maybeSingle: pricingOrderMaybeSingle }));
+    const orderStatusEq = vi.fn(() => ({ maybeSingle: orderStatusMaybeSingle }));
+    const orderSelect = vi.fn((columns: string) => ({
+      eq: columns.includes("customer:customer_id") ? pricingOrderEq : orderStatusEq,
+    }));
+    const orderUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const orderUpdate = vi.fn(() => ({ eq: orderUpdateEq }));
+    const paymentSelectEq = vi.fn(() => Promise.resolve({
+      data: [],
+      error: null,
+    }));
+    const paymentSelect = vi.fn(() => ({ eq: paymentSelectEq }));
+    const paymentInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const itemSelectEq = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: orderItemId,
+          product_id: productId,
+          final_quantity: 3,
+          price_type: "retail",
+          unit_price: 300,
+          agent_commission_amount: 0,
+        },
+      ],
+      error: null,
+    }));
+    const itemSelect = vi.fn(() => ({ eq: itemSelectEq }));
+    const itemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const itemUpdate = vi.fn(() => ({ eq: itemUpdateEq }));
+    const productIn = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: productId,
+          default_price: 300,
+          reseller_price: 280,
+          agent_commission_type: "value",
+          agent_commission_value: 20,
+        },
+      ],
+      error: null,
+    }));
+    const productSelect = vi.fn(() => ({ in: productIn }));
+    const adminInvoiceBalanceEq = vi.fn(() => ({ maybeSingle: invoiceBalanceMaybeSingle }));
+    const adminOrderSelect = vi.fn(() => ({ eq: adminInvoiceBalanceEq }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "product") return { select: productSelect };
+      if (table === "customer_order") return { select: adminOrderSelect };
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+    const rpc = vi.fn(() => Promise.resolve({ data: 0, error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "invoice") return { select: invoiceSelect, insert: invoiceInsert };
+      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "payment") return { select: paymentSelect, insert: paymentInsert };
+      if (table === "customer_order_item") return { select: itemSelect, update: itemUpdate };
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
+
+    await executeAdminAction({ from, rpc } as never, {
+      type: "record-payment",
+      customerType: "regular",
+      payload: {
+        order_id: orderId,
+        amount: 900,
+        payment_method: "Cash",
+        payment_terms: "Cash on Delivery (COD)",
+        payment_date: "2026-07-18",
+        recorded_by: adminUserId,
+        reference_number: null,
+        notes: null,
+      },
+    }, adminUserId);
+
+    expect(paymentInsert).toHaveBeenCalledWith(expect.objectContaining({
+      order_id: orderId,
+      amount: 900,
+    }));
+    expect(invoiceInsert).toHaveBeenCalledWith(expect.objectContaining({
+      order_id: orderId,
+      status: "issued",
+    }));
+  });
+
   it("validates and creates a direct customer record", async () => {
     const payload = {
       first_name: "Ana",
@@ -1142,13 +2640,23 @@ describe("executeAdminAction", () => {
     const phoneLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: phoneMaybeSingle })) }));
     const emailMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
     const emailLookupIlike = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: emailMaybeSingle })) }));
-    const customerSelect = vi.fn(() => ({
+    const profileSelect = vi.fn(() => ({
       eq: phoneLookupEq,
       ilike: emailLookupIlike,
     }));
-    const customerInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const profileInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: "profile-id" }, error: null })),
+      })),
+    }));
+    const customerInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: "customer-id" }, error: null })),
+      })),
+    }));
     const from = vi.fn((table: string) => {
-      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "profile") return { select: profileSelect, insert: profileInsert };
+      if (table === "customer") return { insert: customerInsert };
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -1157,22 +2665,28 @@ describe("executeAdminAction", () => {
       payload,
     }, adminUserId);
 
-    expect(customerSelect).toHaveBeenCalledWith("id");
+    expect(profileSelect).toHaveBeenCalledWith("id");
     expect(phoneLookupEq).toHaveBeenCalledWith("phone_number", "09170000000");
     expect(emailLookupIlike).toHaveBeenCalledWith("email", "ana@example.test");
-    expect(customerInsert).toHaveBeenCalledWith(payload);
+    expect(profileInsert).toHaveBeenCalled();
+    expect(customerInsert).toHaveBeenCalledWith(expect.objectContaining({
+      profile_id: "profile-id",
+      assigned_agent_id: null,
+      is_reseller: false,
+    }));
   });
 
   it("rejects direct customer creation when the phone number already exists", async () => {
     const maybeSingle = vi.fn(() => Promise.resolve({
-      data: { id: "existing-customer-id" },
+      data: { id: "existing-profile-id" },
       error: null,
     }));
-    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
-    const customerSelect = vi.fn(() => ({ eq: customerLookupEq }));
+    const profileLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
+    const profileSelect = vi.fn(() => ({ eq: profileLookupEq }));
     const customerInsert = vi.fn();
     const from = vi.fn((table: string) => {
-      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "profile") return { select: profileSelect };
+      if (table === "customer") return { insert: customerInsert };
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -1192,8 +2706,8 @@ describe("executeAdminAction", () => {
       },
     }, adminUserId)).rejects.toThrow("Phone number already exists for another customer.");
 
-    expect(customerSelect).toHaveBeenCalledWith("id");
-    expect(customerLookupEq).toHaveBeenCalledWith("phone_number", "09170000000");
+    expect(profileSelect).toHaveBeenCalledWith("id");
+    expect(profileLookupEq).toHaveBeenCalledWith("phone_number", "09170000000");
     expect(customerInsert).not.toHaveBeenCalled();
   });
 
@@ -1222,6 +2736,7 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "processing",
         payment_status: "unpaid",
+        release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
         updated_at: "2026-07-01T00:00:00.000Z",
       },
@@ -1243,6 +2758,7 @@ describe("executeAdminAction", () => {
       source: "admin_manual",
       order_status: "processing",
       payment_status: "unpaid",
+      release_date: "2026-07-18T03:15:00.000Z",
       submitted_by: adminUserId,
       updated_at: "2026-07-01T00:00:00.000Z",
     });
@@ -1257,6 +2773,140 @@ describe("executeAdminAction", () => {
     ]);
   });
 
+  it("creates an admin personal order for an agent through the agent customer record", async () => {
+    const agentId = "64568f81-108b-42bd-b926-7e825dad67c6";
+    const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const agentMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { customer_id: customerId },
+      error: null,
+    }));
+    const agentEq = vi.fn(() => ({ maybeSingle: agentMaybeSingle }));
+    const agentSelect = vi.fn(() => ({ eq: agentEq }));
+    const orderInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
+      })),
+    }));
+    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "agent") return { select: agentSelect };
+      if (table === "customer_order") return { insert: orderInsert };
+      if (table === "customer_order_item") return { insert: itemInsert };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from } as never, {
+      type: "create-order",
+      customer: {
+        type: "agent",
+        agentId,
+      },
+      agentOrderType: "personal",
+      payload: {
+        agent_id: agentId,
+        source: "admin_manual",
+        order_status: "processing",
+        payment_status: "unpaid",
+        release_date: "2026-07-18T03:15:00.000Z",
+        submitted_by: adminUserId,
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+      items: [
+        {
+          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          partial_quantity: 2,
+          final_quantity: 2,
+          add_details: null,
+        },
+      ],
+    });
+
+    expect(agentSelect).toHaveBeenCalledWith("customer_id");
+    expect(agentEq).toHaveBeenCalledWith("id", agentId);
+    expect(orderInsert).toHaveBeenCalledWith({
+      customer_id: customerId,
+      agent_id: agentId,
+      source: "admin_manual",
+      order_status: "processing",
+      payment_status: "unpaid",
+      release_date: "2026-07-18T03:15:00.000Z",
+      submitted_by: adminUserId,
+      updated_at: "2026-07-01T00:00:00.000Z",
+    });
+    expect(itemInsert).toHaveBeenCalledWith([
+      {
+        order_id: orderId,
+        product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+        partial_quantity: 2,
+        final_quantity: 2,
+        add_details: null,
+      },
+    ]);
+  });
+
+  it("creates an admin distribution order for an agent", async () => {
+    const agentId = "64568f81-108b-42bd-b926-7e825dad67c6";
+    const agentOrderId = "9dfbf3fe-4215-4213-b515-36d0509ea6ec";
+    const orderInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: agentOrderId }, error: null })),
+      })),
+    }));
+    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "agent_order") return { insert: orderInsert };
+      if (table === "agent_order_item") return { insert: itemInsert };
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    const result = await executeAdminAction({ from } as never, {
+      type: "create-order",
+      customer: {
+        type: "agent",
+        agentId,
+      },
+      agentOrderType: "distribution",
+      payload: {
+        agent_id: agentId,
+        source: "admin_manual",
+        order_status: "processing",
+        payment_status: "unpaid",
+        release_date: "2026-07-18T03:15:00.000Z",
+        submitted_by: adminUserId,
+        updated_at: "2026-07-01T00:00:00.000Z",
+      },
+      items: [
+        {
+          product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+          partial_quantity: 2,
+          final_quantity: 2,
+          add_details: "For distribution",
+        },
+      ],
+    });
+
+    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
+      agent_id: agentId,
+      order_status: "pending_customers",
+      notes: null,
+      submitted_by: adminUserId,
+      admin_read_by: adminUserId,
+      release_date: "2026-07-18T03:15:00.000Z",
+    }));
+    expect(itemInsert).toHaveBeenCalledWith([
+      {
+        agent_order_id: agentOrderId,
+        product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+        quantity: 2,
+        add_details: "For distribution",
+      },
+    ]);
+    expect(result).toEqual({
+      redirectPath: `/admin/orders/agent/${agentOrderId}`,
+    });
+  });
+
   it("creates a sales invoice when an admin-created order is fully paid on creation", async () => {
     const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
     const orderInsert = vi.fn(() => ({
@@ -1264,25 +2914,50 @@ describe("executeAdminAction", () => {
         single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
       })),
     }));
-    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
-    const itemSelectEq = vi.fn(() => Promise.resolve({
-      data: [
-        { final_quantity: 2, unit_price: 350 },
-      ],
+    const invoiceBalanceMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        order_status: "processing",
+        agent_id: null,
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        payment: [{ amount: 700 }],
+        customer_order_item: [
+          {
+            final_quantity: 2,
+            unit_price: 350,
+            agent_commission_amount: 0,
+            product: null,
+          },
+        ],
+      },
       error: null,
     }));
-    const itemSelect = vi.fn(() => ({ eq: itemSelectEq }));
+    const orderSelectEq = vi.fn(() => ({ maybeSingle: invoiceBalanceMaybeSingle }));
+    const orderSelect = vi.fn(() => ({ eq: orderSelectEq }));
+    const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
     const paymentInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const invoiceMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const invoiceLimit = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceSelectEq = vi.fn(() => ({ limit: invoiceLimit }));
+    const invoiceSelect = vi.fn(() => ({ eq: invoiceSelectEq }));
     const invoiceInsert = vi.fn(() => Promise.resolve({ error: null }));
+    const orderUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const orderUpdate = vi.fn(() => ({ eq: orderUpdateEq }));
+    const rpc = vi.fn(() => Promise.resolve({ data: 0, error: null }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "customer_order") return { select: orderSelect };
+      throw new Error(`Unexpected admin table ${table}`);
+    });
     const from = vi.fn((table: string) => {
-      if (table === "customer_order") return { insert: orderInsert };
-      if (table === "customer_order_item") return { insert: itemInsert, select: itemSelect };
+      if (table === "customer_order") return { insert: orderInsert, select: orderSelect, update: orderUpdate };
+      if (table === "customer_order_item") return { insert: itemInsert };
       if (table === "payment") return { insert: paymentInsert };
-      if (table === "invoice") return { insert: invoiceInsert };
+      if (table === "invoice") return { select: invoiceSelect, insert: invoiceInsert };
       throw new Error(`Unexpected table ${table}`);
     });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
 
-    await executeAdminAction({ from } as never, {
+    await executeAdminAction({ from, rpc } as never, {
       type: "create-order",
       customer: {
         type: "existing",
@@ -1293,6 +2968,7 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "processing",
         payment_status: "unpaid",
+        release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
         updated_at: "2026-07-01T00:00:00.000Z",
       },
@@ -1325,13 +3001,20 @@ describe("executeAdminAction", () => {
       reference_number: null,
       notes: null,
     });
-    expect(itemSelect).toHaveBeenCalledWith("final_quantity, unit_price");
-    expect(itemSelectEq).toHaveBeenCalledWith("order_id", orderId);
+    expect(invoiceSelect).toHaveBeenCalledWith("id");
+    expect(invoiceSelectEq).toHaveBeenCalledWith("order_id", orderId);
+    expect(orderSelect).toHaveBeenCalledWith(expect.stringContaining("customer_order_item"));
+    expect(orderSelectEq).toHaveBeenCalledWith("id", orderId);
+    expect(rpc).not.toHaveBeenCalled();
     expect(invoiceInsert).toHaveBeenCalledWith(expect.objectContaining({
       order_id: orderId,
       status: "issued",
       due_at: null,
     }));
+    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      order_status: "closed",
+    }));
+    expect(orderUpdateEq).toHaveBeenCalledWith("id", orderId);
   });
 
   it("creates a new customer before creating an admin order even when the phone number already exists", async () => {
@@ -1353,9 +3036,14 @@ describe("executeAdminAction", () => {
     const phoneLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: phoneMaybeSingle })) }));
     const emailMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
     const emailLookupIlike = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: emailMaybeSingle })) }));
-    const customerSelect = vi.fn(() => ({
+    const profileSelect = vi.fn(() => ({
       eq: phoneLookupEq,
       ilike: emailLookupIlike,
+    }));
+    const profileInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: "profile-id" }, error: null })),
+      })),
     }));
     const customerInsert = vi.fn(() => ({
       select: vi.fn(() => ({
@@ -1369,7 +3057,8 @@ describe("executeAdminAction", () => {
     }));
     const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
     const from = vi.fn((table: string) => {
-      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "profile") return { select: profileSelect, insert: profileInsert };
+      if (table === "customer") return { insert: customerInsert };
       if (table === "customer_order") return { insert: orderInsert };
       if (table === "customer_order_item") return { insert: itemInsert };
       throw new Error(`Unexpected table ${table}`);
@@ -1386,6 +3075,7 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "processing",
         payment_status: "unpaid",
+        release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
         updated_at: "2026-07-01T00:00:00.000Z",
       },
@@ -1399,10 +3089,13 @@ describe("executeAdminAction", () => {
       ],
     });
 
-    expect(customerSelect).toHaveBeenCalledWith("id");
+    expect(profileSelect).toHaveBeenCalledWith("id");
     expect(phoneLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
     expect(emailLookupIlike).toHaveBeenCalledWith("email", "luz@example.test");
-    expect(customerInsert).toHaveBeenCalledWith(customerPayload);
+    expect(profileInsert).toHaveBeenCalled();
+    expect(customerInsert).toHaveBeenCalledWith(expect.objectContaining({
+      profile_id: "profile-id",
+    }));
     expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
       customer_id: customerId,
     }));
@@ -1410,15 +3103,16 @@ describe("executeAdminAction", () => {
 
   it("rejects admin order creation when the new customer phone number already exists", async () => {
     const maybeSingle = vi.fn(() => Promise.resolve({
-      data: { id: "existing-customer-id" },
+      data: { id: "existing-profile-id" },
       error: null,
     }));
-    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
-    const customerSelect = vi.fn(() => ({ eq: customerLookupEq }));
+    const profileLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle })) }));
+    const profileSelect = vi.fn(() => ({ eq: profileLookupEq }));
     const customerInsert = vi.fn();
     const orderInsert = vi.fn();
     const from = vi.fn((table: string) => {
-      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "profile") return { select: profileSelect };
+      if (table === "customer") return { insert: customerInsert };
       if (table === "customer_order") return { insert: orderInsert };
       throw new Error(`Unexpected table ${table}`);
     });
@@ -1445,6 +3139,7 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "processing",
         payment_status: "unpaid",
+        release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
         updated_at: "2026-07-01T00:00:00.000Z",
       },
@@ -1458,8 +3153,8 @@ describe("executeAdminAction", () => {
       ],
     })).rejects.toThrow("Phone number already exists for another customer.");
 
-    expect(customerSelect).toHaveBeenCalledWith("id");
-    expect(customerLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
+    expect(profileSelect).toHaveBeenCalledWith("id");
+    expect(profileLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
     expect(customerInsert).not.toHaveBeenCalled();
     expect(orderInsert).not.toHaveBeenCalled();
   });
@@ -1468,18 +3163,19 @@ describe("executeAdminAction", () => {
     const phoneMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
     const phoneLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: phoneMaybeSingle })) }));
     const emailMaybeSingle = vi.fn(() => Promise.resolve({
-      data: { id: "existing-customer-id" },
+      data: { id: "existing-profile-id" },
       error: null,
     }));
     const emailLookupIlike = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: emailMaybeSingle })) }));
-    const customerSelect = vi.fn(() => ({
+    const profileSelect = vi.fn(() => ({
       eq: phoneLookupEq,
       ilike: emailLookupIlike,
     }));
     const customerInsert = vi.fn();
     const orderInsert = vi.fn();
     const from = vi.fn((table: string) => {
-      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "profile") return { select: profileSelect };
+      if (table === "customer") return { insert: customerInsert };
       if (table === "customer_order") return { insert: orderInsert };
       throw new Error(`Unexpected table ${table}`);
     });
@@ -1506,6 +3202,7 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "processing",
         payment_status: "unpaid",
+        release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
         updated_at: "2026-07-01T00:00:00.000Z",
       },
@@ -1519,7 +3216,7 @@ describe("executeAdminAction", () => {
       ],
     })).rejects.toThrow("Email already exists for another customer.");
 
-    expect(customerSelect).toHaveBeenCalledWith("id");
+    expect(profileSelect).toHaveBeenCalledWith("id");
     expect(phoneLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
     expect(emailLookupIlike).toHaveBeenCalledWith("email", "luz@example.test");
     expect(customerInsert).not.toHaveBeenCalled();
@@ -1542,12 +3239,17 @@ describe("executeAdminAction", () => {
       updated_at: "2026-07-01T00:00:00.000Z",
     };
     const phoneMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
-    const customerLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: phoneMaybeSingle })) }));
+    const phoneLookupEq = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: phoneMaybeSingle })) }));
     const emailMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
-    const customerLookupIlike = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: emailMaybeSingle })) }));
-    const customerSelect = vi.fn(() => ({
-      eq: customerLookupEq,
-      ilike: customerLookupIlike,
+    const emailLookupIlike = vi.fn(() => ({ limit: vi.fn(() => ({ maybeSingle: emailMaybeSingle })) }));
+    const profileSelect = vi.fn(() => ({
+      eq: phoneLookupEq,
+      ilike: emailLookupIlike,
+    }));
+    const profileInsert = vi.fn(() => ({
+      select: vi.fn(() => ({
+        single: vi.fn(() => Promise.resolve({ data: { id: "profile-id" }, error: null })),
+      })),
     }));
     const customerInsert = vi.fn(() => ({
       select: vi.fn(() => ({
@@ -1561,7 +3263,8 @@ describe("executeAdminAction", () => {
     }));
     const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
     const from = vi.fn((table: string) => {
-      if (table === "customer") return { select: customerSelect, insert: customerInsert };
+      if (table === "profile") return { select: profileSelect, insert: profileInsert };
+      if (table === "customer") return { insert: customerInsert };
       if (table === "customer_order") return { insert: orderInsert };
       if (table === "customer_order_item") return { insert: itemInsert };
       throw new Error(`Unexpected table ${table}`);
@@ -1578,6 +3281,7 @@ describe("executeAdminAction", () => {
         source: "admin_manual",
         order_status: "processing",
         payment_status: "unpaid",
+        release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
         updated_at: "2026-07-01T00:00:00.000Z",
       },
@@ -1591,10 +3295,13 @@ describe("executeAdminAction", () => {
       ],
     });
 
-    expect(customerSelect).toHaveBeenCalledWith("id");
-    expect(customerLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
-    expect(customerLookupIlike).toHaveBeenCalledWith("email", "luz@example.test");
-    expect(customerInsert).toHaveBeenCalledWith(customerPayload);
+    expect(profileSelect).toHaveBeenCalledWith("id");
+    expect(phoneLookupEq).toHaveBeenCalledWith("phone_number", "09171112222");
+    expect(emailLookupIlike).toHaveBeenCalledWith("email", "luz@example.test");
+    expect(profileInsert).toHaveBeenCalled();
+    expect(customerInsert).toHaveBeenCalledWith(expect.objectContaining({
+      profile_id: "profile-id",
+    }));
     expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
       customer_id: customerId,
     }));
@@ -1858,6 +3565,142 @@ describe("executeAdminAction", () => {
     expect(itemInsert).not.toHaveBeenCalled();
   });
 
+  it("blocks order product quantity reductions below the recorded payment total", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const orderItemId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
+    const orderItemMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { order_id: orderId },
+      error: null,
+    }));
+    const orderItemEq = vi.fn(() => ({ maybeSingle: orderItemMaybeSingle }));
+    const orderItemSelect = vi.fn(() => ({ eq: orderItemEq }));
+    const orderItemUpdate = vi.fn();
+    const invoiceMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const invoiceLimit = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceEq = vi.fn(() => ({ limit: invoiceLimit }));
+    const invoiceSelect = vi.fn(() => ({ eq: invoiceEq }));
+    const orderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        id: orderId,
+        agent_id: null,
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        customer: { promoted_to_agent_id: null },
+        payment: [{ amount: 600 }],
+        customer_order_item: [
+          {
+            id: orderItemId,
+            final_quantity: 3,
+            unit_price: 300,
+            agent_commission_amount: 0,
+            product: {
+              agent_commission_type: "value",
+              agent_commission_value: 0,
+            },
+          },
+        ],
+      },
+      error: null,
+    }));
+    const orderEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
+    const orderSelect = vi.fn(() => ({ eq: orderEq }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "customer_order") return { select: orderSelect };
+
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+    const from = vi.fn((table: string) => {
+      if (table === "customer_order_item") {
+        return { select: orderItemSelect, update: orderItemUpdate };
+      }
+
+      if (table === "invoice") return { select: invoiceSelect };
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "update-order-item-quantity",
+      orderItemId,
+      payload: {
+        partial_quantity: 1.5,
+      },
+    }, adminUserId)).rejects.toThrow(
+      "Order product quantities cannot be reduced below the recorded payment total.",
+    );
+
+    expect(orderItemUpdate).not.toHaveBeenCalled();
+  });
+
+  it("allows order product quantity increases after a payment record exists", async () => {
+    const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const orderItemId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
+    const orderItemMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { order_id: orderId },
+      error: null,
+    }));
+    const orderItemEq = vi.fn(() => ({ maybeSingle: orderItemMaybeSingle }));
+    const orderItemSelect = vi.fn(() => ({ eq: orderItemEq }));
+    const orderItemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const orderItemUpdate = vi.fn(() => ({ eq: orderItemUpdateEq }));
+    const invoiceMaybeSingle = vi.fn(() => Promise.resolve({ data: null, error: null }));
+    const invoiceLimit = vi.fn(() => ({ maybeSingle: invoiceMaybeSingle }));
+    const invoiceEq = vi.fn(() => ({ limit: invoiceLimit }));
+    const invoiceSelect = vi.fn(() => ({ eq: invoiceEq }));
+    const orderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        id: orderId,
+        agent_id: null,
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        customer: { promoted_to_agent_id: null },
+        payment: [{ amount: 600 }],
+        customer_order_item: [
+          {
+            id: orderItemId,
+            final_quantity: 3,
+            unit_price: 300,
+            agent_commission_amount: 0,
+            product: {
+              agent_commission_type: "value",
+              agent_commission_value: 0,
+            },
+          },
+        ],
+      },
+      error: null,
+    }));
+    const orderEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
+    const orderSelect = vi.fn(() => ({ eq: orderEq }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "customer_order") return { select: orderSelect };
+
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+    const from = vi.fn((table: string) => {
+      if (table === "customer_order_item") {
+        return { select: orderItemSelect, update: orderItemUpdate };
+      }
+
+      if (table === "invoice") return { select: invoiceSelect };
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
+
+    await executeAdminAction({ from } as never, {
+      type: "update-order-item-quantity",
+      orderItemId,
+      payload: {
+        partial_quantity: 4,
+      },
+    }, adminUserId);
+
+    expect(orderItemUpdate).toHaveBeenCalledWith({ partial_quantity: 4 });
+    expect(orderItemUpdateEq).toHaveBeenCalledWith("id", orderItemId);
+  });
+
   it("removes order products only after edit checks pass", async () => {
     const orderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
     const orderItemMaybeSingle = vi.fn(() => Promise.resolve({
@@ -1885,6 +3728,46 @@ describe("executeAdminAction", () => {
     const limit = vi.fn(() => ({ maybeSingle: emptyMaybeSingle }));
     const eq = vi.fn(() => ({ limit }));
     const select = vi.fn(() => ({ eq }));
+    const orderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        id: orderId,
+        agent_id: null,
+        agent_order_id: null,
+        converted_to_agent_order_id: null,
+        customer: { promoted_to_agent_id: null },
+        payment: [],
+        customer_order_item: [
+          {
+            id: "45e73d23-f25f-4de7-ae3a-ebcf34e995f1",
+            final_quantity: 1,
+            unit_price: 100,
+            agent_commission_amount: 0,
+            product: {
+              agent_commission_type: "value",
+              agent_commission_value: 0,
+            },
+          },
+          {
+            id: "item-2",
+            final_quantity: 1,
+            unit_price: 100,
+            agent_commission_amount: 0,
+            product: {
+              agent_commission_type: "value",
+              agent_commission_value: 0,
+            },
+          },
+        ],
+      },
+      error: null,
+    }));
+    const orderEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
+    const orderSelect = vi.fn(() => ({ eq: orderEq }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "customer_order") return { select: orderSelect };
+
+      throw new Error(`Unexpected admin table ${table}`);
+    });
     const from = vi.fn((table: string) => {
       if (table === "customer_order_item") {
         return { select: orderItemsSelect, delete: orderItemsDelete };
@@ -1896,6 +3779,7 @@ describe("executeAdminAction", () => {
 
       throw new Error(`Unexpected table ${table}`);
     });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
 
     await executeAdminAction({ from } as never, {
       type: "remove-order-item",

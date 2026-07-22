@@ -8,7 +8,7 @@ Auth users are **not** seeded automatically. After `supabase start` / `supabase 
 2. Go to **Authentication → Users → Add user**
 3. Map roles in the database as needed:
    - Admin access: row in `public.admin_role` for the user's auth id
-   - Agent access: row in `public.agent_profile` for the user's auth id
+   - Agent access: row in `public.agent` for the user's auth id
 
 ## Required Environment Variables
 

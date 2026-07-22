@@ -83,47 +83,41 @@ begin
     identity_data = excluded.identity_data,
     updated_at = excluded.updated_at;
 
-  insert into public.profile (id, display_name, created_at, updated_at)
-  values (agent_user_id, 'Phase 7 Test Agent', seeded_at, seeded_at)
+  insert into public.profile (id, user_id, first_name, last_name, display_name, phone_number, created_at, updated_at)
+  values (agent_user_id, agent_user_id, 'Phase', 'Agent', 'Phase 7 Test Agent', '09170000007', seeded_at, seeded_at)
   on conflict (id) do update
   set
+    first_name = excluded.first_name,
+    last_name = excluded.last_name,
     display_name = excluded.display_name,
+    phone_number = excluded.phone_number,
     updated_at = excluded.updated_at;
 
-  insert into public.agent_profile (
+  insert into public.agent (
     user_id,
-    first_name,
-    last_name,
-    display_name,
+    profile_id,
     status,
-    contact,
     created_at,
     updated_at
   )
   values (
     agent_user_id,
-    'Phase',
-    'Agent',
-    'Phase 7 Test Agent',
+    agent_user_id,
     'active',
-    '09170000007',
     seeded_at,
     seeded_at
   )
   on conflict (user_id) do update
   set
-    first_name = excluded.first_name,
-    last_name = excluded.last_name,
-    display_name = excluded.display_name,
+    profile_id = excluded.profile_id,
     status = excluded.status,
-    contact = excluded.contact,
     updated_at = excluded.updated_at
   returning id into agent_profile_id;
 
   if agent_profile_id is null then
     select id
     into agent_profile_id
-    from public.agent_profile
+    from public.agent
     where user_id = agent_user_id;
   end if;
 
@@ -153,37 +147,31 @@ begin
   )
   on conflict (id) do nothing;
 
+  insert into public.profile (id, first_name, last_name, phone_number, address, created_at, updated_at)
+  values
+    ('70000000-0000-4000-8000-000000000081', 'Assigned', 'Customer', '09170000001', 'Assigned test address', seeded_at, seeded_at),
+    ('70000000-0000-4000-8000-000000000082', 'Unassigned', 'Customer', '09170000002', 'Unassigned test address', seeded_at, seeded_at)
+  on conflict (id) do nothing;
+
   insert into public.customer (
     id,
-    first_name,
-    last_name,
-    phone_number,
-    address,
+    profile_id,
     assigned_agent_id
   )
   values (
     '70000000-0000-4000-8000-000000000072',
-    'Assigned',
-    'Customer',
-    '09170000001',
-    'Assigned test address',
+    '70000000-0000-4000-8000-000000000081',
     agent_profile_id
   )
   on conflict (id) do nothing;
 
   insert into public.customer (
     id,
-    first_name,
-    last_name,
-    phone_number,
-    address
+    profile_id
   )
   values (
     '70000000-0000-4000-8000-000000000073',
-    'Unassigned',
-    'Customer',
-    '09170000002',
-    'Unassigned test address'
+    '70000000-0000-4000-8000-000000000082'
   )
   on conflict (id) do nothing;
 end $$;
@@ -323,7 +311,7 @@ declare
 begin
   select id
   into agent_profile_id
-  from public.agent_profile
+  from public.agent
   where user_id = '22222222-2222-2222-2222-222222222222';
 
   select value
@@ -367,11 +355,11 @@ begin
     from public.agent_order
     where id = distribution_agent_order_id
       and agent_id = agent_profile_id
-      and order_status = 'pending_customers'
-      and release_date = '2026-07-21'::date
+      and order_status = 'pending_order'
+      and release_date = timezone('Asia/Manila', timestamp '2026-07-21 00:00:00')
       and submitted_by = '22222222-2222-2222-2222-222222222222'
   ) then
-    raise exception 'Expected product-only agent order to create a distributable agent order';
+    raise exception 'Expected product-only agent order to require admin approval';
   end if;
 
   select count(*)
@@ -397,16 +385,16 @@ begin
   if not exists (
     select 1
     from public.customer_order
-    join public.agent_profile
-      on agent_profile.customer_id = customer_order.customer_id
+    join public.agent
+      on agent.customer_id = customer_order.customer_id
     where customer_order.id = personal_customer_order_id
       and customer_order.agent_id = agent_profile_id
       and customer_order.source = 'agent_submitted'
       and customer_order.order_status = 'pending'
       and customer_order.payment_status = 'unpaid'
-      and customer_order.release_date = '2026-07-22'::date
+      and customer_order.release_date = timezone('Asia/Manila', timestamp '2026-07-22 00:00:00')
       and customer_order.submitted_by = '22222222-2222-2222-2222-222222222222'
-      and agent_profile.id = agent_profile_id
+      and agent.id = agent_profile_id
   ) then
     raise exception 'Expected personal agent order to create a normal linked customer order';
   end if;
@@ -477,13 +465,15 @@ begin
   if not exists (
     select 1
     from public.customer
-    where id = new_customer_id
-      and first_name = 'New'
-      and last_name = 'Agent Customer'
-      and phone_number = '09170000003'
-      and address = 'New customer test address'
-      and assigned_agent_id = agent_profile_id
-      and created_by = '22222222-2222-2222-2222-222222222222'
+    join public.profile customer_person
+      on customer_person.id = customer.profile_id
+    where customer.id = new_customer_id
+      and customer_person.first_name = 'New'
+      and customer_person.last_name = 'Agent Customer'
+      and customer_person.phone_number = '09170000003'
+      and customer_person.address = 'New customer test address'
+      and customer.assigned_agent_id = agent_profile_id
+      and customer.created_by = '22222222-2222-2222-2222-222222222222'
   ) then
     raise exception 'Expected new agent customer to be assigned to the submitting agent';
   end if;

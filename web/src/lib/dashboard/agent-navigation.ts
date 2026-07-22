@@ -5,6 +5,18 @@ export type AgentNavItem = {
   isAction?: boolean;
 };
 
+export const agentMobilePrimaryRoutes = [
+  "/agent",
+  "/agent/customers",
+  "/agent/orders",
+  "/agent/notifications",
+  "/agent/profile",
+] as const;
+
+export function isAgentMobilePrimaryRoute(pathname: string) {
+  return (agentMobilePrimaryRoutes as readonly string[]).includes(pathname);
+}
+
 export function isAgentNavActive(pathname: string, href: string) {
   if (href === "/agent") {
     return pathname === "/agent";

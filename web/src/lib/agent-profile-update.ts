@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { parseContactNumber } from "@/lib/formatters";
+import {
+  assertAgentPhoneIsAvailable,
+  updateAgentWithProfile,
+} from "@/lib/profile-identity";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
@@ -40,8 +44,8 @@ export async function executeAgentProfileUpdate(
   fields: AgentProfileUpdateFields,
 ) {
   const { data: agent, error: loadError } = await adminClient
-    .from("agent_profile")
-    .select("id, user_id")
+    .from("agent")
+    .select("id, user_id, profile_id")
     .eq("id", agentId)
     .maybeSingle();
 
@@ -49,33 +53,21 @@ export async function executeAgentProfileUpdate(
     throw new Error("Unable to load agent profile.");
   }
 
-  if (!agent) {
+  if (!agent?.profile_id) {
     throw new Error("Agent profile was not found.");
   }
 
   await assertAgentContactIsAvailable(adminClient, fields.contact, agentId);
   await assertAgentEmailIsAvailable(adminClient, fields.email, agent.user_id);
 
-  const { error: profileError } = await adminClient
-    .from("agent_profile")
-    .update({
-      employee_id: fields.employee_id,
-      first_name: fields.first_name,
-      last_name: fields.last_name,
-      display_name: fields.display_name,
-      contact: fields.contact,
-      status: fields.status,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", agentId);
-
-  if (profileError) {
-    if (profileError.code === "23505") {
-      throw new Error("Contact number or employee ID already exists for another agent.");
-    }
-
-    throw new Error("Unable to update agent profile.");
-  }
+  await updateAgentWithProfile(adminClient, agentId, String(agent.profile_id), {
+    employee_id: fields.employee_id,
+    first_name: fields.first_name,
+    last_name: fields.last_name,
+    display_name: fields.display_name,
+    contact: fields.contact,
+    status: fields.status,
+  });
 
   if (!fields.email || !agent.user_id) {
     return;
@@ -124,26 +116,9 @@ export async function assertAgentContactIsAvailable(
   adminClient: SupabaseAdminClient,
   contact: string,
   excludeAgentId?: string,
+  excludeProfileId?: string,
 ) {
-  const normalizedContact = contact.trim();
-  let query = adminClient
-    .from("agent_profile")
-    .select("id")
-    .eq("contact", normalizedContact);
-
-  if (excludeAgentId) {
-    query = query.neq("id", excludeAgentId);
-  }
-
-  const { data, error } = await query.limit(1).maybeSingle();
-
-  if (error) {
-    throw new Error("Unable to validate existing agent contact number.");
-  }
-
-  if (data?.id) {
-    throw new Error("Contact number already exists for another agent.");
-  }
+  await assertAgentPhoneIsAvailable(adminClient, contact, excludeAgentId, excludeProfileId);
 }
 
 function requiredString(formData: FormData, key: string) {

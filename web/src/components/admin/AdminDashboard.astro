@@ -2,7 +2,6 @@
 import AdminCharts from "@/components/admin/AdminCharts";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
-import { computeAdminOrderStatusCounts } from "@/lib/admin-dashboard/summary";
 import { formatCurrency } from "@/lib/admin-dashboard/view";
 
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
@@ -14,7 +13,6 @@ type Props = {
 const { data } = Astro.props;
 const analytics = buildAdminAnalytics(data);
 const pendingCustomerBalances = analytics.pendingCustomerBalances;
-const orderCounts = computeAdminOrderStatusCounts(data.orders, data.agentOrders);
 const numberFormatter = new Intl.NumberFormat("en-PH");
 ---
 
@@ -36,24 +34,6 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
     >
       View unpaid customers
     </button>
-  </article>
-  <article class="admin-summary-card admin-summary-card--cluster" data-summary-card="orderCluster">
-    <h2>Orders</h2>
-    <dl class="admin-summary-cluster">
-      <div class="admin-summary-cluster__item">
-        <dt>Total</dt>
-        <dd data-summary-metric="totalOrders">{numberFormatter.format(orderCounts.totalOrders)}</dd>
-      </div>
-      <div class="admin-summary-cluster__item">
-        <dt>Pending</dt>
-        <dd data-summary-metric="pendingOrders">{numberFormatter.format(orderCounts.pendingOrders)}</dd>
-      </div>
-      <div class="admin-summary-cluster__item">
-        <dt>Processing</dt>
-        <dd data-summary-metric="processingOrders">{numberFormatter.format(orderCounts.processingOrders)}</dd>
-      </div>
-    </dl>
-    <a href="/admin/orders">Review orders</a>
   </article>
   <article class="admin-summary-card" data-summary-card="agents">
     <h2>Agents</h2>
@@ -81,18 +61,84 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
     pendingCustomerBalances.length > 0 ? (
       <div class="pending-payments-list">
         {pendingCustomerBalances.map((customer) => (
-          <a
-            class="pending-payments-list__row"
-            href={`/admin/customers/${customer.customerId}`}
-          >
-            <span>
-              <strong>{customer.customerName}</strong>
-              <small>
-                {customer.orderCount} unpaid {customer.orderCount === 1 ? "order" : "orders"}
-              </small>
-            </span>
-            <b>{formatCurrency(customer.unpaidBalance)}</b>
-          </a>
+          <article class="pending-payments-customer">
+            <header class="pending-payments-customer__header">
+              <div class="pending-payments-customer__identity">
+                <a
+                  class="pending-payments-customer__name"
+                  href={`/admin/customers/${customer.customerId}`}
+                >
+                  {customer.customerName}
+                </a>
+                <p class="pending-payments-customer__meta">
+                  {customer.orderCount} unpaid {customer.orderCount === 1 ? "order" : "orders"}
+                </p>
+              </div>
+            </header>
+
+            <ul class="pending-payments-orders">
+              {
+                customer.orders.map((order) => (
+                  <li class="pending-payments-order">
+                    <div class="pending-payments-order__header">
+                      <span class="pending-payments-order__code">
+                        {order.orderCode}
+                      </span>
+                      <strong class="pending-payments-order__balance">
+                        {formatCurrency(order.unpaidBalance)}
+                      </strong>
+                    </div>
+                    <div
+                      class="pending-payments-order__calculation"
+                      aria-label={`${order.orderCode} receivable calculation`}
+                    >
+                      {
+                        order.hasCommissionAdjustment ? (
+                          <>
+                            <div class="pending-payments-calculation__row">
+                              <span>Gross</span>
+                              <span>{formatCurrency(order.grossTotal)}</span>
+                            </div>
+                            <div class="pending-payments-calculation__row pending-payments-calculation__row--deduction">
+                              <span>Commission</span>
+                              <span>−{formatCurrency(order.commissionTotal)}</span>
+                            </div>
+                            <div class="pending-payments-calculation__row">
+                              <span>Receivable</span>
+                              <span>{formatCurrency(order.receivableTotal)}</span>
+                            </div>
+                            <div class="pending-payments-calculation__row pending-payments-calculation__row--deduction">
+                              <span>Paid</span>
+                              <span>−{formatCurrency(order.paidTotal)}</span>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div class="pending-payments-calculation__row">
+                              <span>Gross</span>
+                              <span>{formatCurrency(order.grossTotal)}</span>
+                            </div>
+                            <div class="pending-payments-calculation__row pending-payments-calculation__row--deduction">
+                              <span>Paid</span>
+                              <span>−{formatCurrency(order.paidTotal)}</span>
+                            </div>
+                          </>
+                        )
+                      }
+                    </div>
+                    <div class="pending-payments-order__actions">
+                      <a
+                        class="pending-payments-order__view-link"
+                        href={`/admin/orders/customer/${order.orderId}`}
+                      >
+                        View order details
+                      </a>
+                    </div>
+                  </li>
+                ))
+              }
+            </ul>
+          </article>
         ))}
       </div>
     ) : (
@@ -106,8 +152,6 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
 </section>
 
 <script>
-  const orderClusterMetrics = ["totalOrders", "pendingOrders", "processingOrders"] as const;
-
   function initAdminDashboardSummary() {
     const summaryCards = Array.from(
       document.querySelectorAll<HTMLElement>("[data-summary-card]"),
@@ -145,20 +189,6 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
         const numberFormatter = new Intl.NumberFormat("en-PH");
 
         cardByKey.forEach((card, key) => {
-          if (key === "orderCluster") {
-            orderClusterMetrics.forEach((metricKey) => {
-              const value = summary[metricKey];
-              const valueNode = card.querySelector<HTMLElement>(`[data-summary-metric="${metricKey}"]`);
-
-              if (!valueNode || typeof value !== "number" || Number.isNaN(value)) {
-                return;
-              }
-
-              valueNode.textContent = numberFormatter.format(value);
-            });
-            return;
-          }
-
           const value = summary[key];
           const valueNode = card.querySelector<HTMLElement>("[data-summary-value]");
 

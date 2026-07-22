@@ -9,10 +9,19 @@ type Props = {
 const { href, type = "button", class: className = "", ...rest } = Astro.props;
 const Tag = href ? "a" : "button";
 const buttonProps = href ? { href } : { type };
+const shouldDisablePrefetch =
+  href &&
+  !Object.prototype.hasOwnProperty.call(rest, "data-astro-prefetch") &&
+  !String(href).endsWith(".pdf") &&
+  (/^\/admin(\/|$)/.test(String(href)) || /^\/agent(\/|$)/.test(String(href)));
+const prefetchProps = shouldDisablePrefetch
+  ? { "data-astro-prefetch": "false" as const }
+  : {};
 ---
 
 <Tag
   {...buttonProps}
+  {...prefetchProps}
   class={`group inline-flex items-center gap-2 rounded-lg border-none shadow-none transition-colors duration-200 ease-in-out cursor-pointer bg-transparent text-left p-0 text-inherit decoration-none ${className}`}
   style="cursor: pointer; text-decoration: none;"
   {...rest}

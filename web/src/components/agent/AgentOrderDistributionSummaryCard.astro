@@ -1,0 +1,47 @@
+---
+import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
+
+type Props = {
+  paid: number;
+  commission: number;
+  grossTotal: number;
+  primaryLabel: string;
+  primaryAmount: number;
+  pendingAcceptanceAmount?: number | null;
+  summaryLabel?: string;
+};
+
+const {
+  paid,
+  commission,
+  grossTotal,
+  primaryLabel,
+  primaryAmount,
+  pendingAcceptanceAmount = null,
+  summaryLabel = "Agent order summary",
+} = Astro.props;
+---
+
+<article class="agent-order-distribution-summary" aria-label={summaryLabel}>
+  <AgentOrderCalculationSummary
+    paid={paid}
+    commission={commission}
+    grossTotal={grossTotal}
+    primaryLabel={primaryLabel}
+    primaryAmount={primaryAmount}
+    pendingAcceptanceAmount={pendingAcceptanceAmount}
+    summaryLabel={summaryLabel}
+    variant="summary"
+  />
+</article>
+
+<style>
+  .agent-order-distribution-summary {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
+    padding: 1rem;
+  }
+</style>

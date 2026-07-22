@@ -70,14 +70,16 @@ begin
   if not exists (
     select 1
     from public.customer
-    where id = inserted_customer_id
-      and first_name = 'Guest'
-      and last_name = 'Buyer'
-      and phone_number = '09170000000'
-      and email = 'guest@example.com'
-      and address = 'Temporary public order address'
-      and assigned_agent_id is null
-      and is_reseller = false
+    join public.profile customer_person
+      on customer_person.id = customer.profile_id
+    where customer.id = inserted_customer_id
+      and customer_person.first_name = 'Guest'
+      and customer_person.last_name = 'Buyer'
+      and customer_person.phone_number = '09170000000'
+      and customer_person.email = 'guest@example.com'
+      and customer_person.address = 'Temporary public order address'
+      and customer.assigned_agent_id is null
+      and customer.is_reseller = false
   ) then
     raise exception 'Expected guest customer record to be inserted';
   end if;

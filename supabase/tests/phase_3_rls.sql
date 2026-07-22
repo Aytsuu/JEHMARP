@@ -12,7 +12,7 @@ begin
     and pg_class.relname in (
       'profile',
       'admin_role',
-      'agent_profile',
+      'agent',
       'customer',
       'product',
       'customer_order',
@@ -24,7 +24,6 @@ begin
       'reseller_application',
       'page',
       'page_section',
-      'media_asset',
       'analytics_daily',
       'analytics_product_daily',
       'analytics_agent_daily'
@@ -123,6 +122,26 @@ begin
       and policyname = 'Agents can read own commission metrics'
   ) then
     raise exception 'Missing agent commission metrics policy';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'profile'
+      and policyname = 'Agents can read own agent identity profile'
+  ) then
+    raise exception 'Missing agent identity profile read policy';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'profile'
+      and policyname = 'Agents can read assigned customer identity profiles'
+  ) then
+    raise exception 'Missing assigned customer identity profile read policy';
   end if;
 
   if not exists (

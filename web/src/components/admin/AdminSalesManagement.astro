@@ -6,7 +6,7 @@ import TableActionMenu from "@/components/TableActionMenu.astro";
 import type { AdminSalesManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
 import { orderSources } from "@/lib/admin-dashboard/order-filters";
-import { formatCurrency, formatDate } from "@/lib/admin-dashboard/view";
+import { formatCurrency, formatDate, formatSalePaymentSummary } from "@/lib/admin-dashboard/view";
 import { formatOrderSource } from "@/lib/formatters";
 
 type Props = {
@@ -59,17 +59,19 @@ const skeletonRows = Array.from({ length: 6 });
         <table class="dashboard-table">
           <thead>
             <tr>
-              <th scope="col">Customer</th>
+              <th scope="col">Order Date</th>
               <th scope="col">Sale Date</th>
+              <th scope="col">Customer</th>
               <th scope="col">Source</th>
-              <th scope="col">Order Total</th>
+              <th scope="col">Amount</th>
+              <th scope="col">Payments</th>
               <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
             {data.salesRows.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={5}
+                colspan={7}
                 message="No completed sales match the selected filters."
               />
             ) : data.salesRows.map((sale) => {
@@ -79,10 +81,12 @@ const skeletonRows = Array.from({ length: 6 });
 
               return (
                 <tr data-status={sale.payment_status}>
-                  <td class="dashboard-table__cell--truncate">{sale.customer_label || "Guest"}</td>
+                  <td>{formatDate(sale.created_at)}</td>
                   <td>{formatDate(sale.sale_date)}</td>
+                  <td class="dashboard-table__cell--truncate">{sale.customer_label || "Guest"}</td>
                   <td>{sale.source_label}</td>
                   <td>{formatCurrency(sale.order_total)}</td>
+                  <td>{formatSalePaymentSummary(sale.payment_count)}</td>
                   <td>
                     <TableActionMenu
                       menuLabel={`Open actions for sale ${sale.customer_label || sale.id}`}
@@ -107,10 +111,12 @@ const skeletonRows = Array.from({ length: 6 });
         <caption class="sr-only">Loading filtered sales</caption>
         <thead>
           <tr>
-            <th scope="col">Customer</th>
+            <th scope="col">Order Date</th>
             <th scope="col">Sale Date</th>
+            <th scope="col">Customer</th>
             <th scope="col">Source</th>
-            <th scope="col">Order Total</th>
+            <th scope="col">Amount</th>
+            <th scope="col">Payments</th>
             <th scope="col">Action</th>
           </tr>
         </thead>
@@ -119,8 +125,10 @@ const skeletonRows = Array.from({ length: 6 });
             <tr>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
             </tr>
           ))}

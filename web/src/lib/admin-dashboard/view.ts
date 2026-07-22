@@ -85,8 +85,26 @@ function formatPlainNumber(value: number) {
   }).format(value);
 }
 
+export function formatAgentCode(agentId: string) {
+  return `Agent-${agentId.slice(0, 6).toUpperCase()}`;
+}
+
 export function formatDate(value: string | null) {
-  return value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(new Date(value)) : "Not set";
+  return formatDateTime(value);
+}
+
+export function formatSalePaymentSummary(paymentCount: number) {
+  const count = Number.isFinite(paymentCount) ? Math.max(0, Math.trunc(paymentCount)) : 0;
+
+  if (count === 0) {
+    return "No payments recorded";
+  }
+
+  if (count === 1) {
+    return "Paid in full once";
+  }
+
+  return `Paid ${count} times`;
 }
 
 export function formatDateTime(value: string | null) {
@@ -109,6 +127,95 @@ export function agentOrderTotal(order: AdminAgentOrder) {
   return order.agent_order_item.reduce((total, item) => {
     return total + item.quantity * (item.product?.default_price ?? 0);
   }, 0);
+}
+
+export function orderDistributionConversionAgentId(
+  order: Pick<AdminOrder, "agent_id" | "customer">,
+) {
+  return order.agent_id ?? order.customer?.promoted_to_agent_id ?? null;
+}
+
+export function orderItemEffectiveCommissionAmount(
+  item: AdminOrder["customer_order_item"][number],
+  quantityKey: "partial_quantity" | "final_quantity" = "final_quantity",
+) {
+  const commissionAmount = Number(item.agent_commission_amount ?? 0);
+
+  if (commissionAmount > 0) {
+    return roundCurrency(commissionAmount);
+  }
+
+  return defaultProductCommissionAmount({
+    product: item.product,
+    quantity: item[quantityKey],
+    unitPrice: item.unit_price,
+  });
+}
+
+export function agentOrderItemEffectiveCommissionAmount(
+  item: AdminAgentOrder["agent_order_item"][number],
+) {
+  const commissionAmount = Number(item.agent_commission_amount ?? 0);
+
+  if (commissionAmount > 0) {
+    return roundCurrency(commissionAmount);
+  }
+
+  return defaultProductCommissionAmount({
+    product: item.product,
+    quantity: item.quantity,
+    unitPrice: item.product?.default_price ?? 0,
+  });
+}
+
+export function isOrderCommissionEffective(
+  order: Partial<Pick<AdminOrder, "agent_id" | "agent_order_id" | "converted_to_agent_order_id">>,
+) {
+  return Boolean(
+    order.agent_id ||
+    order.agent_order_id ||
+    order.converted_to_agent_order_id,
+  );
+}
+
+export function orderCommissionTotal(
+  order: Pick<AdminOrder, "customer_order_item"> &
+    Partial<Pick<AdminOrder, "agent_id" | "agent_order_id" | "converted_to_agent_order_id" | "customer">>,
+) {
+  const useDefaultCommission = isOrderCommissionEffective(order);
+
+  if (!useDefaultCommission) {
+    return 0;
+  }
+
+  return roundCurrency(
+    order.customer_order_item.reduce((total, item) => {
+      return total + orderItemEffectiveCommissionAmount(item);
+    }, 0),
+  );
+}
+
+export function agentOrderCommissionTotal(order: Pick<AdminAgentOrder, "agent_order_item">) {
+  return roundCurrency(
+    order.agent_order_item.reduce((total, item) => {
+      return total + agentOrderItemEffectiveCommissionAmount(item);
+    }, 0),
+  );
+}
+
+export function orderReceivableTotal(
+  order: AdminOrder,
+  quantityKey: "partial_quantity" | "final_quantity",
+) {
+  return roundCurrency(
+    Math.max(orderTotal(order, quantityKey) - orderCommissionTotal(order), 0),
+  );
+}
+
+export function agentOrderReceivableTotal(order: AdminAgentOrder) {
+  return roundCurrency(
+    Math.max(agentOrderTotal(order) - agentOrderCommissionTotal(order), 0),
+  );
 }
 
 export function agentOrderPaymentStatus(
@@ -134,11 +241,104 @@ export function orderPaymentTotal(order: AdminOrder) {
 }
 
 export function orderBalance(order: AdminOrder) {
-  return Math.max(orderTotal(order, "final_quantity") - orderPaymentTotal(order), 0);
+  return Math.max(
+    roundCurrency(orderReceivableTotal(order, "final_quantity") - orderPaymentTotal(order)),
+    0,
+  );
+}
+
+export function agentCustomerBalance(
+  orders: AdminOrder[],
+  agentCustomerId: string | null | undefined,
+) {
+  if (!agentCustomerId) {
+    return 0;
+  }
+
+  return roundCurrency(
+    orders
+      .filter((order) => order.customer_id === agentCustomerId)
+      .reduce((total, order) => total + orderBalance(order), 0),
+  );
 }
 
 export function canManageOrderCommissions(order: AdminOrder) {
-  return Boolean(order.agent_id);
+  return Boolean(order.agent_id) && order.order_status === "processing";
+}
+
+export function canConvertPromotedCustomerOrderToDistribution(
+  order: AdminOrder,
+  promotedAgentId: string | null | undefined,
+) {
+  return getCustomerOrderDistributionConversionBlockReason(order, promotedAgentId) === null;
+}
+
+export function shouldShowCustomerOrderDistributionConversionCard(
+  order: AdminOrder,
+  promotedAgentId: string | null | undefined,
+) {
+  return Boolean(promotedAgentId) &&
+    !order.agent_order_id &&
+    !order.converted_to_agent_order_id;
+}
+
+export function customerOrderDistributionConversionBlockMessage(
+  reason: string | null,
+) {
+  switch (reason) {
+    case null:
+      return null;
+    case "Has payment":
+    case "Has payment record":
+      return "This order already has a payment record, so it cannot be converted.";
+    case "Closed":
+      return "Closed orders cannot be converted.";
+    case "No items":
+      return "Orders without products cannot be converted.";
+    case "Already linked":
+      return "This order is already linked to an agent distribution order.";
+    case "Converted":
+      return "This order was already converted to an agent distribution order.";
+    case "Not promoted":
+      return "Only orders from promoted customers can be converted.";
+    default:
+      return "This order cannot be converted right now.";
+  }
+}
+
+export function getCustomerOrderDistributionConversionBlockReason(
+  order: AdminOrder,
+  promotedAgentId: string | null | undefined,
+) {
+  if (!promotedAgentId) {
+    return "Not promoted";
+  }
+
+  if (order.converted_to_agent_order_id) {
+    return "Converted";
+  }
+
+  if (order.agent_order_id) {
+    return "Already linked";
+  }
+
+  if (order.order_status === "closed") {
+    return "Closed";
+  }
+
+  if (order.payment_status !== "unpaid") {
+    return "Has payment";
+  }
+
+  if (order.payment.length > 0 || (order.agent_received_payment ?? []).length > 0) {
+    return "Has payment record";
+  }
+
+  if (order.customer_order_item.length === 0) {
+    return "No items";
+  }
+
+  return null;
 }
 
 export function selected(value: string | null | undefined, option: string) {

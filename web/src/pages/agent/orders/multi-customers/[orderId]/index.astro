@@ -1,6 +1,8 @@
 ﻿---
 import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
 import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
+import AgentOrderDistributionSummaryCard from "@/components/agent/AgentOrderDistributionSummaryCard.astro";
+import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import {
@@ -13,30 +15,32 @@ import {
 } from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
 import {
+  agentOrderCommissionTotal,
   agentOrderPaymentStatus,
+  agentOrderRemittanceTotal,
   agentOrderTotal,
   formatCurrency,
   formatDate,
   fullName,
+  orderExpectedCommission,
   orderPaymentTotal,
   orderTotal,
 } from "@/lib/agent-dashboard/view";
 import {
   buildAttachCustomerProductOptions,
   canAttachCustomerToAgentOrder,
+  formatAgentOrderDistributionStatus,
   formatPendingIndicator,
   getAgentOrderProductDistribution,
   sumPendingCustomerOrderAmount,
 } from "@/lib/agent-order-distribution";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
 
 export const prerender = false;
 
-function formatAmountValue(value: number) {
-  return new Intl.NumberFormat("en-PH", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+function orderQuantityKey(order: AgentOrder): "partial_quantity" | "final_quantity" {
+  return order.invoice.length > 0 ? "final_quantity" : "partial_quantity";
 }
 
 function pendingAgentPaymentTotal(order: AgentOrder) {
@@ -83,7 +87,39 @@ const attachCustomerProducts = buildAttachCustomerProductOptions({
   agentOrder,
   products: data.products,
 });
-const attachCustomerCustomers = data.customers.map((customer) => ({
+const customerBalanceById = data.orders.reduce<Record<string, number>>((balances, order) => {
+  if (!order.customer_id) return balances;
+
+  const balance = Math.max(orderTotal(order, "final_quantity") - orderPaymentTotal(order), 0);
+  if (balance <= 0) return balances;
+
+  return {
+    ...balances,
+    [order.customer_id]: (balances[order.customer_id] ?? 0) + balance,
+  };
+}, {});
+const attachedCustomerIds = agentOrder.customer_order.flatMap((order) =>
+  order.customer_id ? [order.customer_id] : [],
+);
+const paymentNoticeByCustomerId = data.orders.reduce<Record<string, "unpaid" | "partial">>((notices, order) => {
+  const paymentNotice = order.payment_status === "unpaid" || order.payment_status === "partial"
+    ? order.payment_status
+    : null;
+
+  if (!order.customer_id || !paymentNotice) {
+    return notices;
+  }
+
+  return {
+    ...notices,
+    [order.customer_id]: notices[order.customer_id] === "unpaid"
+      ? "unpaid"
+      : paymentNotice,
+  };
+}, {});
+const attachCustomerCustomers = data.customers
+  .filter((customer) => !attachedCustomerIds.includes(customer.id))
+  .map((customer) => ({
   id: customer.id,
   label: fullName(customer),
   firstName: customer.first_name,
@@ -91,6 +127,10 @@ const attachCustomerCustomers = data.customers.map((customer) => ({
   phoneNumber: customer.phone_number,
   email: customer.email ?? "",
   address: customer.address,
+  balance: customerBalanceById[customer.id] ?? 0,
+  creditLimit: customer.credit_limit,
+  creditExceeded: customer.credit_limit_exceeded,
+  paymentNotice: paymentNoticeByCustomerId[customer.id] ?? null,
 }));
 const totalPaid = agentOrder.customer_order.reduce(
   (sum, order) => sum + orderPaymentTotal(order),
@@ -100,12 +140,14 @@ const totalPendingAgentReceived = agentOrder.customer_order.reduce(
   (sum, order) => sum + pendingAgentPaymentTotal(order),
   0,
 );
-const totalCommission = agentOrder.agent_order_item.reduce(
-  (sum, item) => sum + item.agent_commission_amount,
-  0,
-);
+const totalCommission = agentOrderCommissionTotal(agentOrder);
+const totalRemittance = agentOrderRemittanceTotal(agentOrder);
+const orderSummaryPendingAmount = pendingCustomerOrderAmount > 0
+  ? pendingCustomerOrderAmount
+  : null;
 const agentOrderCode = `Order-${agentOrder.id.slice(0, 6).toUpperCase()}`;
-const todayDate = new Date().toISOString().slice(0, 10);
+const todayDate = manilaDateInputValue();
+const todayTime = manilaTimeInputValue();
 const productCount = agentOrder.agent_order_item.length;
 const customerCount = agentOrder.customer_order.length;
 ---
@@ -148,31 +190,15 @@ const customerCount = agentOrder.customer_order.length;
     class="agent-record-content flex max-w-full flex-col gap-4 md:gap-8"
     data-agent-order-detail
   >
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4">
-      <div class="detail-field">
-        <div class="detail-field-value detail-field-value--amount">
-          <span class="amount-ratio">
-            <span class="amount-ratio__paid">{formatCurrency(totalPaid)}</span>
-            <span class="amount-ratio__total"
-              >/{formatAmountValue(totalAmount)}</span
-            >
-            {
-              pendingCustomerOrderAmount > 0 && (
-                <span class="pending-indicator">
-                  {formatPendingIndicator(pendingCustomerOrderAmount, formatCurrency)}
-                </span>
-              )
-            }
-          </span>
-        </div>
-        <span class="detail-field-label">Total amount</span>
-      </div>
-
-      <div class="detail-field">
-        <div class="detail-field-value">{formatCurrency(totalCommission)}</div>
-        <span class="detail-field-label">Total commission</span>
-      </div>
-    </div>
+    <AgentOrderDistributionSummaryCard
+      paid={totalPaid}
+      commission={totalCommission}
+      grossTotal={totalAmount}
+      primaryLabel="Remittance"
+      primaryAmount={totalRemittance}
+      pendingAcceptanceAmount={orderSummaryPendingAmount}
+      summaryLabel="Order calculation"
+    />
 
     <div class="flex flex-col gap-4" data-order-detail-tabs>
       <div
@@ -279,9 +305,10 @@ const customerCount = agentOrder.customer_order.length;
                               Distribution
                             </dt>
                             <dd class="text-[0.9rem] font-semibold text-gray-900">
-                              {distribution.remainingQuantity > 0
-                                ? `${distribution.remainingQuantity} ${item.product?.unit_label ?? "unit"} remaining`
-                                : "Fully distributed"}
+                              {formatAgentOrderDistributionStatus({
+                                remainingQuantity: distribution.remainingQuantity,
+                                unitLabel: item.product?.unit_label ?? "unit",
+                              })}
                             </dd>
                           </div>
                         </dl>
@@ -333,9 +360,10 @@ const customerCount = agentOrder.customer_order.length;
                                 )
                               }
                               <span class="agent-order-products-table__meta">
-                                {distribution.remainingQuantity > 0
-                                  ? `${distribution.remainingQuantity} ${item.product?.unit_label ?? "unit"} remaining`
-                                  : "Fully distributed"}
+                                {formatAgentOrderDistributionStatus({
+                                  remainingQuantity: distribution.remainingQuantity,
+                                  unitLabel: item.product?.unit_label ?? "unit",
+                                })}
                               </span>
                             </td>
                             <td>{item.add_details ?? "N/A"}</td>
@@ -452,6 +480,15 @@ const customerCount = agentOrder.customer_order.length;
                     />
                   </label>
                   <label class="grid gap-1">
+                    <span>Time</span>
+                    <input
+                      type="time"
+                      name="paymentTime"
+                      value={todayTime}
+                      required
+                    />
+                  </label>
+                  <label class="grid gap-1">
                     <span>Reference</span>
                     <input type="text" name="referenceNumber" />
                   </label>
@@ -469,15 +506,13 @@ const customerCount = agentOrder.customer_order.length;
 
                 <div class="grid gap-3 md:hidden">
                   {agentOrder.customer_order.map((order) => {
-                    const invoice = order.invoice[0];
-                    const orderAmount = orderTotal(
-                      order,
-                      invoice ? "final_quantity" : "partial_quantity",
-                    );
+                    const quantityKey = orderQuantityKey(order);
+                    const grossTotal = orderTotal(order, quantityKey);
+                    const orderCommission = orderExpectedCommission(order);
                     const orderPaid = orderPaymentTotal(order);
                     const pendingAgentReceived = pendingAgentPaymentTotal(order);
                     const remainingBalance = Math.max(
-                      orderAmount - orderPaid - pendingAgentReceived,
+                      grossTotal - orderPaid - pendingAgentReceived,
                       0,
                     );
                     const canRecordPayment = remainingBalance > 0;
@@ -485,6 +520,7 @@ const customerCount = agentOrder.customer_order.length;
                     const customerName = order.customer
                       ? fullName(order.customer)
                       : "Guest";
+                    const orderPendingIndicator = isPendingOrder;
 
                     return (
                       <article class="agent-order-detail-card rounded-xl border border-gray-200 bg-white p-4">
@@ -519,31 +555,20 @@ const customerCount = agentOrder.customer_order.length;
                             />
                           </div>
                         </div>
-                        <dl class="mt-3 grid grid-cols-1 gap-2.5">
-                          <div>
-                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
-                              Total amount
-                            </dt>
-                            <dd class="text-[0.9rem] font-semibold text-gray-900">
-                              <span class="amount-ratio">
-                                <span class="amount-ratio__paid">
-                                  {formatCurrency(orderPaid)}
-                                </span>
-                                <span class="amount-ratio__total">
-                                  /{formatAmountValue(orderAmount)}
-                                </span>
-                                {
-                                  isPendingOrder && (
-                                    <span class="pending-indicator">
-                                      {formatPendingIndicator(orderAmount, formatCurrency)}
-                                    </span>
-                                  )
-                                }
-                              </span>
-                            </dd>
-                          </div>
-                          {
-                            pendingAgentReceived > 0 && (
+                        <div class="mt-3">
+                          <AgentOrderCalculationSummary
+                            paid={orderPaid}
+                            commission={orderCommission}
+                            grossTotal={grossTotal}
+                            summaryLabel={`${customerName} order calculation`}
+                            awaitingAcceptance={orderPendingIndicator}
+                            variant="customer"
+                            compact
+                          />
+                        </div>
+                        {
+                          pendingAgentReceived > 0 && (
+                            <dl class="mt-3 grid grid-cols-1 gap-2.5">
                               <div>
                                 <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
                                   Pending confirmation
@@ -552,9 +577,9 @@ const customerCount = agentOrder.customer_order.length;
                                   {formatCurrency(pendingAgentReceived)}
                                 </dd>
                               </div>
-                            )
-                          }
-                        </dl>
+                            </dl>
+                          )
+                        }
                         <div class="mt-3 flex justify-end">
                           <ViewButton href={`/agent/orders/${order.id}`} />
                         </div>
@@ -568,31 +593,30 @@ const customerCount = agentOrder.customer_order.length;
                     <thead>
                       <tr>
                         <th scope="col">Select</th>
+                        <th scope="col">Date Created</th>
                         <th scope="col">Customer</th>
-                        <th scope="col">Date</th>
                         <th scope="col">Source</th>
                         <th scope="col">Order Status</th>
                         <th scope="col">Payment Status</th>
-                        <th scope="col">Total amount</th>
+                        <th scope="col">Order calculation</th>
                         <th scope="col">Agent received</th>
                         <th scope="col">Action</th>
                       </tr>
                     </thead>
                     <tbody>
                       {agentOrder.customer_order.map((order) => {
-                        const invoice = order.invoice[0];
-                        const orderAmount = orderTotal(
-                          order,
-                          invoice ? "final_quantity" : "partial_quantity",
-                        );
+                        const quantityKey = orderQuantityKey(order);
+                        const grossTotal = orderTotal(order, quantityKey);
+                        const orderCommission = orderExpectedCommission(order);
                         const orderPaid = orderPaymentTotal(order);
                         const pendingAgentReceived = pendingAgentPaymentTotal(order);
                         const remainingBalance = Math.max(
-                          orderAmount - orderPaid - pendingAgentReceived,
+                          grossTotal - orderPaid - pendingAgentReceived,
                           0,
                         );
                         const canRecordPayment = remainingBalance > 0;
                         const isPendingOrder = order.order_status === "pending";
+                        const orderPendingIndicator = isPendingOrder;
 
                         return (
                           <tr>
@@ -605,10 +629,10 @@ const customerCount = agentOrder.customer_order.length;
                                 aria-label={`Select ${order.customer ? fullName(order.customer) : "guest order"}`}
                               />
                             </td>
+                            <td>{formatDate(order.created_at)}</td>
                             <td>
                               {order.customer ? fullName(order.customer) : "Guest"}
                             </td>
-                            <td>{formatDate(order.created_at)}</td>
                             <td>{formatOrderSource(order.source)}</td>
                             <td>
                               <StatusBadge
@@ -625,21 +649,15 @@ const customerCount = agentOrder.customer_order.length;
                               />
                             </td>
                             <td>
-                              <span class="amount-ratio">
-                                <span class="amount-ratio__paid">
-                                  {formatCurrency(orderPaid)}
-                                </span>
-                                <span class="amount-ratio__total">
-                                  /{formatAmountValue(orderAmount)}
-                                </span>
-                                {
-                                  isPendingOrder && (
-                                    <span class="pending-indicator">
-                                      {formatPendingIndicator(orderAmount, formatCurrency)}
-                                    </span>
-                                  )
-                                }
-                              </span>
+                              <AgentOrderCalculationSummary
+                                paid={orderPaid}
+                                commission={orderCommission}
+                                grossTotal={grossTotal}
+                                summaryLabel="Customer order calculation"
+                                awaitingAcceptance={orderPendingIndicator}
+                                variant="customer"
+                                compact
+                              />
                             </td>
                             <td>
                               <span class="agent-received-payment">
@@ -732,51 +750,6 @@ const customerCount = agentOrder.customer_order.length;
     align-items: center;
     justify-content: flex-end;
     gap: 0.45rem;
-  }
-
-  .detail-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    border: 1px solid rgba(17, 24, 39, 0.08);
-    border-radius: 1rem;
-    background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
-    padding: 1rem;
-  }
-
-  .detail-field-label {
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--color-brand-muted-black);
-    text-transform: none;
-    letter-spacing: normal;
-  }
-
-  .detail-field-value {
-    font-size: 1.35rem;
-    line-height: 1.15;
-    color: #111827;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-  }
-
-  .amount-ratio {
-    display: inline-flex;
-    align-items: baseline;
-    gap: 0;
-    white-space: nowrap;
-  }
-
-  .amount-ratio__paid {
-    font-size: inherit;
-    font-weight: inherit;
-    color: inherit;
-  }
-
-  .amount-ratio__total {
-    font-size: 0.78em;
-    font-weight: 500;
-    color: #9ca3af;
   }
 
   .record-section {
@@ -884,7 +857,7 @@ const customerCount = agentOrder.customer_order.length;
   }
 
   .agent-order-customer-orders-table {
-    min-width: 1120px;
+    min-width: 1180px;
   }
 
   .agent-order-customer-orders-table th:first-child,
@@ -893,13 +866,8 @@ const customerCount = agentOrder.customer_order.length;
     text-align: center;
   }
 
-  .agent-order-customer-orders-table .amount-ratio {
-    font-size: 0.95rem;
-    font-weight: 600;
-  }
-
-  .agent-order-customer-orders-table .amount-ratio__total {
-    font-size: 0.82em;
+  .agent-order-customer-orders-table td :global(.order-calculation-summary) {
+    min-width: 12rem;
   }
 
   .agent-received-payment {
@@ -972,10 +940,6 @@ const customerCount = agentOrder.customer_order.length;
   }
 
   @media (max-width: 767px) {
-    .detail-field-value {
-      font-size: 1.1rem;
-    }
-
     .record-heading-badges {
       justify-content: flex-start;
     }

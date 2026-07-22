@@ -1,4 +1,5 @@
 import {
+  consumeDashboardFragmentRefreshNeeded,
   readDashboardFragmentCache,
   writeDashboardFragmentCache,
 } from "./dashboard-fragment-cache";
@@ -83,6 +84,23 @@ export function initDashboardFragmentTable(config: DashboardFragmentTableConfig)
     return pageSizes.includes(value) ? value : 10;
   }
 
+  function currentTotalPages() {
+    const footer = activeContainer.querySelector<HTMLElement>("[data-server-pagination-footer]");
+    const totalPages = Number(footer?.dataset.totalPages ?? "1");
+
+    return Number.isInteger(totalPages) && totalPages > 0 ? totalPages : 1;
+  }
+
+  function navigateToPage(page: number) {
+    const totalPages = currentTotalPages();
+    const nextPage = Math.min(Math.max(page, 1), totalPages);
+
+    void applyQuery(normalizeFormQuery({
+      page: nextPage,
+      pageSize: currentPageSize(),
+    }));
+  }
+
   function normalizeFormQuery(options: { page?: number; pageSize?: number } = {}) {
     const params = new URLSearchParams();
     const formData = new FormData(activeForm);
@@ -148,21 +166,26 @@ export function initDashboardFragmentTable(config: DashboardFragmentTableConfig)
     });
   }
 
-  async function applyQuery(targetQuery: string) {
+  async function applyQuery(
+    targetQuery: string,
+    options: { force?: boolean } = {},
+  ) {
     const currentQuery = normalizeParams(new URLSearchParams(window.location.search));
 
-    if (targetQuery === currentQuery) return;
+    if (!options.force && targetQuery === currentQuery) return;
 
-    const cachedFragment = readDashboardFragmentCache(config.cacheKey, targetQuery);
-    if (cachedFragment) {
-      window.history.replaceState(
-        { [config.historyStateKey]: targetQuery },
-        "",
-        buildUrl(config.pagePath, targetQuery),
-      );
-      replaceFragment(cachedFragment);
-      activeForm.dataset.currentFilterQuery = targetQuery;
-      return;
+    if (!options.force) {
+      const cachedFragment = readDashboardFragmentCache(config.cacheKey, targetQuery);
+      if (cachedFragment) {
+        window.history.replaceState(
+          { [config.historyStateKey]: targetQuery },
+          "",
+          buildUrl(config.pagePath, targetQuery),
+        );
+        replaceFragment(cachedFragment);
+        activeForm.dataset.currentFilterQuery = targetQuery;
+        return;
+      }
     }
 
     showSkeletonForQuery(targetQuery);
@@ -173,6 +196,7 @@ export function initDashboardFragmentTable(config: DashboardFragmentTableConfig)
 
     try {
       const response = await fetch(buildUrl(config.fragmentPath, targetQuery), {
+        cache: "no-store",
         headers: {
           "X-Requested-With": "fetch",
         },
@@ -206,11 +230,17 @@ export function initDashboardFragmentTable(config: DashboardFragmentTableConfig)
     }, 120);
   }
 
-  writeDashboardFragmentCache(
-    config.cacheKey,
-    normalizeParams(new URLSearchParams(window.location.search)),
-    activeContainer.outerHTML,
-  );
+  const initialQuery = normalizeParams(new URLSearchParams(window.location.search));
+
+  if (consumeDashboardFragmentRefreshNeeded()) {
+    void applyQuery(initialQuery, { force: true });
+  } else {
+    writeDashboardFragmentCache(
+      config.cacheKey,
+      initialQuery,
+      activeContainer.outerHTML,
+    );
+  }
 
   activeForm.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -250,9 +280,29 @@ export function initDashboardFragmentTable(config: DashboardFragmentTableConfig)
     if (!button || button.disabled) return;
 
     const page = Number(button.dataset.page ?? "1");
-    void applyQuery(normalizeFormQuery({
-      page: Number.isInteger(page) && page > 0 ? page : 1,
-      pageSize: currentPageSize(),
-    }));
+    navigateToPage(Number.isInteger(page) && page > 0 ? page : 1);
+  });
+
+  activeContainer.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || !target.matches("[data-pagination-page-input]")) {
+      return;
+    }
+
+    const page = Number(target.value);
+    navigateToPage(Number.isInteger(page) && page > 0 ? page : 1);
+  });
+
+  activeContainer.addEventListener("keydown", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || !target.matches("[data-pagination-page-input]")) {
+      return;
+    }
+
+    if (event.key !== "Enter") return;
+
+    event.preventDefault();
+    const page = Number(target.value);
+    navigateToPage(Number.isInteger(page) && page > 0 ? page : 1);
   });
 }

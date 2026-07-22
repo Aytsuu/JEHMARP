@@ -24,6 +24,13 @@ export const defaultAdminPagination: AdminPaginationParams = {
   pageSize: 10,
 };
 
+export function formatRecordCount(totalRows: number) {
+  const count = Math.max(Math.trunc(totalRows), 0);
+  const label = count === 1 ? "record" : "records";
+
+  return `${count} ${label}`;
+}
+
 export function parseAdminPagination(url: URL): AdminPaginationParams {
   const page = positiveInteger(url.searchParams.get("page")) ?? defaultAdminPagination.page;
   const requestedPageSize = positiveInteger(url.searchParams.get("pageSize"));

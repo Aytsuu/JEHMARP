@@ -63,9 +63,9 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
         <table class="dashboard-table">
           <thead>
             <tr>
+              <th scope="col">Date Created</th>
               <th scope="col">Invoice Number</th>
               <th scope="col">Customer</th>
-              <th scope="col">Date</th>
               <th scope="col">Invoice Total</th>
               <th scope="col">Paid</th>
               <th scope="col">Balance</th>
@@ -84,13 +84,13 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
 
               return (
                 <tr data-status={invoice.payment_status}>
+                  <td>{formatDate(invoice.invoice_created_at)}</td>
                   <td class="dashboard-table__cell--truncate">
                     {invoice.invoice_number}
                   </td>
                   <td class="dashboard-table__cell--truncate">
                     {invoice.customer_label || "Guest"}
                   </td>
-                  <td>{formatDate(invoice.invoice_created_at)}</td>
                   <td>{formatCurrency(invoice.invoice_total)}</td>
                   <td>{formatCurrency(invoice.paid_total)}</td>
                   <td>{formatCurrency(invoice.balance)}</td>
@@ -118,9 +118,9 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
         <caption class="sr-only">Loading filtered invoices</caption>
         <thead>
           <tr>
+            <th scope="col">Date Created</th>
             <th scope="col">Invoice Number</th>
             <th scope="col">Customer</th>
-            <th scope="col">Date</th>
             <th scope="col">Invoice Total</th>
             <th scope="col">Paid</th>
             <th scope="col">Balance</th>

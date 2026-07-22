@@ -12,6 +12,7 @@ declare
   first_order_id uuid := '99999999-0000-4000-8000-000000000021';
   second_order_id uuid := '99999999-0000-4000-8000-000000000022';
   text_result text;
+  timestamp_result timestamptz;
 begin
   insert into auth.users (
     id,
@@ -47,30 +48,27 @@ begin
     updated_at = excluded.updated_at,
     deleted_at = null;
 
-  insert into public.profile (id, display_name, created_at, updated_at)
-  values (agent_user_id, 'Phase 9 Test Agent', seeded_at, seeded_at)
+  insert into public.profile (id, user_id, first_name, last_name, display_name, phone_number, created_at, updated_at)
+  values (agent_user_id, agent_user_id, 'Phase', 'Nine', 'Phase 9 Test Agent', '09179999999', seeded_at, seeded_at)
   on conflict (id) do update
   set
+    first_name = excluded.first_name,
+    last_name = excluded.last_name,
     display_name = excluded.display_name,
+    phone_number = excluded.phone_number,
     updated_at = excluded.updated_at;
 
-  insert into public.agent_profile (
+  insert into public.agent (
     user_id,
-    first_name,
-    last_name,
-    display_name,
+    profile_id,
     status,
-    contact,
     created_at,
     updated_at
   )
   values (
     agent_user_id,
-    'Phase',
-    'Nine',
-    'Phase 9 Test Agent',
+    agent_user_id,
     'active',
-    '09179999999',
     seeded_at,
     seeded_at
   )
@@ -97,17 +95,19 @@ begin
     true
   );
 
+  insert into public.profile (id, first_name, last_name, phone_number, address, created_at, updated_at)
+  values
+    ('99999999-0000-4000-8000-000000000091', 'Paid', 'One', '09179999991', 'Phase 9 Address 1', seeded_at, seeded_at),
+    ('99999999-0000-4000-8000-000000000092', 'Paid', 'Two', '09179999992', 'Phase 9 Address 2', seeded_at, seeded_at);
+
   insert into public.customer (
     id,
-    first_name,
-    last_name,
-    phone_number,
-    address,
+    profile_id,
     assigned_agent_id
   )
   values
-    (first_customer_id, 'Paid', 'One', '09179999991', 'Phase 9 Address 1', agent_profile_id),
-    (second_customer_id, 'Paid', 'Two', '09179999992', 'Phase 9 Address 2', agent_profile_id);
+    (first_customer_id, '99999999-0000-4000-8000-000000000091', agent_profile_id),
+    (second_customer_id, '99999999-0000-4000-8000-000000000092', agent_profile_id);
 
   insert into public.agent_order (
     id,
@@ -118,7 +118,7 @@ begin
   values (
     agent_order_id,
     agent_profile_id,
-    'processing',
+    'pending_customers',
     agent_user_id
   );
 
@@ -135,6 +135,15 @@ begin
   values
     (first_order_id, first_customer_id, agent_profile_id, agent_order_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id),
     (second_order_id, second_customer_id, agent_profile_id, agent_order_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id);
+
+  select order_status
+  into text_result
+  from public.agent_order
+  where id = agent_order_id;
+
+  if text_result <> 'processing' then
+    raise exception 'Expected agent order with attached customer orders to become processing, got %', text_result;
+  end if;
 
   insert into public.customer_order_item (
     order_id,
@@ -175,6 +184,15 @@ begin
     raise exception 'Expected first fully paid customer order to close, got %', text_result;
   end if;
 
+  select sale_date
+  into timestamp_result
+  from public.customer_order
+  where id = first_order_id;
+
+  if timestamp_result is null then
+    raise exception 'Expected first fully paid customer order to receive sale_date.';
+  end if;
+
   select order_status
   into text_result
   from public.agent_order
@@ -182,6 +200,15 @@ begin
 
   if text_result <> 'processing' then
     raise exception 'Expected agent order to remain processing while one linked order is unpaid, got %', text_result;
+  end if;
+
+  select sale_date
+  into timestamp_result
+  from public.agent_order
+  where id = agent_order_id;
+
+  if timestamp_result is not null then
+    raise exception 'Expected agent order sale_date to remain empty before all linked orders are paid.';
   end if;
 
   insert into public.payment (
@@ -215,6 +242,15 @@ begin
 
   if text_result <> 'closed' then
     raise exception 'Expected agent order to close after all linked customer orders are paid, got %', text_result;
+  end if;
+
+  select sale_date
+  into timestamp_result
+  from public.agent_order
+  where id = agent_order_id;
+
+  if timestamp_result is null then
+    raise exception 'Expected closed paid agent order to receive sale_date.';
   end if;
 end $$;
 

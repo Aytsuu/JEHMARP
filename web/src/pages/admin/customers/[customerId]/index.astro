@@ -1,11 +1,13 @@
 ---
 import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import ViewButton from "@/components/ViewButton.astro";
+import Sheet from "@/components/ui/Sheet.astro";
 import {
   formatAdminActionFeedback,
   handleAdminDashboardAction,
 } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { loadAdminCustomerRecord, loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import {
   formatCurrency,
@@ -16,6 +18,7 @@ import {
   orderTotal,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
 
 export const prerender = false;
 
@@ -36,7 +39,8 @@ if (Astro.request.method === "POST") {
 }
 
 const data = await loadAdminDashboardData();
-const customer = data.customers.find((c) => c.id === customerId);
+const customer = data.customers.find((c) => c.id === customerId)
+  ?? (customerId ? await loadAdminCustomerRecord(customerId) : null);
 
 if (!customer) {
   return Astro.redirect("/admin/customers", 302);
@@ -46,9 +50,15 @@ const customerOrders = data.orders.filter((order) => order.customer_id === custo
 const pendingOrders = customerOrders.filter((order) => order.order_status !== "closed");
 const historicalOrders = customerOrders.filter((order) => order.order_status === "closed");
 const assignedAgent = data.agents.find((agent) => agent.id === customer.assigned_agent_id);
-const linkedAgent = data.agents.find((agent) => agent.customer_id === customer.id);
+const linkedAgent = data.agents.find((agent) =>
+  agent.customer_id === customer.id
+  || agent.promoted_from_customer_id === customer.id
+  || agent.id === customer.promoted_to_agent_id
+);
+const isPromotedCustomer = Boolean(customer.promoted_to_agent_id || linkedAgent?.promoted_from_customer_id === customer.id);
 const pendingTotalBalance = pendingOrders.reduce((total, order) => total + orderBalance(order), 0);
-const today = new Date().toISOString().slice(0, 10);
+const today = manilaDateInputValue();
+const todayTime = manilaTimeInputValue();
 const feedback = formatAdminActionFeedback(Astro.url);
 const customerName = fullName(customer);
 const customerReturnTo = encodeURIComponent(`/admin/customers/${customer.id}`);
@@ -60,6 +70,8 @@ const backUrl =
 const backLabel = backUrl.startsWith("/admin/agents/")
   ? "Back to agent record"
   : "Back to customers";
+const customerEmail = customer.email?.trim() ?? "";
+const hasCustomerEmail = customerEmail.length > 0;
 ---
 
 <AdminNotificationsPageLayout
@@ -107,16 +119,6 @@ const backLabel = backUrl.startsWith("/admin/agents/")
         {assignedAgent ? assignedAgent.display_name : "No assigned agent"}
       </span>
     </li>
-    <li class="record-meta__item">
-      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M20 21v-2a4 4 0 0 0-4-4h-1"></path>
-        <path d="M4 21v-2a4 4 0 0 1 4-4h1"></path>
-        <circle cx="12" cy="7" r="4"></circle>
-      </svg>
-      <span class="record-meta__text">
-        {linkedAgent ? `Agent profile: ${linkedAgent.display_name}` : "Not an agent"}
-      </span>
-    </li>
     <li class="record-meta__item record-meta__item--wide">
       <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
@@ -127,6 +129,16 @@ const backLabel = backUrl.startsWith("/admin/agents/")
   </ul>
 
   <div class="customer-record-content">
+    {isPromotedCustomer && linkedAgent && (
+      <div class="customer-promotion-note" role="note">
+        <strong>Promoted customer record</strong>
+        <span>
+          This customer record is retained for historical orders. Active management now happens from the agent record.
+        </span>
+        <a href={`/admin/agents/${linkedAgent.id}`}>View agent record</a>
+      </div>
+    )}
+
     <div class="content-section">
       <h3 class="customer-record-content__heading">Orders Summary</h3>
       <div class="orders-summary-grid">
@@ -146,52 +158,91 @@ const backLabel = backUrl.startsWith("/admin/agents/")
         </div>
 
         <div class="detail-field">
-          <span class="detail-field-label">Credit limit</span>
-          <div class="detail-field-value">{formatCompactCurrency(customer.credit_limit)}</div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Credit status</span>
-          <div class="detail-field-value">
-            {customer.credit_limit_exceeded ? "Exceeded" : "Within limit"}
-          </div>
-        </div>
-
-        <div class="detail-field">
           <span class="detail-field-label">Historical orders</span>
           <div class="detail-field-value">{historicalOrders.length}</div>
         </div>
       </div>
-
-      <form method="post" class="customer-credit-form">
-        <input type="hidden" name="action" value="save-customer" />
-        <input type="hidden" name="customerId" value={customer.id} />
-        <input type="hidden" name="firstName" value={customer.first_name} />
-        <input type="hidden" name="lastName" value={customer.last_name} />
-        <input type="hidden" name="phoneNumber" value={customer.phone_number} />
-        <input type="hidden" name="email" value={customer.email ?? ""} />
-        <input type="hidden" name="address" value={customer.address} />
-        <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
-        {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
-        <label>
-          <span>Credit limit</span>
-          <input name="creditLimit" type="number" min="0" step="1" value={customer.credit_limit} required />
-        </label>
-        <button type="submit" class="btn-table-manage">Save Credit</button>
-      </form>
-
-      <div class="customer-record-actions">
-        {linkedAgent ? (
-          <a href={`/admin/agents/${linkedAgent.id}`} class="btn-table-manage">View Agent</a>
-        ) : (
-          <form method="post">
-            <input type="hidden" name="action" value="promote-customer-to-agent" />
-            <input type="hidden" name="customerId" value={customer.id} />
-            <button type="submit" class="btn-table-manage">Promote to Agent</button>
-          </form>
-        )}
-      </div>
     </div>
+
+    {!isPromotedCustomer && (
+      <div class="content-section">
+        <h3 class="customer-record-content__heading">Credit limit</h3>
+        <div class="orders-summary-grid customer-credit-summary-grid">
+          <div class="detail-field">
+            <span class="detail-field-label">Current limit</span>
+            <div class="detail-field-value">{formatCompactCurrency(customer.credit_limit)}</div>
+          </div>
+
+          <div class="detail-field">
+            <span class="detail-field-label">Credit status</span>
+            <div class="detail-field-value">
+              <StatusBadge
+                kind="payment"
+                status={customer.credit_limit_exceeded ? "unpaid" : "paid"}
+                label={customer.credit_limit_exceeded ? "Exceeded" : "Within limit"}
+              />
+            </div>
+          </div>
+        </div>
+
+        <form method="post" class="admin-form customer-credit-form" data-astro-reload>
+          <input type="hidden" name="action" value="save-customer" />
+          <input type="hidden" name="customerId" value={customer.id} />
+          <input type="hidden" name="firstName" value={customer.first_name} />
+          <input type="hidden" name="lastName" value={customer.last_name} />
+          <input type="hidden" name="phoneNumber" value={customer.phone_number} />
+          <input type="hidden" name="email" value={customer.email ?? ""} />
+          <input type="hidden" name="address" value={customer.address} />
+          <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
+          {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
+          <div class="admin-form-grid customer-credit-form__grid">
+            <label class="field-row">
+              <span>Credit limit</span>
+              <input
+                name="creditLimit"
+                type="number"
+                min="0"
+                step="1"
+                value={customer.credit_limit}
+                required
+              />
+            </label>
+          </div>
+          <div class="customer-record-form__actions">
+            <button type="submit">Save credit limit</button>
+          </div>
+        </form>
+      </div>
+    )}
+
+    {!isPromotedCustomer && (
+      <div class="content-section">
+        <h3 class="customer-record-content__heading">Agent account</h3>
+        {linkedAgent ? (
+          <p class="customer-record-section-copy">
+            Open the linked agent record to manage this account.
+          </p>
+        ) : (
+          <p class="customer-record-section-copy">
+            Promote this customer to create an agent login. Profile details will be copied from this record.
+          </p>
+        )}
+        <div class="customer-record-actions customer-record-actions--section">
+          {linkedAgent ? (
+            <a href={`/admin/agents/${linkedAgent.id}`} class="btn-table-manage">View agent</a>
+          ) : (
+            <button
+              type="button"
+              class="btn-table-manage"
+              data-open-create-sheet
+              data-sheet-target="#promote-customer-agent-sheet"
+            >
+              Promote to agent
+            </button>
+          )}
+        </div>
+      </div>
+    )}
 
     <div class="content-section">
       <h3 class="customer-record-content__heading">Pending Orders ({pendingOrders.length})</h3>
@@ -200,93 +251,120 @@ const backLabel = backUrl.startsWith("/admin/agents/")
           <p class="empty-state">No pending orders found for this customer.</p>
         ) : (
           <>
-          <div class="pending-payment-summary">
-            <strong>Total to be paid</strong>
-            <span>{formatCurrency(pendingTotalBalance)}</span>
-          </div>
-          <form method="post" class="customer-payment-distribution-form">
-            <input type="hidden" name="action" value="apply-customer-payment" />
-            <input type="hidden" name="customerId" value={customer.id} />
-            <label>
-              <span>Received payment</span>
-              <input name="amount" type="number" min="0.01" step="0.01" max={pendingTotalBalance} required />
-            </label>
-            <label>
-              <span>Payment method</span>
-              <select name="paymentMethod" required>
-                <option value="">Select method</option>
-                <option value="Cash" selected>Cash</option>
-                <option value="Check">Check</option>
-              </select>
-            </label>
-            <label>
-              <span>Payment terms</span>
-              <select name="paymentTerms" required>
-                <option value="">Select payment terms</option>
-                <option value="Cash on Delivery (COD)" selected>Cash on Delivery (COD)</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Gcash">Gcash</option>
-              </select>
-            </label>
-            <label>
-              <span>Payment date</span>
-              <input name="paymentDate" type="date" value={today} required />
-            </label>
-            <label>
-              <span>Reference</span>
-              <input name="referenceNumber" />
-            </label>
-            <label class="customer-payment-distribution-form__notes">
-              <span>Notes</span>
-              <textarea name="notes" rows="2"></textarea>
-            </label>
-            <button type="submit" class="btn-table-manage">Distribute Payment</button>
-          </form>
-          <div class="table-wrap">
-            <table style="table-layout: fixed; width: 100%;">
-              <thead>
-                <tr>
-                  <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Date</th>
-                  <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Source</th>
-                  <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Status</th>
-                  <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Payment Status</th>
-                  <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Balance</th>
-                  <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {
-                  pendingOrders.map((order) => {
-                    const balance = orderBalance(order);
-                    return (
-                      <tr>
-                        <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {formatDate(order.created_at)}
-                        </td>
-                        <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {formatOrderSource(order.source)}
-                        </td>
-                        <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {autoCapitalize(order.order_status)}
-                        </td>
-                        <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {autoCapitalize(order.payment_status)}
-                        </td>
-                        <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {formatCurrency(balance)}
-                        </td>
-                        <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          <ViewButton
-                            href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })
-                }
-              </tbody>
-            </table>
-          </div>
+            <div class="customer-record-highlight" role="status">
+              <span class="customer-record-highlight__label">Total to be paid</span>
+              <strong class="customer-record-highlight__value">
+                {formatCurrency(pendingTotalBalance)}
+              </strong>
+            </div>
+
+            <section class="customer-record-form-section">
+              <h4 class="customer-record-form-section__title">Apply payment</h4>
+              <form method="post" class="admin-form customer-payment-form" data-astro-reload>
+                <input type="hidden" name="action" value="apply-customer-payment" />
+                <input type="hidden" name="customerId" value={customer.id} />
+                <div class="admin-form-grid customer-payment-form__grid">
+                  <label class="field-row">
+                    <span>Received payment</span>
+                    <input
+                      name="amount"
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      max={pendingTotalBalance}
+                      required
+                    />
+                  </label>
+                  <label class="field-row">
+                    <span>Payment method</span>
+                    <select name="paymentMethod" required>
+                      <option value="">Select method</option>
+                      <option value="Cash" selected>Cash</option>
+                      <option value="Check">Check</option>
+                    </select>
+                  </label>
+                  <label class="field-row">
+                    <span>Payment terms</span>
+                    <select name="paymentTerms" required>
+                      <option value="">Select payment terms</option>
+                      <option value="Cash on Delivery (COD)" selected>Cash on Delivery (COD)</option>
+                      <option value="Bank Transfer">Bank Transfer</option>
+                      <option value="Gcash">Gcash</option>
+                    </select>
+                  </label>
+                  <div class="field-row-group field-row-group--datetime">
+                    <label class="field-row field-row--date">
+                      <span>Payment date</span>
+                      <input name="paymentDate" type="date" value={today} required />
+                    </label>
+                    <label class="field-row field-row--time">
+                      <span>Payment time</span>
+                      <input name="paymentTime" type="time" value={todayTime} required />
+                    </label>
+                  </div>
+                  <label class="field-row">
+                    <span>Reference</span>
+                    <input name="referenceNumber" />
+                  </label>
+                </div>
+                <label class="field-row">
+                  <span>Notes</span>
+                  <textarea name="notes" rows="2"></textarea>
+                </label>
+                <div class="customer-record-form__actions">
+                  <button type="submit">Distribute payment</button>
+                </div>
+              </form>
+            </section>
+
+            <div class="table-wrap">
+              <table class="agent-customers-table customer-record-orders-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Date Created</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Order Status</th>
+                    <th scope="col">Payment Status</th>
+                    <th scope="col">Balance</th>
+                    <th scope="col">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {
+                    pendingOrders.map((order) => {
+                      const balance = orderBalance(order);
+                      return (
+                        <tr>
+                          <td>{formatDate(order.created_at)}</td>
+                          <td>{formatOrderSource(order.source)}</td>
+                          <td>
+                            <StatusBadge
+                              kind="order"
+                              status={order.order_status}
+                              label={autoCapitalize(order.order_status)}
+                            />
+                          </td>
+                          <td>
+                            <StatusBadge
+                              kind="payment"
+                              status={order.payment_status}
+                              label={autoCapitalize(order.payment_status)}
+                            />
+                          </td>
+                          <td>{formatCurrency(balance)}</td>
+                          <td>
+                            <ViewButton
+                              href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`}
+                              data-astro-prefetch="false"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })
+                  }
+                </tbody>
+              </table>
+            </div>
           </>
         )
       }
@@ -301,15 +379,15 @@ const backLabel = backUrl.startsWith("/admin/agents/")
           <p class="empty-state">No historical or closed orders found for this customer.</p>
         ) : (
           <div class="table-wrap">
-            <table style="table-layout: fixed; width: 100%;">
+            <table class="agent-customers-table customer-record-orders-table">
               <thead>
                 <tr>
-                  <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Date</th>
-                  <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Source</th>
-                  <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Order Status</th>
-                  <th scope="col" style="width: 17%; padding: 1.1rem 0.75rem;">Payment Status</th>
-                  <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Total</th>
-                  <th scope="col" style="width: 16%; padding: 1.1rem 0.75rem;">Action</th>
+                  <th scope="col">Date Created</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Order Status</th>
+                  <th scope="col">Payment Status</th>
+                  <th scope="col">Total</th>
+                  <th scope="col">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -319,24 +397,27 @@ const backLabel = backUrl.startsWith("/admin/agents/")
                     const total = orderTotal(order, invoice ? "final_quantity" : "partial_quantity");
                     return (
                       <tr>
-                        <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {formatDate(order.created_at)}
+                        <td>{formatDate(order.created_at)}</td>
+                        <td>{formatOrderSource(order.source)}</td>
+                        <td>
+                          <StatusBadge
+                            kind="order"
+                            status={order.order_status}
+                            label={autoCapitalize(order.order_status)}
+                          />
                         </td>
-                        <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {formatOrderSource(order.source)}
+                        <td>
+                          <StatusBadge
+                            kind="payment"
+                            status={order.payment_status}
+                            label={autoCapitalize(order.payment_status)}
+                          />
                         </td>
-                        <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {autoCapitalize(order.order_status)}
-                        </td>
-                        <td style="width: 17%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {autoCapitalize(order.payment_status)}
-                        </td>
-                        <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
-                          {formatCurrency(total)}
-                        </td>
-                        <td style="width: 16%; padding: 1.1rem 0.75rem; vertical-align: middle;">
+                        <td>{formatCurrency(total)}</td>
+                        <td>
                           <ViewButton
                             href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`}
+                            data-astro-prefetch="false"
                           />
                         </td>
                       </tr>
@@ -350,6 +431,83 @@ const backLabel = backUrl.startsWith("/admin/agents/")
       }
     </div>
   </div>
+
+  <Sheet id="promote-customer-agent-sheet" width="32rem">
+    <div slot="header" class="promote-agent-sheet__header-copy">
+      <h3 class="drawer-sheet__title" data-sheet-title>Promote to Agent</h3>
+      <p class="promote-agent-sheet__header-description">
+        Create an agent login for {customerName}. Profile details come from the customer record.
+      </p>
+    </div>
+    <form
+      id="promote-customer-agent-form"
+      method="post"
+      class="admin-form promote-agent-form"
+      aria-label="Promote customer to agent"
+      data-astro-reload
+    >
+      <input type="hidden" name="action" value="promote-customer-to-agent" />
+      <input type="hidden" name="customerId" value={customer.id} />
+      {
+        hasCustomerEmail && (
+          <input type="hidden" name="existingEmail" value={customerEmail} />
+        )
+      }
+
+      <section class="promote-agent-form__section">
+        <h4 class="promote-agent-form__section-title">Account details</h4>
+        <div class="admin-form-grid promote-agent-form__grid">
+          {
+            hasCustomerEmail ? (
+              <label class="field-row field-row--full">
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={customerEmail}
+                  readonly
+                  aria-readonly="true"
+                />
+              </label>
+            ) : (
+              <label class="field-row field-row--full">
+                <span>Email</span>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  autocomplete="email"
+                />
+              </label>
+            )
+          }
+          <label class="field-row field-row--full">
+            <span>Employee ID</span>
+            <input
+              name="employeeId"
+              type="text"
+              autocomplete="off"
+              placeholder="Optional"
+            />
+          </label>
+          <label class="field-row field-row--full">
+            <span>Temporary password</span>
+            <input
+              name="password"
+              type="password"
+              minlength="8"
+              required
+              autocomplete="new-password"
+            />
+          </label>
+        </div>
+      </section>
+    </form>
+    <div slot="footer" class="promote-agent-sheet__footer">
+      <button type="submit" form="promote-customer-agent-form">
+        Promote to agent
+      </button>
+    </div>
+  </Sheet>
 </AdminNotificationsPageLayout>
 
 <style>
@@ -370,80 +528,230 @@ const backLabel = backUrl.startsWith("/admin/agents/")
     border-radius: 0.75rem !important;
   }
 
+  .customer-promotion-note {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 1rem;
+    align-items: center;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.5rem;
+    background: #eff6ff;
+    color: #1e3a8a;
+    padding: 0.9rem 1rem;
+  }
+
+  .customer-promotion-note strong,
+  .customer-promotion-note span {
+    grid-column: 1;
+  }
+
+  .customer-promotion-note strong {
+    font-size: 0.9rem;
+  }
+
+  .customer-promotion-note span {
+    font-size: 0.86rem;
+    line-height: 1.45;
+  }
+
+  .customer-promotion-note a {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    color: #1d4ed8;
+    font-size: 0.86rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+
+  .customer-promotion-note a:hover {
+    text-decoration: underline;
+  }
+
   .orders-summary-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
     gap: 1rem;
   }
 
-  .customer-record-actions {
-    margin-top: 1rem;
+  .customer-credit-summary-grid {
+    margin-bottom: 1.25rem;
+  }
+
+  .customer-record-section-copy {
+    margin: 0 0 1rem;
+    color: #6b7280;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .customer-record-form-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .customer-record-form-section__title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6b7280;
+  }
+
+  .customer-credit-form,
+  .customer-payment-form {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #f9fafb;
+    padding: 1rem;
+  }
+
+  .customer-credit-form__grid {
+    grid-template-columns: minmax(0, 16rem);
+  }
+
+  .customer-payment-form__grid {
+    margin-bottom: 0.85rem;
+  }
+
+  .customer-record-form__actions {
     display: flex;
     justify-content: flex-end;
+    margin-top: 0.85rem;
   }
 
-  .customer-credit-form {
-    display: flex;
-    align-items: end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    margin-top: 1rem;
-    border: 1px solid #d1d5db;
+  .customer-record-form__actions button {
+    min-height: 2.45rem;
+    border: 0;
     border-radius: 0.5rem;
-    background-color: #f9fafb;
-    padding: 0.75rem 1rem;
+    background: var(--color-brand-red);
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    padding: 0.65rem 0.9rem;
   }
 
-  .customer-credit-form label {
-    display: flex;
-    min-width: min(100%, 16rem);
-    flex-direction: column;
-    gap: 0.35rem;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--color-brand-muted-black);
+  .customer-record-form__actions button:hover,
+  .customer-record-form__actions button:focus-visible {
+    background: #9f1d21;
   }
 
-  .customer-credit-form input {
-    width: 100%;
-  }
-
-  .pending-payment-summary {
+  .customer-record-highlight {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    border: 1px solid #d1d5db;
-    border-radius: 0.5rem;
-    background-color: #f9fafb;
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+    padding: 0.9rem 1rem;
+    margin-bottom: 1.25rem;
   }
 
-  .customer-payment-distribution-form {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 0.75rem;
-    align-items: end;
-    margin-bottom: 1rem;
+  .customer-record-highlight__label {
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6b7280;
   }
 
-  .customer-payment-distribution-form label {
+  .customer-record-highlight__value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #111827;
+  }
+
+  .customer-record-actions {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .customer-record-actions--section {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .promote-agent-sheet__header-description {
+    margin: 0.35rem 0 0;
+    color: #6b7280;
+    font-size: 0.88rem;
+    line-height: 1.5;
+  }
+
+  .promote-agent-form__section {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--color-brand-muted-black);
+    gap: 0.85rem;
   }
 
-  .customer-payment-distribution-form input,
-  .customer-payment-distribution-form textarea {
+  .promote-agent-form__section-title {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6b7280;
+  }
+
+  .promote-agent-form__grid {
+    gap: 0.85rem;
+  }
+
+  .field-row--full {
+    grid-column: 1 / -1;
+  }
+
+  .promote-agent-form input[readonly] {
+    background: #f3f4f6;
+    color: #374151;
+    cursor: not-allowed;
+  }
+
+  .customer-record-orders-table {
+    table-layout: fixed;
     width: 100%;
+    min-width: 760px;
   }
 
-  .customer-payment-distribution-form__notes {
-    grid-column: span 2;
+  .customer-record-orders-table th,
+  .customer-record-orders-table td {
+    padding: 1.1rem 0.75rem;
+    vertical-align: middle;
+  }
+
+  .customer-record-orders-table th:nth-child(1),
+  .customer-record-orders-table td:nth-child(1) {
+    width: 17%;
+  }
+
+  .customer-record-orders-table th:nth-child(2),
+  .customer-record-orders-table td:nth-child(2) {
+    width: 17%;
+  }
+
+  .customer-record-orders-table th:nth-child(3),
+  .customer-record-orders-table td:nth-child(3) {
+    width: 17%;
+  }
+
+  .customer-record-orders-table th:nth-child(4),
+  .customer-record-orders-table td:nth-child(4) {
+    width: 17%;
+  }
+
+  .customer-record-orders-table th:nth-child(5),
+  .customer-record-orders-table td:nth-child(5) {
+    width: 16%;
+  }
+
+  .customer-record-orders-table th:nth-child(6),
+  .customer-record-orders-table td:nth-child(6) {
+    width: 16%;
   }
 
   .detail-field {
@@ -468,5 +776,16 @@ const backLabel = backUrl.startsWith("/admin/agents/")
     font-size: 1rem;
     color: #111827;
     font-weight: 500;
+  }
+
+  @media (max-width: 640px) {
+    .customer-promotion-note {
+      grid-template-columns: 1fr;
+    }
+
+    .customer-promotion-note a {
+      grid-column: 1;
+      grid-row: auto;
+    }
   }
 </style>

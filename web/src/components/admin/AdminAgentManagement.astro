@@ -8,7 +8,7 @@ import ViewButton from "@/components/ViewButton.astro";
 import type { AdminAgentManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminAgentFilters } from "@/lib/admin-dashboard/agent-filters";
 import { agentStatuses } from "@/lib/admin-dashboard/agent-filters";
-import { selected, formatDate } from "@/lib/admin-dashboard/view";
+import { selected, formatDate, formatAgentCode } from "@/lib/admin-dashboard/view";
 import { autoCapitalize } from "@/lib/formatters";
 
 type Props = {
@@ -29,7 +29,7 @@ const skeletonRows = Array.from({ length: 6 });
         Add the agent's profile details. Email and temporary password are only needed when the agent should be able to log in.
       </p>
     </div>
-    <form id="create-agent-form" method="post" class="admin-form agent-create-form" aria-label="Create agent">
+    <form id="create-agent-form" method="post" class="admin-form agent-create-form" aria-label="Create agent" data-astro-reload>
       <input type="hidden" name="action" value="create-agent" />
       <div class="admin-form-grid agent-create-form__grid">
         <label class="field-row"><span>Employee ID</span><input name="employeeId" autocomplete="off" /></label>
@@ -73,7 +73,7 @@ const skeletonRows = Array.from({ length: 6 });
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
-            placeholder="Search agent name, email, or contact..."
+            placeholder="Search agent code, name, email, or contact..."
             autocomplete="off"
             aria-label="Search agents"
             data-agent-search-input
@@ -106,23 +106,26 @@ const skeletonRows = Array.from({ length: 6 });
         <table class="dashboard-table">
           <thead>
             <tr>
+              <th scope="col">Date Created</th>
+              <th scope="col">Agent Code</th>
               <th scope="col">Agent</th>
               <th scope="col">Employee ID</th>
               <th scope="col">Email</th>
               <th scope="col">Contact</th>
               <th scope="col">Status</th>
-              <th scope="col">Date Created</th>
               <th scope="col">Action</th>
             </tr>
           </thead>
           <tbody>
             {data.agents.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={7}
+                colspan={8}
                 message="No agents match the selected filters."
               />
             ) : data.agents.map((agent) => (
               <tr data-status={agent.status}>
+                <td>{formatDate(agent.created_at)}</td>
+                <td>{formatAgentCode(agent.id)}</td>
                 <td class="dashboard-table__cell--truncate">
                   <button
                     type="button"
@@ -261,7 +264,6 @@ const skeletonRows = Array.from({ length: 6 });
                     </form>
                   </div>
                 </td>
-                <td>{formatDate(agent.created_at)}</td>
                 <td><ViewButton href={`/admin/agents/${agent.id}`} /></td>
               </tr>
             ))}
@@ -277,8 +279,8 @@ const skeletonRows = Array.from({ length: 6 });
     <DashboardTableBoard aria-busy="true" aria-live="polite">
       <table class="product-table-skeleton dashboard-table">
         <caption class="sr-only">Loading filtered agents</caption>
-        <thead><tr><th scope="col">Agent</th><th scope="col">Employee ID</th><th scope="col">Email</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Date Created</th><th scope="col">Action</th></tr></thead>
-        <tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody>
+        <thead><tr><th scope="col">Date Created</th><th scope="col">Agent Code</th><th scope="col">Agent</th><th scope="col">Employee ID</th><th scope="col">Email</th><th scope="col">Contact</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+        <tbody>{skeletonRows.map(() => (<tr><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td><td><span class="table-skeleton-block"></span></td><td><span class="table-skeleton-block table-skeleton-block--short"></span></td></tr>))}</tbody>
       </table>
     </DashboardTableBoard>
   </template>

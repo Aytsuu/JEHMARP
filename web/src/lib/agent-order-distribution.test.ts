@@ -4,6 +4,7 @@ import {
   buildAgentOrderProductDistributions,
   canAttachCustomerToAgentOrder,
   canDecreaseAgentOrderItemQuantity,
+  formatAgentOrderDistributionStatus,
   getAgentOrderProductDistribution,
   minimumAgentOrderItemQuantity,
   sumPendingCustomerOrderAmount,
@@ -83,11 +84,30 @@ describe("agent-order-distribution", () => {
     expect(minimumAgentOrderItemQuantity(7)).toBe(7);
   });
 
+  it("formats fully distributed product status", () => {
+    expect(formatAgentOrderDistributionStatus({
+      remainingQuantity: 0,
+      unitLabel: "kg",
+    })).toBe("Fully Distributed");
+  });
+
+  it("formats remaining product quantity for distribution", () => {
+    expect(formatAgentOrderDistributionStatus({
+      remainingQuantity: 3,
+      unitLabel: "kg",
+    })).toBe("3 kg remaining for distribution");
+  });
+
   it("sums pending customer order amounts only", () => {
     expect(sumPendingCustomerOrderAmount(agentOrder)).toBe(550);
   });
 
   it("blocks attaching customers when the agent order is closed and fully paid", () => {
+    expect(canAttachCustomerToAgentOrder({
+      order_status: "pending_order",
+      customer_order: [],
+    })).toBe(false);
+
     expect(canAttachCustomerToAgentOrder({
       order_status: "closed",
       customer_order: [

@@ -22,24 +22,19 @@ function initPaymentPricing(form: HTMLFormElement) {
 
   const customerTypeSelect = form.querySelector<HTMLSelectElement>("[data-payment-customer-type]");
   const amountInput = form.querySelector<HTMLInputElement>("[data-payment-amount]");
-  const totalValue = form.querySelector<HTMLElement>("[data-payment-total-value]");
-  const balanceValue = form.querySelector<HTMLElement>("[data-payment-balance-value]");
-  const paidTotalInput = form.querySelector<HTMLInputElement>("[data-payment-paid-total]");
+  const paidTotal = Number(form.dataset.paymentPaidTotal ?? 0);
+  const commissionTotal = Number(form.dataset.paymentCommissionTotal ?? 0);
 
-  if (!customerTypeSelect || !amountInput || !totalValue || !balanceValue) return;
-
-  const activeCustomerTypeSelect = customerTypeSelect;
-  const activeAmountInput = amountInput;
-  const activeTotalValue = totalValue;
-  const activeBalanceValue = balanceValue;
+  if (!amountInput) return;
+  const paymentAmountInput = amountInput;
 
   function currentOrderTotal() {
-    return Array.from(form.querySelectorAll<HTMLElement>("[data-payment-pricing-item]")).reduce(
+    const pricedTotal = Array.from(form.querySelectorAll<HTMLElement>("[data-payment-pricing-item]")).reduce(
       (total, item) => {
         const quantity = Number(item.dataset.finalQuantity ?? 0);
         const defaultPrice = Number(item.dataset.defaultPrice ?? 0);
         const resellerPrice = Number(item.dataset.resellerPrice ?? defaultPrice);
-        const unitPrice = activeCustomerTypeSelect.value === "reseller" ? resellerPrice : defaultPrice;
+        const unitPrice = customerTypeSelect?.value === "reseller" ? resellerPrice : defaultPrice;
 
         if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) return total;
 
@@ -47,13 +42,13 @@ function initPaymentPricing(form: HTMLFormElement) {
       },
       0,
     );
-  }
 
-  function formatCurrency(value: number) {
-    return new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: "PHP",
-    }).format(value);
+    if (pricedTotal > 0) {
+      return pricedTotal;
+    }
+
+    const datasetTotal = Number(form.dataset.paymentOrderTotal ?? 0);
+    return Number.isFinite(datasetTotal) ? datasetTotal : 0;
   }
 
   function formatAmount(value: number) {
@@ -61,21 +56,24 @@ function initPaymentPricing(form: HTMLFormElement) {
   }
 
   function refreshPaymentAmounts() {
-    const paidTotal = Number(paidTotalInput?.value ?? 0);
     const orderTotal = currentOrderTotal();
-    const balance = Math.max(orderTotal - (Number.isFinite(paidTotal) ? paidTotal : 0), 0);
+    const balance = Math.max(
+      orderTotal -
+        (Number.isFinite(commissionTotal) ? commissionTotal : 0) -
+        (Number.isFinite(paidTotal) ? paidTotal : 0),
+      0,
+    );
     const formattedBalance = formatAmount(balance);
 
-    activeTotalValue.textContent = formatCurrency(orderTotal);
-    activeBalanceValue.textContent = formatCurrency(balance);
-    activeAmountInput.max = formattedBalance;
+    paymentAmountInput.min = "0.01";
+    paymentAmountInput.max = formattedBalance;
 
-    const currentAmount = Number(activeAmountInput.value);
-    if (!activeAmountInput.value || !Number.isFinite(currentAmount) || currentAmount > balance) {
-      activeAmountInput.value = formattedBalance;
+    const currentAmount = Number(paymentAmountInput.value);
+    if (!paymentAmountInput.value || !Number.isFinite(currentAmount) || currentAmount < 0) {
+      paymentAmountInput.value = "0.00";
     }
   }
 
-  activeCustomerTypeSelect.addEventListener("change", refreshPaymentAmounts);
+  customerTypeSelect?.addEventListener("change", refreshPaymentAmounts);
   refreshPaymentAmounts();
 }

@@ -1,7 +1,10 @@
 ---
 import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import ViewButton from "@/components/ViewButton.astro";
-import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import {
+  formatAdminActionFeedback,
+  handleAdminDashboardAction,
+} from "@/lib/admin-dashboard/actions";
 import {
   loadAdminAgentDetailsData,
   loadAdminDashboardData,
@@ -10,11 +13,15 @@ import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import {
   agentOrderPaymentStatus,
   agentOrderTotal,
+  canConvertPromotedCustomerOrderToDistribution,
   formatCurrency,
   fullName,
   formatDate,
+  getCustomerOrderDistributionConversionBlockReason,
+  orderBalance,
+  orderTotal,
 } from "@/lib/admin-dashboard/view";
-import { autoCapitalize } from "@/lib/formatters";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 
 export const prerender = false;
 
@@ -25,9 +32,22 @@ if (!adminRoute.ready) {
 }
 
 const { agentId } = Astro.params;
+
+if (!agentId) {
+  return Astro.redirect("/admin/agents", 302);
+}
+
+if (Astro.request.method === "POST") {
+  return handleAdminDashboardAction(
+    Astro,
+    adminRoute.userId,
+    `/admin/agents/${agentId}`,
+  );
+}
+
 const [dashboardData, detailData] = await Promise.all([
   loadAdminDashboardData(),
-  agentId ? loadAdminAgentDetailsData(agentId) : Promise.resolve(null),
+  loadAdminAgentDetailsData(agentId),
 ]);
 
 if (!detailData) {
@@ -36,6 +56,17 @@ if (!detailData) {
 
 const agent = detailData.agent;
 const assignedCustomers = detailData.assignedCustomers;
+const previousCustomerOrders = detailData.previousCustomerOrders.map((order) => {
+  const blockReason = getCustomerOrderDistributionConversionBlockReason(order, agent.id);
+
+  return {
+    order,
+    blockReason,
+    canConvert: canConvertPromotedCustomerOrderToDistribution(order, agent.id),
+    balance: orderBalance(order),
+    totalAmount: orderTotal(order, "final_quantity"),
+  };
+});
 const agentOrders = detailData.agentOrders.map((order) => {
   const paymentStatus = agentOrderPaymentStatus(order);
   const indication = order.order_status !== "processing" && order.order_status !== "closed"
@@ -111,6 +142,17 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
   </ul>
 
   <div class="agent-record-content">
+    {
+      agent.promoted_from_customer_at && (
+        <div class="agent-promotion-note" role="note">
+          <strong>Promoted customer record</strong>
+          <span>
+            This agent was previously a customer. Completed customer orders remain unchanged; eligible unpaid orders can be converted into agent distribution orders below.
+          </span>
+        </div>
+      )
+    }
+
     <div class="content-section">
       <h3 class="agent-record-content__heading">Assigned Summary</h3>
       <div class="assigned-summary-grid">
@@ -125,11 +167,90 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
         </div>
 
         <div class="detail-field">
+          <span class="detail-field-label">Agent remaining balance</span>
+          <div class="detail-field-value">{formatCurrency(detailData.agentRemainingBalance)}</div>
+        </div>
+
+        <div class="detail-field">
           <span class="detail-field-label">Agent orders</span>
           <div class="detail-field-value">{agentOrders.length}</div>
         </div>
       </div>
     </div>
+
+    {
+      agent.promoted_from_customer_id && (
+        <div class="content-section">
+          <h3 class="agent-record-content__heading">
+            Previous Customer Orders ({previousCustomerOrders.length})
+          </h3>
+          {
+            previousCustomerOrders.length === 0 ? (
+              <p class="empty-state">No previous customer orders found for this promoted agent.</p>
+            ) : (
+              <div class="table-wrap">
+                <table class="agent-customers-table promoted-customer-orders-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Action</th>
+                      <th scope="col">Date Created</th>
+                      <th scope="col">Source</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Payment</th>
+                      <th scope="col">Balance</th>
+                      <th scope="col">Total Amount</th>
+                      <th scope="col">Order</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previousCustomerOrders.map(({ order, blockReason, canConvert, balance, totalAmount }) => (
+                      <tr>
+                        <td>
+                          {canConvert ? (
+                            <form
+                              method="post"
+                              class="promoted-order-conversion-form"
+                              data-astro-reload
+                              onsubmit="return confirm('Convert this customer order into an agent distribution order?')"
+                            >
+                              <input
+                                type="hidden"
+                                name="action"
+                                value="convert-customer-order-to-agent-distribution"
+                              />
+                              <input type="hidden" name="orderId" value={order.id} />
+                              <input type="hidden" name="returnTo" value={`/admin/agents/${agent.id}`} />
+                              <button type="submit">Convert</button>
+                            </form>
+                          ) : order.converted_to_agent_order_id ? (
+                            <ViewButton
+                              href={`/admin/orders/agent/${order.converted_to_agent_order_id}?returnTo=${agentReturnTo}`}
+                            />
+                          ) : (
+                            <span class="promoted-order-state">{blockReason ?? "Unavailable"}</span>
+                          )}
+                        </td>
+                        <td>{formatDate(order.created_at)}</td>
+                        <td>{formatOrderSource(order.source)}</td>
+                        <td>{autoCapitalize(order.order_status)}</td>
+                        <td>{autoCapitalize(order.payment_status)}</td>
+                        <td>{formatCurrency(balance)}</td>
+                        <td>{formatCurrency(totalAmount)}</td>
+                        <td>
+                          <ViewButton
+                            href={`/admin/orders/customer/${order.id}?returnTo=${agentReturnTo}`}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          }
+        </div>
+      )
+    }
 
     <div class="content-section">
       <h3 class="agent-record-content__heading">
@@ -143,6 +264,7 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
             <table class="agent-customers-table">
               <thead>
                 <tr>
+                  <th scope="col">Date Created</th>
                   <th scope="col">Customer</th>
                   <th scope="col">Contact</th>
                   <th scope="col">Address</th>
@@ -153,6 +275,7 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
                 {
                   assignedCustomers.map((customer) => (
                     <tr>
+                      <td>{formatDate(customer.created_at)}</td>
                       <td>
                         {fullName(customer)}
                         {
@@ -194,8 +317,8 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
             <table class="agent-customers-table agent-orders-table">
               <thead>
                 <tr>
+                  <th scope="col">Date Created</th>
                   <th scope="col">Order</th>
-                  <th scope="col">Date</th>
                   <th scope="col">Status</th>
                   <th scope="col">Payment</th>
                   <th scope="col">Total Amount</th>
@@ -206,8 +329,8 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
               <tbody>
                 {agentOrders.map(({ order, paymentStatus, totalAmount, indication }) => (
                   <tr>
-                    <td>Agent order {order.id.slice(0, 8)}</td>
                     <td>{formatDate(order.created_at)}</td>
+                    <td>Agent order {order.id.slice(0, 8)}</td>
                     <td>{autoCapitalize(order.order_status)}</td>
                     <td>{autoCapitalize(paymentStatus)}</td>
                     <td>{formatCurrency(totalAmount)}</td>
@@ -252,6 +375,23 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
     box-shadow: none !important;
     border: 1px solid #d1d5db !important;
     border-radius: 0.75rem !important;
+  }
+
+  .agent-promotion-note {
+    display: grid;
+    gap: 0.35rem;
+    border: 1px solid #f59e0b;
+    border-radius: 0.5rem;
+    background: #fffbeb;
+    color: #78350f;
+    padding: 0.85rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .agent-promotion-note strong {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   .assigned-summary-grid {
@@ -299,23 +439,28 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
     vertical-align: middle;
   }
 
-  .agent-customers-table th:nth-child(1),
-  .agent-customers-table td:nth-child(1) {
-    width: 28%;
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) th:nth-child(1),
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) td:nth-child(1) {
+    width: 16%;
   }
 
-  .agent-customers-table th:nth-child(2),
-  .agent-customers-table td:nth-child(2) {
-    width: 28%;
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) th:nth-child(2),
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) td:nth-child(2) {
+    width: 24%;
   }
 
-  .agent-customers-table th:nth-child(3),
-  .agent-customers-table td:nth-child(3) {
-    width: 34%;
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) th:nth-child(3),
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) td:nth-child(3) {
+    width: 24%;
   }
 
-  .agent-customers-table th:nth-child(4),
-  .agent-customers-table td:nth-child(4) {
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) th:nth-child(4),
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) td:nth-child(4) {
+    width: 26%;
+  }
+
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) th:nth-child(5),
+  .agent-customers-table:not(.agent-orders-table):not(.promoted-customer-orders-table) td:nth-child(5) {
     width: 10%;
   }
 
@@ -327,6 +472,45 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
 
   .agent-orders-table {
     min-width: 760px;
+  }
+
+  .promoted-customer-orders-table {
+    min-width: 980px;
+  }
+
+  .promoted-order-conversion-form {
+    margin: 0;
+  }
+
+  .promoted-order-conversion-form button {
+    min-height: 2.25rem;
+    border: 1px solid rgba(102, 24, 24, 0.2);
+    border-radius: 0.45rem;
+    background: var(--color-brand-red);
+    color: #ffffff;
+    padding: 0.35rem 0.65rem;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .promoted-order-conversion-form button:hover,
+  .promoted-order-conversion-form button:focus-visible {
+    background: #111827;
+  }
+
+  .promoted-order-state {
+    display: inline-flex;
+    min-height: 1.7rem;
+    align-items: center;
+    border-radius: 0.35rem;
+    background: #f3f4f6;
+    color: #4b5563;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    white-space: nowrap;
   }
 
   .agent-orders-table__indicator {

@@ -3,6 +3,7 @@ import AdminOrderManagement from "@/components/admin/AdminOrderManagement.astro"
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
+  handleAdminDashboardAction,
   markUnreadAdminOrdersRead,
 } from "@/lib/admin-dashboard/actions";
 import {
@@ -28,6 +29,11 @@ if (!adminRoute.ready) {
 }
 
 await markUnreadAdminOrdersRead(Astro, adminRoute.userId);
+
+if (Astro.request.method === "POST") {
+  const returnPath = `${Astro.url.pathname}${Astro.url.search}`;
+  return handleAdminDashboardAction(Astro, adminRoute.userId, returnPath);
+}
 
 const orderFilters = parseAdminOrderFilters(Astro.url);
 const orderPagination = parseAdminPagination(Astro.url);

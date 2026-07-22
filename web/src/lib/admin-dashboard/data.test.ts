@@ -21,6 +21,7 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    is: vi.fn(() => builder),
     neq: vi.fn(() => builder),
     in: vi.fn(() => builder),
     gte: vi.fn(() => builder),
@@ -169,6 +170,7 @@ describe("loadAdminDashboardData", () => {
     expect(orderBuilder.eq).toHaveBeenCalledWith("source", "guest_shop");
     expect(orderBuilder.eq).toHaveBeenCalledWith("order_status", "pending");
     expect(orderBuilder.eq).toHaveBeenCalledWith("payment_status", "partial");
+    expect(orderBuilder.is).toHaveBeenCalledWith("converted_to_agent_order_id", null);
   });
 
   it("loads admin order management rows through the paginated order RPC", async () => {
@@ -181,8 +183,12 @@ describe("loadAdminDashboardData", () => {
       source_label: "Shop",
       payment_status: "partial",
       total_amount: "1200.00",
+      commission_total: "60.00",
+      paid_total: "300.00",
+      remaining_receivable: "840.00",
       href: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       linked_customer_count: null,
+      pending_customer_order_count: null,
     };
     const orderBuilder = createQueryBuilder();
     const from = vi.fn((table: string) => (
@@ -213,7 +219,11 @@ describe("loadAdminDashboardData", () => {
     expect(result.orderRows).toEqual([{
       ...orderRow,
       release_date: null,
-      total_amount: 1200,
+      total_amount: 1140,
+      commission_total: 60,
+      paid_total: 300,
+      remaining_receivable: 840,
+      pending_customer_order_count: null,
     }]);
     expect(result.pagination.totalRows).toBe(1);
   });
@@ -232,6 +242,7 @@ describe("loadAdminDashboardData", () => {
       order_total: "1200.00",
       paid_total: "1200.00",
       balance: "0.00",
+      payment_count: 1,
       href: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
     };
     const rpc = vi.fn(() => Promise.resolve({
@@ -261,8 +272,38 @@ describe("loadAdminDashboardData", () => {
       order_total: 1200,
       paid_total: 1200,
       balance: 0,
+      payment_count: 1,
     }]);
     expect(result.pagination.totalRows).toBe(1);
+  });
+
+  it("does not replace a missing admin sales date with the order date", async () => {
+    const salesRow = {
+      id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      created_at: "2026-07-03T00:00:00.000Z",
+      sale_date: null,
+      release_date: null,
+      customer_label: "Maria Cruz",
+      source_label: "Shop",
+      order_status: "closed",
+      payment_status: "paid",
+      invoice_number: "INV-00000042",
+      order_total: "1200.00",
+      paid_total: "1200.00",
+      balance: "0.00",
+      payment_count: 1,
+      href: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    };
+    const rpc = vi.fn(() => Promise.resolve({
+      data: [{ records: [salesRow], total_rows: "1" }],
+      error: null,
+    }));
+    createSupabaseAdminClient.mockReturnValue({ rpc });
+    const { loadAdminSalesManagementData } = await import("./data");
+
+    const result = await loadAdminSalesManagementData();
+
+    expect(result.salesRows[0]?.sale_date).toBeNull();
   });
 
   it("loads admin invoice rows through the paginated invoice RPC", async () => {
@@ -315,7 +356,6 @@ describe("loadAdminDashboardData", () => {
       assigned_agent_id: "agent-1",
       assigned_agent_name: "Carlos Dela Cruz",
       is_reseller: true,
-      is_agent: false,
       credit_limit: 1500,
       credit_limit_exceeded: true,
       outstanding_credit_balance: 1800,
@@ -341,10 +381,23 @@ describe("loadAdminDashboardData", () => {
       page_number: 1,
       page_size: 10,
     });
-    expect(from).toHaveBeenCalledWith("agent_profile");
+    expect(from).toHaveBeenCalledWith("agent");
     expect(result.customers).toEqual([customerRow]);
     expect(result.agents).toEqual([]);
     expect(result.pagination.totalRows).toBe(1);
+  });
+
+  it("filters promoted customers out of direct admin customer loads", async () => {
+    const customerBuilder = createQueryBuilder();
+    const from = vi.fn((table: string) => (
+      table === "customer" ? customerBuilder : createQueryBuilder()
+    ));
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminDashboardData } = await import("./data");
+
+    await loadAdminDashboardData();
+
+    expect(customerBuilder.is).toHaveBeenCalledWith("promoted_to_agent_id", null);
   });
 
   it("loads admin agent rows through the paginated agent RPC", async () => {
@@ -381,6 +434,147 @@ describe("loadAdminDashboardData", () => {
     });
     expect(result.agents.map((agent) => agent.id)).toEqual(["agent-1"]);
     expect(result.pagination.totalRows).toBe(1);
+  });
+
+  it("separates assigned-customer balance from an agent's own customer balance on agent details", async () => {
+    const agentCustomerId = "customer-agent";
+    const assignedCustomerId = "customer-assigned";
+    const agentRow = {
+      id: "agent-1",
+      user_id: "user-1",
+      customer_id: agentCustomerId,
+      employee_id: "EMP-001",
+      status: "active",
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+      profile: {
+        first_name: "Carlos",
+        last_name: "Dela Cruz",
+        display_name: "Carlos Dela Cruz",
+        email: "carlos@example.test",
+        phone_number: "09170000000",
+        address: null,
+      },
+    };
+    const assignedCustomerRow = {
+      id: assignedCustomerId,
+      assigned_agent_id: "agent-1",
+      is_reseller: false,
+      credit_limit: 1000,
+      credit_limit_exceeded: false,
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+      profile: {
+        first_name: "Maria",
+        last_name: "Cruz",
+        display_name: "Maria Cruz",
+        email: "maria@example.test",
+        phone_number: "09171111111",
+        address: "Quezon City",
+      },
+    };
+    const agentCustomerRow = {
+      ...assignedCustomerRow,
+      id: agentCustomerId,
+      profile: {
+        first_name: "Carlos",
+        last_name: "Dela Cruz",
+        display_name: "Carlos Dela Cruz",
+        email: "carlos@example.test",
+        phone_number: "09170000000",
+        address: "Agent personal order",
+      },
+    };
+    const assignedOrder = createMockOrder({
+      customer_id: assignedCustomerId,
+      customer: null,
+      customer_order_item: [{ final_quantity: 5, unit_price: 100 }],
+      payment: [{ amount: 100 }],
+    });
+    const agentOwnOrder = createMockOrder({
+      customer_id: agentCustomerId,
+      customer: null,
+      customer_order_item: [{ final_quantity: 3, unit_price: 100 }],
+      payment: [{ amount: 50 }],
+    });
+    const customerOrderBuilders = [
+      createQueryBuilder({ data: [assignedOrder], error: null }),
+      createQueryBuilder({ data: [agentOwnOrder], error: null }),
+    ];
+    const agentBuilder = createQueryBuilder({ data: [agentRow], error: null });
+    const customerBuilder = createQueryBuilder({
+      data: [assignedCustomerRow, agentCustomerRow],
+      error: null,
+    });
+    const agentOrderBuilder = createQueryBuilder();
+    const from = vi.fn((table: string) => {
+      if (table === "agent") return agentBuilder;
+      if (table === "customer") return customerBuilder;
+      if (table === "customer_order") return customerOrderBuilders.shift() ?? createQueryBuilder();
+      if (table === "agent_order") return agentOrderBuilder;
+      return createQueryBuilder();
+    });
+    const listUsers = vi.fn(() => Promise.resolve({
+      data: {
+        users: [
+          {
+            id: "user-1",
+            email: "carlos@example.test",
+          },
+        ],
+      },
+      error: null,
+    }));
+    createSupabaseAdminClient.mockReturnValue({
+      from,
+      auth: {
+        admin: {
+          listUsers,
+        },
+      },
+    });
+    const { loadAdminAgentDetailsData } = await import("./data");
+
+    const result = await loadAdminAgentDetailsData("agent-1");
+
+    expect(result?.assignedCustomers.map((customer) => customer.id)).toEqual([assignedCustomerId]);
+    expect(result?.remainingBalance).toBe(400);
+    expect(result?.agentRemainingBalance).toBe(250);
+    expect(result?.previousCustomerOrders).toEqual([]);
+  });
+
+  it("loads converted source order metadata with an admin agent order", async () => {
+    const agentOrder = {
+      id: "agent-order-1",
+      agent_id: "agent-1",
+      order_status: "pending_customers",
+      notes: null,
+      submitted_by: null,
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+      agent: null,
+      agent_order_item: [],
+      customer_order: [],
+    };
+    const sourceOrder = createMockOrder({
+      id: "source-order-1",
+      converted_to_agent_order_id: "agent-order-1",
+      customer: null,
+    });
+    const agentOrderBuilder = createQueryBuilder({ data: [agentOrder], error: null });
+    const sourceOrderBuilder = createQueryBuilder({ data: [sourceOrder], error: null });
+    const from = vi.fn((table: string) => {
+      if (table === "agent_order") return agentOrderBuilder;
+      if (table === "customer_order") return sourceOrderBuilder;
+      return createQueryBuilder();
+    });
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminAgentOrder } = await import("./data");
+
+    const result = await loadAdminAgentOrder("agent-order-1");
+
+    expect(sourceOrderBuilder.eq).toHaveBeenCalledWith("converted_to_agent_order_id", "agent-order-1");
+    expect(result?.converted_source_order?.id).toBe("source-order-1");
   });
 
   it("applies reseller application filters and pagination to the database query", async () => {
@@ -584,6 +778,64 @@ describe("loadAdminDashboardData", () => {
     expect(result?.invoice).toEqual([invoice]);
   });
 
+  it("normalizes the parent distributed agent order for linked customer orders", async () => {
+    const order = {
+      id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      agent_order_id: "11111111-1111-4111-8111-111111111111",
+      customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+      agent_id: null,
+      source: "agent_submitted",
+      order_status: "processing",
+      payment_status: "unpaid",
+      approved_at: null,
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+      customer: null,
+      agent: null,
+      agent_order: {
+        id: "11111111-1111-4111-8111-111111111111",
+        agent_id: "b5f2b9bb-5704-4d75-83c1-812d9f9e1111",
+        agent: {
+          id: "b5f2b9bb-5704-4d75-83c1-812d9f9e1111",
+          user_id: "8bcce9f3-2a1b-43c0-9e51-70667e017111",
+          status: "active",
+          created_at: "2026-07-01T00:00:00.000Z",
+          updated_at: "2026-07-01T00:00:00.000Z",
+          profile: {
+            display_name: "Agent Maria",
+            phone_number: "09171234567",
+            email: "agent@example.test",
+          },
+        },
+      },
+      customer_order_item: [],
+      payment: [],
+      invoice: [],
+      customer_order_status_history: [],
+    };
+    const builder = createQueryBuilder({
+      data: [order],
+      error: null,
+    });
+    const from = vi.fn(() => builder);
+    createSupabaseAdminClient.mockReturnValue({ from });
+    const { loadAdminOrder } = await import("./data");
+
+    const result = await loadAdminOrder(order.id);
+
+    expect(result?.agent_order).toEqual({
+      id: "11111111-1111-4111-8111-111111111111",
+      agent_id: "b5f2b9bb-5704-4d75-83c1-812d9f9e1111",
+      agent: {
+        id: "b5f2b9bb-5704-4d75-83c1-812d9f9e1111",
+        user_id: "8bcce9f3-2a1b-43c0-9e51-70667e017111",
+        display_name: "Agent Maria",
+        email: "agent@example.test",
+        contact: "09171234567",
+      },
+    });
+  });
+
   it("builds dashboard summary totals from all matching records", async () => {
     const orderBuilder = createQueryBuilder({
       data: [
@@ -732,7 +984,7 @@ describe("loadAdminDashboardData", () => {
     const from = vi.fn((table: string) => {
       if (table === "customer_order") return orderBuilder;
       if (table === "agent_order") return agentOrderBuilder;
-      if (table === "agent_profile") return agentBuilder;
+      if (table === "agent") return agentBuilder;
       if (table === "customer") return customerBuilder;
       if (table === "contact_inquiry") return inquiryBuilder;
       if (table === "product") return productBuilder;

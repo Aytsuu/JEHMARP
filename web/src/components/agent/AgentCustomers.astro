@@ -27,10 +27,6 @@ const { data } = Astro.props;
         </div>
       </div>
 
-      <div class="agent-customers__pagination-summary">
-        <DashboardTablePagination variant="summary" />
-      </div>
-
       <div class="agent-record-list agent-customers__list" data-interactive-cards>
         {data.customers.map((customer) => (
           <AgentRecordCard href={`/agent/customers/${customer.id}`}>
@@ -77,8 +73,8 @@ const { data } = Astro.props;
         ))}
       </div>
 
-      <div class="agent-customers__pagination-controls">
-        <DashboardTablePagination variant="controls" />
+      <div class="agent-customers__pagination">
+        <DashboardTablePagination />
       </div>
     </div>
   )}
@@ -94,35 +90,21 @@ const { data } = Astro.props;
     margin-top: 0.85rem;
   }
 
-  .agent-customers__pagination-summary {
-    margin-top: 0.85rem;
-  }
-
-  .agent-customers__pagination-controls {
+  .agent-customers__pagination {
     margin-top: 1rem;
   }
 
-  .agent-customers__pagination-summary :global(.dashboard-interactive-table__footer),
-  .agent-customers__pagination-controls :global(.dashboard-interactive-table__footer) {
+  .agent-customers__pagination :global(.dashboard-interactive-table__footer) {
     position: static;
     border-top: 0;
     background: transparent;
     min-height: 0;
   }
 
-  .agent-customers__pagination-summary :global(.table-pagination),
-  .agent-customers__pagination-controls :global(.table-pagination) {
-    padding-inline: 0;
-  }
-
-  .agent-customers__pagination-summary :global(.table-pagination) {
-    justify-content: space-between;
-    margin-top: 0;
-  }
-
-  .agent-customers__pagination-controls :global(.table-pagination) {
+  .agent-customers__pagination :global(.table-pagination) {
     justify-content: center;
     margin-top: 0;
+    padding-inline: 0;
   }
 
   .agent-customers-card {
