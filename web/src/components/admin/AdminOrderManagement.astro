@@ -233,24 +233,6 @@ function pendingCustomerOrderLabel(count: number) {
 
       <section class="order-create-section">
         <div class="order-create-section__header">
-          <h3 class="order-create-section__title">Release and payment</h3>
-        </div>
-        <div class="order-create-section__body">
-          <div class="field-row-group field-row-group--datetime">
-            <label class="field-row field-row--date">
-              <span>Release date</span>
-              <input name="releaseDate" type="date" required data-release-date />
-            </label>
-            <label class="field-row field-row--time">
-              <span>Release time</span>
-              <input name="releaseTime" type="time" required data-release-time />
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <section class="order-create-section">
-        <div class="order-create-section__header">
           <h3 class="order-create-section__title">Order items</h3>
         </div>
         <div class="order-create-section__body">
@@ -334,6 +316,24 @@ function pendingCustomerOrderLabel(count: number) {
             </svg>
             <span>Add Item</span>
           </button>
+
+          <div class="order-create-section order-create-section--subblock">
+            <div class="order-create-section__header">
+              <h3 class="order-create-section__title">Release</h3>
+            </div>
+            <div class="order-create-section__body">
+              <div class="order-create-form__field-pair">
+                <label class="field-row">
+                  <span>Release date</span>
+                  <input name="releaseDate" type="date" required data-release-date />
+                </label>
+                <label class="field-row">
+                  <span>Release time</span>
+                  <input name="releaseTime" type="time" required data-release-time />
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -417,14 +417,14 @@ function pendingCustomerOrderLabel(count: number) {
 
       <section class="order-create-section" data-downpayment-section>
         <div class="order-create-section__header">
-          <h3 class="order-create-section__title">Downpayment</h3>
+          <h3 class="order-create-section__title">Payment</h3>
         </div>
-        <div class="order-create-section__body">
-          <div class="admin-form-grid order-create-form__payment-grid">
-            <label class="field-row">
-              <span>Amount received</span>
-              <input name="downpaymentAmount" type="number" min="0.01" step="0.01" data-downpayment-amount />
-            </label>
+        <div class="order-create-section__body order-create-form__payment-fields">
+          <label class="field-row">
+            <span>Amount received</span>
+            <input name="downpaymentAmount" type="number" min="0.01" step="0.01" data-downpayment-amount />
+          </label>
+          <div class="order-create-form__field-pair">
             <label class="field-row">
               <span>Payment method</span>
               <select name="downpaymentMethod" data-downpayment-method>
@@ -440,21 +440,21 @@ function pendingCustomerOrderLabel(count: number) {
                 <option value="Gcash">Gcash</option>
               </select>
             </label>
-            <div class="field-row-group field-row-group--datetime">
-              <label class="field-row field-row--date">
-                <span>Payment date</span>
-                <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
-              </label>
-              <label class="field-row field-row--time">
-                <span>Payment time</span>
-                <input name="downpaymentTime" type="time" value={defaultTime} data-downpayment-time />
-              </label>
-            </div>
+          </div>
+          <div class="order-create-form__field-pair">
             <label class="field-row">
-              <span>Reference</span>
-              <input name="downpaymentReferenceNumber" data-downpayment-reference />
+              <span>Payment date</span>
+              <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
+            </label>
+            <label class="field-row">
+              <span>Payment time</span>
+              <input name="downpaymentTime" type="time" value={defaultTime} data-downpayment-time />
             </label>
           </div>
+          <label class="field-row">
+            <span>Reference</span>
+            <input name="downpaymentReferenceNumber" data-downpayment-reference />
+          </label>
           <label class="field-row">
             <span>Payment notes</span>
             <textarea name="downpaymentNotes" rows="2" data-downpayment-notes></textarea>

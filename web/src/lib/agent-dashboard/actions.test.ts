@@ -274,8 +274,6 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
-    formData.set("releaseDate", "2026-07-22");
-    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -312,10 +310,6 @@ describe("parseAgentActionFormData", () => {
             ],
           },
         ],
-        releaseSchedule: {
-          date: "2026-07-22",
-          time: "08:30",
-        },
         requireApproval: true,
       },
     });
@@ -325,8 +319,6 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
-    formData.set("releaseDate", "2026-07-22");
-    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -374,10 +366,6 @@ describe("parseAgentActionFormData", () => {
             ],
           },
         ],
-        releaseSchedule: {
-          date: "2026-07-22",
-          time: "08:30",
-        },
         requireApproval: true,
       },
     });
@@ -387,8 +375,6 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
-    formData.set("releaseDate", "2026-07-22");
-    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -415,7 +401,10 @@ describe("parseAgentActionFormData", () => {
 describe("executeAgentAction", () => {
   it("attaches a customer order after verifying agent order status with explicit queries", async () => {
     const agentOrderMaybeSingle = vi.fn(() => Promise.resolve({
-      data: { order_status: "pending_customers" },
+      data: {
+        order_status: "pending_customers",
+        release_date: "2026-07-22T00:30:00.000Z",
+      },
       error: null,
     }));
     const agentOrderEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
@@ -453,14 +442,10 @@ describe("executeAgentAction", () => {
           ],
         },
       ],
-      releaseSchedule: {
-        date: "2026-07-22",
-        time: "08:30",
-      },
       requireApproval: true,
     });
 
-    expect(agentOrderSelect).toHaveBeenCalledWith("order_status");
+    expect(agentOrderSelect).toHaveBeenCalledWith("order_status, release_date");
     expect(agentOrderEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
     expect(customerOrderSelect).toHaveBeenCalledWith("payment_status");
     expect(customerOrderEq).toHaveBeenCalledWith("agent_order_id", "11111111-1111-4111-8111-111111111111");

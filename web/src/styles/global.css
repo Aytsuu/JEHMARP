@@ -5409,6 +5409,7 @@
     justify-content: space-between;
     gap: 0.75rem;
     padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e5e7eb;
   }
 
   .drawer-sheet__header-content {
@@ -5452,12 +5453,12 @@
   .drawer-sheet__body {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 0 2rem;
+    padding: 1.5rem 2rem;
     min-width: 0;
   }
 
   .drawer-sheet__footer {
-    border-top: 1px solid var(--color-brand-cream);
+    border-top: 1px solid #e5e7eb;
     padding: 1.25rem 2rem;
     background-color: #ffffff;
     display: flex;
@@ -5869,6 +5870,46 @@
     min-width: 0;
   }
 
+  .order-create-section--subblock {
+    margin-top: 0.25rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .order-create-form__payment-fields {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .order-create-form__field-pair {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .order-create-form__field-pair .field-row,
+  .order-create-form__payment-fields > .field-row {
+    width: 100%;
+    justify-items: stretch;
+  }
+
+  .order-create-form__field-pair .field-row input,
+  .order-create-form__field-pair .field-row select,
+  .order-create-form__payment-fields > .field-row input,
+  .order-create-form__payment-fields > .field-row select,
+  .order-create-form__payment-fields > .field-row textarea {
+    width: 100%;
+    max-width: none;
+    field-sizing: normal;
+  }
+
+  @media (max-width: 47.99rem) {
+    .order-create-form__field-pair {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   .order-create-form__customer-grid {
     grid-template-columns: 1fr !important;
   }
@@ -6070,7 +6111,7 @@
     }
 
     :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body {
-      padding: 0 0.75rem 0.75rem;
+      padding: 0.75rem;
     }
 
     :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__footer {

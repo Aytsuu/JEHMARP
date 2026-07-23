@@ -1363,7 +1363,10 @@ describe("executeAdminAction", () => {
 
   it("attaches a customer order after verifying agent order status with explicit queries", async () => {
     const agentOrderMaybeSingle = vi.fn(() => Promise.resolve({
-      data: { order_status: "processing" },
+      data: {
+        order_status: "processing",
+        release_date: "2026-07-18T01:30:00.000Z",
+      },
       error: null,
     }));
     const agentOrderEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
@@ -1401,14 +1404,10 @@ describe("executeAdminAction", () => {
           ],
         },
       ],
-      releaseSchedule: {
-        date: "2026-07-18",
-        time: "09:30",
-      },
       requireApproval: false,
     }, adminUserId);
 
-    expect(agentOrderSelect).toHaveBeenCalledWith("order_status");
+    expect(agentOrderSelect).toHaveBeenCalledWith("order_status, release_date");
     expect(agentOrderEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
     expect(customerOrderSelect).toHaveBeenCalledWith("payment_status");
     expect(customerOrderEq).toHaveBeenCalledWith("agent_order_id", "11111111-1111-4111-8111-111111111111");

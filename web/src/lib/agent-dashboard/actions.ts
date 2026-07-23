@@ -3,11 +3,7 @@ import { z } from "zod";
 
 import { logDevelopmentActionError } from "@/lib/request-logger";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { canAttachCustomerToAgentOrder } from "@/lib/agent-order-distribution";
-import {
-  parseAttachCustomerEntriesJson,
-  type AgentOrderAttachEntry,
-} from "@/lib/agent-order-attach";
+import { assertAgentOrderAllowsCustomerAttach, parseAttachCustomerEntriesJson, type AgentOrderAttachEntry } from "@/lib/agent-order-attach";
 import {
   executeAgentProfileUpdate,
   parseAgentProfileUpdateFields,
@@ -84,10 +80,6 @@ export type AgentAction =
       type: "attach-agent-order-customer";
       agentOrderId: string;
       entries: AgentOrderAttachEntry[];
-      releaseSchedule: {
-        date: string;
-        time: string;
-      };
       requireApproval: boolean;
     }
   | {
@@ -178,7 +170,6 @@ export function parseAgentActionFormData(
 
     if (action === "attach-agent-order-customer") {
       const entriesJson = requiredString(formData, "attachCustomerEntries");
-      const releaseSchedule = requiredDateTimePartsFromFormData(formData, "releaseDate", "releaseTime");
 
       return {
         success: true,
@@ -186,10 +177,6 @@ export function parseAgentActionFormData(
           type: "attach-agent-order-customer",
           agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
           entries: parseAttachCustomerEntriesJson(entriesJson, { assignedCustomerIds }),
-          releaseSchedule: {
-            date: releaseSchedule.date,
-            time: releaseSchedule.time,
-          },
           requireApproval: true,
         },
       };
@@ -337,15 +324,15 @@ export async function executeAgentAction(
       return;
     }
     case "attach-agent-order-customer": {
-      await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
+      const releaseSchedule = await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
 
       const trackingNumbers: string[] = [];
       const emailStatuses: NewCustomerTrackingEmailStatus[] = [];
 
       for (const entry of action.entries) {
         const releaseSchedulePayload = {
-          releaseDate: action.releaseSchedule.date,
-          releaseTime: action.releaseSchedule.time,
+          releaseDate: releaseSchedule.date,
+          releaseTime: releaseSchedule.time,
         };
         const { data, error } = await supabase.rpc("attach_customer_to_agent_order", {
           target_agent_order_id: action.agentOrderId,
@@ -431,47 +418,6 @@ function getAgentOrderCustomerPayload(
         releaseDate,
         releaseTime,
       };
-  }
-}
-
-async function assertAgentOrderAllowsCustomerAttach(
-  supabase: SupabaseServerClient,
-  agentOrderId: string,
-) {
-  const { data: agentOrder, error: agentOrderError } = await supabase
-    .from("agent_order")
-    .select("order_status")
-    .eq("id", agentOrderId)
-    .maybeSingle();
-
-  if (agentOrderError) {
-    throw new Error("Unable to verify agent order status before attaching a customer.", {
-      cause: agentOrderError,
-    });
-  }
-
-  if (!agentOrder) {
-    throw new Error("Agent order was not found.");
-  }
-
-  const { data: customerOrders, error: customerOrdersError } = await supabase
-    .from("customer_order")
-    .select("payment_status")
-    .eq("agent_order_id", agentOrderId);
-
-  if (customerOrdersError) {
-    throw new Error("Unable to verify linked customer order payment statuses before attaching a customer.", {
-      cause: customerOrdersError,
-    });
-  }
-
-  if (!canAttachCustomerToAgentOrder({
-    order_status: String(agentOrder.order_status),
-    customer_order: (customerOrders ?? []).map((order) => ({
-      payment_status: String((order as { payment_status?: unknown }).payment_status ?? "unpaid"),
-    })),
-  })) {
-    throw new Error("Completed and paid agent orders cannot accept new customers.");
   }
 }
 

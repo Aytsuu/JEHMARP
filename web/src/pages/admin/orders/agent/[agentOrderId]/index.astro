@@ -214,7 +214,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
     menuLabel="Other distribution orders"
     titleClass="admin-notifications-page__title"
   />
-  <ul slot="heading-meta" class="record-meta" aria-label="Agent order date">
+  <ul slot="heading-meta" class="record-meta" aria-label="Agent order dates">
     <li class="record-meta__item">
       <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -223,6 +223,13 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
         <line x1="3" y1="10" x2="21" y2="10"></line>
       </svg>
       <span class="record-meta__text">{formatDate(agentOrder.created_at)}</span>
+    </li>
+    <li class="record-meta__item">
+      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 7v5l3 2"></path>
+      </svg>
+      <span class="record-meta__text">Release {formatDate(agentOrder.release_date)}</span>
     </li>
   </ul>
 

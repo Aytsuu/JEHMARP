@@ -91,34 +91,6 @@ function productOptionLabel(product: ProductOption) {
       </p>
     )}
 
-    <section class="order-create-section">
-      <div class="order-create-section__header">
-        <h3 class="order-create-section__title">Release</h3>
-      </div>
-      <div class="order-create-section__body">
-        <div class="field-row-group field-row-group--datetime">
-          <label class="field-row field-row--date">
-            <span>Release date</span>
-            <input
-              name="releaseDate"
-              type="date"
-              required
-              disabled={!canSubmit}
-            />
-          </label>
-          <label class="field-row field-row--time">
-            <span>Release time</span>
-            <input
-              name="releaseTime"
-              type="time"
-              required
-              disabled={!canSubmit}
-            />
-          </label>
-        </div>
-      </div>
-    </section>
-
     <div class="order-create-section" data-customer-entries>
       <Accordion class="customer-entry-accordion" open data-customer-entry>
         <span slot="title" class="customer-entry-accordion__title-row">

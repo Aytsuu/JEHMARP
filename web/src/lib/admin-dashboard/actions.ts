@@ -8,8 +8,7 @@ import {
   requiredDateTimeFromFormData,
   requiredDateTimePartsFromFormData,
 } from "@/lib/datetime";
-import { canAttachCustomerToAgentOrder } from "@/lib/agent-order-distribution";
-import { parseAttachCustomerEntriesJson, type AgentOrderAttachEntry } from "@/lib/agent-order-attach";
+import { parseAttachCustomerEntriesJson, assertAgentOrderAllowsCustomerAttach, type AgentOrderAttachEntry } from "@/lib/agent-order-attach";
 import {
   ensureSalesInvoiceBeforeAgentPaymentConfirmation,
   ensureSalesInvoiceWhenOrderFullyPaid,
@@ -302,10 +301,6 @@ export type AdminAction =
       type: "attach-agent-order-customer";
       agentOrderId: string;
       entries: AgentOrderAttachEntry[];
-      releaseSchedule: {
-        date: string;
-        time: string;
-      };
       requireApproval: boolean;
     }
   | {
@@ -758,12 +753,12 @@ export async function executeAdminAction(
       await executeAgentOrderApproval(supabase, action);
       return;
     case "attach-agent-order-customer": {
-      await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
+      const releaseSchedule = await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
 
       for (const entry of action.entries) {
         const releaseSchedulePayload = {
-          releaseDate: action.releaseSchedule.date,
-          releaseTime: action.releaseSchedule.time,
+          releaseDate: releaseSchedule.date,
+          releaseTime: releaseSchedule.time,
         };
         const { data, error } = await supabase.rpc("attach_customer_to_agent_order", {
           target_agent_order_id: action.agentOrderId,
@@ -1175,16 +1170,11 @@ function parseAdminActionFormDataOrThrow(
       });
     case "attach-agent-order-customer": {
       const entriesJson = requiredString(formData, "attachCustomerEntries");
-      const releaseSchedule = requiredDateTimePartsFromFormData(formData, "releaseDate", "releaseTime");
 
       return success({
         type: "attach-agent-order-customer",
         agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
         entries: parseAttachCustomerEntriesJson(entriesJson),
-        releaseSchedule: {
-          date: releaseSchedule.date,
-          time: releaseSchedule.time,
-        },
         requireApproval: false,
       });
     }
@@ -3026,47 +3016,6 @@ async function assertAgentOrderItemCommissionEditable(
 
   if (isFullyPaid) {
     throw new Error("Agent order commission cannot be edited after all customer orders are fully paid.");
-  }
-}
-
-async function assertAgentOrderAllowsCustomerAttach(
-  supabase: SupabaseServerClient,
-  agentOrderId: string,
-) {
-  const { data: agentOrder, error: agentOrderError } = await supabase
-    .from("agent_order")
-    .select("order_status")
-    .eq("id", agentOrderId)
-    .maybeSingle();
-
-  if (agentOrderError) {
-    throw new Error("Unable to verify agent order status before attaching a customer.", {
-      cause: agentOrderError,
-    });
-  }
-
-  if (!agentOrder) {
-    throw new Error("Agent order was not found.");
-  }
-
-  const { data: customerOrders, error: customerOrdersError } = await supabase
-    .from("customer_order")
-    .select("payment_status")
-    .eq("agent_order_id", agentOrderId);
-
-  if (customerOrdersError) {
-    throw new Error("Unable to verify linked customer order payment statuses before attaching a customer.", {
-      cause: customerOrdersError,
-    });
-  }
-
-  if (!canAttachCustomerToAgentOrder({
-    order_status: String(agentOrder.order_status),
-    customer_order: (customerOrders ?? []).map((order) => ({
-      payment_status: String((order as { payment_status?: unknown }).payment_status ?? "unpaid"),
-    })),
-  })) {
-    throw new Error("Completed and paid agent orders cannot accept new customers.");
   }
 }
 

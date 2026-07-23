@@ -286,6 +286,9 @@ const orderStatusBadgeLabel = (status: typeof order.order_status) =>
 const customerDisplayName = order.customer
   ? fullName(order.customer)
   : "Unassigned customer";
+const customerViewHref = order.customer?.id
+  ? `/admin/customers/${order.customer.id}`
+  : null;
 const customerAddress = order.customer?.address ?? "No address on file";
 const customerPhone = order.customer?.phone_number ?? "No contact number";
 const customerEmail = order.customer?.email ?? "No email address";
@@ -427,6 +430,10 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               <dd>{formatDateTime(order.created_at)}</dd>
             </div>
             <div class="order-information__item">
+              <dt>Release</dt>
+              <dd>{formatDateTime(order.release_date)}</dd>
+            </div>
+            <div class="order-information__item">
               <dt>Payment status</dt>
               <dd>
                 <StatusBadge
@@ -539,6 +546,13 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                 <span class="order-party-card__eyebrow">Customer</span>
                 <p class="order-party-card__name">{customerDisplayName}</p>
               </div>
+              {
+                customerViewHref ? (
+                  <a href={customerViewHref} class="order-party-card__view-details-link">
+                    View details
+                  </a>
+                ) : null
+              }
             </div>
 
             <ul class="order-party-card__meta-list">
@@ -2580,11 +2594,32 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
   }
 
   .order-party-card__identity {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
     margin-bottom: 0.95rem;
   }
 
   .order-party-card__identity-copy {
     min-width: 0;
+  }
+
+  .order-party-card__view-details-link {
+    flex-shrink: 0;
+    color: #661818;
+    font-size: 0.88rem;
+    font-weight: 700;
+    line-height: 1.3;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .order-party-card__view-details-link:hover,
+  .order-party-card__view-details-link:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+    outline: none;
   }
 
   .order-party-card--customer .order-party-card__eyebrow,
