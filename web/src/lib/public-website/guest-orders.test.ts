@@ -109,6 +109,8 @@ describe("submitGuestOrder", () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "turnstile_secret");
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.upstash.io");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis_token");
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESELLER_PRICE_LIST_FROM", "");
 
     const rpc = vi.fn(() => Promise.resolve({
       data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",

@@ -21,6 +21,8 @@ describe("sendCustomerTrackingNumberEmail", () => {
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESELLER_PRICE_LIST_FROM", "");
 
     await expect(
       sendCustomerTrackingNumberEmail("maria@example.com", context),
