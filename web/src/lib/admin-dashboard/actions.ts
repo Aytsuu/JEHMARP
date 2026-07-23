@@ -29,6 +29,7 @@ import {
   mapCustomerWithProfile,
   customerWithProfileSelect,
   updateCustomerWithProfile,
+  asProfileIdentityClient,
 } from "@/lib/profile-identity";
 import { logDevelopmentActionError } from "@/lib/request-logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -1335,7 +1336,7 @@ async function executeAgentCreate(
   }
 
   try {
-    await insertAgentWithProfile(adminClient, {
+    await insertAgentWithProfile(asProfileIdentityClient(adminClient), {
       user_id: userId,
       employee_id: payload.employee_id,
       first_name: payload.first_name,
@@ -1474,13 +1475,18 @@ async function executeCustomerSave(
   if (!action.customerId) {
     await assertCustomerContactIsAvailable(supabase, action.payload);
 
-    await insertCustomerWithProfile(supabase, action.payload);
+    await insertCustomerWithProfile(asProfileIdentityClient(supabase), action.payload);
     return;
   }
 
-  const profileId = await loadCustomerProfileId(supabase, action.customerId);
+  const profileId = await loadCustomerProfileId(asProfileIdentityClient(supabase), action.customerId);
   await assertCustomerContactIsAvailable(supabase, action.payload, profileId);
-  await updateCustomerWithProfile(supabase, action.customerId, profileId, action.payload);
+  await updateCustomerWithProfile(
+    asProfileIdentityClient(supabase),
+    action.customerId,
+    profileId,
+    action.payload,
+  );
 }
 
 async function resolveOrderCustomer(
@@ -1521,7 +1527,7 @@ async function resolveOrderCustomer(
 
   await assertCustomerContactIsAvailable(supabase, customer.payload);
 
-  const customerId = await insertCustomerWithProfile(supabase, customer.payload);
+  const customerId = await insertCustomerWithProfile(asProfileIdentityClient(supabase), customer.payload);
   return {
     customerId,
     createdCustomerId: customerId,
@@ -1533,13 +1539,13 @@ async function assertCustomerContactIsAvailable(
   payload: CustomerFormPayload,
   excludeProfileId?: string,
 ) {
-  await assertProfilePhoneIsAvailable(supabase, payload.phone_number, excludeProfileId);
+  await assertProfilePhoneIsAvailable(asProfileIdentityClient(supabase), payload.phone_number, excludeProfileId);
 
   if (!payload.email) {
     return;
   }
 
-  await assertProfileEmailIsAvailable(supabase, payload.email, excludeProfileId);
+  await assertProfileEmailIsAvailable(asProfileIdentityClient(supabase), payload.email, excludeProfileId);
 }
 
 async function loadExistingProduct(
@@ -1907,7 +1913,7 @@ async function executeCustomerPromotionToAgent(
   let agentId: string | null = null;
 
   try {
-    agentId = await insertAgentWithProfile(adminClient, {
+    agentId = await insertAgentWithProfile(asProfileIdentityClient(adminClient), {
       user_id: userId,
       customer_id: customerId,
       profile_id: customerProfileId,

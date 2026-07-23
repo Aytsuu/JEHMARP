@@ -7,6 +7,7 @@ import {
   assertProfileEmailIsAvailable,
   assertProfilePhoneIsAvailable,
   insertCustomerWithProfile,
+  asProfileIdentityClient,
 } from "@/lib/profile-identity";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -138,14 +139,14 @@ export async function submitCustomerRegistration(
     payload.data.agentCode,
   );
 
-  await assertProfilePhoneIsAvailable(supabase, payload.data.phoneNumber);
+  await assertProfilePhoneIsAvailable(asProfileIdentityClient(supabase), payload.data.phoneNumber);
 
   if (payload.data.email) {
-    await assertProfileEmailIsAvailable(supabase, payload.data.email);
+    await assertProfileEmailIsAvailable(asProfileIdentityClient(supabase), payload.data.email);
   }
 
   try {
-    await insertCustomerWithProfile(supabase, {
+    await insertCustomerWithProfile(asProfileIdentityClient(supabase), {
       first_name: payload.data.firstName,
       last_name: payload.data.lastName,
       phone_number: payload.data.phoneNumber,
@@ -157,7 +158,7 @@ export async function submitCustomerRegistration(
     });
   } catch (error) {
     if (error instanceof Error && error.message.includes("already exists")) {
-      throw new Error("Phone number or email already exists for another customer.");
+      throw new Error("Phone number or email already exists for another customer.", { cause: error });
     }
 
     throw error;

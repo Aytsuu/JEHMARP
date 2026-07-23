@@ -4,6 +4,7 @@ import { parseContactNumber } from "@/lib/formatters";
 import {
   assertAgentPhoneIsAvailable,
   updateAgentWithProfile,
+  asProfileIdentityClient,
 } from "@/lib/profile-identity";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -61,7 +62,7 @@ export async function executeAgentProfileUpdate(
   await assertAgentEmailIsAvailable(adminClient, fields.email, agent.user_id);
 
   await updateAgentWithProfile(
-    adminClient,
+    asProfileIdentityClient(adminClient),
     agentId,
     String(agent.profile_id),
     {
@@ -122,7 +123,12 @@ export async function assertAgentContactIsAvailable(
   excludeAgentId?: string,
   excludeProfileId?: string,
 ) {
-  await assertAgentPhoneIsAvailable(adminClient, contact, excludeAgentId, excludeProfileId);
+  await assertAgentPhoneIsAvailable(
+    asProfileIdentityClient(adminClient),
+    contact,
+    excludeAgentId,
+    excludeProfileId,
+  );
 }
 
 function requiredString(formData: FormData, key: string) {

@@ -39,8 +39,11 @@ type SupabaseLikeClient = {
   };
 };
 
-// Use a loose client type at module boundaries to avoid Supabase generic recursion in astro check.
-export type ProfileIdentitySupabaseClient = any;
+export type ProfileIdentitySupabaseClient = SupabaseLikeClient;
+
+export function asProfileIdentityClient(client: unknown): ProfileIdentitySupabaseClient {
+  return client as ProfileIdentitySupabaseClient;
+}
 
 export type ProfileIdentityRow = {
   first_name: string;
