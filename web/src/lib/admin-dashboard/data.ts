@@ -419,6 +419,7 @@ export type AdminAgent = {
 
 export type AdminCustomer = {
   id: string;
+  tracking_number: string;
   first_name: string;
   last_name: string;
   phone_number: string;
@@ -1961,6 +1962,7 @@ function getAdminAgentOrderSearchText(order: AdminAgentOrder) {
 
 function getAdminCustomerSearchText(customer: AdminCustomer, assignedAgent: string) {
   const values = [
+    customer.tracking_number,
     customer.first_name,
     customer.last_name,
     `${customer.first_name} ${customer.last_name}`.trim(),

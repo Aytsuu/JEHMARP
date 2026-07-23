@@ -20,6 +20,10 @@ describe("computeAdminOrderStatusCounts", () => {
       totalOrders: 7,
       pendingOrders: 3,
       processingOrders: 2,
+      pendingOrder: 2,
+      pendingCustomer: 1,
+      processing: 2,
+      closed: 2,
     });
   });
 });

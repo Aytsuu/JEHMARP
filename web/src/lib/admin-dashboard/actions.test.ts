@@ -2654,11 +2654,21 @@ describe("executeAdminAction", () => {
         single: vi.fn(() => Promise.resolve({ data: { id: "customer-id" }, error: null })),
       })),
     }));
+    const customerTrackingEq = vi.fn(() => ({
+      maybeSingle: vi.fn(() => Promise.resolve({
+        data: { tracking_number: "JHM-TEST1234" },
+        error: null,
+      })),
+    }));
+    const customerSelect = vi.fn(() => ({
+      eq: customerTrackingEq,
+    }));
     const from = vi.fn((table: string) => {
       if (table === "profile") return { select: profileSelect, insert: profileInsert };
-      if (table === "customer") return { insert: customerInsert };
+      if (table === "customer") return { insert: customerInsert, select: customerSelect };
       throw new Error(`Unexpected table ${table}`);
     });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from });
 
     await executeAdminAction({ from } as never, {
       type: "save-customer",
@@ -2689,6 +2699,7 @@ describe("executeAdminAction", () => {
       if (table === "customer") return { insert: customerInsert };
       throw new Error(`Unexpected table ${table}`);
     });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from });
 
     await expect(executeAdminAction({ from } as never, {
       type: "save-customer",
@@ -3050,21 +3061,34 @@ describe("executeAdminAction", () => {
         single: vi.fn(() => Promise.resolve({ data: { id: customerId }, error: null })),
       })),
     }));
+    const customerTrackingEq = vi.fn(() => ({
+      maybeSingle: vi.fn(() => Promise.resolve({
+        data: { tracking_number: "JHM-TEST1234" },
+        error: null,
+      })),
+    }));
+    const customerSelect = vi.fn(() => ({
+      eq: customerTrackingEq,
+    }));
     const orderInsert = vi.fn(() => ({
       select: vi.fn(() => ({
         single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
       })),
     }));
     const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
-    const from = vi.fn((table: string) => {
+    const adminFrom = vi.fn((table: string) => {
       if (table === "profile") return { select: profileSelect, insert: profileInsert };
-      if (table === "customer") return { insert: customerInsert };
+      if (table === "customer") return { insert: customerInsert, select: customerSelect };
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+    const serverFrom = vi.fn((table: string) => {
       if (table === "customer_order") return { insert: orderInsert };
       if (table === "customer_order_item") return { insert: itemInsert };
-      throw new Error(`Unexpected table ${table}`);
+      throw new Error(`Unexpected server table ${table}`);
     });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
 
-    await executeAdminAction({ from } as never, {
+    await executeAdminAction({ from: serverFrom } as never, {
       type: "create-order",
       customer: {
         type: "new",
@@ -3110,14 +3134,18 @@ describe("executeAdminAction", () => {
     const profileSelect = vi.fn(() => ({ eq: profileLookupEq }));
     const customerInsert = vi.fn();
     const orderInsert = vi.fn();
-    const from = vi.fn((table: string) => {
+    const adminFrom = vi.fn((table: string) => {
       if (table === "profile") return { select: profileSelect };
       if (table === "customer") return { insert: customerInsert };
-      if (table === "customer_order") return { insert: orderInsert };
-      throw new Error(`Unexpected table ${table}`);
+      throw new Error(`Unexpected admin table ${table}`);
     });
+    const serverFrom = vi.fn((table: string) => {
+      if (table === "customer_order") return { insert: orderInsert };
+      throw new Error(`Unexpected server table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
 
-    await expect(executeAdminAction({ from } as never, {
+    await expect(executeAdminAction({ from: serverFrom } as never, {
       type: "create-order",
       customer: {
         type: "new",
@@ -3173,14 +3201,18 @@ describe("executeAdminAction", () => {
     }));
     const customerInsert = vi.fn();
     const orderInsert = vi.fn();
-    const from = vi.fn((table: string) => {
+    const adminFrom = vi.fn((table: string) => {
       if (table === "profile") return { select: profileSelect };
       if (table === "customer") return { insert: customerInsert };
-      if (table === "customer_order") return { insert: orderInsert };
-      throw new Error(`Unexpected table ${table}`);
+      throw new Error(`Unexpected admin table ${table}`);
     });
+    const serverFrom = vi.fn((table: string) => {
+      if (table === "customer_order") return { insert: orderInsert };
+      throw new Error(`Unexpected server table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
 
-    await expect(executeAdminAction({ from } as never, {
+    await expect(executeAdminAction({ from: serverFrom } as never, {
       type: "create-order",
       customer: {
         type: "new",
@@ -3256,21 +3288,34 @@ describe("executeAdminAction", () => {
         single: vi.fn(() => Promise.resolve({ data: { id: customerId }, error: null })),
       })),
     }));
+    const customerTrackingEq = vi.fn(() => ({
+      maybeSingle: vi.fn(() => Promise.resolve({
+        data: { tracking_number: "JHM-TEST1234" },
+        error: null,
+      })),
+    }));
+    const customerSelect = vi.fn(() => ({
+      eq: customerTrackingEq,
+    }));
     const orderInsert = vi.fn(() => ({
       select: vi.fn(() => ({
         single: vi.fn(() => Promise.resolve({ data: { id: orderId }, error: null })),
       })),
     }));
     const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
-    const from = vi.fn((table: string) => {
+    const adminFrom = vi.fn((table: string) => {
       if (table === "profile") return { select: profileSelect, insert: profileInsert };
-      if (table === "customer") return { insert: customerInsert };
+      if (table === "customer") return { insert: customerInsert, select: customerSelect };
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+    const serverFrom = vi.fn((table: string) => {
       if (table === "customer_order") return { insert: orderInsert };
       if (table === "customer_order_item") return { insert: itemInsert };
-      throw new Error(`Unexpected table ${table}`);
+      throw new Error(`Unexpected server table ${table}`);
     });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
 
-    await executeAdminAction({ from } as never, {
+    await executeAdminAction({ from: serverFrom } as never, {
       type: "create-order",
       customer: {
         type: "new",

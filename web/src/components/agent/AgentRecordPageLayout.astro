@@ -44,6 +44,7 @@ const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
 const isPageReady = pageAvailability.status === "ready";
 const hasHeadingMeta = Astro.slots.has("heading-meta");
 const hasHeadingAside = Astro.slots.has("heading-aside");
+const hasHeadingTitle = Astro.slots.has("heading-title");
 const isAgentPrimaryPage = isAgentMobilePrimaryRoute(Astro.url.pathname);
 ---
 
@@ -83,7 +84,15 @@ const isAgentPrimaryPage = isAgentMobilePrimaryRoute(Astro.url.pathname);
             ]}
           >
             <div class="admin-notifications-page__heading-copy">
-              <h1 id={headingId} class="admin-notifications-page__title">{heading}</h1>
+              {
+                hasHeadingTitle ? (
+                  <div class="admin-notifications-page__title-slot">
+                    <slot name="heading-title" />
+                  </div>
+                ) : (
+                  <h1 id={headingId} class="admin-notifications-page__title">{heading}</h1>
+                )
+              }
               {
                 hasHeadingMeta ? (
                   <div class="admin-notifications-page__heading-meta">

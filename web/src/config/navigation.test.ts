@@ -8,6 +8,7 @@ describe("primaryNavigation", () => {
       { label: "Home", href: "/" },
       { label: "Our Story", href: "/our-story" },
       { label: "Shop", href: "/shop" },
+      { label: "Track Orders", href: "/track" },
       { label: "Business", href: "/business" },
       { label: "Contact", href: "/contact" },
       { label: "Login", href: "/login" },

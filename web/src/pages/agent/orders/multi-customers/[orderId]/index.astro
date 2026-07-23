@@ -3,6 +3,7 @@ import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astr
 import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
 import AgentOrderDistributionSummaryCard from "@/components/agent/AgentOrderDistributionSummaryCard.astro";
 import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
+import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import {
@@ -36,6 +37,10 @@ import {
 } from "@/lib/agent-order-distribution";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
+import {
+  buildOrderDetailNavEntries,
+  formatOrderCode,
+} from "@/lib/order-detail-nav";
 
 export const prerender = false;
 
@@ -145,7 +150,12 @@ const totalRemittance = agentOrderRemittanceTotal(agentOrder);
 const orderSummaryPendingAmount = pendingCustomerOrderAmount > 0
   ? pendingCustomerOrderAmount
   : null;
-const agentOrderCode = `Order-${agentOrder.id.slice(0, 6).toUpperCase()}`;
+const agentOrderCode = formatOrderCode(agentOrder.id);
+const agentOrderNavigationEntries = buildOrderDetailNavEntries({
+  orders: data.agentOrders,
+  currentOrderId: agentOrder.id,
+  buildHref: (entry) => `/agent/orders/multi-customers/${entry.id}`,
+});
 const todayDate = manilaDateInputValue();
 const todayTime = manilaTimeInputValue();
 const productCount = agentOrder.agent_order_item.length;
@@ -161,6 +171,13 @@ const customerCount = agentOrder.customer_order.length;
   feedback={feedback}
   dashboardData={data}
 >
+  <OrderDetailNav
+    slot="heading-title"
+    currentCode={agentOrderCode}
+    entries={agentOrderNavigationEntries}
+    menuLabel="Other distribution orders"
+    titleClass="admin-notifications-page__title"
+  />
   <ul slot="heading-meta" class="record-meta" aria-label="Agent order date">
     <li class="record-meta__item">
       <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">

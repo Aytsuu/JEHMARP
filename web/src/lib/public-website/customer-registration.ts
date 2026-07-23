@@ -10,6 +10,9 @@ import {
   asProfileIdentityClient,
 } from "@/lib/profile-identity";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import {
+  deliverNewCustomerTrackingNotification,
+} from "@/lib/public-website/customer-tracking";
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
@@ -125,8 +128,13 @@ export async function getCustomerRegistrationLinkState(
 export async function submitCustomerRegistration(
   token: string,
   payload: CustomerRegistrationParseResult & { success: true },
-  supabase: SupabaseAdminClient = createSupabaseAdminClient(),
+  options: {
+    supabase?: SupabaseAdminClient;
+    siteOrigin?: string;
+    fetch?: typeof fetch;
+  } = {},
 ) {
+  const supabase = options.supabase ?? createSupabaseAdminClient();
   const link = await loadRegistrationLinkByToken(supabase, token);
 
   if (!link || link.revoked_at || new Date(link.expires_at).getTime() <= Date.now()) {
@@ -145,8 +153,11 @@ export async function submitCustomerRegistration(
     await assertProfileEmailIsAvailable(asProfileIdentityClient(supabase), payload.data.email);
   }
 
+  let customerId: string;
+  let trackingNumber: string;
+
   try {
-    await insertCustomerWithProfile(asProfileIdentityClient(supabase), {
+    ({ customerId, trackingNumber } = await insertCustomerWithProfile(asProfileIdentityClient(supabase), {
       first_name: payload.data.firstName,
       last_name: payload.data.lastName,
       phone_number: payload.data.phoneNumber,
@@ -155,13 +166,27 @@ export async function submitCustomerRegistration(
       assigned_agent_id: assignedAgentId,
       is_reseller: false,
       updated_at: new Date().toISOString(),
-    });
+    }));
   } catch (error) {
     if (error instanceof Error && error.message.includes("already exists")) {
       throw new Error("Phone number or email already exists for another customer.", { cause: error });
     }
 
     throw error;
+  }
+
+  if (options.siteOrigin) {
+    const emailResult = await deliverNewCustomerTrackingNotification({
+      trackingNumber,
+      recipientName: `${payload.data.firstName} ${payload.data.lastName}`.trim(),
+      email: payload.data.email,
+      siteOrigin: options.siteOrigin,
+      fetch: options.fetch,
+    });
+
+    if (emailResult === "failed") {
+      console.error("Unable to deliver registration tracking email.");
+    }
   }
 
   await supabase
@@ -171,6 +196,11 @@ export async function submitCustomerRegistration(
       last_used_at: new Date().toISOString(),
     })
     .eq("id", link.id);
+
+  return {
+    customerId,
+    trackingNumber,
+  };
 }
 
 async function loadRegistrationLinkByToken(

@@ -13,6 +13,12 @@ import {
   parseAgentProfileUpdateFields,
   createAgentProfileAdminClient,
 } from "@/lib/agent-profile-update";
+import {
+  deliverNewCustomerTrackingNotification,
+  formatMultipleNewCustomerTrackingFeedback,
+  loadGuestOrderTrackingNumber,
+  type NewCustomerTrackingEmailStatus,
+} from "@/lib/public-website/customer-tracking";
 import { loadAgentDashboardData } from "./data";
 import {
   requiredDateTimeFromFormData,
@@ -24,6 +30,9 @@ const agentOrderSubmissionModes = ["distribution", "personal"] as const;
 const paymentMethods = ["Cash", "Check"] as const;
 const paymentTermsOptions = ["Cash on Delivery (COD)", "Bank Transfer", "Gcash"] as const;
 
+type AgentActionResult = {
+  statusMessage?: string;
+};
 type AgentDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect"> & Partial<Pick<APIContext, "url">>;
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 type AgentOrderSubmissionMode = (typeof agentOrderSubmissionModes)[number];
@@ -247,7 +256,14 @@ export async function handleAgentDashboardAction(
   }
 
   try {
-    await executeAgentAction(createSupabaseServerClient(context), parsed.action);
+    const actionResult = await executeAgentAction(
+      createSupabaseServerClient(context),
+      parsed.action,
+      { siteOrigin: context.url?.origin },
+    );
+    const message = actionResult?.statusMessage ?? getActionSuccessMessage(parsed.action);
+
+    return context.redirect(`${returnPath}?status=${encodeURIComponent(message)}`, 303);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Agent action failed.";
     logDevelopmentActionError({
@@ -261,14 +277,13 @@ export async function handleAgentDashboardAction(
 
     return context.redirect(`${returnPath}?error=${encodeURIComponent(message)}`, 303);
   }
-
-  return context.redirect(`${returnPath}?status=${encodeURIComponent(getActionSuccessMessage(parsed.action))}`, 303);
 }
 
 export async function executeAgentAction(
   supabase: SupabaseServerClient,
   action: AgentAction,
-): Promise<void> {
+  options: { siteOrigin?: string } = {},
+): Promise<AgentActionResult | void> {
   switch (action.type) {
     case "create-agent-order": {
       const { data, error } = await supabase.rpc("submit_agent_order", {
@@ -324,6 +339,9 @@ export async function executeAgentAction(
     case "attach-agent-order-customer": {
       await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
 
+      const trackingNumbers: string[] = [];
+      const emailStatuses: NewCustomerTrackingEmailStatus[] = [];
+
       for (const entry of action.entries) {
         const releaseSchedulePayload = {
           releaseDate: action.releaseSchedule.date,
@@ -349,6 +367,28 @@ export async function executeAgentAction(
         if (error || typeof data !== "string") {
           throw new Error(error?.message || "Unable to attach customer order.");
         }
+
+        if (entry.customer.type === "new") {
+          const trackingNumber = await loadGuestOrderTrackingNumber(data, supabase);
+          trackingNumbers.push(trackingNumber);
+          emailStatuses.push(await deliverNewCustomerTrackingNotification({
+            trackingNumber,
+            recipientName: `${entry.customer.payload.firstName} ${entry.customer.payload.lastName}`.trim(),
+            email: entry.customer.payload.email,
+            siteOrigin: options.siteOrigin,
+            includeOrderSubmittedNote: true,
+          }));
+        }
+      }
+
+      if (trackingNumbers.length > 0) {
+        return {
+          statusMessage: formatMultipleNewCustomerTrackingFeedback({
+            baseMessage: getActionSuccessMessage(action),
+            trackingNumbers,
+            emailStatuses,
+          }),
+        };
       }
 
       return;

@@ -36,6 +36,9 @@ type SupabaseLikeClient = {
     update: (values: Record<string, unknown>) => {
       eq: (column: string, value: string) => SupabaseMutationResult;
     };
+    delete: () => {
+      eq: (column: string, value: string) => SupabaseMutationResult;
+    };
   };
 };
 
@@ -82,6 +85,7 @@ export const profileIdentitySelect = `
 export const customerWithProfileSelect = `
   id,
   profile_id,
+  tracking_number,
   assigned_agent_id,
   is_reseller,
   credit_limit,
@@ -187,6 +191,7 @@ export function mapCustomerWithProfile<
     is_reseller: boolean;
     credit_limit?: number;
     credit_limit_exceeded?: boolean;
+    tracking_number?: string | null;
     promoted_to_agent_id?: string | null;
     promoted_to_agent_at?: string | null;
     created_at: string;
@@ -211,6 +216,7 @@ export function mapCustomerWithProfile<
     address: identity.address,
     assigned_agent_id: row.assigned_agent_id,
     is_reseller: row.is_reseller,
+    tracking_number: String(row.tracking_number ?? ""),
     credit_limit: Number(row.credit_limit ?? 1000),
     credit_limit_exceeded: Boolean(row.credit_limit_exceeded),
     promoted_to_agent_id: row.promoted_to_agent_id ?? null,
@@ -532,27 +538,89 @@ export async function insertCustomerWithProfile(
     profile_id?: string;
   },
 ) {
+  const createdProfileInThisCall = !payload.profile_id;
   const profileId = payload.profile_id
     ?? (await insertProfile(supabase, payload));
 
+  try {
+    const { data, error } = await supabase
+      .from("customer")
+      .insert({
+        profile_id: profileId,
+        assigned_agent_id: payload.assigned_agent_id,
+        is_reseller: payload.is_reseller,
+        credit_limit: payload.credit_limit,
+        created_by: payload.created_by,
+        updated_at: payload.updated_at,
+      })
+      .select("id")
+      .single();
+
+    if (error || !data?.id) {
+      throw createCustomerInsertError(error);
+    }
+
+    const customerId = String(data.id);
+    const trackingNumber = await loadCustomerTrackingNumberForClient(supabase, customerId);
+
+    return {
+      customerId,
+      trackingNumber,
+    };
+  } catch (error) {
+    if (createdProfileInThisCall) {
+      await cleanupOrphanProfile(supabase, profileId);
+    }
+
+    throw error;
+  }
+}
+
+async function loadCustomerTrackingNumberForClient(
+  supabase: ProfileIdentitySupabaseClient,
+  customerId: string,
+): Promise<string> {
   const { data, error } = await supabase
     .from("customer")
-    .insert({
-      profile_id: profileId,
-      assigned_agent_id: payload.assigned_agent_id,
-      is_reseller: payload.is_reseller,
-      credit_limit: payload.credit_limit,
-      created_by: payload.created_by,
-      updated_at: payload.updated_at,
-    })
-    .select("id")
-    .single();
+    .select("tracking_number")
+    .eq("id", customerId)
+    .maybeSingle();
 
-  if (error || !data?.id) {
-    throw new Error("Unable to create customer.");
+  const trackingNumber = (data as { tracking_number?: string } | null)?.tracking_number;
+
+  if (error || !trackingNumber) {
+    throw new Error("Unable to load customer tracking number.");
   }
 
-  return String(data.id);
+  return String(trackingNumber);
+}
+
+async function cleanupOrphanProfile(
+  supabase: ProfileIdentitySupabaseClient,
+  profileId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("customer")
+    .select("id")
+    .eq("profile_id", profileId)
+    .maybeSingle();
+
+  if (error || data?.id) {
+    return;
+  }
+
+  await supabase
+    .from("profile")
+    .delete()
+    .eq("id", profileId);
+}
+
+function createCustomerInsertError(error: SupabaseLikeError | null): Error {
+  if (error?.message) {
+    return new Error(`Unable to create customer: ${error.message}`);
+  }
+
+  return new Error("Unable to create customer.");
 }
 
 export async function updateCustomerWithProfile(

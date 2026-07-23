@@ -31,6 +31,15 @@ describe("buildAdminAnalytics", () => {
       label: "processing",
       count: 2,
     });
+    expect(analytics.orderStatusOverview).toEqual({
+      totalOrders: 3,
+      statuses: [
+        { key: "pending_order", label: "Pending Order", count: 1, color: "#f97316" },
+        { key: "pending_customers", label: "Pending Customer", count: 0, color: "#ecb55d" },
+        { key: "processing", label: "Processing", count: 1, color: "#2563eb" },
+        { key: "closed", label: "Closed", count: 1, color: "#10b981" },
+      ],
+    });
     expect(analytics.paymentsByStatus.find((item) => item.label === "partial")).toEqual({
       label: "partial",
       count: 1,
@@ -420,6 +429,10 @@ function createAnalyticsData(): AdminDashboardData {
       totalOrders: 3,
       pendingOrders: 1,
       processingOrders: 1,
+      pendingOrder: 1,
+      pendingCustomer: 0,
+      processing: 1,
+      closed: 1,
       agents: 0,
       inquiries: 1,
       customers: 3,
@@ -458,6 +471,7 @@ function customer(
 ) {
   return {
     id,
+    tracking_number: `JHM-${id.slice(-8).toUpperCase().padStart(8, "0")}`,
     first_name: firstName,
     last_name: lastName,
     phone_number: "09170000000",

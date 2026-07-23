@@ -348,6 +348,7 @@ describe("loadAdminDashboardData", () => {
   it("loads admin customer rows through the paginated customer RPC", async () => {
     const customerRow = {
       id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+      tracking_number: "JHM-ABCD2345",
       first_name: "Maria",
       last_name: "Cruz",
       phone_number: "09170000000",
@@ -458,6 +459,7 @@ describe("loadAdminDashboardData", () => {
     };
     const assignedCustomerRow = {
       id: assignedCustomerId,
+      tracking_number: "JHM-ASSIGNED1",
       assigned_agent_id: "agent-1",
       is_reseller: false,
       credit_limit: 1000,
@@ -1000,6 +1002,10 @@ describe("loadAdminDashboardData", () => {
       totalOrders: 4,
       pendingOrders: 2,
       processingOrders: 1,
+      pendingOrder: 1,
+      pendingCustomer: 1,
+      processing: 1,
+      closed: 1,
       agents: 2,
       inquiries: 2,
       customers: 1,

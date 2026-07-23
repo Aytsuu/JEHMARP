@@ -118,12 +118,25 @@ export type RecentOrderMetric = {
   createdAt: string;
 };
 
+export type OrderStatusOverviewMetric = {
+  key: "pending_order" | "pending_customers" | "processing" | "closed";
+  label: string;
+  count: number;
+  color: string;
+};
+
+export type OrderStatusOverview = {
+  totalOrders: number;
+  statuses: OrderStatusOverviewMetric[];
+};
+
 export type AdminAnalytics = {
   summary: AnalyticsSummary;
   salesByDay: SalesPeriodMetric[];
   salesByMonth: SalesPeriodMetric[];
   ordersByStatus: CountMetric[];
   paymentsByStatus: CountMetric[];
+  orderStatusOverview: OrderStatusOverview;
   topProducts: ProductSalesMetric[];
   salesByCategory: ProductSalesMetric[];
   weeklyProductOrders: WeeklyProductOrdersMetric;
@@ -205,6 +218,7 @@ export function buildAdminAnalytics(
       label: status,
       count: data.orders.filter((order) => order.payment_status === status).length,
     })),
+    orderStatusOverview: buildOrderStatusOverview(data.summary),
     topProducts: buildProductSales(data, completedPaidOrders).slice(0, 5),
     salesByCategory: buildCategorySales(data, completedPaidOrders),
     weeklyProductOrders: buildWeeklyProductOrders(data, now),
@@ -214,6 +228,40 @@ export function buildAdminAnalytics(
     recentInquiries: byNewest(data.contactInquiries).slice(0, 5),
     recentResellerApplications: byNewest(data.resellerApplications).slice(0, 5),
     recentCustomers: byNewest(data.customers).slice(0, 5),
+  };
+}
+
+function buildOrderStatusOverview(
+  summary: AdminDashboardData["summary"],
+): OrderStatusOverview {
+  return {
+    totalOrders: summary.totalOrders,
+    statuses: [
+      {
+        key: "pending_order",
+        label: "Pending Order",
+        count: summary.pendingOrder,
+        color: "#f97316",
+      },
+      {
+        key: "pending_customers",
+        label: "Pending Customer",
+        count: summary.pendingCustomer,
+        color: "#ecb55d",
+      },
+      {
+        key: "processing",
+        label: "Processing",
+        count: summary.processing,
+        color: "#2563eb",
+      },
+      {
+        key: "closed",
+        label: "Closed",
+        count: summary.closed,
+        color: "#10b981",
+      },
+    ],
   };
 }
 

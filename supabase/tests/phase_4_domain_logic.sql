@@ -19,6 +19,7 @@ declare
   text_result text;
   row_count integer;
   timestamp_result timestamptz;
+  tracking_lookup jsonb;
 begin
   insert into public.product (
     name,
@@ -243,6 +244,23 @@ begin
 
   if numeric_result <> 320 then
     raise exception 'Expected commission-adjusted unpaid balance 320, got %', numeric_result;
+  end if;
+
+  select public.compute_customer_amount_due(test_order_id)
+  into numeric_result;
+
+  if numeric_result <> 400 then
+    raise exception 'Expected customer amount due 400 without commission deduction, got %', numeric_result;
+  end if;
+
+  select public.get_customer_orders_by_tracking_number(customer.tracking_number)
+  into tracking_lookup
+  from public.customer
+  where customer.id = test_customer_id;
+
+  if coalesce((tracking_lookup -> 'orders' -> 0 ->> 'amountDue')::numeric, -1) <> 400 then
+    raise exception 'Expected tracking amount due 400 without commission deduction, got %',
+      tracking_lookup -> 'orders' -> 0 ->> 'amountDue';
   end if;
 
   select payment_status

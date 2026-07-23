@@ -13,7 +13,7 @@ type Props = {
   orderableProducts: PublicProduct[];
   pagination: ProductPagination;
   orderStatus: string | null;
-  orderReference: string | null;
+  orderEmailSent: boolean;
   orderMessage: string | null;
   turnstileSiteKey: string | null;
   shopPath?: string;
@@ -26,7 +26,7 @@ const {
   orderableProducts,
   pagination,
   orderStatus,
-  orderReference,
+  orderEmailSent,
   orderMessage,
   turnstileSiteKey,
   shopPath = "/shop",
@@ -74,7 +74,14 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
     <section class="message-block" aria-labelledby="order-confirmation">
       <h2 id="order-confirmation">Order submitted</h2>
       <p>Your guest order was submitted for review.</p>
-      {orderReference && <p>Reference: {orderReference}</p>}
+      {orderEmailSent ? (
+        <p>We sent your customer tracking number to the email address you provided.</p>
+      ) : (
+        <p>Our team will share your customer tracking number with you so you can follow your order status.</p>
+      )}
+      <p>
+        <a href="/track">Track your order status</a> once you have your tracking number.
+      </p>
     </section>
   )
 }
