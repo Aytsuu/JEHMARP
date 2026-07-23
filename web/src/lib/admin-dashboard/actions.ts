@@ -33,6 +33,7 @@ import {
   customerWithProfileSelect,
   updateCustomerWithProfile,
   asProfileIdentityClient,
+  type ProfileIdentitySupabaseClient,
 } from "@/lib/profile-identity";
 import { logDevelopmentActionError } from "@/lib/request-logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -1583,17 +1584,17 @@ async function resolveOrderCustomer(
 }
 
 async function assertCustomerContactIsAvailable(
-  supabase: SupabaseServerClient,
+  supabase: ProfileIdentitySupabaseClient,
   payload: CustomerFormPayload,
   excludeProfileId?: string,
 ) {
-  await assertProfilePhoneIsAvailable(asProfileIdentityClient(supabase), payload.phone_number, excludeProfileId);
+  await assertProfilePhoneIsAvailable(supabase, payload.phone_number, excludeProfileId);
 
   if (!payload.email) {
     return;
   }
 
-  await assertProfileEmailIsAvailable(asProfileIdentityClient(supabase), payload.email, excludeProfileId);
+  await assertProfileEmailIsAvailable(supabase, payload.email, excludeProfileId);
 }
 
 async function loadExistingProduct(
