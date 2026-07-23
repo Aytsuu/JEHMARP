@@ -78,6 +78,60 @@ select
   'unpaid'
 from public.agent_order agent_order_row;
 
+-- Distribution items omit unit_price/price_type; skip customer pricing for them.
+create or replace function private.sync_order_item_price_snapshot()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  order_customer_is_reseller boolean;
+  retail_price numeric;
+  reseller_price_value numeric;
+begin
+  if new.order_kind = 'distribution' then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT'
+     or new.product_id is distinct from old.product_id then
+    select customer.is_reseller
+    into order_customer_is_reseller
+    from public."order" order_row
+    join public.customer
+      on customer.id = order_row.customer_id
+    where order_row.id = new.order_id
+      and order_row.order_kind in ('customer', 'personal');
+
+    if order_customer_is_reseller is null then
+      raise exception 'Order % does not have a valid customer for pricing.', new.order_id;
+    end if;
+
+    select product.default_price, product.reseller_price
+    into retail_price, reseller_price_value
+    from public.product
+    where product.id = new.product_id;
+
+    if retail_price is null or reseller_price_value is null then
+      raise exception 'Product % does not have valid prices for order item pricing.', new.product_id;
+    end if;
+
+    if order_customer_is_reseller then
+      new.unit_price := reseller_price_value;
+      new.price_type := 'reseller';
+    else
+      new.unit_price := retail_price;
+      new.price_type := 'retail';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+alter function private.sync_order_item_price_snapshot() owner to postgres;
+
 insert into public.order_item (
   id,
   order_id,
