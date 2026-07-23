@@ -1,5 +1,6 @@
 import type { AdminDashboardData } from "./data";
 import { fullName } from "./view";
+import { buildUnpaidOrderCheckNotifications } from "./unpaid-order-checks";
 
 export type AdminNotification = {
   id: string;
@@ -14,7 +15,11 @@ export type AdminNotification = {
 
 type AdminNotificationSource = Pick<
   AdminDashboardData,
-  "resellerApplications" | "orders" | "contactInquiries"
+  | "resellerApplications"
+  | "orders"
+  | "contactInquiries"
+  | "customers"
+  | "readAdminNotificationIds"
 >;
 
 export function getUnreadAdminResellerApplicationIds(
@@ -55,8 +60,10 @@ export function getUnreadAdminInquiryIds(
 
 function buildAdminActionNotifications(
   data: AdminNotificationSource,
+  now = new Date(),
 ): AdminNotification[] {
   const notifications: AdminNotification[] = [];
+  const readNotificationIds = new Set(data.readAdminNotificationIds);
 
   data.resellerApplications
     .filter((application) => application.application_status === "submitted")
@@ -106,13 +113,22 @@ function buildAdminActionNotifications(
       });
     });
 
-  return sortNotificationsByDateDesc(notifications);
+  return sortNotificationsByDateDesc([
+    ...notifications,
+    ...buildUnpaidOrderCheckNotifications(
+      data.orders,
+      data.customers,
+      readNotificationIds,
+      now,
+    ),
+  ]);
 }
 
 export function buildAdminNotifications(
   data: AdminNotificationSource,
+  now = new Date(),
 ): AdminNotification[] {
-  const notifications = buildAdminActionNotifications(data);
+  const notifications = buildAdminActionNotifications(data, now);
 
   if (notifications.length > 0) {
     return notifications;
@@ -135,8 +151,9 @@ export function buildAdminNotifications(
 
 export function getAdminUnreadNotificationIds(
   data: AdminNotificationSource,
+  now = new Date(),
 ): string[] {
-  return buildAdminActionNotifications(data)
+  return buildAdminActionNotifications(data, now)
     .filter((notification) => notification.isUnread)
     .map((notification) => notification.id);
 }

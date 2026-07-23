@@ -1,6 +1,7 @@
 ---
 import type { NavigationItem } from "@/config/navigation";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar.astro";
+import AlertDialog from "@/components/ui/AlertDialog.astro";
 import type { DashboardSidebarUnreadBadge } from "@/lib/dashboard/sidebar-navigation";
 import { getDashboardPageTransitionName } from "@/lib/dashboard/page-transition";
 import { ClientRouter } from "astro:transitions";
@@ -71,7 +72,24 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
       </main>
     </div>
 
+    <form
+      id="dashboard-logout-form"
+      method="post"
+      action="/api/logout"
+      data-astro-reload
+      hidden
+    ></form>
+    <AlertDialog
+      id="dashboard-logout-dialog"
+      title="Sign out?"
+      description="You will need to sign in again to access your dashboard."
+      confirmLabel="Sign out"
+      cancelLabel="Stay signed in"
+      variant="danger"
+    />
+
     <script>
+      import { initDashboardAlertDialogs } from "@/lib/client/dashboard-alert-dialog";
       import { initDashboardNavNavigation } from "@/lib/client/dashboard-nav";
       import { initDashboardRouteLoading } from "@/lib/client/dashboard-route-loading";
       import { initDashboardSidebarUnreadBadges } from "@/lib/client/dashboard-sidebar-badges";
@@ -84,6 +102,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
         initDashboardNavNavigation();
         initDashboardRouteLoading();
         initDashboardSidebarUnreadBadges();
+        initDashboardAlertDialogs();
       }
 
       document.addEventListener("DOMContentLoaded", initAdminContentDashboardFeatures);

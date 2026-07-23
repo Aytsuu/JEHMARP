@@ -60,14 +60,12 @@ const routeStatuses = getDashboardRouteStatuses();
                     return (
                       <li>
                         {item.isAction ? (
-                          <form
-                            class="dashboard-sidebar__logout-form"
-                            method="post"
-                            action={item.href}
-                            data-astro-reload
-                            style="margin: 0; padding: 0;"
-                          >
-                            <button type="submit">
+                          <div class="dashboard-sidebar__logout-form">
+                            <button
+                              type="button"
+                              data-open-alert-dialog="dashboard-logout-dialog"
+                              data-alert-dialog-form="dashboard-logout-form"
+                            >
                               <span class="dashboard-sidebar__nav-link-content">
                                 <span class="nav-icon-wrapper" set:html={item.icon} />
                                 <span class="dashboard-sidebar__nav-label">{item.label}</span>
@@ -76,7 +74,7 @@ const routeStatuses = getDashboardRouteStatuses();
                                 {item.label}
                               </span>
                             </button>
-                          </form>
+                          </div>
                         ) : (
                           <a
                             href={item.href}

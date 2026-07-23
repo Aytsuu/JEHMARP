@@ -7,6 +7,7 @@ import {
   getUnreadAdminInquiryIds,
   getUnreadAdminOrderIds,
   getUnreadAdminResellerApplicationIds,
+  getAdminUnreadNotificationIds,
 } from "@/lib/admin-dashboard/notifications";
 import { adminDashboardRoutes } from "@/config/navigation";
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
@@ -34,8 +35,9 @@ const unreadInquiryCount = dashboardData ? getUnreadAdminInquiryIds(dashboardDat
 const unreadResellerApplicationCount = dashboardData
   ? getUnreadAdminResellerApplicationIds(dashboardData).length
   : 0;
-const unreadNotificationCount =
-  unreadOrderCount + unreadInquiryCount + unreadResellerApplicationCount;
+const unreadNotificationCount = dashboardData
+  ? getAdminUnreadNotificationIds(dashboardData).length
+  : 0;
 const pageAvailability = getDashboardPageAvailability(Astro.url.pathname);
 const isPageReady = pageAvailability.status === "ready";
 ---

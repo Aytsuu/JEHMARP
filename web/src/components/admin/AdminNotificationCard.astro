@@ -17,6 +17,8 @@ function notificationIcon(type: string) {
       return "message";
     case "Reseller Application":
       return "users";
+    case "Regular Check":
+      return "clock";
     default:
       return "system";
   }
@@ -31,6 +33,7 @@ const icon = notificationIcon(notif.type);
     notif.isUnread ? "notification-item--unread" : "notification-item--read",
     isNavigable && "notification-item--navigable",
   ]}
+  data-notification-id={notif.id}
 >
   {
     isNavigable && (
@@ -91,6 +94,18 @@ const icon = notificationIcon(notif.type);
               <circle cx="9" cy="7" r="4" />
               <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          )
+        }
+        {
+          icon === "clock" && (
+            <svg
+              class="notification-item__type-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
             </svg>
           )
         }
@@ -178,7 +193,7 @@ const icon = notificationIcon(notif.type);
   }
 
   .notification-item--navigable:hover {
-    border-color: rgba(102, 24, 24, 0.22);
+    border-color: #d1d5db;
   }
 
   .notification-item__overlay {
@@ -224,12 +239,16 @@ const icon = notificationIcon(notif.type);
   }
 
   .notification-item--unread {
-    border-color: rgba(180, 137, 43, 0.35);
-    background: linear-gradient(180deg, #fffdf8 0%, #ffffff 100%);
+    border-color: #e5e7eb;
+    background: #ffffff;
   }
 
   .notification-item--read {
     opacity: 0.82;
+  }
+
+  .notification-item--read .notification-item__status {
+    display: none;
   }
 
   .notification-item__content {

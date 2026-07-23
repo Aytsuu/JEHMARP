@@ -1,0 +1,66 @@
+---
+type Props = {
+  id: string;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  variant?: "default" | "danger";
+};
+
+const {
+  id,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  variant = "default",
+} = Astro.props;
+
+const titleId = `${id}-title`;
+const descriptionId = `${id}-description`;
+---
+
+<div
+  id={id}
+  class="alert-dialog"
+  role="alertdialog"
+  aria-modal="true"
+  aria-labelledby={titleId}
+  aria-describedby={description ? descriptionId : undefined}
+  aria-hidden="true"
+  data-alert-dialog={id}
+  data-alert-dialog-variant={variant}
+>
+  <div class="alert-dialog__backdrop" data-alert-dialog-close></div>
+  <section class="alert-dialog__panel" tabindex="-1" data-alert-dialog-panel>
+    <div class="alert-dialog__content">
+      <h2 id={titleId} class="alert-dialog__title">{title}</h2>
+      {
+        description && (
+          <p id={descriptionId} class="alert-dialog__description">
+            {description}
+          </p>
+        )
+      }
+      <slot />
+    </div>
+    <footer class="alert-dialog__actions">
+      <button type="button" class="alert-dialog__button alert-dialog__button--secondary" data-alert-dialog-cancel>
+        {cancelLabel}
+      </button>
+      <button
+        type="button"
+        class:list={[
+          "alert-dialog__button",
+          variant === "danger"
+            ? "alert-dialog__button--danger"
+            : "alert-dialog__button--primary",
+        ]}
+        data-alert-dialog-confirm
+      >
+        {confirmLabel}
+      </button>
+    </footer>
+  </section>
+</div>

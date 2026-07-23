@@ -2233,6 +2233,140 @@
     color: #6b7280;
   }
 
+  .alert-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    display: none;
+    place-items: center;
+    padding: 1rem;
+    pointer-events: none;
+  }
+
+  .alert-dialog--open {
+    display: grid;
+    pointer-events: auto;
+  }
+
+  .alert-dialog-is-open {
+    overflow: hidden;
+  }
+
+  .alert-dialog-is-open .dashboard-frame {
+    pointer-events: none;
+  }
+
+  .alert-dialog__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(17 24 39 / 0.56);
+  }
+
+  .alert-dialog__panel {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    gap: 1.25rem;
+    width: min(100%, 24rem);
+    padding: 1.25rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.85rem;
+    background: #ffffff;
+    box-shadow: 0 24px 70px rgb(15 23 42 / 0.24);
+  }
+
+  .alert-dialog__panel:focus {
+    outline: none;
+  }
+
+  .alert-dialog__content {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .alert-dialog__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #111827;
+    letter-spacing: -0.01em;
+  }
+
+  .alert-dialog__description {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: #4b5563;
+  }
+
+  .alert-dialog__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.55rem;
+    flex-wrap: wrap;
+  }
+
+  .alert-dialog__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.25rem;
+    padding: 0.45rem 0.9rem;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      color 0.2s ease;
+  }
+
+  .alert-dialog__button--secondary {
+    background: #f3f4f6;
+    border-color: #e5e7eb;
+    color: #374151;
+  }
+
+  .alert-dialog__button--secondary:hover,
+  .alert-dialog__button--secondary:focus-visible {
+    background: #e5e7eb;
+    border-color: #d1d5db;
+    outline: none;
+  }
+
+  .alert-dialog__button--primary {
+    background: var(--color-brand-red);
+    border-color: var(--color-brand-red);
+    color: #ffffff;
+  }
+
+  .alert-dialog__button--primary:hover,
+  .alert-dialog__button--primary:focus-visible {
+    background: #8f1d1d;
+    border-color: #8f1d1d;
+    outline: none;
+  }
+
+  .alert-dialog__button--danger {
+    background: var(--color-brand-red);
+    border-color: var(--color-brand-red);
+    color: #ffffff;
+  }
+
+  .alert-dialog__button--danger:hover,
+  .alert-dialog__button--danger:focus-visible {
+    background: #8f1d1d;
+    border-color: #8f1d1d;
+    outline: none;
+  }
+
+  .alert-dialog__button:focus-visible {
+    box-shadow: 0 0 0 2px rgba(102, 24, 24, 0.18);
+  }
+
   .pending-payments-list {
     display: grid;
     gap: 0.85rem;

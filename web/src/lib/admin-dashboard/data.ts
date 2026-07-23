@@ -30,6 +30,7 @@ import {
 import type { AdminProductFilters } from "./product-filters";
 import type { AdminResellerApplicationFilters } from "./reseller-application-filters";
 import { computeAdminOrderStatusCounts, type AdminOrderStatusCounts } from "./summary";
+import { loadReadAdminNotificationIds } from "./admin-notification-read";
 import { agentCustomerBalance } from "./view";
 import type {
   InquiryStatus,
@@ -698,6 +699,7 @@ export type AdminDashboardData = {
   orders: AdminOrder[];
   contactInquiries: AdminContactInquiry[];
   resellerApplications: AdminResellerApplication[];
+  readAdminNotificationIds: string[];
   summary: AdminDashboardSummary;
 };
 
@@ -802,6 +804,7 @@ export async function loadAdminDashboardData(
     orders,
     contactInquiries,
     resellerApplications,
+    readAdminNotificationIds,
   ] = await Promise.all([
     loadPages(supabase),
     loadPageSections(supabase),
@@ -812,6 +815,7 @@ export async function loadAdminDashboardData(
     loadOrders(supabase, options.orderLimit ?? 50, options.orderFilters),
     loadContactInquiries(supabase, options.contactInquiryLimit ?? 50),
     loadResellerApplications(supabase, options.resellerApplicationLimit ?? 50),
+    loadReadAdminNotificationIds(supabase),
   ]);
 
   return {
@@ -824,6 +828,7 @@ export async function loadAdminDashboardData(
     orders,
     contactInquiries,
     resellerApplications,
+    readAdminNotificationIds,
     summary: buildAdminDashboardSummary({
       orders,
       agentOrders,
@@ -1590,7 +1595,7 @@ async function loadAgentOrdersForAgent(
   );
 }
 
-async function loadCustomers(
+export async function loadCustomers(
   supabase: SupabaseAdminClient,
   filters: AdminCustomerFilters = {},
 ) {
@@ -1628,7 +1633,7 @@ async function loadCustomers(
   return filterAdminCustomers(customers, filters, agentNamesById);
 }
 
-async function loadOrders(
+export async function loadOrders(
   supabase: SupabaseAdminClient,
   limit: number,
   filters: AdminOrderFilters = {},
