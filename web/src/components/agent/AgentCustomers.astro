@@ -44,6 +44,17 @@ const { data } = Astro.props;
                 <li class="agent-customers-card__detail">
                   <span class="agent-customers-card__icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24">
+                      <path d="M4 7h16"></path>
+                      <path d="M8 11h8"></path>
+                      <path d="M10 15h4"></path>
+                      <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+                    </svg>
+                  </span>
+                  <span class="agent-customers-card__value agent-customers-card__value--tracking">{customer.tracking_number}</span>
+                </li>
+                <li class="agent-customers-card__detail">
+                  <span class="agent-customers-card__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
                       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
                       <circle cx="12" cy="10" r="3"></circle>
                     </svg>
@@ -169,6 +180,14 @@ const { data } = Astro.props;
     color: #4b5563;
     font-size: 0.9rem;
     line-height: 1.45;
+  }
+
+  .agent-customers-card__value--tracking {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #111827;
   }
 
   @media (min-width: 48rem) {

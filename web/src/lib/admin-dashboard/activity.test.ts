@@ -98,6 +98,7 @@ function createAdminDashboardData(): AdminDashboardData {
     agents: [],
     customers: [{
       id: "customer-id",
+      tracking_number: "JHM-TEST1234",
       first_name: "Ada",
       last_name: "Buyer",
       phone_number: "09170000000",
@@ -184,6 +185,10 @@ function createAdminDashboardData(): AdminDashboardData {
       totalOrders: 1,
       pendingOrders: 0,
       processingOrders: 1,
+      pendingOrder: 0,
+      pendingCustomer: 0,
+      processing: 1,
+      closed: 0,
       agents: 0,
       inquiries: 1,
       customers: 1,

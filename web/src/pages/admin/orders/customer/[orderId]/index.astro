@@ -1,6 +1,7 @@
 ---
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
+import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/admin-dashboard/actions";
 import {
   loadAdminDashboardData,
+  loadAdminAgentOrder,
   loadAdminOrder,
 } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
@@ -39,6 +41,10 @@ import {
   getOrderStatusBadgeLabel,
   isAdminOrderDetailNavOrder,
 } from "@/lib/order-status-display";
+import {
+  buildOrderDetailNavEntries,
+  formatOrderCode,
+} from "@/lib/order-detail-nav";
 
 export const prerender = false;
 
@@ -189,7 +195,7 @@ const activeOrderDetailTab =
     ? requestedOrderDetailTab
     : "products";
 const isOrderDetailTabActive = (tab: string) => tab === activeOrderDetailTab;
-const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
+const orderCode = formatOrderCode(order.id);
 const orderSlipPdfHref = `/admin/orders/customer/${order.id}/order-slip.pdf`;
 const salesInvoicePdfHref = `/admin/orders/customer/${order.id}/sales-invoice.pdf`;
 const paymentRecordReturnPath = `/admin/orders/customer/${order.id}?tab=payment-record`;
@@ -344,21 +350,27 @@ const backHref =
     : "/admin/orders";
 const backLabel = backHref.startsWith("/admin/customers/")
   ? "Back to customer record"
-  : "Back to orders";
-const orderNavigationEntries = [...dashboardData.orders]
-  .filter((entry) => isAdminOrderDetailNavOrder(entry))
-  .sort(
-    (left, right) =>
-      new Date(right.created_at).getTime() -
-      new Date(left.created_at).getTime(),
-  )
-  .map((entry) => ({
-    id: entry.id,
-    code: `Order-${entry.id.slice(0, 6).toUpperCase()}`,
-    createdAt: entry.created_at,
-    href: `/admin/orders/customer/${entry.id}?returnTo=${encodeURIComponent(backHref)}`,
-    isCurrent: entry.id === order.id,
-  }));
+  : backHref.startsWith("/admin/orders/agent/")
+    ? "Back to distribution order"
+    : "Back to orders";
+const parentAgentOrder = order.agent_order_id
+  ? await loadAdminAgentOrder(order.agent_order_id)
+  : null;
+const orderNavigationSource = parentAgentOrder
+  ? parentAgentOrder.customer_order.filter(isAdminOrderDetailNavOrder)
+  : order.agent_order_id
+    ? dashboardData.orders.filter(
+        (entry) =>
+          entry.agent_order_id === order.agent_order_id
+          && isAdminOrderDetailNavOrder(entry),
+      )
+    : dashboardData.orders.filter(isAdminOrderDetailNavOrder);
+const orderNavigationEntries = buildOrderDetailNavEntries({
+  orders: orderNavigationSource,
+  currentOrderId: order.id,
+  buildHref: (entry) =>
+    `/admin/orders/customer/${entry.id}?returnTo=${encodeURIComponent(backHref)}`,
+});
 ---
 
 <AdminPageFrame
@@ -383,47 +395,15 @@ const orderNavigationEntries = [...dashboardData.orders]
             <RouteBackButton href={backHref} label={backLabel} />
 
             <div class="order-title-copy">
-              <div class="order-detail-nav" data-order-detail-nav>
-                <button
-                  type="button"
-                  class="order-detail-nav__trigger"
-                  data-order-detail-nav-trigger
-                  aria-haspopup="listbox"
-                  aria-expanded="false"
-                >
-                  <h1>{orderCode}</h1>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <polyline points="6 9 12 15 18 9"></polyline>
-                  </svg>
-                </button>
-                <div
-                  class="order-detail-nav__menu"
-                  data-order-detail-nav-menu
-                  hidden
-                >
-                  <ul role="listbox" aria-label="Other orders">
-                    {
-                      orderNavigationEntries.map((entry) => (
-                        <li>
-                          <a
-                            href={entry.href}
-                            class:list={[
-                              "order-detail-nav__option",
-                              entry.isCurrent && "is-current",
-                            ]}
-                            aria-current={entry.isCurrent ? "page" : undefined}
-                          >
-                            <span>{entry.code}</span>
-                            <time datetime={entry.createdAt}>
-                              {formatDateTime(entry.createdAt)}
-                            </time>
-                          </a>
-                        </li>
-                      ))
-                    }
-                  </ul>
-                </div>
-              </div>
+              <OrderDetailNav
+                currentCode={orderCode}
+                entries={orderNavigationEntries}
+                menuLabel={
+                  parentAgentOrder
+                    ? "Other customer orders in this distribution order"
+                    : "Other orders"
+                }
+              />
               <p>{formatOrderSource(order.source)}</p>
             </div>
           </div>
@@ -1927,10 +1907,6 @@ const orderNavigationEntries = [...dashboardData.orders]
   </div>
 </AdminPageFrame>
 
-<script>
-  import "@/lib/client/order-detail-nav";
-</script>
-
 <script is:inline>
   const notesPanel = document.querySelector("[data-order-notes-panel]");
 
@@ -2351,86 +2327,6 @@ const orderNavigationEntries = [...dashboardData.orders]
     padding-top: 0.15rem;
   }
 
-  .order-detail-nav {
-    position: relative;
-    min-width: 0;
-  }
-
-  .order-detail-nav__trigger {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    border: none;
-    background: transparent;
-    padding: 0;
-    cursor: pointer;
-    color: inherit;
-    text-align: left;
-  }
-
-  .order-detail-nav__trigger h1 {
-    margin: 0;
-    font-size: inherit;
-    line-height: 1.15;
-  }
-
-  .order-detail-nav__trigger svg {
-    width: 1rem;
-    height: 1rem;
-    color: rgba(17, 24, 39, 0.55);
-    flex-shrink: 0;
-  }
-
-  .order-detail-nav__menu {
-    position: absolute;
-    top: calc(100% + 0.45rem);
-    left: 0;
-    z-index: 20;
-    width: min(22rem, calc(100vw - 2rem));
-    max-height: 16rem;
-    overflow: auto;
-    border: 1px solid rgba(17, 24, 39, 0.1);
-    border-radius: 0.85rem;
-    background: #fff;
-    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
-  }
-
-  .order-detail-nav__menu ul {
-    list-style: none;
-    margin: 0;
-    padding: 0.35rem;
-  }
-
-  .order-detail-nav__option {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.65rem 0.75rem;
-    border-radius: 0.6rem;
-    color: #111827;
-    text-decoration: none;
-    font-size: 0.86rem;
-    font-weight: 600;
-  }
-
-  .order-detail-nav__option time {
-    color: rgba(17, 24, 39, 0.56);
-    font-size: 0.76rem;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-
-  .order-detail-nav__option:hover,
-  .order-detail-nav__option:focus-visible {
-    background: rgba(17, 24, 39, 0.05);
-    outline: none;
-  }
-
-  .order-detail-nav__option.is-current {
-    background: rgba(127, 29, 29, 0.08);
-  }
-
   .order-information {
     margin-bottom: 1rem;
     padding: 0.95rem 1rem;
@@ -2788,7 +2684,8 @@ const orderNavigationEntries = [...dashboardData.orders]
     flex-shrink: 0;
   }
 
-  .order-title-copy h1 {
+  .order-title-copy h1,
+  .order-title-copy :global(.order-detail-nav__title) {
     margin: 0;
     font-size: 1.5rem;
     line-height: 1.15;

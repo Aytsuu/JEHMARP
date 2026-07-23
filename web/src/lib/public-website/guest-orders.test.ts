@@ -109,11 +109,24 @@ describe("submitGuestOrder", () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "turnstile_secret");
     vi.stubEnv("UPSTASH_REDIS_REST_URL", "https://redis.example.upstash.io");
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "redis_token");
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESELLER_PRICE_LIST_FROM", "");
 
     const rpc = vi.fn(() => Promise.resolve({
       data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       error: null,
     }));
+    const maybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        customer: {
+          tracking_number: "JHM-ABCD2345",
+        },
+      },
+      error: null,
+    }));
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ select }));
     const fetcher = vi.fn((url: string) => {
       if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
         return Promise.resolve(Response.json({ success: true }));
@@ -130,9 +143,14 @@ describe("submitGuestOrder", () => {
       submitGuestOrder(validPayload(), {
         fetch: fetcher as typeof fetch,
         clientIp: "203.0.113.10",
-        supabase: { rpc } as never,
+        siteOrigin: "https://jehmarp.example",
+        supabase: { rpc, from } as never,
       }),
-    ).resolves.toBe("49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    ).resolves.toEqual({
+      orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      trackingNumber: "JHM-ABCD2345",
+      trackingEmailStatus: "skipped",
+    });
 
     expect(fetcher).toHaveBeenCalledWith(
       "https://challenges.cloudflare.com/turnstile/v0/siteverify",

@@ -7,14 +7,15 @@ export const primaryNavigation = [
   { label: "Home", href: "/" },
   { label: "Our Story", href: "/our-story" },
   { label: "Shop", href: "/shop" },
+  { label: "Track Orders", href: "/track" },
   { label: "Business", href: "/business" },
   { label: "Contact", href: "/contact" },
   { label: "Login", href: "/login" },
 ] as const satisfies readonly NavigationItem[];
 
-export const publicRoutes = primaryNavigation.slice(0, 5);
+export const publicRoutes = primaryNavigation.slice(0, -1);
 
-export const authRoutes = primaryNavigation.slice(5);
+export const authRoutes = primaryNavigation.slice(-1);
 
 export const adminDashboardRoutes = [
   { label: "Dashboard", href: "/admin" },

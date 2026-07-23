@@ -7,11 +7,15 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Pie,
+  PieChart,
   ResponsiveContainer,
+  Sector,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
+import type { PieSectorShapeProps } from "recharts/types/polar/Pie";
 import type { TooltipContentProps } from "recharts";
 
 import type {
@@ -41,6 +45,12 @@ type WeeklyProductChartRow = {
   quantityDifference: number;
   products: WeeklyProductOrderProductMetric[];
 } & Record<string, string | number | WeeklyProductOrderProductMetric[]>;
+
+type OrderStatusPieRow = {
+  name: string;
+  value: number;
+  fill: string;
+};
 
 const pesoPrefix = "\u20B1";
 const weeklyProductColors = [
@@ -217,6 +227,74 @@ function TrendArrow({ value }: { value: number }) {
   );
 }
 
+function renderOrderStatusPieSector(props: PieSectorShapeProps) {
+  const cx = Number(props.cx ?? 0);
+  const cy = Number(props.cy ?? 0);
+  const innerRadius = Number(props.innerRadius ?? 0);
+  const outerRadius = Number(props.outerRadius ?? 0);
+  const startAngle = Number(props.startAngle ?? 0);
+  const endAngle = Number(props.endAngle ?? 0);
+  const fill = typeof props.fill === "string" ? props.fill : "#661818";
+
+  if (props.isActive) {
+    return (
+      <g>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={outerRadius + 8}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          fill={fill}
+        />
+        <Sector
+          cx={cx}
+          cy={cy}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          innerRadius={outerRadius + 10}
+          outerRadius={outerRadius + 14}
+          fill={fill}
+        />
+      </g>
+    );
+  }
+
+  return (
+    <Sector
+      cx={cx}
+      cy={cy}
+      innerRadius={innerRadius}
+      outerRadius={outerRadius}
+      startAngle={startAngle}
+      endAngle={endAngle}
+      fill={fill}
+      stroke="#fff"
+      strokeWidth={2}
+    />
+  );
+}
+
+function OrderStatusTooltip({ active, payload }: TooltipContentProps) {
+  if (!active || !payload || payload.length === 0) {
+    return null;
+  }
+
+  const row = payload[0]?.payload as OrderStatusPieRow | undefined;
+
+  if (!row) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-md">
+      <p className="font-semibold text-gray-900">{row.name}</p>
+      <p className="mt-1 font-medium text-gray-700">{formatNumber(row.value)} orders</p>
+    </div>
+  );
+}
+
 export default function AdminCharts({ analytics }: AdminChartsProps) {
   const [salesPeriod, setSalesPeriod] = useState<"day" | "month">("month");
   const [recentActivityTab, setRecentActivityTab] =
@@ -270,6 +348,14 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
       };
     });
   const weeklyPeakDay = analytics.weeklyProductOrders.peakDay;
+  const orderStatusOverview = analytics.orderStatusOverview;
+  const orderStatusPieData: OrderStatusPieRow[] = orderStatusOverview.statuses
+    .filter((status) => status.count > 0)
+    .map((status) => ({
+      name: status.label,
+      value: status.count,
+      fill: status.color,
+    }));
 
   const selectedAgentData = analytics.salesByAgent.find(
     (agent) => agent.label === selectedAgentLabel,
@@ -303,92 +389,159 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
   return (
     <div className="flex flex-col gap-6">
       <>
-        <div className="order-1 rounded-xl border border-gray-300 bg-white p-6">
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">
-                Revenue & Sales Trend
-              </h3>
-              <p className="text-sm text-gray-500">
-                Gross order value tracked over time
-              </p>
+        <div className="order-1 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)]">
+          <div className="rounded-xl border border-gray-300 bg-white p-6">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  Revenue & Sales Trend
+                </h3>
+                <p className="text-sm text-gray-500">
+                  Gross order value tracked over time
+                </p>
+              </div>
+              <div className="inline-flex h-fit self-start rounded-lg border border-gray-300 bg-gray-50 p-1 sm:self-auto">
+                <button
+                  onClick={() => setSalesPeriod("month")}
+                  className={`chart-tab-btn ${
+                    salesPeriod === "month"
+                      ? "active shadow-sm"
+                      : "!text-gray-600 hover:!text-gray-900 hover:bg-gray-200/50"
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setSalesPeriod("day")}
+                  className={`chart-tab-btn ${
+                    salesPeriod === "day"
+                      ? "active shadow-sm"
+                      : "!text-gray-600 hover:!text-gray-900 hover:bg-gray-200/50"
+                  }`}
+                >
+                  Daily
+                </button>
+              </div>
             </div>
-            <div className="inline-flex h-fit self-start rounded-lg border border-gray-300 bg-gray-50 p-1 sm:self-auto">
-              <button
-                onClick={() => setSalesPeriod("month")}
-                className={`chart-tab-btn ${
-                  salesPeriod === "month"
-                    ? "active shadow-sm"
-                    : "!text-gray-600 hover:!text-gray-900 hover:bg-gray-200/50"
-                }`}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setSalesPeriod("day")}
-                className={`chart-tab-btn ${
-                  salesPeriod === "day"
-                    ? "active shadow-sm"
-                    : "!text-gray-600 hover:!text-gray-900 hover:bg-gray-200/50"
-                }`}
-              >
-                Daily
-              </button>
+
+            <div className="h-[350px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={salesData}
+                  margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+                >
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop
+                        offset="5%"
+                        stopColor={colors.brandRed}
+                        stopOpacity={0.2}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor={colors.brandRed}
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#f3f4f6"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="label"
+                    stroke="#9ca3af"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#9ca3af"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value: number) => `${pesoPrefix}${formatNumber(value)}`}
+                  />
+                  <Tooltip content={CurrencyTooltip} />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="grossSales"
+                    name="Gross Sales"
+                    stroke={colors.brandRed}
+                    strokeWidth={2.5}
+                    fillOpacity={1}
+                    fill="url(#colorSales)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="h-[350px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={salesData}
-                margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-              >
-                <defs>
-                  <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                    <stop
-                      offset="5%"
-                      stopColor={colors.brandRed}
-                      stopOpacity={0.2}
-                    />
-                    <stop
-                      offset="95%"
-                      stopColor={colors.brandRed}
-                      stopOpacity={0}
-                    />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#f3f4f6"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="label"
-                  stroke="#9ca3af"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#9ca3af"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value: number) => `${pesoPrefix}${formatNumber(value)}`}
-                />
-                <Tooltip content={CurrencyTooltip} />
-                <Legend />
-                <Area
-                  type="monotone"
-                  dataKey="grossSales"
-                  name="Gross Sales"
-                  stroke={colors.brandRed}
-                  strokeWidth={2.5}
-                  fillOpacity={1}
-                  fill="url(#colorSales)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="rounded-xl border border-gray-300 bg-white p-6">
+            <h3 className="text-lg font-bold text-gray-900">Order Status</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Distribution across active order stages
+            </p>
+
+            <div className="mt-5 flex items-center gap-5">
+              <div className="h-[190px] w-[190px] shrink-0">
+                {orderStatusPieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={orderStatusPieData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={72}
+                        paddingAngle={3}
+                        shape={renderOrderStatusPieSector}
+                      />
+                      <Tooltip content={OrderStatusTooltip} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-full border border-dashed border-gray-300 text-sm text-gray-500">
+                    No orders yet
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <ul className="space-y-3">
+                  {orderStatusOverview.statuses.map((status) => (
+                    <li
+                      key={status.key}
+                      className="flex items-center justify-between gap-4 border-b border-gray-100 pb-3 last:border-b-0 last:pb-0"
+                    >
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: status.color }}
+                          aria-hidden="true"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          {status.label}
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-lg font-bold tabular-nums text-gray-900">
+                        {formatNumber(status.count)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-4 border-t border-gray-200 pt-4 text-sm text-gray-500">
+                  <span className="font-semibold text-gray-900">
+                    {formatNumber(orderStatusOverview.totalOrders)}
+                  </span>{" "}
+                  total order records
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 

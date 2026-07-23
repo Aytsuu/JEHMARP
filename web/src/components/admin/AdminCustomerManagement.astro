@@ -122,7 +122,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             name="search"
             type="search"
             value={activeFilters.search ?? ""}
-            placeholder="Search name, email, contact, or assigned agent..."
+            placeholder="Search name, email, contact, tracking number, or assigned agent..."
             autocomplete="off"
             aria-label="Search customers"
             data-customer-search-input
@@ -163,6 +163,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             <tr>
               <th scope="col">Date Created</th>
               <th scope="col">Customer</th>
+              <th scope="col">Tracking</th>
               <th scope="col">Email</th>
               <th scope="col">Contact</th>
               <th scope="col">Type</th>
@@ -174,7 +175,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
           <tbody>
             {data.customers.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={8}
+                colspan={9}
                 message="No customers match the selected filters."
               />
             ) : data.customers.map((customer) => (
@@ -206,6 +207,9 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                       <button type="submit">Save Changes</button>
                     </form>
                   </div>
+                </td>
+                <td class="dashboard-table__cell--truncate">
+                  <span class="customer-tracking-number">{customer.tracking_number}</span>
                 </td>
                 <td class="dashboard-table__cell--truncate">
                   <button
@@ -384,6 +388,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
           <tr>
             <th scope="col">Date Created</th>
             <th scope="col">Customer</th>
+            <th scope="col">Tracking</th>
             <th scope="col">Email</th>
             <th scope="col">Contact</th>
             <th scope="col">Type</th>
@@ -397,6 +402,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             <tr>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
@@ -410,6 +416,16 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
     </DashboardTableBoard>
   </template>
 </section>
+
+<style>
+  .customer-tracking-number {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #111827;
+  }
+</style>
 
 <script>
   import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";

@@ -69,6 +69,7 @@ function createAgentDashboardData(): AgentDashboardData {
     },
     customers: [{
       id: "customer-1",
+      tracking_number: "JHM-TEST1234",
       first_name: "Jane",
       last_name: "Doe",
       phone_number: "09171234567",

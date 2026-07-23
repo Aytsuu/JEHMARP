@@ -8,6 +8,7 @@ declare
   item_count integer;
   numeric_result numeric;
   text_result text;
+  tracking_lookup jsonb;
   blocked boolean;
   can_anon_execute boolean;
 begin
@@ -80,8 +81,9 @@ begin
       and customer_person.address = 'Temporary public order address'
       and customer.assigned_agent_id is null
       and customer.is_reseller = false
+      and customer.tracking_number ~ '^JHM-[A-HJ-NP-Z2-9]{8}$'
   ) then
-    raise exception 'Expected guest customer record to be inserted';
+    raise exception 'Expected guest customer record to be inserted with tracking number';
   end if;
 
   select count(*)
@@ -137,6 +139,30 @@ begin
 
   if can_anon_execute then
     raise exception 'anon must not execute the trusted guest order function directly';
+  end if;
+
+  select public.get_customer_orders_by_tracking_number(customer.tracking_number)
+  into tracking_lookup
+  from public.customer
+  where customer.id = inserted_customer_id;
+
+  if tracking_lookup is null or jsonb_array_length(tracking_lookup -> 'orders') <> 1 then
+    raise exception 'Expected tracking lookup to return one guest order';
+  end if;
+
+  if coalesce((tracking_lookup ->> 'totalAmountDue')::numeric, -1) <> 300 then
+    raise exception 'Expected tracking lookup total amount due to be 300, got %',
+      tracking_lookup ->> 'totalAmountDue';
+  end if;
+
+  if coalesce((tracking_lookup -> 'orders' -> 0 ->> 'orderTotal')::numeric, -1) <> 300 then
+    raise exception 'Expected tracking lookup order total to be 300, got %',
+      tracking_lookup -> 'orders' -> 0 ->> 'orderTotal';
+  end if;
+
+  if coalesce((tracking_lookup -> 'orders' -> 0 ->> 'amountDue')::numeric, -1) <> 300 then
+    raise exception 'Expected tracking lookup amount due to be 300, got %',
+      tracking_lookup -> 'orders' -> 0 ->> 'amountDue';
   end if;
 end $$;
 

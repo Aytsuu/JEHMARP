@@ -223,6 +223,7 @@ export type AgentProfile = {
 
 export type AgentCustomer = {
   id: string;
+  tracking_number: string;
   first_name: string;
   last_name: string;
   phone_number: string;

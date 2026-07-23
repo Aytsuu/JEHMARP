@@ -1,0 +1,197 @@
+---
+import type { AdminAgentSummary } from "@/lib/admin-dashboard/data";
+
+type Props = {
+  agent: AdminAgentSummary | null;
+  viewHref?: string | null;
+  eyebrow?: string;
+};
+
+const { agent, viewHref = null, eyebrow = "Agent" } = Astro.props;
+
+const displayName = agent?.display_name ?? "Agent details unavailable";
+const phone = agent?.contact ?? "No contact number";
+const email = agent?.email ?? "No email address";
+---
+
+<article class="order-party-card order-party-card--agent">
+  <div class="order-party-card__identity">
+    <div class="order-party-card__identity-copy">
+      <span class="order-party-card__eyebrow">{eyebrow}</span>
+      <p class="order-party-card__name">{displayName}</p>
+    </div>
+    {
+      viewHref ? (
+        <a href={viewHref} class="order-party-card__view-link btn-table-manage">
+          View agent details
+        </a>
+      ) : null
+    }
+  </div>
+
+  <ul class="order-party-card__meta-list">
+    <li
+      class:list={[
+        "order-party-card__meta-item",
+        { "is-placeholder": !agent?.contact },
+      ]}
+    >
+      <span class="order-party-card__meta-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z"
+          ></path>
+        </svg>
+      </span>
+      {
+        agent?.contact ? (
+          <a class="order-party-card__meta-link" href={`tel:${agent.contact}`}>
+            {phone}
+          </a>
+        ) : (
+          <span class="order-party-card__meta-text">{phone}</span>
+        )
+      }
+    </li>
+    <li
+      class:list={[
+        "order-party-card__meta-item",
+        { "is-placeholder": !agent?.email },
+      ]}
+    >
+      <span class="order-party-card__meta-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+          ></path>
+          <path d="m22 6-10 7L2 6"></path>
+        </svg>
+      </span>
+      {
+        agent?.email ? (
+          <a class="order-party-card__meta-link" href={`mailto:${agent.email}`}>
+            {email}
+          </a>
+        ) : (
+          <span class="order-party-card__meta-text">{email}</span>
+        )
+      }
+    </li>
+  </ul>
+</article>
+
+<style>
+  .order-party-card {
+    border-radius: 1rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    padding: 1rem;
+    background: #ffffff;
+  }
+
+  .order-party-card--agent {
+    background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
+  }
+
+  .order-party-card__identity {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.95rem;
+  }
+
+  .order-party-card__identity-copy {
+    min-width: 0;
+  }
+
+  .order-party-card--agent .order-party-card__eyebrow,
+  .order-party-card--agent .order-party-card__name {
+    color: #111827;
+  }
+
+  .order-party-card__eyebrow {
+    display: block;
+    margin-bottom: 0.35rem;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .order-party-card__name {
+    margin: 0;
+    color: #111827;
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+  }
+
+  .order-party-card__view-link {
+    flex-shrink: 0;
+    text-decoration: none;
+  }
+
+  .order-party-card__meta-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .order-party-card__meta-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+  }
+
+  .order-party-card__meta-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.35rem;
+    height: 1.35rem;
+    flex-shrink: 0;
+    color: rgba(17, 24, 39, 0.52);
+  }
+
+  .order-party-card--agent .order-party-card__meta-icon {
+    color: #991b1b;
+  }
+
+  .order-party-card__meta-icon svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .order-party-card__meta-text,
+  .order-party-card__meta-link {
+    min-width: 0;
+    color: #111827;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+    text-decoration: none;
+  }
+
+  .order-party-card__meta-link:hover,
+  .order-party-card__meta-link:focus-visible {
+    color: #661818;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
+  .order-party-card__meta-item.is-placeholder .order-party-card__meta-text,
+  .order-party-card__meta-item.is-placeholder .order-party-card__meta-link {
+    color: rgba(17, 24, 39, 0.46);
+    font-style: italic;
+  }
+</style>

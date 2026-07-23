@@ -15,7 +15,7 @@ const [{ products, pagination }, orderableProducts] = await Promise.all([
   listOrderablePublicProducts(),
 ]);
 const orderStatus = Astro.url.searchParams.get("order");
-const orderReference = Astro.url.searchParams.get("reference");
+const orderEmailSent = Astro.url.searchParams.get("email") === "1";
 const orderMessage = Astro.url.searchParams.get("message");
 const { turnstileSiteKey } = getPublicEnv();
 ---
@@ -31,7 +31,7 @@ const { turnstileSiteKey } = getPublicEnv();
       orderableProducts={orderableProducts}
       pagination={pagination}
       orderStatus={orderStatus}
-      orderReference={orderReference}
+      orderEmailSent={orderEmailSent}
       orderMessage={orderMessage}
       turnstileSiteKey={turnstileSiteKey ?? null}
     />

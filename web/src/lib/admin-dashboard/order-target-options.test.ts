@@ -53,6 +53,7 @@ describe("buildAdminOrderTargetOptions", () => {
 function customerRow(overrides: Partial<AdminCustomer>): AdminCustomer {
   return {
     id: "customer-id",
+    tracking_number: "JHM-TEST1234",
     first_name: "Customer",
     last_name: "Name",
     phone_number: "09170000000",

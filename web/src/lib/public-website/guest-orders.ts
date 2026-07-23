@@ -4,6 +4,13 @@ import { createHash } from "node:crypto";
 import { getServerEnv } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
+import {
+  loadGuestOrderTrackingNumber,
+  buildCustomerTrackPageUrl,
+} from "@/lib/public-website/customer-tracking";
+import {
+  sendCustomerTrackingNumberEmail,
+} from "@/lib/public-website/customer-tracking-email";
 
 const customerSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required.").max(100),
@@ -34,6 +41,13 @@ export type GuestOrderSubmitOptions = {
   fetch?: typeof fetch;
   clientIp?: string | null;
   supabase?: ReturnType<typeof createSupabaseAdminClient>;
+  siteOrigin?: string;
+};
+
+export type GuestOrderSubmitResult = {
+  orderId: string;
+  trackingNumber: string;
+  trackingEmailStatus: "sent" | "failed" | "skipped";
 };
 
 export type GuestOrderParseResult =
@@ -84,7 +98,7 @@ export function parseGuestOrderFormData(formData: FormData): GuestOrderParseResu
 export async function submitGuestOrder(
   payload: GuestOrderPayload,
   options: GuestOrderSubmitOptions = {},
-): Promise<string> {
+): Promise<GuestOrderSubmitResult> {
   const env = getServerEnv();
   const fetcher = options.fetch ?? fetch;
 
@@ -116,7 +130,20 @@ export async function submitGuestOrder(
       throw new Error("Unable to submit guest order");
     }
 
-    return data;
+    const orderId = data;
+    const trackingNumber = await loadGuestOrderTrackingNumber(orderId, supabase);
+    const trackingEmailStatus = await deliverGuestOrderTrackingEmail(
+      payload,
+      trackingNumber,
+      options.siteOrigin,
+      fetcher,
+    );
+
+    return {
+      orderId,
+      trackingNumber,
+      trackingEmailStatus,
+    };
   } catch (error) {
     await clearGuestOrderDuplicateGuard(fetcher, {
       redisUrl: env.upstashRedisRestUrl,
@@ -125,6 +152,35 @@ export async function submitGuestOrder(
     });
     throw error;
   }
+}
+
+async function deliverGuestOrderTrackingEmail(
+  payload: GuestOrderPayload,
+  trackingNumber: string,
+  siteOrigin: string | undefined,
+  fetcher: typeof fetch,
+): Promise<GuestOrderSubmitResult["trackingEmailStatus"]> {
+  if (!payload.customer.email || !siteOrigin) {
+    return "skipped";
+  }
+
+  const recipientName = `${payload.customer.firstName} ${payload.customer.lastName}`.trim();
+  const emailResult = await sendCustomerTrackingNumberEmail(
+    payload.customer.email,
+    {
+      recipientName,
+      trackingNumber,
+      trackPageUrl: buildCustomerTrackPageUrl(siteOrigin),
+      includeOrderSubmittedNote: true,
+    },
+    { fetch: fetcher },
+  );
+
+  if (emailResult.status === "failed") {
+    console.error("Unable to deliver guest order tracking email.", emailResult.error);
+  }
+
+  return emailResult.status;
 }
 
 async function enforceGuestOrderRateLimit(

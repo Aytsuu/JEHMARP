@@ -10,9 +10,11 @@ import { isTrustedFormOrigin } from "@/lib/security/form-origin";
 export const prerender = false;
 
 const token = Astro.params.token ?? "";
-let feedback: { status?: string; error?: string } = {
+let feedback: { status?: string; error?: string; tracking?: string; emailSent?: boolean } = {
   status: Astro.url.searchParams.get("status") ?? undefined,
   error: Astro.url.searchParams.get("error") ?? undefined,
+  tracking: Astro.url.searchParams.get("tracking") ?? undefined,
+  emailSent: Astro.url.searchParams.get("email") === "1",
 };
 
 if (Astro.request.method === "POST") {
@@ -34,9 +36,20 @@ if (Astro.request.method === "POST") {
   }
 
   try {
-    await submitCustomerRegistration(token, parsed);
+    const result = await submitCustomerRegistration(token, parsed, {
+      siteOrigin: Astro.url.origin,
+    });
+    const params = new URLSearchParams({
+      status: "Registration submitted.",
+      tracking: result.trackingNumber,
+    });
+
+    if (parsed.data.email) {
+      params.set("email", "1");
+    }
+
     return Astro.redirect(
-      `${Astro.url.pathname}?status=${encodeURIComponent("Registration submitted.")}`,
+      `${Astro.url.pathname}?${params.toString()}`,
       303,
     );
   } catch (error) {
@@ -89,7 +102,28 @@ const expiresAt = linkState.status === "valid"
       ) : feedback.status ? (
         <div class="customer-registration-card">
           <h2>Registration submitted</h2>
-          <p>The customer record has been sent to JEHMARP.</p>
+          <p>Save your customer tracking number now. You will need it to track your orders without an account.</p>
+          {feedback.tracking && (
+            <div class="customer-registration-tracking">
+              <p class="customer-registration-tracking__label">Your tracking number</p>
+              <div class="customer-registration-tracking__value-row">
+                <code id="customer-tracking-number">{feedback.tracking}</code>
+                <button type="button" class="customer-registration-tracking__copy" data-copy-target="customer-tracking-number">
+                  Copy
+                </button>
+              </div>
+              <p class="customer-registration-tracking__warning">
+                Copy this tracking number or take a screenshot before leaving this page.
+              </p>
+            </div>
+          )}
+          {feedback.emailSent ? (
+            <p>We also sent this tracking number to the email address you provided.</p>
+          ) : (
+            <p>
+              <a href="/track">Track your orders</a> once you have saved your tracking number.
+            </p>
+          )}
         </div>
       ) : (
         <form method="post" class="customer-registration-form">
@@ -263,4 +297,74 @@ const expiresAt = linkState.status === "valid"
       grid-template-columns: 1fr;
     }
   }
+
+  .customer-registration-tracking {
+    margin-top: 1rem;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .customer-registration-tracking__label {
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #374151;
+    text-transform: uppercase;
+  }
+
+  .customer-registration-tracking__value-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .customer-registration-tracking code {
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+  }
+
+  .customer-registration-tracking__copy {
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background: #fff;
+    color: #111827;
+    cursor: pointer;
+    font-weight: 800;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .customer-registration-tracking__warning {
+    margin: 0;
+    color: #991b1b;
+    font-weight: 700;
+  }
 </style>
+
+<script>
+  const copyButtons = document.querySelectorAll("[data-copy-target]");
+
+  copyButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const targetId = button.getAttribute("data-copy-target");
+
+      if (!targetId) {
+        return;
+      }
+
+      const target = document.getElementById(targetId);
+
+      if (!target?.textContent) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(target.textContent.trim());
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Copy failed";
+      }
+    });
+  });
+</script>

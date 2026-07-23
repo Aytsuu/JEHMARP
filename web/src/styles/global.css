@@ -50,6 +50,13 @@
 
   body.public-body {
     font-family: var(--font-sans);
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+
+  body.public-body > main {
+    flex: 1 0 auto;
   }
 
   * {

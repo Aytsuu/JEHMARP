@@ -1,6 +1,7 @@
 ---
 import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
 import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
+import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import {
   formatAgentActionFeedback,
@@ -23,6 +24,11 @@ import {
 } from "@/lib/agent-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
+import { isAdminOrderDetailNavOrder } from "@/lib/order-status-display";
+import {
+  buildOrderDetailNavEntries,
+  formatOrderCode,
+} from "@/lib/order-detail-nav";
 
 export const prerender = false;
 
@@ -79,13 +85,23 @@ const orderQuantityKey =
 const paidTotal = orderPaymentTotal(order);
 const commissionTotal = orderExpectedCommission(order);
 const grossTotal = orderTotal(order, orderQuantityKey);
-const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
+const orderCode = formatOrderCode(order.id);
 const backUrl = order.agent_order_id
   ? `/agent/orders/multi-customers/${order.agent_order_id}`
   : "/agent/orders";
 const backLabel = order.agent_order_id
   ? "Back to distribution order"
   : "Back to orders";
+const parentAgentOrder = order.agent_order_id
+  ? data.agentOrders.find((cluster) => cluster.id === order.agent_order_id) ?? null
+  : null;
+const orderNavigationEntries = parentAgentOrder
+  ? buildOrderDetailNavEntries({
+      orders: parentAgentOrder.customer_order.filter(isAdminOrderDetailNavOrder),
+      currentOrderId: order.id,
+      buildHref: (entry) => `/agent/orders/${entry.id}`,
+    })
+  : [];
 const agentReceivedPayments = order.agent_received_payment ?? [];
 const pendingAgentReceivedPayments = agentReceivedPayments.filter(
   (payment) => payment.status === "pending_admin_confirmation",
@@ -166,6 +182,17 @@ const timelineItems = [
   backUrl={backUrl}
   backLabel={backLabel}
 >
+  {
+    parentAgentOrder && (
+      <OrderDetailNav
+        slot="heading-title"
+        currentCode={orderCode}
+        entries={orderNavigationEntries}
+        menuLabel="Other customer orders in this distribution order"
+        titleClass="admin-notifications-page__title"
+      />
+    )
+  }
   <ul slot="heading-meta" class="record-meta" aria-label="Order date">
     <li class="record-meta__item">
       <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">

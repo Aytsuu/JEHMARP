@@ -78,7 +78,11 @@ describe("POST /api/guest-orders", () => {
       success: true,
       data: payload,
     });
-    submitGuestOrder.mockResolvedValue("order-id");
+    submitGuestOrder.mockResolvedValue({
+      orderId: "order-id",
+      trackingNumber: "JHM-ABCD2345",
+      trackingEmailStatus: "sent",
+    });
 
     const { POST } = await import("./guest-orders");
     const response = await POST({
@@ -95,9 +99,10 @@ describe("POST /api/guest-orders", () => {
     } as Parameters<APIRoute>[0]);
 
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("/shop?order=submitted&reference=order-id");
+    expect(response.headers.get("location")).toBe("/shop?order=submitted&email=1");
     expect(submitGuestOrder).toHaveBeenCalledWith(payload, {
       clientIp: "203.0.113.10",
+      siteOrigin: "https://shop.example.test",
     });
   });
 
@@ -123,7 +128,11 @@ describe("POST /api/guest-orders", () => {
       success: true,
       data: payload,
     });
-    submitGuestOrder.mockResolvedValue("order-id");
+    submitGuestOrder.mockResolvedValue({
+      orderId: "order-id",
+      trackingNumber: "JHM-ABCD2345",
+      trackingEmailStatus: "sent",
+    });
 
     const { POST } = await import("./guest-orders");
     const response = await POST({
@@ -139,9 +148,10 @@ describe("POST /api/guest-orders", () => {
     } as Parameters<APIRoute>[0]);
 
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("/shop?order=submitted&reference=order-id");
+    expect(response.headers.get("location")).toBe("/shop?order=submitted&email=1");
     expect(submitGuestOrder).toHaveBeenCalledWith(payload, {
       clientIp: null,
+      siteOrigin: "https://shop.example.test",
     });
   });
 });

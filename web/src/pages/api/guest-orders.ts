@@ -25,13 +25,17 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   }
 
   try {
-    const orderId = await submitGuestOrder(parsed.data, {
+    await submitGuestOrder(parsed.data, {
       clientIp: getClientIp(request.headers),
+      siteOrigin: url.origin,
     });
     const params = new URLSearchParams({
       order: "submitted",
-      reference: orderId,
     });
+
+    if (parsed.data.customer.email) {
+      params.set("email", "1");
+    }
 
     return redirect(`${returnPath}?${params.toString()}`, 303);
   } catch (error) {

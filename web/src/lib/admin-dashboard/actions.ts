@@ -21,6 +21,9 @@ import {
   parseAgentProfileUpdateFields,
 } from "@/lib/agent-profile-update";
 import {
+  finalizeNewCustomerCreation,
+} from "@/lib/public-website/customer-tracking";
+import {
   assertProfileEmailIsAvailable,
   assertProfilePhoneIsAvailable,
   insertAgentWithProfile,
@@ -30,6 +33,7 @@ import {
   customerWithProfileSelect,
   updateCustomerWithProfile,
   asProfileIdentityClient,
+  type ProfileIdentitySupabaseClient,
 } from "@/lib/profile-identity";
 import { logDevelopmentActionError } from "@/lib/request-logger";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -79,6 +83,7 @@ type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 type AdminActionResult = {
   redirectPath?: string;
+  statusMessage?: string;
 };
 type PromotionAuthUser = {
   id: string;
@@ -494,7 +499,12 @@ export async function handleAdminDashboardAction(
 
   try {
     actionResult =
-      await executeAdminAction(createSupabaseServerClient(context), parsed.action, adminUserId) ?? {};
+      await executeAdminAction(
+        createSupabaseServerClient(context),
+        parsed.action,
+        adminUserId,
+        { siteOrigin: context.url?.origin },
+      ) ?? {};
   } catch (error) {
     const message = error instanceof Error ? error.message : "Admin action failed.";
     logDevelopmentActionError({
@@ -520,7 +530,7 @@ export async function handleAdminDashboardAction(
   }
 
   const redirectPath = actionResult?.redirectPath ?? getActionRedirectPath(parsed.action, returnPath);
-  const message = getActionSuccessMessage(parsed.action);
+  const message = actionResult?.statusMessage ?? getActionSuccessMessage(parsed.action);
 
   if (wantsJsonResponse) {
     return Response.json({
@@ -646,6 +656,7 @@ export async function executeAdminAction(
   supabase: SupabaseServerClient,
   action: AdminAction,
   adminUserId = "00000000-0000-4000-8000-000000000000",
+  options: { siteOrigin?: string } = {},
 ): Promise<AdminActionResult | void> {
   switch (action.type) {
     case "save-page-section":
@@ -655,8 +666,7 @@ export async function executeAdminAction(
       await executeProductSave(action);
       return;
     case "save-customer":
-      await executeCustomerSave(supabase, action);
-      return;
+      return await executeCustomerSave(supabase, action, options);
     case "create-agent":
       await executeAgentCreate(action.payload);
       return;
@@ -667,7 +677,7 @@ export async function executeAdminAction(
       await executeAgentProfileUpdate(createSupabaseAdminClient(), action.agentId, action.payload);
       return;
     case "create-order":
-      return await executeOrderCreate(supabase, action);
+      return await executeOrderCreate(supabase, action, options);
     case "update-order-status":
       await executeTableUpdate(supabase, "customer_order", action.orderId, action.payload);
       return;
@@ -1410,6 +1420,7 @@ async function executeProductSave(action: Extract<AdminAction, { type: "save-pro
 async function executeOrderCreate(
   supabase: SupabaseServerClient,
   action: Extract<AdminAction, { type: "create-order" }>,
+  options: { siteOrigin?: string } = {},
 ): Promise<AdminActionResult | void> {
   if (action.agentOrderType === "distribution") {
     return await executeAgentDistributionOrderCreate(supabase, action);
@@ -1440,7 +1451,16 @@ async function executeOrderCreate(
     throw new Error("Unable to create order items.");
   }
 
-  if (!action.payment) return;
+  if (!action.payment) {
+    return customer.createdCustomerDetails
+      ? await finalizeNewCustomerCreation({
+          ...customer.createdCustomerDetails,
+          siteOrigin: options.siteOrigin,
+          baseMessage: "Order created.",
+          includeOrderSubmittedNote: true,
+        })
+      : undefined;
+  }
 
   const { error: paymentError } = await supabase
     .from("payment")
@@ -1452,7 +1472,14 @@ async function executeOrderCreate(
   if (!paymentError) {
     try {
       await ensureSalesInvoiceWhenOrderFullyPaid(supabase, orderId);
-      return;
+      return customer.createdCustomerDetails
+        ? await finalizeNewCustomerCreation({
+            ...customer.createdCustomerDetails,
+            siteOrigin: options.siteOrigin,
+            baseMessage: "Order created.",
+            includeOrderSubmittedNote: true,
+          })
+        : undefined;
     } catch (error) {
       await cleanupCreatedOrder(
         supabase,
@@ -1469,20 +1496,30 @@ async function executeOrderCreate(
 }
 
 async function executeCustomerSave(
-  supabase: SupabaseServerClient,
+  _supabase: SupabaseServerClient,
   action: Extract<AdminAction, { type: "save-customer" }>,
-) {
-  if (!action.customerId) {
-    await assertCustomerContactIsAvailable(supabase, action.payload);
+  options: { siteOrigin?: string } = {},
+): Promise<AdminActionResult | void> {
+  const identityClient = asProfileIdentityClient(createSupabaseAdminClient());
 
-    await insertCustomerWithProfile(asProfileIdentityClient(supabase), action.payload);
-    return;
+  if (!action.customerId) {
+    await assertCustomerContactIsAvailable(identityClient, action.payload);
+
+    const { trackingNumber } = await insertCustomerWithProfile(identityClient, action.payload);
+
+    return await finalizeNewCustomerCreation({
+      trackingNumber,
+      recipientName: `${action.payload.first_name} ${action.payload.last_name}`.trim(),
+      email: action.payload.email,
+      siteOrigin: options.siteOrigin,
+      baseMessage: "Customer created.",
+    });
   }
 
-  const profileId = await loadCustomerProfileId(asProfileIdentityClient(supabase), action.customerId);
-  await assertCustomerContactIsAvailable(supabase, action.payload, profileId);
+  const profileId = await loadCustomerProfileId(identityClient, action.customerId);
+  await assertCustomerContactIsAvailable(identityClient, action.payload, profileId);
   await updateCustomerWithProfile(
-    asProfileIdentityClient(supabase),
+    identityClient,
     action.customerId,
     profileId,
     action.payload,
@@ -1525,27 +1562,39 @@ async function resolveOrderCustomer(
     };
   }
 
-  await assertCustomerContactIsAvailable(supabase, customer.payload);
+  await assertCustomerContactIsAvailable(
+    asProfileIdentityClient(createSupabaseAdminClient()),
+    customer.payload,
+  );
 
-  const customerId = await insertCustomerWithProfile(asProfileIdentityClient(supabase), customer.payload);
+  const { customerId, trackingNumber } = await insertCustomerWithProfile(
+    asProfileIdentityClient(createSupabaseAdminClient()),
+    customer.payload,
+  );
+
   return {
     customerId,
     createdCustomerId: customerId,
+    createdCustomerDetails: {
+      trackingNumber,
+      recipientName: `${customer.payload.first_name} ${customer.payload.last_name}`.trim(),
+      email: customer.payload.email,
+    },
   };
 }
 
 async function assertCustomerContactIsAvailable(
-  supabase: SupabaseServerClient,
+  supabase: ProfileIdentitySupabaseClient,
   payload: CustomerFormPayload,
   excludeProfileId?: string,
 ) {
-  await assertProfilePhoneIsAvailable(asProfileIdentityClient(supabase), payload.phone_number, excludeProfileId);
+  await assertProfilePhoneIsAvailable(supabase, payload.phone_number, excludeProfileId);
 
   if (!payload.email) {
     return;
   }
 
-  await assertProfileEmailIsAvailable(asProfileIdentityClient(supabase), payload.email, excludeProfileId);
+  await assertProfileEmailIsAvailable(supabase, payload.email, excludeProfileId);
 }
 
 async function loadExistingProduct(
