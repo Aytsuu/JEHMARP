@@ -1,3 +1,4 @@
+-- migration-safety: destructive-reviewed
 -- Phase 5: Drop compat views and legacy link columns
 
 drop trigger if exists block_pending_agent_order_customer_link on public."order";

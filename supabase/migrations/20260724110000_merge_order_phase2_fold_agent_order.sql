@@ -1,3 +1,4 @@
+-- migration-safety: destructive-reviewed
 -- Phase 2: Fold agent_order into unified order table
 
 insert into public."order" (
