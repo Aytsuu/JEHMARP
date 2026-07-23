@@ -23,7 +23,6 @@ import {
   formatDateTime,
   fullName,
   getCustomerOrderDistributionConversionBlockReason,
-  orderBalance,
   orderCommissionTotal,
   orderDistributionConversionAgentId,
   orderPaymentTotal,
@@ -137,7 +136,6 @@ const pendingAgentReceivedTotal = pendingAgentReceivedPayments.reduce(
 const canEditOrderProducts = !hasSalesInvoice;
 const canGenerateInvoice = order.order_status === "processing";
 const paidTotal = orderPaymentTotal(order);
-const balance = orderBalance(order);
 const totalCommission = orderCommissionTotal(order);
 type PaymentFormCustomerType = "regular" | "wholesale" | "reseller";
 const isResellerCustomer = Boolean(order.customer?.is_reseller);
@@ -156,8 +154,7 @@ const paymentOrderTotal = order.customer_order_item.reduce((total, item) => {
 }, 0);
 const isAgentLinkedOrder = Boolean(
   order.agent_id ||
-  order.agent_order_id ||
-  order.converted_to_agent_order_id ||
+  order.parent_order_id ||
   totalCommission > 0,
 );
 const commissionAdjustedOrderTotal = orderReceivableTotal(
@@ -170,10 +167,10 @@ const paymentFormOrderTotal = isAgentLinkedOrder
   : paymentOrderTotal;
 const paymentFormBalance = Math.max(paymentFormOrderTotal - paidTotal, 0);
 const canCreatePaymentRecord = paymentFormBalance > 0;
-const receivable = isAgentLinkedOrder ? commissionAdjustedOrderTotal : balance;
-const showOrigOrderTotal = isAgentLinkedOrder
-  ? commissionAdjustedOrderTotal < paymentOrderTotal
-  : paidTotal > 0 && receivable < paymentOrderTotal;
+const receivable = isAgentLinkedOrder ? commissionAdjustedOrderTotal : paymentOrderTotal;
+const showOrigOrderTotal =
+  isAgentLinkedOrder && commissionAdjustedOrderTotal < paymentOrderTotal;
+const balanceDue = paymentFormBalance;
 const canEditInvoiceQuantities = hasSalesInvoice;
 const distributionConversionAgentId = orderDistributionConversionAgentId(order);
 const distributionConversionBlockReason =
@@ -216,8 +213,7 @@ const salesInvoicePdfFileName = invoice
   : null;
 const commissionProjectionTrigger = Boolean(
   order.agent_id ||
-    order.agent_order_id ||
-    order.converted_to_agent_order_id ||
+    order.parent_order_id ||
     order.customer?.promoted_to_agent_id,
 );
 
@@ -292,7 +288,7 @@ const customerViewHref = order.customer?.id
 const customerAddress = order.customer?.address ?? "No address on file";
 const customerPhone = order.customer?.phone_number ?? "No contact number";
 const customerEmail = order.customer?.email ?? "No email address";
-const orderedByAgent = order.agent_order_id ? order.agent_order?.agent ?? null : null;
+const orderedByAgent = order.parent_order_id && !order.converted_at ? order.parent_order?.agent ?? null : null;
 const orderedByAgentDisplayName =
   orderedByAgent?.display_name ?? "Agent details unavailable";
 const orderedByAgentPhone = orderedByAgent?.contact ?? "No contact number";
@@ -356,15 +352,15 @@ const backLabel = backHref.startsWith("/admin/customers/")
   : backHref.startsWith("/admin/orders/agent/")
     ? "Back to distribution order"
     : "Back to orders";
-const parentAgentOrder = order.agent_order_id
-  ? await loadAdminAgentOrder(order.agent_order_id)
+const parentAgentOrder = order.parent_order_id && !order.converted_at
+  ? await loadAdminAgentOrder(order.parent_order_id)
   : null;
 const orderNavigationSource = parentAgentOrder
   ? parentAgentOrder.customer_order.filter(isAdminOrderDetailNavOrder)
-  : order.agent_order_id
+  : order.parent_order_id
     ? dashboardData.orders.filter(
         (entry) =>
-          entry.agent_order_id === order.agent_order_id
+          entry.parent_order_id === order.parent_order_id
           && isAdminOrderDetailNavOrder(entry),
       )
     : dashboardData.orders.filter(isAdminOrderDetailNavOrder);
@@ -431,7 +427,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
             </div>
             <div class="order-information__item">
               <dt>Release</dt>
-              <dd>{formatDateTime(order.release_date)}</dd>
+              <dd>{formatDateTime(order.release_date ?? null)}</dd>
             </div>
             <div class="order-information__item">
               <dt>Payment status</dt>
@@ -485,6 +481,10 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                   )
                 }
               </dd>
+            </div>
+            <div class="order-information__item order-information__item--balance-due">
+              <dt>Balance due</dt>
+              <dd>{formatCurrency(balanceDue)}</dd>
             </div>
           </dl>
         </section>
@@ -635,7 +635,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
           </article>
 
           {
-            order.agent_order_id && (
+            order.parent_order_id && !order.converted_at && (
               <article class="order-party-card order-party-card--agent">
                 <div class="order-party-card__identity">
                   <div class="order-party-card__identity-copy">
@@ -2397,6 +2397,18 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     color: rgba(17, 24, 39, 0.42);
     font-size: 0.76rem;
     font-weight: 600;
+  }
+
+  .order-information__item--balance-due {
+    margin-top: 0.15rem;
+    border-top: 1px solid rgba(17, 24, 39, 0.08);
+    padding-top: 0.5rem;
+  }
+
+  .order-information__item--balance-due dt,
+  .order-information__item--balance-due dd {
+    color: #111827;
+    font-size: 0.9rem;
   }
 
   .order-commission-form {

@@ -8,6 +8,7 @@ type Props = {
   remittance?: number;
   primaryLabel?: string;
   primaryAmount?: number;
+  remaining?: number;
   summaryLabel?: string;
   pendingAcceptanceAmount?: number | null;
   awaitingAcceptance?: boolean;
@@ -22,6 +23,7 @@ const {
   remittance = 0,
   primaryLabel,
   primaryAmount,
+  remaining,
   summaryLabel = "Order calculation",
   pendingAcceptanceAmount = null,
   awaitingAcceptance = false,
@@ -33,6 +35,10 @@ const showPendingAcceptanceAmount =
   variant === "summary" && (pendingAcceptanceAmount ?? 0) > 0;
 const resolvedPrimaryLabel = primaryLabel ?? "Remittance";
 const resolvedPrimaryAmount = primaryAmount ?? remittance;
+const resolvedReceivable =
+  variant === "summary" ? resolvedPrimaryAmount : grossTotal;
+const resolvedRemaining =
+  remaining ?? Math.max(resolvedReceivable - paid, 0);
 ---
 
 <div
@@ -54,6 +60,10 @@ const resolvedPrimaryAmount = primaryAmount ?? remittance;
           <span>{resolvedPrimaryLabel}</span>
           <strong>{formatCurrency(resolvedPrimaryAmount)}</strong>
         </div>
+        <div class="order-calculation-summary__row order-calculation-summary__row--balance-due">
+          <span>Balance due</span>
+          <strong>{formatCurrency(resolvedRemaining)}</strong>
+        </div>
         <div class="order-calculation-summary__row order-calculation-summary__row--muted">
           <span>Gross total</span>
           <span>{formatCurrency(grossTotal)}</span>
@@ -72,6 +82,10 @@ const resolvedPrimaryAmount = primaryAmount ?? remittance;
         <div class="order-calculation-summary__row order-calculation-summary__row--primary">
           <span>Receivable</span>
           <strong>{formatCurrency(grossTotal)}</strong>
+        </div>
+        <div class="order-calculation-summary__row order-calculation-summary__row--balance-due">
+          <span>Balance due</span>
+          <strong>{formatCurrency(resolvedRemaining)}</strong>
         </div>
         {
           awaitingAcceptance && (
@@ -123,6 +137,16 @@ const resolvedPrimaryAmount = primaryAmount ?? remittance;
     line-height: 1.1;
   }
 
+  .order-calculation-summary__row--balance-due {
+    color: #111827;
+    font-size: 0.88rem;
+    font-weight: 700;
+  }
+
+  .order-calculation-summary__row--balance-due strong {
+    font-size: 1.05rem;
+  }
+
   .order-calculation-summary__row--pending {
     color: #b45309;
     font-size: 0.78rem;
@@ -170,6 +194,14 @@ const resolvedPrimaryAmount = primaryAmount ?? remittance;
 
   .order-calculation-summary--compact .order-calculation-summary__row--primary strong {
     font-size: 0.92rem;
+  }
+
+  .order-calculation-summary--compact .order-calculation-summary__row--balance-due {
+    font-size: 0.76rem;
+  }
+
+  .order-calculation-summary--compact .order-calculation-summary__row--balance-due strong {
+    font-size: 0.86rem;
   }
 
   .order-calculation-summary--compact .order-calculation-summary__row--muted {

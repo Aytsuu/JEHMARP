@@ -119,7 +119,7 @@ function createAgentDashboardData(): AgentDashboardData {
     }],
     orders: [{
       id: "order-12345678",
-      agent_order_id: null,
+      parent_order_id: null,
       customer_id: "customer-1",
       agent_id: "agent-1",
       source: "agent_submitted",

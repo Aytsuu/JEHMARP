@@ -41,7 +41,7 @@ function createAgentProfile(overrides: Partial<AgentProfile> = {}): AgentProfile
 function createOrder(overrides: Partial<AgentOrder> = {}): AgentOrder {
   return {
     id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-    agent_order_id: null,
+    parent_order_id: null,
     customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
     agent_id: agentId,
     source: "agent_submitted",
@@ -211,8 +211,8 @@ describe("agent dashboard calculations", () => {
     expect(isAgentMyOrder(createOrder(), agent)).toBe(true);
     expect(isAgentMyOrder(createOrder({ agent_id: null }), agent)).toBe(false);
     expect(isAgentMyOrder(createOrder({ agent_id: "other-agent" }), agent)).toBe(false);
-    expect(isAgentMyStandaloneOrder(createOrder({ agent_order_id: "cluster-1" }), agent)).toBe(false);
-    expect(isAgentMyStandaloneOrder(createOrder({ converted_to_agent_order_id: "cluster-2" }), agent)).toBe(false);
+    expect(isAgentMyStandaloneOrder(createOrder({ parent_order_id: "cluster-1" }), agent)).toBe(false);
+    expect(isAgentMyStandaloneOrder(createOrder({ parent_order_id: "cluster-2", converted_at: "2026-07-01T00:00:00.000Z" }), agent)).toBe(false);
     expect(isAgentMyStandaloneOrder(createOrder(), agent)).toBe(true);
   });
 

@@ -200,7 +200,7 @@ export async function loadGuestOrderTrackingNumber(
   supabase: ReturnType<typeof createSupabaseAdminClient> = createSupabaseAdminClient(),
 ): Promise<string> {
   const { data, error } = await supabase
-    .from("customer_order")
+    .from("order")
     .select("customer:customer_id ( tracking_number )")
     .eq("id", orderId)
     .maybeSingle();

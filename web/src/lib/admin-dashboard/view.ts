@@ -169,18 +169,17 @@ export function agentOrderItemEffectiveCommissionAmount(
 }
 
 export function isOrderCommissionEffective(
-  order: Partial<Pick<AdminOrder, "agent_id" | "agent_order_id" | "converted_to_agent_order_id">>,
+  order: Partial<Pick<AdminOrder, "agent_id" | "parent_order_id">>,
 ) {
   return Boolean(
     order.agent_id ||
-    order.agent_order_id ||
-    order.converted_to_agent_order_id,
+    order.parent_order_id,
   );
 }
 
 export function orderCommissionTotal(
   order: Pick<AdminOrder, "customer_order_item"> &
-    Partial<Pick<AdminOrder, "agent_id" | "agent_order_id" | "converted_to_agent_order_id" | "customer">>,
+    Partial<Pick<AdminOrder, "agent_id" | "parent_order_id" | "customer">>,
 ) {
   const useDefaultCommission = isOrderCommissionEffective(order);
 
@@ -278,8 +277,7 @@ export function shouldShowCustomerOrderDistributionConversionCard(
   promotedAgentId: string | null | undefined,
 ) {
   return Boolean(promotedAgentId) &&
-    !order.agent_order_id &&
-    !order.converted_to_agent_order_id;
+    !order.parent_order_id;
 }
 
 export function customerOrderDistributionConversionBlockMessage(
@@ -314,11 +312,11 @@ export function getCustomerOrderDistributionConversionBlockReason(
     return "Not promoted";
   }
 
-  if (order.converted_to_agent_order_id) {
+  if (order.parent_order_id && order.converted_at) {
     return "Converted";
   }
 
-  if (order.agent_order_id) {
+  if (order.parent_order_id) {
     return "Already linked";
   }
 

@@ -125,9 +125,10 @@ export async function assertAgentOrderAllowsCustomerAttach(
   agentOrderId: string,
 ) {
   const { data: agentOrder, error: agentOrderError } = await supabase
-    .from("agent_order")
+    .from("order")
     .select("order_status, release_date")
     .eq("id", agentOrderId)
+    .eq("order_kind", "distribution")
     .maybeSingle();
 
   if (agentOrderError) {
@@ -141,9 +142,11 @@ export async function assertAgentOrderAllowsCustomerAttach(
   }
 
   const { data: customerOrders, error: customerOrdersError } = await supabase
-    .from("customer_order")
+    .from("order")
     .select("payment_status")
-    .eq("agent_order_id", agentOrderId);
+    .in("order_kind", ["customer", "personal"])
+    .eq("parent_order_id", agentOrderId)
+    .is("converted_at", null);
 
   if (customerOrdersError) {
     throw new Error("Unable to verify linked customer order payment statuses before attaching a customer.", {

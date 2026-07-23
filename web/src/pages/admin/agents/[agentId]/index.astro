@@ -221,9 +221,9 @@ const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
                               <input type="hidden" name="returnTo" value={`/admin/agents/${agent.id}`} />
                               <button type="submit">Convert</button>
                             </form>
-                          ) : order.converted_to_agent_order_id ? (
+                          ) : order.parent_order_id && order.converted_at ? (
                             <ViewButton
-                              href={`/admin/orders/agent/${order.converted_to_agent_order_id}?returnTo=${agentReturnTo}`}
+                              href={`/admin/orders/agent/${order.parent_order_id}?returnTo=${agentReturnTo}`}
                             />
                           ) : (
                             <span class="promoted-order-state">{blockReason ?? "Unavailable"}</span>

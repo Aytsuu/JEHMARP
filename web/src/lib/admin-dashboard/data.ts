@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { throwLoadError } from "@/lib/load-error";
+import { sortOrderPaymentsDescending } from "@/lib/order-payments";
 import {
   agentSummaryWithProfileSelect,
   agentWithProfileSelect,
@@ -47,9 +48,12 @@ type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 const customerOrderStatuses = new Set(["pending", "processing", "closed"]);
 const agentOrderStatuses = new Set(["pending_customers", "pending_order", "processing", "closed"]);
 
+const customerOrderKinds = ["customer", "personal"] as const;
+
 const adminOrderSelect = `
   id,
-  agent_order_id,
+  order_kind,
+  parent_order_id,
   customer_id,
   agent_id,
   source,
@@ -61,9 +65,8 @@ const adminOrderSelect = `
   approved_at,
   admin_read_at,
   admin_read_by,
-  converted_to_agent_order_id,
-  converted_to_agent_order_at,
-  converted_to_agent_order_by,
+  converted_at,
+  converted_by,
   created_at,
   updated_at,
   customer:customer_id (
@@ -102,7 +105,7 @@ const adminOrderSelect = `
       last_name
     )
   ),
-  agent_order:agent_order!customer_order_agent_order_id_fkey (
+  parent_order:order!parent_order_id (
     id,
     agent_id,
     agent:agent_id (
@@ -118,7 +121,7 @@ const adminOrderSelect = `
       )
     )
   ),
-  customer_order_item (
+  order_item (
     id,
     product_id,
     partial_quantity,
@@ -179,7 +182,7 @@ const adminOrderSelect = `
     created_at,
     updated_at
   ),
-  customer_order_status_history (
+  order_status_history (
     id,
     from_status,
     to_status,
@@ -190,6 +193,7 @@ const adminOrderSelect = `
 
 const adminAgentOrderSelect = `
   id,
+  order_kind,
   agent_id,
   order_status,
   release_date,
@@ -214,14 +218,15 @@ const adminAgentOrderSelect = `
       last_name
     )
   ),
-  agent_order_item (
+  order_item (
     id,
     product_id,
-    quantity,
+    partial_quantity,
+    final_quantity,
     add_details,
     agent_commission_amount,
-    agent_commission_updated_by,
-    agent_commission_updated_at,
+    agent_commission_set_by,
+    agent_commission_set_at,
     created_at,
     updated_at,
     product:product_id (
@@ -233,133 +238,59 @@ const adminAgentOrderSelect = `
       agent_commission_type,
       agent_commission_value
     )
-  ),
-  customer_order!customer_order_agent_order_id_fkey (
-    id,
-    agent_order_id,
-    customer_id,
-    agent_id,
-    source,
-    order_status,
-    payment_status,
-    release_date,
-    sale_date,
-    notes,
-    approved_at,
-    admin_read_at,
-    admin_read_by,
-    converted_to_agent_order_id,
-    converted_to_agent_order_at,
-    converted_to_agent_order_by,
-    created_at,
-    updated_at,
-    customer:customer_id (
-      id,
-      assigned_agent_id,
-      is_reseller,
-      credit_limit,
-      credit_limit_exceeded,
-      promoted_to_agent_id,
-      promoted_to_agent_at,
-      profile:profile_id (${profileIdentitySelect}),
-      assigned_agent:assigned_agent_id (
-        id,
-        user_id,
-        status,
-        created_at,
-        updated_at,
-        profile:profile_id (
-          display_name,
-          phone_number,
-          email
-        )
-      )
-    ),
-    agent:agent_id (
-      id,
-      user_id,
-      status,
-      created_at,
-      updated_at,
-      profile:profile_id (
-        display_name,
-        phone_number,
-        email,
-        first_name,
-        last_name
-      )
-    ),
-    customer_order_item (
-      id,
-      product_id,
-      partial_quantity,
-      final_quantity,
-      unit_price,
-      price_type,
-      add_details,
-      agent_order_quantity_increase,
-      agent_commission_amount,
-      agent_commission_paid,
-      product:product_id (
-        id,
-        name,
-        unit_label,
-        default_price,
-        reseller_price,
-        agent_commission_type,
-        agent_commission_value
-      )
-    ),
-    payment (
-      id,
-      amount,
-      payment_method,
-      payment_terms,
-      payment_date,
-      reference_number,
-      notes,
-      created_at
-    ),
-    agent_received_payment (
-      id,
-      order_id,
-      agent_id,
-      amount,
-      payment_method,
-      payment_terms,
-      payment_date,
-      reference_number,
-      notes,
-      status,
-      confirmed_at,
-      created_at,
-      updated_at,
-      agent:agent_id (
-        id,
-        profile:profile_id (
-          display_name
-        )
-      )
-    ),
-    invoice (
-      id,
-      order_id,
-      invoice_number,
-      status,
-      issued_at,
-      due_at,
-      created_at,
-      updated_at
-    ),
-    customer_order_status_history (
-      id,
-      from_status,
-      to_status,
-      changed_at,
-      notes
-    )
   )
 `;
+
+async function loadChildOrdersByParentIds(
+  supabase: SupabaseAdminClient,
+  parentOrderIds: string[],
+): Promise<Map<string, unknown[]>> {
+  const childOrdersByParentId = new Map<string, unknown[]>();
+
+  if (parentOrderIds.length === 0) {
+    return childOrdersByParentId;
+  }
+
+  const { data, error } = await supabase
+    .from("order")
+    .select(adminOrderSelect)
+    .in("order_kind", [...customerOrderKinds])
+    .in("parent_order_id", parentOrderIds);
+
+  if (error) throwLoadError("Unable to load distribution child orders.", error);
+
+  for (const row of data ?? []) {
+    const parentOrderId = (row as { parent_order_id?: string | null }).parent_order_id;
+    if (!parentOrderId) {
+      continue;
+    }
+
+    const existing = childOrdersByParentId.get(parentOrderId) ?? [];
+    existing.push(row);
+    childOrdersByParentId.set(parentOrderId, existing);
+  }
+
+  return childOrdersByParentId;
+}
+
+async function attachChildOrdersToDistributionOrders(
+  supabase: SupabaseAdminClient,
+  distributionOrders: unknown[],
+): Promise<unknown[]> {
+  const parentOrderIds = distributionOrders
+    .map((order) => (order as { id?: string }).id)
+    .filter((id): id is string => Boolean(id));
+  const childOrdersByParentId = await loadChildOrdersByParentIds(supabase, parentOrderIds);
+
+  return distributionOrders.map((order) => {
+    const orderId = (order as { id?: string }).id;
+
+    return {
+      ...(order as Record<string, unknown>),
+      child_orders: orderId ? childOrdersByParentId.get(orderId) ?? [] : [],
+    };
+  });
+}
 
 export type AdminPage = {
   id: string;
@@ -544,7 +475,8 @@ export type AdminOrderParentAgentOrder = {
 
 export type AdminOrder = {
   id: string;
-  agent_order_id?: string | null;
+  order_kind?: "customer" | "personal" | "distribution";
+  parent_order_id?: string | null;
   customer_id: string;
   agent_id: string | null;
   source: "guest_shop" | "agent_submitted" | "admin_manual";
@@ -556,13 +488,14 @@ export type AdminOrder = {
   approved_at: string | null;
   admin_read_at?: string | null;
   admin_read_by?: string | null;
-  converted_to_agent_order_id?: string | null;
-  converted_to_agent_order_at?: string | null;
-  converted_to_agent_order_by?: string | null;
+  converted_at?: string | null;
+  converted_by?: string | null;
   created_at: string;
   updated_at: string;
   customer: AdminOrderCustomer | null;
   agent: Pick<AdminAgent, "id" | "display_name" | "email" | "contact"> | null;
+  parent_order?: AdminOrderParentAgentOrder | null;
+  /** @deprecated Use parent_order */
   agent_order?: AdminOrderParentAgentOrder | null;
   customer_order_item: AdminOrderItem[];
   payment: AdminPayment[];
@@ -1035,7 +968,7 @@ export async function loadAdminActivityManagementData(
 export async function loadAdminOrder(orderId: string): Promise<AdminOrder | null> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
-    .from("customer_order")
+    .from("order")
     .select(adminOrderSelect)
     .eq("id", orderId)
     .maybeSingle();
@@ -1054,14 +987,17 @@ export async function loadAdminAgentOrder(agentOrderId: string): Promise<AdminAg
   const supabase = createSupabaseAdminClient();
   const [{ data, error }, { data: sourceOrderData, error: sourceOrderError }] = await Promise.all([
     supabase
-      .from("agent_order")
+      .from("order")
       .select(adminAgentOrderSelect)
       .eq("id", agentOrderId)
+      .eq("order_kind", "distribution")
       .maybeSingle(),
     supabase
-      .from("customer_order")
+      .from("order")
       .select(adminOrderSelect)
-      .eq("converted_to_agent_order_id", agentOrderId)
+      .eq("parent_order_id", agentOrderId)
+      .not("converted_at", "is", null)
+      .in("order_kind", customerOrderKinds)
       .maybeSingle(),
   ]);
 
@@ -1072,9 +1008,11 @@ export async function loadAdminAgentOrder(agentOrderId: string): Promise<AdminAg
     return null;
   }
 
+  const [distributionOrder] = await attachChildOrdersToDistributionOrders(supabase, [data]);
+
   const [agentOrder] = await enrichAgentOrdersWithAgentEmails(
     supabase,
-    [normalizeAdminAgentOrder(data)],
+    [normalizeAdminAgentOrder(distributionOrder)],
   );
   if (!agentOrder) {
     return null;
@@ -1406,13 +1344,13 @@ async function loadCustomerOutstandingBalances(
   supabase: SupabaseAdminClient,
 ): Promise<Record<string, number>> {
   const { data, error } = await supabase
-    .from("customer_order")
+    .from("order")
     .select(`
       id,
       customer_id,
       order_status,
       payment_status,
-      customer_order_item (
+      order_item (
         final_quantity,
         unit_price
       ),
@@ -1420,20 +1358,22 @@ async function loadCustomerOutstandingBalances(
         amount
       )
     `)
+    .in("order_kind", customerOrderKinds)
     .neq("order_status", "closed")
     .in("payment_status", ["unpaid", "partial"])
-    .is("converted_to_agent_order_id", null);
+    .is("converted_at", null);
 
   if (error) throwLoadError("Unable to load customer outstanding balances.", error);
 
   return ((data ?? []) as Array<{
     customer_id?: unknown;
     customer_order_item?: Array<{ final_quantity?: unknown; unit_price?: unknown }> | null;
+    order_item?: Array<{ final_quantity?: unknown; unit_price?: unknown }> | null;
     payment?: Array<{ amount?: unknown }> | null;
   }>).reduce<Record<string, number>>((balances, order) => {
     if (typeof order.customer_id !== "string") return balances;
 
-    const orderTotal = (order.customer_order_item ?? []).reduce((total, item) => {
+    const orderTotal = (order.order_item ?? order.customer_order_item ?? []).reduce((total, item) => {
       const quantity = Number(item.final_quantity ?? 0);
       const unitPrice = Number(item.unit_price ?? 0);
       return total + (Number.isFinite(quantity) && Number.isFinite(unitPrice) ? quantity * unitPrice : 0);
@@ -1559,12 +1499,13 @@ async function loadOrdersForCustomers(
   }
 
   let query = supabase
-    .from("customer_order")
+    .from("order")
     .select(adminOrderSelect)
+    .in("order_kind", customerOrderKinds)
     .in("customer_id", customerIds);
 
   if (!options.includeConverted) {
-    query = query.is("converted_to_agent_order_id", null);
+    query = query.is("converted_at", null);
   }
 
   const { data, error } = await query.order("created_at", { ascending: false });
@@ -1582,16 +1523,19 @@ async function loadAgentOrdersForAgent(
   agentId: string,
 ) {
   const { data, error } = await supabase
-    .from("agent_order")
+    .from("order")
     .select(adminAgentOrderSelect)
+    .eq("order_kind", "distribution")
     .eq("agent_id", agentId)
     .order("created_at", { ascending: false });
 
   if (error) throwLoadError("Unable to load admin agent orders.", error);
 
+  const distributionOrders = await attachChildOrdersToDistributionOrders(supabase, data ?? []);
+
   return enrichAgentOrdersWithAgentEmails(
     supabase,
-    ((data ?? []) as unknown[]).map(normalizeAdminAgentOrder),
+    distributionOrders.map(normalizeAdminAgentOrder),
   );
 }
 
@@ -1639,9 +1583,10 @@ export async function loadOrders(
   filters: AdminOrderFilters = {},
 ) {
   let query = supabase
-    .from("customer_order")
+    .from("order")
     .select(adminOrderSelect)
-    .is("converted_to_agent_order_id", null);
+    .in("order_kind", customerOrderKinds)
+    .is("converted_at", null);
 
   if (filters.source) {
     query = query.eq("source", filters.source);
@@ -1708,8 +1653,9 @@ async function loadAgentOrders(
   }
 
   let query = supabase
-    .from("agent_order")
-    .select(adminAgentOrderSelect);
+    .from("order")
+    .select(adminAgentOrderSelect)
+    .eq("order_kind", "distribution");
 
   if (filters.orderStatus) {
     if (!agentOrderStatuses.has(filters.orderStatus)) {
@@ -1730,9 +1676,11 @@ async function loadAgentOrders(
 
   if (error) throwLoadError("Unable to load admin agent orders.", error);
 
+  const distributionOrders = await attachChildOrdersToDistributionOrders(supabase, data ?? []);
+
   const agentOrders = await enrichAgentOrdersWithAgentEmails(
     supabase,
-    ((data ?? []) as unknown[]).map(normalizeAdminAgentOrder),
+    distributionOrders.map(normalizeAdminAgentOrder),
   );
   const filteredAgentOrders = shouldPostFilter
     ? filterAdminAgentOrders(agentOrders, filters)
@@ -1752,7 +1700,8 @@ function normalizeAdminOrder(order: unknown): AdminOrder {
   const normalizedAgent = raw.agent
     ? normalizeAgentSummaryWithProfile(raw.agent)
     : null;
-  const normalizedAgentOrder = normalizeAdminOrderParentAgentOrder(raw.agent_order);
+  const normalizedParentOrder = normalizeAdminOrderParentAgentOrder(raw.parent_order ?? raw.agent_order);
+  const orderItems = raw.order_item ?? adminOrder.customer_order_item;
 
   const agentReceivedPayment = (adminOrder.agent_received_payment ?? []).map((payment) => {
     const paymentRecord = payment as {
@@ -1777,17 +1726,22 @@ function normalizeAdminOrder(order: unknown): AdminOrder {
     };
   });
 
+  const statusHistory = raw.order_status_history ?? adminOrder.customer_order_status_history;
+
   return {
     ...adminOrder,
     customer: normalizedCustomer,
     agent: normalizedAgent,
-    agent_order: normalizedAgentOrder,
-    customer_order_item: Array.isArray(adminOrder.customer_order_item) ? adminOrder.customer_order_item : [],
-    payment: Array.isArray(adminOrder.payment) ? adminOrder.payment : [],
+    parent_order: normalizedParentOrder,
+    agent_order: normalizedParentOrder,
+    customer_order_item: Array.isArray(orderItems) ? orderItems : [],
+    payment: sortOrderPaymentsDescending(
+      Array.isArray(adminOrder.payment) ? adminOrder.payment : [],
+    ),
     agent_received_payment: agentReceivedPayment,
     invoice: normalizeRelationArray(adminOrder.invoice),
-    customer_order_status_history: Array.isArray(adminOrder.customer_order_status_history)
-      ? adminOrder.customer_order_status_history
+    customer_order_status_history: Array.isArray(statusHistory)
+      ? statusHistory
       : [],
   };
 }
@@ -1837,18 +1791,31 @@ function normalizeAdminCustomer(customer: AdminCustomer): AdminCustomer {
 }
 
 function normalizeAdminAgentOrder(order: unknown): AdminAgentOrder {
+  const raw = order as Record<string, unknown>;
   const adminAgentOrder = order as AdminAgentOrder;
+  const distributionItems = (raw.order_item ?? adminAgentOrder.agent_order_item) as Array<
+    AdminAgentOrderItem & { partial_quantity?: number; final_quantity?: number }
+  >;
+  const childOrders = (raw.child_orders ?? adminAgentOrder.customer_order) as unknown[];
 
   return {
     ...adminAgentOrder,
     agent: adminAgentOrder.agent
       ? normalizeAgentSummaryWithProfile(adminAgentOrder.agent)
       : null,
-    agent_order_item: Array.isArray(adminAgentOrder.agent_order_item)
-      ? adminAgentOrder.agent_order_item
+    agent_order_item: Array.isArray(distributionItems)
+      ? distributionItems.map((item) => ({
+          ...item,
+          quantity: Number(item.quantity ?? item.partial_quantity ?? item.final_quantity ?? 0),
+        }))
       : [],
-    customer_order: Array.isArray(adminAgentOrder.customer_order)
-      ? adminAgentOrder.customer_order.map(normalizeAdminOrder)
+    customer_order: Array.isArray(childOrders)
+      ? childOrders
+          .filter((child) => {
+            const childOrder = child as { converted_at?: string | null };
+            return !childOrder.converted_at;
+          })
+          .map(normalizeAdminOrder)
       : [],
   };
 }
@@ -2316,9 +2283,10 @@ async function loadDashboardSummaryOrders(
   supabase: SupabaseAdminClient,
 ): Promise<Array<Pick<AdminOrder, "order_status">>> {
   const { data, error } = await supabase
-    .from("customer_order")
+    .from("order")
     .select("order_status")
-    .is("converted_to_agent_order_id", null);
+    .in("order_kind", customerOrderKinds)
+    .is("converted_at", null);
 
   if (error) throwLoadError("Unable to load admin orders.", error);
 
@@ -2329,8 +2297,9 @@ async function loadDashboardSummaryAgentOrders(
   supabase: SupabaseAdminClient,
 ): Promise<Array<Pick<AdminAgentOrder, "order_status">>> {
   const { data, error } = await supabase
-    .from("agent_order")
-    .select("order_status");
+    .from("order")
+    .select("order_status")
+    .eq("order_kind", "distribution");
 
   if (error) throwLoadError("Unable to load admin agent orders.", error);
 

@@ -86,14 +86,14 @@ const paidTotal = orderPaymentTotal(order);
 const commissionTotal = orderExpectedCommission(order);
 const grossTotal = orderTotal(order, orderQuantityKey);
 const orderCode = formatOrderCode(order.id);
-const backUrl = order.agent_order_id
-  ? `/agent/orders/multi-customers/${order.agent_order_id}`
+const backUrl = order.parent_order_id
+  ? `/agent/orders/multi-customers/${order.parent_order_id}`
   : "/agent/orders";
-const backLabel = order.agent_order_id
+const backLabel = order.parent_order_id
   ? "Back to distribution order"
   : "Back to orders";
-const parentAgentOrder = order.agent_order_id
-  ? data.agentOrders.find((cluster) => cluster.id === order.agent_order_id) ?? null
+const parentAgentOrder = order.parent_order_id
+  ? data.agentOrders.find((cluster) => cluster.id === order.parent_order_id) ?? null
   : null;
 const orderNavigationEntries = parentAgentOrder
   ? buildOrderDetailNavEntries({
@@ -260,7 +260,7 @@ const timelineItems = [
         <dl class="customer-detail-list">
           <div>
             <dt>Release</dt>
-            <dd>{formatDate(order.release_date)}</dd>
+            <dd>{formatDate(order.release_date ?? null)}</dd>
           </div>
           <div>
             <dt>Phone</dt>

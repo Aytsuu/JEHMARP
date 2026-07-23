@@ -89,7 +89,7 @@ describe("handleAdminDashboardAction", () => {
       action: "update-order-status",
     });
     expect(context.redirect).not.toHaveBeenCalled();
-    expect(db.from).toHaveBeenCalledWith("customer_order");
+    expect(db.from).toHaveBeenCalledWith("order");
   });
 
   it("returns JSON validation errors for fetch-based admin actions", async () => {
@@ -1299,14 +1299,22 @@ describe("executeAdminAction", () => {
       data: linkedCustomerOrders,
       error: null,
     }));
-    const customerOrderEq = vi.fn(() => ({ limit: customerOrderLimit }));
-    const customerOrderSelect = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderIs = vi.fn(() => ({ limit: customerOrderLimit }));
+    const customerOrderEq = vi.fn(() => ({ is: customerOrderIs }));
+    const customerOrderKindIn = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderSelect = vi.fn(() => ({ in: customerOrderKindIn }));
     const agentOrderStatusEq = vi.fn(async () => ({ error: null }));
-    const agentOrderIdEq = vi.fn(() => ({ eq: agentOrderStatusEq }));
+    const agentOrderKindEq = vi.fn(() => ({ eq: agentOrderStatusEq }));
+    const agentOrderIdEq = vi.fn(() => ({ eq: agentOrderKindEq }));
     const agentOrderUpdate = vi.fn(() => ({ eq: agentOrderIdEq }));
+    let orderCall = 0;
     const from = vi.fn((table: string) => {
-      if (table === "customer_order") return { select: customerOrderSelect };
-      if (table === "agent_order") return { update: agentOrderUpdate };
+      if (table === "order") {
+        orderCall += 1;
+        return orderCall === 1
+          ? { select: customerOrderSelect }
+          : { update: agentOrderUpdate };
+      }
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -1315,9 +1323,12 @@ describe("executeAdminAction", () => {
       from,
       customerOrderSelect,
       customerOrderEq,
+      customerOrderKindIn,
+      customerOrderIs,
       customerOrderLimit,
       agentOrderUpdate,
       agentOrderIdEq,
+      agentOrderKindEq,
       agentOrderStatusEq,
     };
   }
@@ -1332,7 +1343,7 @@ describe("executeAdminAction", () => {
     }, adminUserId);
 
     expect(db.customerOrderSelect).toHaveBeenCalledWith("id");
-    expect(db.customerOrderEq).toHaveBeenCalledWith("agent_order_id", "11111111-1111-4111-8111-111111111111");
+    expect(db.customerOrderEq).toHaveBeenCalledWith("parent_order_id", "11111111-1111-4111-8111-111111111111");
     expect(db.customerOrderLimit).toHaveBeenCalledWith(1);
     expect(db.agentOrderUpdate).toHaveBeenCalledWith(expect.objectContaining({
       order_status: "pending_customers",
@@ -1341,6 +1352,7 @@ describe("executeAdminAction", () => {
       updated_at: expect.any(String),
     }));
     expect(db.agentOrderIdEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
+    expect(db.agentOrderKindEq).toHaveBeenCalledWith("order_kind", "distribution");
     expect(db.agentOrderStatusEq).toHaveBeenCalledWith("order_status", "pending_order");
   });
 
@@ -1369,20 +1381,27 @@ describe("executeAdminAction", () => {
       },
       error: null,
     }));
-    const agentOrderEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
+    const agentOrderEq = vi.fn(() => ({ eq: vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle })) }));
     const agentOrderSelect = vi.fn(() => ({ eq: agentOrderEq }));
-    const customerOrderEq = vi.fn(() => Promise.resolve({
+    const customerOrderIs = vi.fn(() => Promise.resolve({
       data: [{ payment_status: "partial" }],
       error: null,
     }));
-    const customerOrderSelect = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderEq = vi.fn(() => ({ is: customerOrderIs }));
+    const customerOrderIn = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderSelect = vi.fn(() => ({ in: customerOrderIn }));
     const rpc = vi.fn(() => Promise.resolve({
       data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       error: null,
     }));
+    let orderCall = 0;
     const from = vi.fn((table: string) => {
-      if (table === "agent_order") return { select: agentOrderSelect };
-      if (table === "customer_order") return { select: customerOrderSelect };
+      if (table === "order") {
+        orderCall += 1;
+        return orderCall === 1
+          ? { select: agentOrderSelect }
+          : { select: customerOrderSelect };
+      }
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -1410,7 +1429,7 @@ describe("executeAdminAction", () => {
     expect(agentOrderSelect).toHaveBeenCalledWith("order_status, release_date");
     expect(agentOrderEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
     expect(customerOrderSelect).toHaveBeenCalledWith("payment_status");
-    expect(customerOrderEq).toHaveBeenCalledWith("agent_order_id", "11111111-1111-4111-8111-111111111111");
+    expect(customerOrderEq).toHaveBeenCalledWith("parent_order_id", "11111111-1111-4111-8111-111111111111");
     expect(rpc).toHaveBeenCalledWith("attach_customer_to_agent_order", {
       target_agent_order_id: "11111111-1111-4111-8111-111111111111",
       target_customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
@@ -1521,7 +1540,7 @@ describe("executeAdminAction", () => {
     const itemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
     const itemUpdate = vi.fn(() => ({ eq: itemUpdateEq }));
     const from = vi.fn((table: string) => {
-      if (table === "customer_order_item") {
+      if (table === "order_item") {
         return {
           select: itemSelect,
           update: itemUpdate,
@@ -1658,8 +1677,8 @@ describe("executeAdminAction", () => {
     const from = vi.fn((table: string) => {
       if (table === "customer") return { select: customerSelect, update: customerUpdate, delete: customerDelete };
       if (table === "agent") return { select: agentSelect, insert: agentInsert };
-      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
-      if (table === "customer_order_item") return { select: orderItemSelect, update: orderItemUpdate };
+      if (table === "order") return { select: orderSelect, update: orderUpdate };
+      if (table === "order_item") return { select: orderItemSelect, update: orderItemUpdate };
       if (table === "profile") return { select: profileSelect };
       throw new Error(`Unexpected table ${table}`);
     });
@@ -1854,7 +1873,7 @@ describe("executeAdminAction", () => {
       if (table === "customer") return { select: customerSelect, update: customerUpdate, delete: customerDelete };
       if (table === "agent") return { select: agentSelect, insert: agentInsert };
       if (table === "admin_role") return { select: adminRoleSelect };
-      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "order") return { select: orderSelect, update: orderUpdate };
       if (table === "profile") return { select: profileSelect };
       throw new Error(`Unexpected table ${table}`);
     });
@@ -1981,7 +2000,7 @@ describe("executeAdminAction", () => {
     const serverFrom = vi.fn((table: string) => {
       if (table === "payment") return { insert: paymentInsert };
       if (table === "invoice") return { select: invoiceSelect };
-      if (table === "customer_order") return { update: markReadUpdate };
+      if (table === "order") return { update: markReadUpdate };
       throw new Error(`Unexpected server table ${table}`);
     });
     const balanceByOrderId = new Map([
@@ -1994,8 +2013,8 @@ describe("executeAdminAction", () => {
     }));
     const selectedOrdersIn = vi.fn(async () => ({
       data: [
-        { id: firstOrderId, agent_order_id: agentOrderId },
-        { id: secondOrderId, agent_order_id: agentOrderId },
+        { id: firstOrderId, parent_order_id: agentOrderId },
+        { id: secondOrderId, parent_order_id: agentOrderId },
       ],
       error: null,
     }));
@@ -2004,22 +2023,21 @@ describe("executeAdminAction", () => {
       data: {
         order_status: "pending",
         agent_id: null,
-        agent_order_id: agentOrderId,
-        converted_to_agent_order_id: null,
+        parent_order_id: agentOrderId,
         payment: [],
-        customer_order_item: [],
+        order_item: [],
       },
       error: null,
     }));
     const invoiceBalanceEq = vi.fn(() => ({ maybeSingle: invoiceBalanceMaybeSingle }));
     const invoiceBalanceSelect = vi.fn(() => ({ eq: invoiceBalanceEq }));
     const adminFrom = vi.fn((table: string) => {
-      if (table !== "customer_order") {
+      if (table !== "order") {
         throw new Error(`Unexpected admin table ${table}`);
       }
 
       return {
-        select: (columns: string) => columns === "id, agent_order_id"
+        select: (columns: string) => columns === "id, parent_order_id"
           ? selectedOrdersSelect()
           : invoiceBalanceSelect(),
       };
@@ -2093,9 +2111,9 @@ describe("executeAdminAction", () => {
     const itemUpdate = vi.fn();
     const from = vi.fn((table: string) => {
       if (table === "invoice") return { select: invoiceSelect };
-      if (table === "customer_order") return { select: orderSelect };
+      if (table === "order") return { select: orderSelect };
       if (table === "payment") return { insert: paymentInsert };
-      if (table === "customer_order_item") return { update: itemUpdate };
+      if (table === "order_item") return { update: itemUpdate };
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -2178,9 +2196,7 @@ describe("executeAdminAction", () => {
       data: {
         order_status: "processing",
         agent_id: null,
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
-        payment: [{ amount: 100 }],
+        parent_order_id: null,        payment: [{ amount: 100 }],
         customer_order_item: [
           {
             final_quantity: 2,
@@ -2196,14 +2212,14 @@ describe("executeAdminAction", () => {
     const adminOrderSelect = vi.fn(() => ({ eq: adminOrderEq }));
     const adminFrom = vi.fn((table: string) => {
       if (table === "product") return { select: productSelect };
-      if (table === "customer_order") return { select: adminOrderSelect };
+      if (table === "order") return { select: adminOrderSelect };
       throw new Error(`Unexpected admin table ${table}`);
     });
     const from = vi.fn((table: string) => {
       if (table === "invoice") return { select: invoiceSelect };
-      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "order") return { select: orderSelect, update: orderUpdate };
       if (table === "payment") return { select: paymentSelect, insert: paymentInsert };
-      if (table === "customer_order_item") return { select: itemSelect, update: itemUpdate };
+      if (table === "order_item") return { select: itemSelect, update: itemUpdate };
       throw new Error(`Unexpected table ${table}`);
     });
     mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
@@ -2263,9 +2279,7 @@ describe("executeAdminAction", () => {
     const pricingOrderMaybeSingle = vi.fn(() => Promise.resolve({
       data: {
         agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
-        customer: { is_reseller: false },
+        parent_order_id: null,        customer: { is_reseller: false },
       },
       error: null,
     }));
@@ -2277,9 +2291,7 @@ describe("executeAdminAction", () => {
       data: {
         order_status: "processing",
         agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
-        payment: [{ amount: 840 }],
+        parent_order_id: null,        payment: [{ amount: 840 }],
         customer_order_item: [
           {
             final_quantity: 3,
@@ -2300,7 +2312,7 @@ describe("executeAdminAction", () => {
     const orderSelect = vi.fn((columns: string) => ({
       eq: columns.includes("customer:customer_id")
         ? pricingOrderEq
-        : columns.includes("customer_order_item")
+        : columns.includes("order_item")
         ? invoiceBalanceEq
         : orderStatusEq,
     }));
@@ -2345,15 +2357,15 @@ describe("executeAdminAction", () => {
     const adminOrderSelect = vi.fn(() => ({ eq: adminInvoiceBalanceEq }));
     const adminFrom = vi.fn((table: string) => {
       if (table === "product") return { select: productSelect };
-      if (table === "customer_order") return { select: adminOrderSelect };
+      if (table === "order") return { select: adminOrderSelect };
       throw new Error(`Unexpected admin table ${table}`);
     });
     const rpc = vi.fn(() => Promise.resolve({ data: 0, error: null }));
     const from = vi.fn((table: string) => {
       if (table === "invoice") return { select: invoiceSelect, insert: invoiceInsert };
-      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "order") return { select: orderSelect, update: orderUpdate };
       if (table === "payment") return { select: paymentSelect, insert: paymentInsert };
-      if (table === "customer_order_item") return { select: itemSelect, update: itemUpdate };
+      if (table === "order_item") return { select: itemSelect, update: itemUpdate };
       throw new Error(`Unexpected table ${table}`);
     });
     mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
@@ -2415,9 +2427,7 @@ describe("executeAdminAction", () => {
     const orderMaybeSingle = vi.fn(() => Promise.resolve({
       data: {
         agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
-        customer: { is_reseller: false },
+        parent_order_id: null,        customer: { is_reseller: false },
       },
       error: null,
     }));
@@ -2464,9 +2474,9 @@ describe("executeAdminAction", () => {
     });
     const from = vi.fn((table: string) => {
       if (table === "invoice") return { select: invoiceSelect };
-      if (table === "customer_order") return { select: orderSelect };
+      if (table === "order") return { select: orderSelect };
       if (table === "payment") return { select: paymentSelect, insert: paymentInsert };
-      if (table === "customer_order_item") return { select: itemSelect, update: itemUpdate };
+      if (table === "order_item") return { select: itemSelect, update: itemUpdate };
       throw new Error(`Unexpected table ${table}`);
     });
     mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
@@ -2504,9 +2514,7 @@ describe("executeAdminAction", () => {
     const pricingOrderMaybeSingle = vi.fn(() => Promise.resolve({
       data: {
         agent_id: null,
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
-        customer: {
+        parent_order_id: null,        customer: {
           is_reseller: false,
           assigned_agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
         },
@@ -2521,9 +2529,7 @@ describe("executeAdminAction", () => {
       data: {
         order_status: "processing",
         agent_id: null,
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
-        payment: [{ amount: 900 }],
+        parent_order_id: null,        payment: [{ amount: 900 }],
         customer_order_item: [
           {
             final_quantity: 3,
@@ -2584,15 +2590,15 @@ describe("executeAdminAction", () => {
     const adminOrderSelect = vi.fn(() => ({ eq: adminInvoiceBalanceEq }));
     const adminFrom = vi.fn((table: string) => {
       if (table === "product") return { select: productSelect };
-      if (table === "customer_order") return { select: adminOrderSelect };
+      if (table === "order") return { select: adminOrderSelect };
       throw new Error(`Unexpected admin table ${table}`);
     });
     const rpc = vi.fn(() => Promise.resolve({ data: 0, error: null }));
     const from = vi.fn((table: string) => {
       if (table === "invoice") return { select: invoiceSelect, insert: invoiceInsert };
-      if (table === "customer_order") return { select: orderSelect, update: orderUpdate };
+      if (table === "order") return { select: orderSelect, update: orderUpdate };
       if (table === "payment") return { select: paymentSelect, insert: paymentInsert };
-      if (table === "customer_order_item") return { select: itemSelect, update: itemUpdate };
+      if (table === "order_item") return { select: itemSelect, update: itemUpdate };
       throw new Error(`Unexpected table ${table}`);
     });
     mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
@@ -2730,8 +2736,8 @@ describe("executeAdminAction", () => {
     }));
     const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
     const from = vi.fn((table: string) => {
-      if (table === "customer_order") return { insert: orderInsert };
-      if (table === "customer_order_item") return { insert: itemInsert };
+      if (table === "order") return { insert: orderInsert };
+      if (table === "order_item") return { insert: itemInsert };
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -2760,9 +2766,10 @@ describe("executeAdminAction", () => {
       ],
     });
 
-    expect(from).toHaveBeenCalledWith("customer_order");
-    expect(from).toHaveBeenCalledWith("customer_order_item");
+    expect(from).toHaveBeenCalledWith("order");
+    expect(from).toHaveBeenCalledWith("order_item");
     expect(orderInsert).toHaveBeenCalledWith({
+      order_kind: "customer",
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
       source: "admin_manual",
@@ -2775,6 +2782,7 @@ describe("executeAdminAction", () => {
     expect(itemInsert).toHaveBeenCalledWith([
       {
         order_id: orderId,
+        order_kind: "customer",
         product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
         partial_quantity: 2,
         final_quantity: 2,
@@ -2801,8 +2809,8 @@ describe("executeAdminAction", () => {
     const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
     const from = vi.fn((table: string) => {
       if (table === "agent") return { select: agentSelect };
-      if (table === "customer_order") return { insert: orderInsert };
-      if (table === "customer_order_item") return { insert: itemInsert };
+      if (table === "order") return { insert: orderInsert };
+      if (table === "order_item") return { insert: itemInsert };
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -2835,6 +2843,7 @@ describe("executeAdminAction", () => {
     expect(agentSelect).toHaveBeenCalledWith("customer_id");
     expect(agentEq).toHaveBeenCalledWith("id", agentId);
     expect(orderInsert).toHaveBeenCalledWith({
+      order_kind: "customer",
       customer_id: customerId,
       agent_id: agentId,
       source: "admin_manual",
@@ -2847,6 +2856,7 @@ describe("executeAdminAction", () => {
     expect(itemInsert).toHaveBeenCalledWith([
       {
         order_id: orderId,
+        order_kind: "customer",
         product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
         partial_quantity: 2,
         final_quantity: 2,
@@ -2865,8 +2875,8 @@ describe("executeAdminAction", () => {
     }));
     const itemInsert = vi.fn(() => Promise.resolve({ error: null }));
     const from = vi.fn((table: string) => {
-      if (table === "agent_order") return { insert: orderInsert };
-      if (table === "agent_order_item") return { insert: itemInsert };
+      if (table === "order") return { insert: orderInsert };
+      if (table === "order_item") return { insert: itemInsert };
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -2897,7 +2907,10 @@ describe("executeAdminAction", () => {
     });
 
     expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
+      order_kind: "distribution",
       agent_id: agentId,
+      source: "agent_submitted",
+      payment_status: "unpaid",
       order_status: "pending_customers",
       notes: null,
       submitted_by: adminUserId,
@@ -2906,9 +2919,11 @@ describe("executeAdminAction", () => {
     }));
     expect(itemInsert).toHaveBeenCalledWith([
       {
-        agent_order_id: agentOrderId,
+        order_id: agentOrderId,
+        order_kind: "distribution",
         product_id: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
-        quantity: 2,
+        partial_quantity: 2,
+        final_quantity: 2,
         add_details: "For distribution",
       },
     ]);
@@ -2928,10 +2943,9 @@ describe("executeAdminAction", () => {
       data: {
         order_status: "processing",
         agent_id: null,
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
+        parent_order_id: null,
         payment: [{ amount: 700 }],
-        customer_order_item: [
+        order_item: [
           {
             final_quantity: 2,
             unit_price: 350,
@@ -2955,12 +2969,12 @@ describe("executeAdminAction", () => {
     const orderUpdate = vi.fn(() => ({ eq: orderUpdateEq }));
     const rpc = vi.fn(() => Promise.resolve({ data: 0, error: null }));
     const adminFrom = vi.fn((table: string) => {
-      if (table === "customer_order") return { select: orderSelect };
+      if (table === "order") return { select: orderSelect };
       throw new Error(`Unexpected admin table ${table}`);
     });
     const from = vi.fn((table: string) => {
-      if (table === "customer_order") return { insert: orderInsert, select: orderSelect, update: orderUpdate };
-      if (table === "customer_order_item") return { insert: itemInsert };
+      if (table === "order") return { insert: orderInsert, select: orderSelect, update: orderUpdate };
+      if (table === "order_item") return { insert: itemInsert };
       if (table === "payment") return { insert: paymentInsert };
       if (table === "invoice") return { select: invoiceSelect, insert: invoiceInsert };
       throw new Error(`Unexpected table ${table}`);
@@ -3013,7 +3027,7 @@ describe("executeAdminAction", () => {
     });
     expect(invoiceSelect).toHaveBeenCalledWith("id");
     expect(invoiceSelectEq).toHaveBeenCalledWith("order_id", orderId);
-    expect(orderSelect).toHaveBeenCalledWith(expect.stringContaining("customer_order_item"));
+    expect(orderSelect).toHaveBeenCalledWith(expect.stringContaining("order_item"));
     expect(orderSelectEq).toHaveBeenCalledWith("id", orderId);
     expect(rpc).not.toHaveBeenCalled();
     expect(invoiceInsert).toHaveBeenCalledWith(expect.objectContaining({
@@ -3081,8 +3095,8 @@ describe("executeAdminAction", () => {
       throw new Error(`Unexpected admin table ${table}`);
     });
     const serverFrom = vi.fn((table: string) => {
-      if (table === "customer_order") return { insert: orderInsert };
-      if (table === "customer_order_item") return { insert: itemInsert };
+      if (table === "order") return { insert: orderInsert };
+      if (table === "order_item") return { insert: itemInsert };
       throw new Error(`Unexpected server table ${table}`);
     });
     mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
@@ -3139,7 +3153,7 @@ describe("executeAdminAction", () => {
       throw new Error(`Unexpected admin table ${table}`);
     });
     const serverFrom = vi.fn((table: string) => {
-      if (table === "customer_order") return { insert: orderInsert };
+      if (table === "order") return { insert: orderInsert };
       throw new Error(`Unexpected server table ${table}`);
     });
     mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
@@ -3206,7 +3220,7 @@ describe("executeAdminAction", () => {
       throw new Error(`Unexpected admin table ${table}`);
     });
     const serverFrom = vi.fn((table: string) => {
-      if (table === "customer_order") return { insert: orderInsert };
+      if (table === "order") return { insert: orderInsert };
       throw new Error(`Unexpected server table ${table}`);
     });
     mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
@@ -3308,8 +3322,8 @@ describe("executeAdminAction", () => {
       throw new Error(`Unexpected admin table ${table}`);
     });
     const serverFrom = vi.fn((table: string) => {
-      if (table === "customer_order") return { insert: orderInsert };
-      if (table === "customer_order_item") return { insert: itemInsert };
+      if (table === "order") return { insert: orderInsert };
+      if (table === "order_item") return { insert: itemInsert };
       throw new Error(`Unexpected server table ${table}`);
     });
     mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
@@ -3388,7 +3402,7 @@ describe("executeAdminAction", () => {
     const paymentEq = vi.fn(() => Promise.resolve({ data: [], error: null }));
     const paymentSelect = vi.fn(() => ({ eq: paymentEq }));
     const from = vi.fn((table: string) => {
-      if (table === "customer_order_item") {
+      if (table === "order_item") {
         return { select: customerOrderItemSelect, update: customerOrderItemUpdate };
       }
 
@@ -3450,7 +3464,7 @@ describe("executeAdminAction", () => {
     }));
     const paymentSelect = vi.fn(() => ({ eq: paymentEq }));
     const from = vi.fn((table: string) => {
-      if (table === "customer_order_item") {
+      if (table === "order_item") {
         return { select: customerOrderItemSelect, update: customerOrderItemUpdate };
       }
 
@@ -3481,35 +3495,37 @@ describe("executeAdminAction", () => {
     const agentOrderItemId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
     const agentOrderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
     const agentOrderItemMaybeSingle = vi.fn(() => Promise.resolve({
-      data: { id: agentOrderItemId, agent_order_id: agentOrderId },
+      data: { id: agentOrderItemId, order_id: agentOrderId },
       error: null,
     }));
     const agentOrderItemSelectEq = vi.fn(() => ({ maybeSingle: agentOrderItemMaybeSingle }));
     const agentOrderItemSelect = vi.fn(() => ({ eq: agentOrderItemSelectEq }));
     const agentOrderItemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
     const agentOrderItemUpdate = vi.fn(() => ({ eq: agentOrderItemUpdateEq }));
-    const customerOrderEq = vi.fn(() => Promise.resolve({
+    const customerOrderIs = vi.fn(() => Promise.resolve({
       data: [
         { id: "customer-order-1", payment_status: "paid" },
         { id: "customer-order-2", payment_status: "partial" },
       ],
       error: null,
     }));
-    const customerOrderSelect = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderEq = vi.fn(() => ({ is: customerOrderIs }));
+    const customerOrderIn = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderSelect = vi.fn(() => ({ in: customerOrderIn }));
     const payload = {
       agent_commission_amount: 95.75,
       agent_commission_updated_by: adminUserId,
       agent_commission_updated_at: "2026-07-14T10:00:00.000Z",
     };
     const from = vi.fn((table: string) => {
-      if (table === "agent_order_item") {
+      if (table === "order_item") {
         return {
           select: agentOrderItemSelect,
           update: agentOrderItemUpdate,
         };
       }
 
-      if (table === "customer_order") {
+      if (table === "order") {
         return { select: customerOrderSelect };
       }
 
@@ -3522,9 +3538,9 @@ describe("executeAdminAction", () => {
       payload,
     }, adminUserId);
 
-    expect(agentOrderItemSelect).toHaveBeenCalledWith("id, agent_order_id");
+    expect(agentOrderItemSelect).toHaveBeenCalledWith("id, order_id");
     expect(customerOrderSelect).toHaveBeenCalledWith("id, payment_status");
-    expect(customerOrderEq).toHaveBeenCalledWith("agent_order_id", agentOrderId);
+    expect(customerOrderEq).toHaveBeenCalledWith("parent_order_id", agentOrderId);
     expect(agentOrderItemUpdate).toHaveBeenCalledWith(payload);
     expect(agentOrderItemUpdateEq).toHaveBeenCalledWith("id", agentOrderItemId);
   });
@@ -3533,29 +3549,31 @@ describe("executeAdminAction", () => {
     const agentOrderItemId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
     const agentOrderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
     const agentOrderItemMaybeSingle = vi.fn(() => Promise.resolve({
-      data: { id: agentOrderItemId, agent_order_id: agentOrderId },
+      data: { id: agentOrderItemId, order_id: agentOrderId },
       error: null,
     }));
     const agentOrderItemSelectEq = vi.fn(() => ({ maybeSingle: agentOrderItemMaybeSingle }));
     const agentOrderItemSelect = vi.fn(() => ({ eq: agentOrderItemSelectEq }));
     const agentOrderItemUpdate = vi.fn();
-    const customerOrderEq = vi.fn(() => Promise.resolve({
+    const customerOrderIs = vi.fn(() => Promise.resolve({
       data: [
         { id: "customer-order-1", payment_status: "paid" },
         { id: "customer-order-2", payment_status: "paid" },
       ],
       error: null,
     }));
-    const customerOrderSelect = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderEq = vi.fn(() => ({ is: customerOrderIs }));
+    const customerOrderIn = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderSelect = vi.fn(() => ({ in: customerOrderIn }));
     const from = vi.fn((table: string) => {
-      if (table === "agent_order_item") {
+      if (table === "order_item") {
         return {
           select: agentOrderItemSelect,
           update: agentOrderItemUpdate,
         };
       }
 
-      if (table === "customer_order") {
+      if (table === "order") {
         return { select: customerOrderSelect };
       }
 
@@ -3588,7 +3606,7 @@ describe("executeAdminAction", () => {
     const itemInsert = vi.fn();
     const from = vi.fn((table: string) => {
       if (table === "invoice") return { select: invoiceSelect };
-      if (table === "customer_order_item") return { insert: itemInsert };
+      if (table === "order_item") return { insert: itemInsert };
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -3627,11 +3645,10 @@ describe("executeAdminAction", () => {
       data: {
         id: orderId,
         agent_id: null,
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
+        parent_order_id: null,
         customer: { promoted_to_agent_id: null },
         payment: [{ amount: 600 }],
-        customer_order_item: [
+        order_item: [
           {
             id: orderItemId,
             final_quantity: 3,
@@ -3649,12 +3666,12 @@ describe("executeAdminAction", () => {
     const orderEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
     const orderSelect = vi.fn(() => ({ eq: orderEq }));
     const adminFrom = vi.fn((table: string) => {
-      if (table === "customer_order") return { select: orderSelect };
+      if (table === "order") return { select: orderSelect };
 
       throw new Error(`Unexpected admin table ${table}`);
     });
     const from = vi.fn((table: string) => {
-      if (table === "customer_order_item") {
+      if (table === "order_item") {
         return { select: orderItemSelect, update: orderItemUpdate };
       }
 
@@ -3696,11 +3713,10 @@ describe("executeAdminAction", () => {
       data: {
         id: orderId,
         agent_id: null,
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
+        parent_order_id: null,
         customer: { promoted_to_agent_id: null },
         payment: [{ amount: 600 }],
-        customer_order_item: [
+        order_item: [
           {
             id: orderItemId,
             final_quantity: 3,
@@ -3718,12 +3734,12 @@ describe("executeAdminAction", () => {
     const orderEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
     const orderSelect = vi.fn(() => ({ eq: orderEq }));
     const adminFrom = vi.fn((table: string) => {
-      if (table === "customer_order") return { select: orderSelect };
+      if (table === "order") return { select: orderSelect };
 
       throw new Error(`Unexpected admin table ${table}`);
     });
     const from = vi.fn((table: string) => {
-      if (table === "customer_order_item") {
+      if (table === "order_item") {
         return { select: orderItemSelect, update: orderItemUpdate };
       }
 
@@ -3776,9 +3792,7 @@ describe("executeAdminAction", () => {
       data: {
         id: orderId,
         agent_id: null,
-        agent_order_id: null,
-        converted_to_agent_order_id: null,
-        customer: { promoted_to_agent_id: null },
+        parent_order_id: null,        customer: { promoted_to_agent_id: null },
         payment: [],
         customer_order_item: [
           {
@@ -3808,12 +3822,12 @@ describe("executeAdminAction", () => {
     const orderEq = vi.fn(() => ({ maybeSingle: orderMaybeSingle }));
     const orderSelect = vi.fn(() => ({ eq: orderEq }));
     const adminFrom = vi.fn((table: string) => {
-      if (table === "customer_order") return { select: orderSelect };
+      if (table === "order") return { select: orderSelect };
 
       throw new Error(`Unexpected admin table ${table}`);
     });
     const from = vi.fn((table: string) => {
-      if (table === "customer_order_item") {
+      if (table === "order_item") {
         return { select: orderItemsSelect, delete: orderItemsDelete };
       }
 

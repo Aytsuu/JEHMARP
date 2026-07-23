@@ -20,6 +20,9 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
   const builder = {
     select: vi.fn(() => builder),
     eq: vi.fn(() => builder),
+    in: vi.fn(() => builder),
+    is: vi.fn(() => builder),
+    not: vi.fn(() => builder),
     maybeSingle: vi.fn(() => Promise.resolve({
       data: response.data[0] ?? null,
       error: response.error,
@@ -66,7 +69,7 @@ describe("agent dashboard data", () => {
     const result = await loadAgentOrder({ cookies: {}, request: {} } as never, order.id);
 
     expect(createSupabaseServerClient).toHaveBeenCalledTimes(1);
-    expect(from).toHaveBeenCalledWith("customer_order");
+    expect(from).toHaveBeenCalledWith("order");
     expect(builder.eq).toHaveBeenCalledWith("id", order.id);
     expect(result).toMatchObject({
       id: order.id,

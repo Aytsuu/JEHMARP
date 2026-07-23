@@ -15,11 +15,11 @@ begin
       'agent',
       'customer',
       'product',
-      'customer_order',
-      'customer_order_item',
+      'order',
+      'order_item',
       'payment',
       'invoice',
-      'customer_order_status_history',
+      'order_status_history',
       'contact_inquiry',
       'reseller_application',
       'page',
@@ -64,11 +64,11 @@ begin
 
   foreach restricted_table in array array[
     'customer',
-    'customer_order',
-    'customer_order_item',
+    'order',
+    'order_item',
     'payment',
     'invoice',
-    'customer_order_status_history',
+    'order_status_history',
     'contact_inquiry',
     'reseller_application'
   ] loop
@@ -78,8 +78,8 @@ begin
   end loop;
 
   foreach restricted_table in array array[
-    'customer_order',
-    'customer_order_item',
+    'order',
+    'order_item',
     'payment',
     'invoice',
     'contact_inquiry',
@@ -168,7 +168,7 @@ begin
     select 1
     from pg_trigger
     where tgname = 'record_order_status_history'
-      and tgrelid = 'public.customer_order'::regclass
+      and tgrelid = 'public.order'::regclass
       and not tgisinternal
   ) then
     raise exception 'Missing order status history trigger';

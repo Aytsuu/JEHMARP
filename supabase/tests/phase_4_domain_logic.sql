@@ -87,25 +87,30 @@ begin
   )
   returning id into test_agent_id;
 
-  insert into public.customer_order (
+  insert into public."order" (
+    order_kind,
     customer_id,
     agent_id,
     source,
-    order_status
+    order_status,
+    payment_status
   )
   values (
+    'customer',
     test_customer_id,
     test_agent_id,
     'admin_manual',
-    'pending'
+    'pending',
+    'unpaid'
   )
   returning id into test_order_id;
 
-  update public.customer_order
+  update public."order"
   set order_status = 'processing'
   where id = test_order_id;
 
-  insert into public.customer_order_item (
+  insert into public.order_item (
+    order_kind,
     order_id,
     product_id,
     partial_quantity,
@@ -114,6 +119,7 @@ begin
     agent_commission_paid
   )
   values (
+    'customer',
     test_order_id,
     test_product_id,
     2,
@@ -125,7 +131,7 @@ begin
 
   select final_quantity
   into numeric_result
-  from public.customer_order_item
+  from public.order_item
   where id = test_item_id;
 
   if numeric_result <> 2 then
@@ -134,7 +140,7 @@ begin
 
   select unit_price
   into numeric_result
-  from public.customer_order_item
+  from public.order_item
   where id = test_item_id;
 
   if numeric_result <> 100 then
@@ -143,7 +149,7 @@ begin
 
   select price_type
   into text_result
-  from public.customer_order_item
+  from public.order_item
   where id = test_item_id;
 
   if text_result <> 'retail' then
@@ -157,13 +163,13 @@ begin
     raise exception 'Expected order total 200 from partial quantity, got %', numeric_result;
   end if;
 
-  update public.customer_order_item
+  update public.order_item
   set final_quantity = 4
   where id = test_item_id;
 
   select partial_quantity
   into numeric_result
-  from public.customer_order_item
+  from public.order_item
   where id = test_item_id;
 
   if numeric_result <> 2 then
@@ -177,20 +183,20 @@ begin
     raise exception 'Expected invoice total 400 from final quantity, got %', numeric_result;
   end if;
 
-  update public.customer_order_item
+  update public.order_item
   set partial_quantity = 3
   where id = test_item_id;
 
   select final_quantity
   into numeric_result
-  from public.customer_order_item
+  from public.order_item
   where id = test_item_id;
 
   if numeric_result <> 3 then
     raise exception 'Expected partial_quantity update to copy into final_quantity, got %', numeric_result;
   end if;
 
-  update public.customer_order_item
+  update public.order_item
   set final_quantity = 4
   where id = test_item_id;
 
@@ -265,7 +271,7 @@ begin
 
   select payment_status
   into text_result
-  from public.customer_order
+  from public."order"
   where id = test_order_id;
 
   if text_result <> 'unpaid' then
@@ -289,7 +295,7 @@ begin
 
   select payment_status
   into text_result
-  from public.customer_order
+  from public."order"
   where id = test_order_id;
 
   if text_result <> 'partial' then
@@ -350,7 +356,7 @@ begin
 
   select payment_status
   into text_result
-  from public.customer_order
+  from public."order"
   where id = test_order_id;
 
   if text_result <> 'paid' then
@@ -411,25 +417,31 @@ begin
   )
   returning id into reseller_customer_id;
 
-  insert into public.customer_order (
+  insert into public."order" (
+    order_kind,
     customer_id,
     source,
-    order_status
+    order_status,
+    payment_status
   )
   values (
+    'customer',
     reseller_customer_id,
     'admin_manual',
-    'processing'
+    'processing',
+    'unpaid'
   )
   returning id into reseller_order_id;
 
-  insert into public.customer_order_item (
+  insert into public.order_item (
+    order_kind,
     order_id,
     product_id,
     partial_quantity,
     final_quantity
   )
   values (
+    'customer',
     reseller_order_id,
     test_product_id,
     2,
@@ -439,7 +451,7 @@ begin
 
   select unit_price
   into numeric_result
-  from public.customer_order_item
+  from public.order_item
   where id = reseller_item_id;
 
   if numeric_result <> 80 then
@@ -448,7 +460,7 @@ begin
 
   select price_type
   into text_result
-  from public.customer_order_item
+  from public.order_item
   where id = reseller_item_id;
 
   if text_result <> 'reseller' then
@@ -462,63 +474,75 @@ begin
     raise exception 'Expected reseller order total 160, got %', numeric_result;
   end if;
 
-  insert into public.customer_order (
+  insert into public."order" (
+    order_kind,
     customer_id,
     source,
-    order_status
+    order_status,
+    payment_status
   )
   values (
+    'customer',
     test_customer_id,
     'admin_manual',
-    'processing'
+    'processing',
+    'unpaid'
   )
   returning id into reseller_order_id;
 
-  insert into public.customer_order_item (
+  insert into public.order_item (
+    order_kind,
     order_id,
     product_id,
     partial_quantity,
     final_quantity
   )
   values (
+    'customer',
     reseller_order_id,
     test_product_id,
     1,
     1
   );
 
-  update public.customer_order
+  update public."order"
   set order_status = 'closed'
   where id = reseller_order_id;
 
   select payment_status
   into text_result
-  from public.customer_order
+  from public."order"
   where id = reseller_order_id;
 
   if text_result <> 'unpaid' then
     raise exception 'Expected unpaid closed order payment status unpaid, got %', text_result;
   end if;
 
-  insert into public.customer_order (
+  insert into public."order" (
+    order_kind,
     customer_id,
     source,
-    order_status
+    order_status,
+    payment_status
   )
   values (
+    'customer',
     test_customer_id,
     'admin_manual',
-    'processing'
+    'processing',
+    'unpaid'
   )
   returning id into reseller_order_id;
 
-  insert into public.customer_order_item (
+  insert into public.order_item (
+    order_kind,
     order_id,
     product_id,
     partial_quantity,
     final_quantity
   )
   values (
+    'customer',
     reseller_order_id,
     test_product_id,
     1,
@@ -540,13 +564,13 @@ begin
     'phase-4-cancelled-refund'
   );
 
-  update public.customer_order
+  update public."order"
   set order_status = 'closed'
   where id = reseller_order_id;
 
   select payment_status
   into text_result
-  from public.customer_order
+  from public."order"
   where id = reseller_order_id;
 
   if text_result <> 'partial' then
@@ -555,7 +579,7 @@ begin
 
   blocked := false;
   begin
-    update public.customer_order
+    update public."order"
     set order_status = 'pending'
     where id = test_order_id;
   exception
@@ -569,7 +593,7 @@ begin
 
   select count(*)
   into row_count
-  from public.customer_order_status_history
+  from public.order_status_history
   where order_id = test_order_id;
 
   if row_count < 2 then

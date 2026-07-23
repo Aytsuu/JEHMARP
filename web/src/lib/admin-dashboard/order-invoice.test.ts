@@ -20,42 +20,15 @@ describe("order invoice helpers", () => {
 
   it("creates a sales invoice when the commission-adjusted receivable is fully paid", async () => {
     const invoiceInsert = vi.fn().mockResolvedValue({ error: null });
-    const orderUpdateEq = vi.fn().mockResolvedValue({ error: null });
-    const orderUpdate = vi.fn(() => ({ eq: orderUpdateEq }));
+    const orderQuery = createOrderUpdateChain();
+    const orderSelect = createOrderSelectChain(paidAgentOrder());
     const rpc = vi.fn();
-    const supabase = {
-      from(table: string) {
-        if (table === "invoice") {
-          return {
-            select: () => ({
-              eq: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({ data: null, error: null }),
-                }),
-              }),
-            }),
-            insert: invoiceInsert,
-          };
-        }
-
-        if (table === "customer_order") {
-          return {
-            update: orderUpdate,
-            select: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: paidAgentOrder(),
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      },
+    const supabase = createInvoiceSupabase({
+      invoiceInsert,
+      orderQuery,
+      orderSelect,
       rpc,
-    };
+    });
     mocks.createSupabaseAdminClient.mockReturnValue(supabase);
 
     await ensureSalesInvoiceWhenOrderFullyPaid(supabase as never, "order-id");
@@ -67,101 +40,47 @@ describe("order invoice helpers", () => {
         status: "issued",
       }),
     );
-    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+    expect(orderQuery.update).toHaveBeenCalledWith(expect.objectContaining({
       order_status: "closed",
       updated_at: expect.any(String),
     }));
-    expect(orderUpdateEq).toHaveBeenCalledWith("id", "order-id");
+    expect(orderQuery.eq).toHaveBeenCalledWith("id", "order-id");
   });
 
   it("does not create a sales invoice while the order receivable remains unpaid", async () => {
     const invoiceInsert = vi.fn();
-    const orderUpdate = vi.fn();
-    const supabase = {
-      from(table: string) {
-        if (table === "invoice") {
-          return {
-            select: () => ({
-              eq: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({ data: null, error: null }),
-                }),
-              }),
-            }),
-            insert: invoiceInsert,
-          };
-        }
-
-        if (table === "customer_order") {
-          return {
-            update: orderUpdate,
-            select: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: {
-                    ...paidAgentOrder(),
-                    payment: [{ amount: 800 }],
-                  },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      },
-    };
+    const orderQuery = createOrderUpdateChain();
+    const orderSelect = createOrderSelectChain({
+      ...paidAgentOrder(),
+      payment: [{ amount: 800 }],
+    });
+    const supabase = createInvoiceSupabase({
+      invoiceInsert,
+      orderQuery,
+      orderSelect,
+    });
     mocks.createSupabaseAdminClient.mockReturnValue(supabase);
 
     await ensureSalesInvoiceWhenOrderFullyPaid(supabase as never, "order-id");
 
     expect(invoiceInsert).not.toHaveBeenCalled();
-    expect(orderUpdate).not.toHaveBeenCalled();
+    expect(orderQuery.update).not.toHaveBeenCalled();
   });
 
   it("uses gross receivable for direct customer orders without an order agent link", async () => {
     const invoiceInsert = vi.fn().mockResolvedValue({ error: null });
-    const orderUpdateEq = vi.fn().mockResolvedValue({ error: null });
-    const orderUpdate = vi.fn(() => ({ eq: orderUpdateEq }));
-    const supabase = {
-      from(table: string) {
-        if (table === "invoice") {
-          return {
-            select: () => ({
-              eq: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({ data: null, error: null }),
-                }),
-              }),
-            }),
-            insert: invoiceInsert,
-          };
-        }
-
-        if (table === "customer_order") {
-          return {
-            update: orderUpdate,
-            select: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: {
-                    ...paidAgentOrder(),
-                    agent_id: null,
-                    agent_order_id: null,
-                    converted_to_agent_order_id: null,
-                    payment: [{ amount: 900 }],
-                  },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      },
-    };
+    const orderQuery = createOrderUpdateChain();
+    const orderSelect = createOrderSelectChain({
+      ...paidAgentOrder(),
+      agent_id: null,
+      parent_order_id: null,
+      payment: [{ amount: 900 }],
+    });
+    const supabase = createInvoiceSupabase({
+      invoiceInsert,
+      orderQuery,
+      orderSelect,
+    });
     mocks.createSupabaseAdminClient.mockReturnValue(supabase);
 
     await ensureSalesInvoiceWhenOrderFullyPaid(supabase as never, "order-id");
@@ -170,61 +89,39 @@ describe("order invoice helpers", () => {
       order_id: "order-id",
       status: "issued",
     }));
-    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+    expect(orderQuery.update).toHaveBeenCalledWith(expect.objectContaining({
       order_status: "closed",
     }));
   });
 
   it("closes a processing order when a sales invoice already exists and the receivable is fully paid", async () => {
     const invoiceInsert = vi.fn();
-    const orderUpdateEq = vi.fn().mockResolvedValue({ error: null });
-    const orderUpdate = vi.fn(() => ({ eq: orderUpdateEq }));
-    const supabase = {
-      from(table: string) {
-        if (table === "invoice") {
-          return {
-            select: () => ({
-              eq: () => ({
-                limit: () => ({
-                  maybeSingle: async () => ({ data: { id: "invoice-id" }, error: null }),
-                }),
-              }),
-            }),
-            insert: invoiceInsert,
-          };
-        }
-
-        if (table === "customer_order") {
-          return {
-            update: orderUpdate,
-            select: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: paidAgentOrder(),
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-
-        throw new Error(`Unexpected table: ${table}`);
-      },
-    };
+    const orderQuery = createOrderUpdateChain();
+    const orderSelect = createOrderSelectChain(paidAgentOrder());
+    const supabase = createInvoiceSupabase({
+      invoiceInsert,
+      existingInvoice: { id: "invoice-id" },
+      orderQuery,
+      orderSelect,
+    });
     mocks.createSupabaseAdminClient.mockReturnValue(supabase);
 
     await ensureSalesInvoiceWhenOrderFullyPaid(supabase as never, "order-id");
 
     expect(invoiceInsert).not.toHaveBeenCalled();
-    expect(orderUpdate).toHaveBeenCalledWith(expect.objectContaining({
+    expect(orderQuery.update).toHaveBeenCalledWith(expect.objectContaining({
       order_status: "closed",
       updated_at: expect.any(String),
     }));
-    expect(orderUpdateEq).toHaveBeenCalledWith("id", "order-id");
+    expect(orderQuery.eq).toHaveBeenCalledWith("id", "order-id");
   });
 
   it("creates a sales invoice before confirming a full agent payment", async () => {
     const invoiceInsert = vi.fn().mockResolvedValue({ error: null });
+    const orderSelect = createOrderSelectChain({
+      ...paidAgentOrder(),
+      payment: [],
+    });
     const supabase = {
       from(table: string) {
         if (table === "agent_received_payment") {
@@ -253,19 +150,9 @@ describe("order invoice helpers", () => {
           };
         }
 
-        if (table === "customer_order") {
+        if (table === "order") {
           return {
-            select: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: {
-                    ...paidAgentOrder(),
-                    payment: [],
-                  },
-                  error: null,
-                }),
-              }),
-            }),
+            select: orderSelect.select,
           };
         }
 
@@ -284,10 +171,9 @@ function paidAgentOrder() {
   return {
     order_status: "processing",
     agent_id: "agent-id",
-    agent_order_id: null,
-    converted_to_agent_order_id: null,
+    parent_order_id: null,
     payment: [{ amount: 840 }],
-    customer_order_item: [
+    order_item: [
       {
         final_quantity: 3,
         unit_price: 300,
@@ -298,5 +184,61 @@ function paidAgentOrder() {
         },
       },
     ],
+  };
+}
+
+function createOrderSelectChain(data: unknown) {
+  const maybeSingle = vi.fn(async () => ({ data, error: null }));
+  const eq = vi.fn(() => ({ maybeSingle }));
+  const select = vi.fn(() => ({ eq }));
+  return { select, eq, maybeSingle };
+}
+
+function createOrderUpdateChain() {
+  const eq = vi.fn().mockResolvedValue({ error: null });
+  const update = vi.fn(() => ({ eq }));
+  return { update, eq };
+}
+
+function createInvoiceSupabase(options: {
+  invoiceInsert?: ReturnType<typeof vi.fn>;
+  existingInvoice?: { id: string } | null;
+  orderQuery?: ReturnType<typeof createOrderUpdateChain>;
+  orderSelect?: ReturnType<typeof createOrderSelectChain>;
+  rpc?: ReturnType<typeof vi.fn>;
+}) {
+  const invoiceInsert = options.invoiceInsert ?? vi.fn();
+  const orderQuery = options.orderQuery ?? createOrderUpdateChain();
+  const orderSelect = options.orderSelect ?? createOrderSelectChain(paidAgentOrder());
+  const rpc = options.rpc ?? vi.fn();
+
+  return {
+    from(table: string) {
+      if (table === "invoice") {
+        return {
+          select: () => ({
+            eq: () => ({
+              limit: () => ({
+                maybeSingle: async () => ({
+                  data: options.existingInvoice ?? null,
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+          insert: invoiceInsert,
+        };
+      }
+
+      if (table === "order") {
+        return {
+          update: orderQuery.update,
+          select: orderSelect.select,
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    },
+    rpc,
   };
 }

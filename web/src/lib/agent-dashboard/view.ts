@@ -2,7 +2,7 @@ import type { AgentDashboardData, AgentOrder, AgentOrderCluster, AgentPaymentSum
 
 export type AgentMyOrderCandidate = Pick<
   AgentOrder,
-  "agent_id" | "agent_order_id" | "converted_to_agent_order_id"
+  "agent_id" | "parent_order_id"
 >;
 
 export function isAgentMyOrder(
@@ -16,7 +16,7 @@ export function isAgentMyStandaloneOrder(
   order: AgentMyOrderCandidate,
   agent: Pick<AgentProfile, "id">,
 ) {
-  if (order.agent_order_id || order.converted_to_agent_order_id) {
+  if (order.parent_order_id) {
     return false;
   }
 

@@ -170,9 +170,7 @@ describe("orderCommissionTotal", () => {
   it("uses product default commission for promoted customer processing orders attached to the new agent", () => {
     const order = {
       agent_id: "agent-1",
-      agent_order_id: null,
-      converted_to_agent_order_id: null,
-      customer: {
+      parent_order_id: null,      customer: {
         promoted_to_agent_id: "agent-1",
       },
       customer_order_item: [
@@ -195,9 +193,7 @@ describe("orderCommissionTotal", () => {
   it("does not use commission for direct customer orders just because the customer has an assigned agent", () => {
     const order = {
       agent_id: null,
-      agent_order_id: null,
-      converted_to_agent_order_id: null,
-      customer: {
+      parent_order_id: null,      customer: {
         assigned_agent_id: "agent-1",
       },
       customer_order_item: [
@@ -221,9 +217,7 @@ describe("orderCommissionTotal", () => {
   it("does not use product default commission for regular customer orders", () => {
     const order = {
       agent_id: null,
-      agent_order_id: null,
-      converted_to_agent_order_id: null,
-      customer_order_item: [
+      parent_order_id: null,      customer_order_item: [
         {
           final_quantity: 3,
           unit_price: 300,
@@ -442,9 +436,7 @@ describe("canConvertPromotedCustomerOrderToDistribution", () => {
     invoice: [],
     order_status: "processing",
     payment_status: "unpaid",
-    agent_order_id: null,
-    converted_to_agent_order_id: null,
-  } as unknown as AdminOrder;
+    parent_order_id: null,  } as unknown as AdminOrder;
 
   it("allows unpaid promoted customer orders without payment records", () => {
     expect(canConvertPromotedCustomerOrderToDistribution(baseOrder, "agent-1")).toBe(true);
@@ -501,7 +493,8 @@ describe("canConvertPromotedCustomerOrderToDistribution", () => {
     expect(getCustomerOrderDistributionConversionBlockReason(baseOrder, null)).toBe("Not promoted");
     expect(getCustomerOrderDistributionConversionBlockReason({
       ...baseOrder,
-      converted_to_agent_order_id: "agent-order-1",
+      parent_order_id: "agent-order-1",
+      converted_at: "2026-07-01T00:00:00.000Z",
     } as AdminOrder, "agent-1")).toBe("Converted");
     expect(getCustomerOrderDistributionConversionBlockReason({
       ...baseOrder,

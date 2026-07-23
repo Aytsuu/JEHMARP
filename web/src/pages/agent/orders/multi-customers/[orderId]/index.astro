@@ -193,7 +193,7 @@ const customerCount = agentOrder.customer_order.length;
         <circle cx="12" cy="12" r="9"></circle>
         <path d="M12 7v5l3 2"></path>
       </svg>
-      <span class="record-meta__text">Release {formatDate(agentOrder.release_date)}</span>
+      <span class="record-meta__text">Release {formatDate(agentOrder.release_date ?? null)}</span>
     </li>
   </ul>
 
