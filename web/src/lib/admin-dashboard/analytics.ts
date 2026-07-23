@@ -5,9 +5,12 @@ import {
   orderPaymentTotal,
   orderReceivableTotal,
   orderTotal,
+  formatDate,
 } from "./view";
+import { formatOrderCode } from "@/lib/order-detail-nav";
 
 import type {
+  AdminAgentOrder,
   AdminContactInquiry,
   AdminCustomer,
   AdminDashboardData,
@@ -125,9 +128,21 @@ export type OrderStatusOverviewMetric = {
   color: string;
 };
 
+export type OrderStatusRecentUpdate = {
+  id: string;
+  orderCode: string;
+  partyLabel: string;
+  statusLabel: string;
+  statusColor: string;
+  updatedAt: string;
+  updatedLabel: string;
+  href: string;
+};
+
 export type OrderStatusOverview = {
   totalOrders: number;
   statuses: OrderStatusOverviewMetric[];
+  recentUpdates: OrderStatusRecentUpdate[];
 };
 
 export type AdminAnalytics = {
@@ -218,7 +233,7 @@ export function buildAdminAnalytics(
       label: status,
       count: data.orders.filter((order) => order.payment_status === status).length,
     })),
-    orderStatusOverview: buildOrderStatusOverview(data.summary),
+    orderStatusOverview: buildOrderStatusOverview(data, now),
     topProducts: buildProductSales(data, completedPaidOrders).slice(0, 5),
     salesByCategory: buildCategorySales(data, completedPaidOrders),
     weeklyProductOrders: buildWeeklyProductOrders(data, now),
@@ -232,37 +247,136 @@ export function buildAdminAnalytics(
 }
 
 function buildOrderStatusOverview(
-  summary: AdminDashboardData["summary"],
+  data: AdminDashboardData,
+  now: Date,
 ): OrderStatusOverview {
   return {
-    totalOrders: summary.totalOrders,
+    totalOrders: data.summary.totalOrders,
     statuses: [
       {
         key: "pending_order",
         label: "Pending Order",
-        count: summary.pendingOrder,
+        count: data.summary.pendingOrder,
         color: "#f97316",
       },
       {
         key: "pending_customers",
         label: "Pending Customer",
-        count: summary.pendingCustomer,
+        count: data.summary.pendingCustomer,
         color: "#ecb55d",
       },
       {
         key: "processing",
         label: "Processing",
-        count: summary.processing,
+        count: data.summary.processing,
         color: "#2563eb",
       },
       {
         key: "closed",
         label: "Closed",
-        count: summary.closed,
+        count: data.summary.closed,
         color: "#10b981",
       },
     ],
+    recentUpdates: buildRecentOrderStatusUpdates(data, now),
   };
+}
+
+const orderStatusPresentation: Record<
+  string,
+  Pick<OrderStatusOverviewMetric, "label" | "color">
+> = {
+  pending: { label: "Pending Order", color: "#f97316" },
+  pending_order: { label: "Pending Order", color: "#f97316" },
+  pending_customers: { label: "Pending Customer", color: "#ecb55d" },
+  processing: { label: "Processing", color: "#2563eb" },
+  closed: { label: "Closed", color: "#10b981" },
+};
+
+export function formatOrderStatusRelativeUpdate(
+  value: string,
+  now = new Date(),
+): string {
+  const differenceMs = now.getTime() - new Date(value).getTime();
+
+  if (differenceMs < 60_000) {
+    return "Just now";
+  }
+
+  const minutes = Math.floor(differenceMs / 60_000);
+
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+
+  const days = Math.floor(hours / 24);
+
+  if (days < 7) {
+    return `${days}d ago`;
+  }
+
+  return formatDate(value);
+}
+
+function buildRecentOrderStatusUpdates(
+  data: AdminDashboardData,
+  now: Date,
+): OrderStatusRecentUpdate[] {
+  const customerUpdates = data.orders.map((order) => ({
+    id: order.id,
+    updatedAt: order.updated_at,
+    orderStatus: order.order_status,
+    partyLabel: fullName(
+      order.customer ?? data.customers.find((customer) => customer.id === order.customer_id) ?? null,
+    ),
+    href: `/admin/orders/customer/${order.id}`,
+  }));
+  const agentUpdates = data.agentOrders.map((order) => ({
+    id: order.id,
+    updatedAt: order.updated_at,
+    orderStatus: order.order_status,
+    partyLabel: getAgentOrderPartyLabel(order, data),
+    href: `/admin/orders/agent/${order.id}`,
+  }));
+
+  return [...customerUpdates, ...agentUpdates]
+    .sort(
+      (left, right) =>
+        new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+    )
+    .slice(0, 2)
+    .map((update) => {
+      const presentation = orderStatusPresentation[update.orderStatus] ?? {
+        label: update.orderStatus,
+        color: "#6b7280",
+      };
+
+      return {
+        id: update.id,
+        orderCode: formatOrderCode(update.id),
+        partyLabel: update.partyLabel,
+        statusLabel: presentation.label,
+        statusColor: presentation.color,
+        updatedAt: update.updatedAt,
+        updatedLabel: formatOrderStatusRelativeUpdate(update.updatedAt, now),
+        href: update.href,
+      };
+    });
+}
+
+function getAgentOrderPartyLabel(
+  order: AdminAgentOrder,
+  data: AdminDashboardData,
+): string {
+  return order.agent?.display_name
+    ?? data.agents.find((agent) => agent.id === order.agent_id)?.display_name
+    ?? "Unassigned agent";
 }
 
 function buildSalesPeriods(

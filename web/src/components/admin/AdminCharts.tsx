@@ -179,11 +179,10 @@ function WeeklyProductTooltip({ active, payload }: TooltipContentProps) {
                 {formatQuantity(product.currentQuantity)}
                 {product.quantityDifference !== 0 && (
                   <small
-                    className={`ml-1 font-bold ${
-                      product.quantityDifference > 0
+                    className={`ml-1 font-bold ${product.quantityDifference > 0
                         ? "text-emerald-700"
                         : "text-red-700"
-                    }`}
+                      }`}
                   >
                     {formatSignedQuantity(product.quantityDifference)}
                   </small>
@@ -206,9 +205,8 @@ function TrendArrow({ value }: { value: number }) {
 
   return (
     <span
-      className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${
-        value > 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-      }`}
+      className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${value > 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
+        }`}
       aria-hidden="true"
     >
       <svg
@@ -363,27 +361,27 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
 
   const singleAgentChartData = selectedAgentData
     ? [
-        {
-          name: "Gross Sales",
-          amount: selectedAgentData.grossSales,
-          fill: colors.brandRed,
-        },
-        {
-          name: "Paid Amount",
-          amount: selectedAgentData.paidAmount,
-          fill: colors.emerald,
-        },
-        {
-          name: "Commission Earned",
-          amount: selectedAgentData.earnedCommission,
-          fill: colors.brandGold,
-        },
-        {
-          name: "Expected Commission",
-          amount: selectedAgentData.expectedCommission,
-          fill: colors.orange,
-        },
-      ]
+      {
+        name: "Gross Sales",
+        amount: selectedAgentData.grossSales,
+        fill: colors.brandRed,
+      },
+      {
+        name: "Paid Amount",
+        amount: selectedAgentData.paidAmount,
+        fill: colors.emerald,
+      },
+      {
+        name: "Commission Earned",
+        amount: selectedAgentData.earnedCommission,
+        fill: colors.brandGold,
+      },
+      {
+        name: "Expected Commission",
+        amount: selectedAgentData.expectedCommission,
+        fill: colors.orange,
+      },
+    ]
     : [];
 
   return (
@@ -403,21 +401,19 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
               <div className="inline-flex h-fit self-start rounded-lg border border-gray-300 bg-gray-50 p-1 sm:self-auto">
                 <button
                   onClick={() => setSalesPeriod("month")}
-                  className={`chart-tab-btn ${
-                    salesPeriod === "month"
+                  className={`chart-tab-btn ${salesPeriod === "month"
                       ? "active shadow-sm"
                       : "!text-gray-600 hover:!text-gray-900 hover:bg-gray-200/50"
-                  }`}
+                    }`}
                 >
                   Monthly
                 </button>
                 <button
                   onClick={() => setSalesPeriod("day")}
-                  className={`chart-tab-btn ${
-                    salesPeriod === "day"
+                  className={`chart-tab-btn ${salesPeriod === "day"
                       ? "active shadow-sm"
                       : "!text-gray-600 hover:!text-gray-900 hover:bg-gray-200/50"
-                  }`}
+                    }`}
                 >
                   Daily
                 </button>
@@ -479,7 +475,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
             </div>
           </div>
 
-          <div className="rounded-xl border border-gray-300 bg-white p-6">
+          <div className="flex flex-col rounded-xl border border-gray-300 bg-white p-6">
             <h3 className="text-lg font-bold text-gray-900">Order Status</h3>
             <p className="mt-1 text-sm text-gray-500">
               Distribution across active order stages
@@ -542,6 +538,57 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                 </p>
               </div>
             </div>
+
+            {orderStatusOverview.recentUpdates.length > 0 ? (
+              <div className="relative mt-5 border-t border-gray-100 pt-4">
+                <ul
+                  className="relative space-y-0.5 pb-1"
+                  aria-label="Recently updated orders"
+                >
+                  {orderStatusOverview.recentUpdates.map((update, index) => {
+                    const opacity = index === 0 ? 1 : 0.55;
+
+                    return (
+                      <li key={update.id} style={{ opacity }}>
+                        <a
+                          href={update.href}
+                          className="flex items-center justify-between gap-3 rounded-lg px-1 py-1.5 text-sm transition-colors hover:bg-gray-50"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-gray-900">
+                              {update.orderCode}
+                            </p>
+                            <p className="truncate text-xs text-gray-500">
+                              {update.partyLabel}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <span
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold"
+                              style={{ color: update.statusColor }}
+                            >
+                              <span
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{ backgroundColor: update.statusColor }}
+                                aria-hidden="true"
+                              />
+                              {update.statusLabel}
+                            </span>
+                            <p className="mt-0.5 text-[0.68rem] text-gray-400">
+                              {update.updatedLabel}
+                            </p>
+                          </div>
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+                <div
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-white/0 via-white/70 to-white"
+                  aria-hidden="true"
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -570,11 +617,10 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                 </div>
                 {weeklyPeakDay.quantityDifference !== 0 && (
                   <div
-                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-extrabold ${
-                      weeklyPeakDay.quantityDifference > 0
+                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-extrabold ${weeklyPeakDay.quantityDifference > 0
                         ? "bg-emerald-50 text-emerald-700"
                         : "bg-red-50 text-red-700"
-                    }`}
+                      }`}
                   >
                     <TrendArrow value={weeklyPeakDay.quantityDifference} />
                     {formatSignedQuantity(weeklyPeakDay.quantityDifference)}
@@ -641,11 +687,10 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                       </span>
                       {day.quantityDifference !== 0 && (
                         <span
-                          className={`inline-flex items-center gap-1 text-xs font-extrabold ${
-                            day.quantityDifference > 0
+                          className={`inline-flex items-center gap-1 text-xs font-extrabold ${day.quantityDifference > 0
                               ? "text-emerald-700"
                               : "text-red-700"
-                          }`}
+                            }`}
                         >
                           <TrendArrow value={day.quantityDifference} />
                           {formatSignedQuantity(day.quantityDifference)}
@@ -782,11 +827,10 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                 role="tab"
                 aria-selected={recentActivityTab === tab.id}
                 onClick={() => setRecentActivityTab(tab.id)}
-                className={`chart-tab-btn whitespace-nowrap ${
-                  recentActivityTab === tab.id
+                className={`chart-tab-btn whitespace-nowrap ${recentActivityTab === tab.id
                     ? "active shadow-sm"
                     : "!text-gray-600 hover:!text-gray-900 hover:bg-gray-200/50"
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -821,11 +865,10 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                       <td className="text-gray-700">{customer.phone_number}</td>
                       <td>
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                            customer.is_reseller
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${customer.is_reseller
                               ? "bg-amber-100 text-amber-800"
                               : "bg-blue-100 text-blue-800"
-                          }`}
+                            }`}
                         >
                           {customer.is_reseller ? "Reseller" : "Retail"}
                         </span>
@@ -1014,11 +1057,10 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                 <button
                   key={agent.label}
                   onClick={() => setSelectedAgentLabel(agent.label)}
-                  className={`w-full cursor-pointer truncate px-2 py-1.5 text-left text-sm font-semibold transition-all !justify-start ${
-                    selectedAgentLabel === agent.label
+                  className={`w-full cursor-pointer truncate px-2 py-1.5 text-left text-sm font-semibold transition-all !justify-start ${selectedAgentLabel === agent.label
                       ? "text-[#661818] underline"
                       : "text-gray-600 hover:text-[#661818]"
-                  }`}
+                    }`}
                   style={{
                     transform: "none",
                     background: "none",
