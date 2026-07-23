@@ -39,6 +39,28 @@ describe("buildAdminAnalytics", () => {
         { key: "processing", label: "Processing", count: 1, color: "#2563eb" },
         { key: "closed", label: "Closed", count: 1, color: "#10b981" },
       ],
+      recentUpdates: [
+        {
+          id: "order-1",
+          orderCode: "Order-ORDER-",
+          partyLabel: "Assigned Customer",
+          statusLabel: "Processing",
+          statusColor: "#2563eb",
+          updatedAt: "2026-07-04T11:30:00.000Z",
+          updatedLabel: "30m ago",
+          href: "/admin/orders/customer/order-1",
+        },
+        {
+          id: "order-2",
+          orderCode: "Order-ORDER-",
+          partyLabel: "Assigned Customer",
+          statusLabel: "Closed",
+          statusColor: "#10b981",
+          updatedAt: "2026-07-04T10:00:00.000Z",
+          updatedLabel: "2h ago",
+          href: "/admin/orders/customer/order-2",
+        },
+      ],
     });
     expect(analytics.paymentsByStatus.find((item) => item.label === "partial")).toEqual({
       label: "partial",
@@ -367,6 +389,7 @@ function createAnalyticsData(): AdminDashboardData {
         status: "processing",
         paymentStatus: "partial",
         createdAt: "2026-07-04T09:00:00.000Z",
+        updatedAt: "2026-07-04T11:30:00.000Z",
         paymentAmounts: [110],
         items: [
           item("product-chicken", "Chicken Thigh", "chicken", 2, 90, 60, false),
@@ -379,6 +402,7 @@ function createAnalyticsData(): AdminDashboardData {
         status: "closed",
         paymentStatus: "paid",
         createdAt: "2026-07-03T10:00:00.000Z",
+        updatedAt: "2026-07-04T10:00:00.000Z",
         paymentAmounts: [120],
         items: [
           item("product-chicken", "Chicken Thigh", "chicken", 1, 90, 50, true),
@@ -393,6 +417,7 @@ function createAnalyticsData(): AdminDashboardData {
         status: "processing",
         paymentStatus: "paid",
         createdAt: "2026-06-28T11:00:00.000Z",
+        updatedAt: "2026-07-03T08:00:00.000Z",
         paymentAmounts: [80],
         items: [
           item("product-pork", "Pork Belly", "pork", 1, 80, 0, false),
@@ -495,6 +520,7 @@ function order(params: {
   status: "pending" | "processing" | "closed";
   paymentStatus: "unpaid" | "partial" | "paid";
   createdAt: string;
+  updatedAt?: string;
   paymentAmounts: number[];
   items: AdminOrderItem[];
 }): AdminOrder {
@@ -510,7 +536,7 @@ function order(params: {
     notes: null,
     approved_at: params.createdAt,
     created_at: params.createdAt,
-    updated_at: params.createdAt,
+    updated_at: params.updatedAt ?? params.createdAt,
     agent: params.agentId
       ? {
           id: params.agentId,
