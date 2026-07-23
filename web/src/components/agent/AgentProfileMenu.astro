@@ -15,15 +15,20 @@ function isProfileSectionActive(href: string) {
         const isCurrent = !item.isAction && isProfileSectionActive(item.href);
 
         return item.isAction ? (
-          <form class="agent-profile-menu__form" method="post" action={item.href} data-astro-reload>
-            <button type="submit" class="agent-profile-menu__item agent-profile-menu__item--action">
+          <div class="agent-profile-menu__form">
+            <button
+              type="button"
+              class="agent-profile-menu__item agent-profile-menu__item--action"
+              data-open-alert-dialog="dashboard-logout-dialog"
+              data-alert-dialog-form="dashboard-logout-form"
+            >
               <span class="agent-profile-menu__icon" set:html={item.icon} />
               <span class="agent-profile-menu__copy">
                 <strong>{item.label}</strong>
                 <small>Sign out of your agent account</small>
               </span>
             </button>
-          </form>
+          </div>
         ) : (
           <a
             href={item.href}

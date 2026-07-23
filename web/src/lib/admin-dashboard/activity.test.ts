@@ -181,6 +181,7 @@ function createAdminDashboardData(): AdminDashboardData {
       created_at: "2026-07-04T14:00:00.000Z",
       updated_at: "2026-07-04T14:00:00.000Z",
     }],
+    readAdminNotificationIds: [],
     summary: {
       totalOrders: 1,
       pendingOrders: 0,

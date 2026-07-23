@@ -6,6 +6,7 @@ import Sheet from "@/components/ui/Sheet.astro";
 import {
   formatAdminActionFeedback,
   handleAdminDashboardAction,
+  markAdminRegularCheckNotificationsReadForCustomer,
 } from "@/lib/admin-dashboard/actions";
 import { loadAdminCustomerRecord, loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
@@ -38,12 +39,23 @@ if (Astro.request.method === "POST") {
   );
 }
 
-const data = await loadAdminDashboardData();
+let data = await loadAdminDashboardData();
 const customer = data.customers.find((c) => c.id === customerId)
   ?? (customerId ? await loadAdminCustomerRecord(customerId) : null);
 
 if (!customer) {
   return Astro.redirect("/admin/customers", 302);
+}
+
+if (customerId) {
+  await markAdminRegularCheckNotificationsReadForCustomer(
+    Astro,
+    customerId,
+    adminRoute.userId,
+    data.orders,
+    data.customers,
+  );
+  data = await loadAdminDashboardData();
 }
 
 const customerOrders = data.orders.filter((order) => order.customer_id === customerId);

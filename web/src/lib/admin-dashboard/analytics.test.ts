@@ -450,6 +450,7 @@ function createAnalyticsData(): AdminDashboardData {
       created_at: "2026-07-04T08:30:00.000Z",
       updated_at: "2026-07-04T08:30:00.000Z",
     }],
+    readAdminNotificationIds: [],
     summary: {
       totalOrders: 3,
       pendingOrders: 1,

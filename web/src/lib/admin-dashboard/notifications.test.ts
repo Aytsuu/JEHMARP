@@ -45,6 +45,8 @@ describe("admin notifications", () => {
           created_at: "2026-07-07T00:00:00.000Z",
         },
       ],
+      customers: [],
+      readAdminNotificationIds: [],
     } as unknown as Parameters<typeof getAdminUnreadNotificationIds>[0];
 
     expect(getAdminUnreadNotificationIds(data)).toEqual([
@@ -90,6 +92,8 @@ describe("admin notifications", () => {
           created_at: "2026-07-07T02:00:00.000Z",
         },
       ],
+      customers: [],
+      readAdminNotificationIds: [],
     } as unknown as Parameters<typeof buildAdminNotifications>[0];
 
     expect(buildAdminNotifications(data).map((notification) => notification.id)).toEqual([
@@ -113,10 +117,78 @@ describe("admin notifications", () => {
         },
       ],
       contactInquiries: [],
+      customers: [],
+      readAdminNotificationIds: [],
     } as unknown as Parameters<typeof getAdminUnreadNotificationIds>[0];
 
     expect(getUnreadAdminOrderIds(data)).toEqual([]);
     expect(getAdminUnreadNotificationIds(data)).toEqual([]);
+  });
+
+  it("includes regular check notifications for aged unpaid orders", () => {
+    const now = new Date("2026-07-23T12:00:00.000Z");
+    const data = {
+      resellerApplications: [],
+      orders: [
+        {
+          id: "order-unpaid",
+          customer_id: "customer-1",
+          order_status: "processing",
+          source: "guest_shop",
+          payment_status: "unpaid",
+          approved_at: "2026-07-15T12:00:00.000Z",
+          created_at: "2026-07-15T12:00:00.000Z",
+          updated_at: "2026-07-15T12:00:00.000Z",
+          admin_read_at: null,
+          customer: {
+            first_name: "Ada",
+            last_name: "Buyer",
+          },
+          customer_order_item: [
+            {
+              id: "item-1",
+              quantity: 1,
+              final_quantity: 1,
+              unit_price: 100,
+              agent_commission_amount: 0,
+            },
+          ],
+          payment: [],
+          invoice: [],
+        },
+      ],
+      contactInquiries: [],
+      customers: [
+        {
+          id: "customer-1",
+          first_name: "Ada",
+          last_name: "Buyer",
+        },
+      ],
+      readAdminNotificationIds: [],
+    } as unknown as Parameters<typeof buildAdminNotifications>[0];
+
+    const notifications = buildAdminNotifications(data, now);
+
+    expect(notifications).toEqual([
+      expect.objectContaining({
+        id: "unpaid-check-customer-1-1w",
+        type: "Regular Check",
+        isUnread: true,
+        message: "Ada Buyer has 1 unpaid order at 1 week unpaid.",
+      }),
+    ]);
+    expect(getAdminUnreadNotificationIds(data, now)).toEqual([
+      "unpaid-check-customer-1-1w",
+    ]);
+
+    const readData = {
+      ...data,
+      readAdminNotificationIds: ["unpaid-check-customer-1-1w"],
+    } as unknown as Parameters<typeof buildAdminNotifications>[0];
+
+    expect(getAdminUnreadNotificationIds(readData, now)).toEqual([]);
+    expect(buildAdminNotifications(readData, now)[0]?.isUnread).toBe(false);
   });
 
   it("excludes records that have been marked read by an admin", () => {
@@ -152,6 +224,8 @@ describe("admin notifications", () => {
           created_at: "2026-07-07T00:00:00.000Z",
         },
       ],
+      customers: [],
+      readAdminNotificationIds: [],
     } as unknown as Parameters<typeof getAdminUnreadNotificationIds>[0];
 
     expect(getUnreadAdminResellerApplicationIds(data)).toEqual([]);
@@ -170,6 +244,8 @@ describe("admin notifications", () => {
       resellerApplications: [],
       orders: [],
       contactInquiries: [],
+      customers: [],
+      readAdminNotificationIds: [],
     } as unknown as Parameters<typeof getAdminUnreadNotificationIds>[0];
 
     const notifications = buildAdminNotifications(data);

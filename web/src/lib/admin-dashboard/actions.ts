@@ -36,6 +36,13 @@ import {
   type ProfileIdentitySupabaseClient,
 } from "@/lib/profile-identity";
 import { logDevelopmentActionError } from "@/lib/request-logger";
+import {
+  getRegularCheckNotificationIdsForCustomer,
+  upsertAdminNotificationRead,
+  upsertAdminNotificationReads,
+} from "./admin-notification-read";
+import { loadCustomers, loadOrders } from "./data";
+import { getUnpaidOrderCheckNotificationIds } from "./unpaid-order-checks";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PRODUCT_IMAGE_BUCKET, isManagedStoragePath } from "@/lib/supabase/storage";
@@ -591,6 +598,30 @@ export async function markUnreadAdminOrdersRead(
   if (failedResult?.error) {
     throw new Error("Unable to mark orders as read.");
   }
+}
+
+export async function markAdminRegularCheckNotificationsReadForCustomer(
+  context: Pick<APIContext, "cookies" | "request">,
+  customerId: string,
+  adminUserId: string,
+  orders: Parameters<typeof getRegularCheckNotificationIdsForCustomer>[1],
+  customers: Parameters<typeof getRegularCheckNotificationIdsForCustomer>[2],
+) {
+  const notificationIds = getRegularCheckNotificationIdsForCustomer(
+    customerId,
+    orders,
+    customers,
+  );
+
+  if (notificationIds.length === 0) {
+    return;
+  }
+
+  await upsertAdminNotificationReads(
+    createSupabaseServerClient(context),
+    notificationIds,
+    adminUserId,
+  );
 }
 
 export async function markAdminOrderReadIfUnread(
@@ -3135,6 +3166,11 @@ async function markAdminNotificationRead(
   notificationId: string,
   adminUserId: string,
 ) {
+  if (notificationId.startsWith("unpaid-check-")) {
+    await upsertAdminNotificationRead(supabase, notificationId, adminUserId);
+    return;
+  }
+
   const target = adminNotificationTarget(notificationId);
 
   await markAdminRecordRead(
@@ -3174,6 +3210,17 @@ async function markAllAdminNotificationsRead(
   if (failedResult?.error) {
     throw new Error("Unable to mark admin notifications as read.");
   }
+
+  const [orders, customers] = await Promise.all([
+    loadOrders(supabase, 200),
+    loadCustomers(supabase),
+  ]);
+
+  await upsertAdminNotificationReads(
+    supabase,
+    getUnpaidOrderCheckNotificationIds(orders, customers),
+    adminUserId,
+  );
 }
 
 function adminNotificationTarget(notificationId: string): {

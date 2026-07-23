@@ -2,6 +2,7 @@
 import type { NavigationItem } from "@/config/navigation";
 import AgentMobileChrome from "@/components/agent/AgentMobileChrome.astro";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar.astro";
+import AlertDialog from "@/components/ui/AlertDialog.astro";
 import type { DashboardSidebarUnreadBadge } from "@/lib/dashboard/sidebar-navigation";
 import Sheet from "@/components/ui/Sheet.astro";
 import { ClientRouter } from "astro:transitions";
@@ -159,6 +160,22 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
     <!-- Drawer Sheet Component -->
     <Sheet header="Manage" content="" />
 
+    <form
+      id="dashboard-logout-form"
+      method="post"
+      action="/api/logout"
+      data-astro-reload
+      hidden
+    ></form>
+    <AlertDialog
+      id="dashboard-logout-dialog"
+      title="Sign out?"
+      description="You will need to sign in again to access your dashboard."
+      confirmLabel="Sign out"
+      cancelLabel="Stay signed in"
+      variant="danger"
+    />
+
     <div class="cell-popover" id="cell-popover" aria-hidden="true">
       <div class="cell-popover__card">
         <header class="cell-popover__header">
@@ -208,6 +225,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
 
     <script>
       import { initDashboardCellPopovers } from "@/lib/client/dashboard-cell-popover";
+      import { initDashboardAlertDialogs } from "@/lib/client/dashboard-alert-dialog";
       import { initDashboardModals } from "@/lib/client/dashboard-modal";
       import { initDashboardSheets } from "@/lib/client/dashboard-sheet";
       import { initDashboardNavNavigation } from "@/lib/client/dashboard-nav";
@@ -544,6 +562,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
         initDashboardNavNavigation();
         initDashboardRouteLoading();
         initDashboardModals();
+        initDashboardAlertDialogs();
         initSidebarUnreadBadges();
         initDashboardSheets();
         initDashboardCellPopovers();
