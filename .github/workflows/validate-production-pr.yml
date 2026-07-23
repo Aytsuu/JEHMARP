@@ -67,7 +67,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
         with:
-          version: 2.101.0
+          version: 2.109.1
 
       - name: Show Supabase CLI version
         run: supabase --version
@@ -85,10 +85,31 @@ jobs:
         run: bash supabase/tests/run.sh
 
       - name: Link production Supabase project
-        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "$SUPABASE_DB_PASSWORD"
+        id: supabase_link
+        continue-on-error: true
+        run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
 
       - name: Check pending production migrations
-        run: supabase db push --linked --dry-run --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+          SUPABASE_DB_PUSH_DRY_RUN: "true"
+        run: |
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            export SUPABASE_LINKED=true
+          else
+            export SUPABASE_LINKED=false
+          fi
+          bash .github/scripts/supabase-db-push-remote.sh
 
       - name: Show migration status
-        run: supabase migration list --linked
+        env:
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            supabase migration list --linked --dns-resolver https
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            supabase migration list --db-url "$SUPABASE_DB_POOLER_URL" --dns-resolver https
+          else
+            echo "Skipping migration list because Supabase link failed."
+            exit 1
+          fi

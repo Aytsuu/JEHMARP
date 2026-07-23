@@ -35,13 +35,13 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
         with:
-          version: 2.101.0
+          version: 2.109.1
 
       - name: Show Supabase CLI version
         run: supabase --version
 
       - name: Link production Supabase project
-        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "$SUPABASE_DB_PASSWORD"
+        run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
 
       - name: Create backup directory
         run: mkdir -p backups

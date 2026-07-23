@@ -115,7 +115,7 @@ jobs:
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
         with:
-          version: 2.101.0
+          version: 2.109.1
 
       - name: Show Supabase CLI version
         run: supabase --version
@@ -134,8 +134,19 @@ jobs:
 
       - name: Link production Supabase project for dev to main checks
         if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
-        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" --password "$SUPABASE_DB_PASSWORD"
+        id: supabase_link
+        continue-on-error: true
+        run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
 
       - name: Dry-run production migrations for dev to main checks
         if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
-        run: supabase db push --linked --dry-run --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+          SUPABASE_DB_PUSH_DRY_RUN: "true"
+        run: |
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            export SUPABASE_LINKED=true
+          else
+            export SUPABASE_LINKED=false
+          fi
+          bash .github/scripts/supabase-db-push-remote.sh
