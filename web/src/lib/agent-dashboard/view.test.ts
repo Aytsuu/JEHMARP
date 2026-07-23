@@ -26,6 +26,7 @@ function createAgentProfile(overrides: Partial<AgentProfile> = {}): AgentProfile
   return {
     id: agentId,
     user_id: "22222222-2222-2222-2222-222222222222",
+    customer_id: null,
     employee_id: "EMP-001",
     first_name: "NMC",
     last_name: "Agent",

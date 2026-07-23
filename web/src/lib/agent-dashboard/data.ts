@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { throwLoadError } from "@/lib/load-error";
 import {
   agentWithProfileSelect,
-  customerWithProfileSelectBasic,
+  customerWithProfileSelect,
   mapAgentWithProfile,
   mapCustomerWithProfile,
   mapNestedOrderCustomer,
@@ -477,7 +477,7 @@ async function loadAgentProfile(supabase: SupabaseServerClient, userId: string) 
 async function loadAssignedCustomers(supabase: SupabaseServerClient) {
   const { data, error } = await supabase
     .from("customer")
-    .select(customerWithProfileSelectBasic)
+    .select(customerWithProfileSelect)
     .order("created_at", { ascending: false });
 
   if (error) throwLoadError("Unable to load assigned customers.", error);

@@ -60,7 +60,11 @@ export async function executeAgentProfileUpdate(
   await assertAgentContactIsAvailable(adminClient, fields.contact, agentId);
   await assertAgentEmailIsAvailable(adminClient, fields.email, agent.user_id);
 
-  await updateAgentWithProfile(adminClient, agentId, String(agent.profile_id), {
+  await updateAgentWithProfile(
+    adminClient,
+    agentId,
+    String(agent.profile_id),
+    {
     employee_id: fields.employee_id,
     first_name: fields.first_name,
     last_name: fields.last_name,

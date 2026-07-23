@@ -528,28 +528,6 @@ function enumValue<T extends string>(
   return found;
 }
 
-function optionalDateString(formData: FormData, key: string) {
-  const value = optionalString(formData, key);
-
-  if (!value) return null;
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`${toSentenceLabel(key)} must be a date.`);
-  }
-
-  return value;
-}
-
-function dateString(formData: FormData, key: string) {
-  const value = requiredString(formData, key);
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`${toSentenceLabel(key)} must be a date.`);
-  }
-
-  return value;
-}
-
 function positiveNumber(formData: FormData, key: string) {
   const value = Number(requiredString(formData, key));
 

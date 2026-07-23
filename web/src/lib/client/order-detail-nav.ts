@@ -9,14 +9,17 @@ export function initOrderDetailNav(root: ParentNode = document) {
     const menu = nav.querySelector<HTMLElement>("[data-order-detail-nav-menu]");
     if (!trigger || !menu) return;
 
+    const triggerEl = trigger;
+    const menuEl = menu;
+
     function setOpen(isOpen: boolean) {
-      menu.hidden = !isOpen;
-      trigger.setAttribute("aria-expanded", String(isOpen));
+      menuEl.hidden = !isOpen;
+      triggerEl.setAttribute("aria-expanded", String(isOpen));
       nav.dataset.open = String(isOpen);
     }
 
-    trigger.addEventListener("click", () => {
-      setOpen(menu.hidden);
+    triggerEl.addEventListener("click", () => {
+      setOpen(menuEl.hidden === true);
     });
 
     document.addEventListener("click", (event) => {

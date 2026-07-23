@@ -53,9 +53,23 @@ jobs:
 
           blocking_pattern='drop[[:space:]]+table|drop[[:space:]]+column|truncate[[:space:]]|delete[[:space:]]+from'
           review_pattern='alter[[:space:]]+column.*set[[:space:]]+not[[:space:]]+null|drop[[:space:]]+policy|security[[:space:]]+definer|grant[[:space:]]+'
+          destructive_reviewed_marker='migration-safety:[[:space:]]*destructive-reviewed'
 
           blocking_matches="$(echo "${changed_files}" | xargs grep -Ein "${blocking_pattern}" || true)"
           review_matches="$(echo "${changed_files}" | xargs grep -Ein "${review_pattern}" || true)"
+
+          unreviewed_blocking_matches=""
+          if [ -n "${blocking_matches}" ]; then
+            while IFS= read -r match_line; do
+              [ -z "${match_line}" ] && continue
+              file="${match_line%%:*}"
+              if head -n 10 "${file}" | grep -Eiq "${destructive_reviewed_marker}"; then
+                echo "Acknowledged destructive SQL in ${file}"
+                continue
+              fi
+              unreviewed_blocking_matches="${unreviewed_blocking_matches}${match_line}"$'\n'
+            done <<< "${blocking_matches}"
+          fi
 
           if [ -n "${review_matches}" ]; then
             echo "Migration review recommended:"
@@ -74,9 +88,9 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
-          if [ -n "${blocking_matches}" ]; then
+          if [ -n "${unreviewed_blocking_matches}" ]; then
             echo "Blocking migration SQL detected:"
-            echo "${blocking_matches}"
+            echo "${unreviewed_blocking_matches}"
             {
               echo "### Blocking migration SQL detected"
               echo ""
@@ -87,12 +101,15 @@ jobs:
               echo "- \`delete from\`"
               echo ""
               echo "Review the matched migration SQL manually before merge."
-              echo "Add the \`migration-reviewed\` label to this PR after review."
+              echo "Add \`-- migration-safety: destructive-reviewed\` near the top of reviewed migrations,"
+              echo "or add the \`migration-reviewed\` label to this PR after review."
             } >> "$GITHUB_STEP_SUMMARY"
 
             if [ "${MIGRATION_REVIEWED}" != "true" ]; then
               exit 1
             fi
+          elif [ -n "${blocking_matches}" ]; then
+            echo "Destructive SQL found only in migrations marked destructive-reviewed."
           fi
 
       - name: Setup Supabase CLI

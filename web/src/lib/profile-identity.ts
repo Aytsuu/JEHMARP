@@ -39,6 +39,9 @@ type SupabaseLikeClient = {
   };
 };
 
+// Use a loose client type at module boundaries to avoid Supabase generic recursion in astro check.
+export type ProfileIdentitySupabaseClient = any;
+
 export type ProfileIdentityRow = {
   first_name: string;
   last_name: string;
@@ -74,20 +77,6 @@ export const profileIdentitySelect = `
 `;
 
 export const customerWithProfileSelect = `
-  id,
-  profile_id,
-  assigned_agent_id,
-  is_reseller,
-  credit_limit,
-  credit_limit_exceeded,
-  promoted_to_agent_id,
-  promoted_to_agent_at,
-  created_at,
-  updated_at,
-  profile:profile_id (${profileIdentitySelect})
-`;
-
-export const customerWithProfileSelectBasic = `
   id,
   profile_id,
   assigned_agent_id,
@@ -321,7 +310,7 @@ export function mapNestedOrderCustomer<
 }
 
 export async function findProfileIdByPhone(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   phoneNumber: string,
   excludeProfileId?: string,
 ) {
@@ -341,7 +330,7 @@ export async function findProfileIdByPhone(
 }
 
 export async function findProfileIdByEmail(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   email: string,
   excludeProfileId?: string,
 ) {
@@ -361,7 +350,7 @@ export async function findProfileIdByEmail(
   return data?.id ? String(data.id) : null;
 }
 
-export async function findCustomerIdByPhone(supabase: SupabaseLikeClient, phoneNumber: string) {
+export async function findCustomerIdByPhone(supabase: ProfileIdentitySupabaseClient, phoneNumber: string) {
   const profileId = await findProfileIdByPhone(supabase, phoneNumber);
 
   if (!profileId) {
@@ -382,7 +371,7 @@ export async function findCustomerIdByPhone(supabase: SupabaseLikeClient, phoneN
   return data?.id ? String(data.id) : null;
 }
 
-export async function findCustomerIdByEmail(supabase: SupabaseLikeClient, email: string) {
+export async function findCustomerIdByEmail(supabase: ProfileIdentitySupabaseClient, email: string) {
   const profileId = await findProfileIdByEmail(supabase, email);
 
   if (!profileId) {
@@ -404,7 +393,7 @@ export async function findCustomerIdByEmail(supabase: SupabaseLikeClient, email:
 }
 
 export async function assertProfilePhoneIsAvailable(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   phoneNumber: string,
   excludeProfileId?: string,
 ) {
@@ -416,7 +405,7 @@ export async function assertProfilePhoneIsAvailable(
 }
 
 export async function assertProfileEmailIsAvailable(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   email: string | null,
   excludeProfileId?: string,
 ) {
@@ -432,7 +421,7 @@ export async function assertProfileEmailIsAvailable(
 }
 
 export async function assertAgentPhoneIsAvailable(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   phoneNumber: string,
   excludeAgentId?: string,
   excludeProfileIdOverride?: string,
@@ -462,7 +451,7 @@ export async function assertAgentPhoneIsAvailable(
 }
 
 export async function insertProfile(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   identity: CustomerIdentityInput | AgentIdentityInput,
   options: { user_id?: string | null; profile_id?: string } = {},
 ) {
@@ -498,7 +487,7 @@ export async function insertProfile(
 }
 
 export async function updateProfileIdentity(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   profileId: string,
   identity: CustomerIdentityInput | AgentIdentityInput,
 ) {
@@ -530,7 +519,7 @@ export async function updateProfileIdentity(
 }
 
 export async function insertCustomerWithProfile(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   payload: CustomerIdentityInput & {
     assigned_agent_id: string | null;
     is_reseller: boolean;
@@ -564,7 +553,7 @@ export async function insertCustomerWithProfile(
 }
 
 export async function updateCustomerWithProfile(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   customerId: string,
   profileId: string,
   payload: CustomerIdentityInput & {
@@ -592,7 +581,7 @@ export async function updateCustomerWithProfile(
 }
 
 export async function insertAgentWithProfile(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   payload: AgentIdentityInput & {
     user_id: string | null;
     customer_id?: string | null;
@@ -650,7 +639,7 @@ export async function insertAgentWithProfile(
 }
 
 export async function updateAgentWithProfile(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   agentId: string,
   profileId: string,
   payload: AgentIdentityInput & {
@@ -679,7 +668,7 @@ export async function updateAgentWithProfile(
 }
 
 export async function loadCustomerProfileId(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   customerId: string,
 ) {
   const { data, error } = await supabase
@@ -701,7 +690,7 @@ export async function loadCustomerProfileId(
 }
 
 export async function loadAgentProfileId(
-  supabase: SupabaseLikeClient,
+  supabase: ProfileIdentitySupabaseClient,
   agentId: string,
 ) {
   const { data, error } = await supabase

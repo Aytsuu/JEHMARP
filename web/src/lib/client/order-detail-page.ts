@@ -9,6 +9,3 @@ export function initDashboardRecordPageRefresh() {
 
   window.location.reload();
 }
-
-/** @deprecated Use initDashboardRecordPageRefresh */
-export const initOrderDetailPageRefresh = initDashboardRecordPageRefresh;

@@ -1,12 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { markDashboardFragmentRefreshNeeded } from "./dashboard-fragment-cache";
-import {
-  initDashboardRecordPageRefresh,
-  initOrderDetailPageRefresh,
-} from "./order-detail-page";
+import { initDashboardRecordPageRefresh } from "./order-detail-page";
 
-describe("initOrderDetailPageRefresh", () => {
+describe("initDashboardRecordPageRefresh", () => {
   beforeEach(() => {
     sessionStorage.clear();
     document.body.innerHTML = "";
@@ -30,15 +27,6 @@ describe("initOrderDetailPageRefresh", () => {
     markDashboardFragmentRefreshNeeded();
 
     initDashboardRecordPageRefresh();
-
-    expect(window.location.reload).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps the legacy order detail initializer alias", () => {
-    document.body.innerHTML = '<div data-order-detail-page></div>';
-    markDashboardFragmentRefreshNeeded();
-
-    initOrderDetailPageRefresh();
 
     expect(window.location.reload).toHaveBeenCalledTimes(1);
   });

@@ -58,6 +58,7 @@ function createAgentDashboardData(): AgentDashboardData {
     agent: {
       id: "agent-1",
       user_id: "user-1",
+      customer_id: null,
       employee_id: "EMP-001",
       first_name: "Agent",
       last_name: "One",

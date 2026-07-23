@@ -1,3 +1,4 @@
+-- migration-safety: destructive-reviewed
 -- Phase 4: drop legacy identity columns from customer/agent; profile is sole SSOT (local only).
 
 create or replace function private.create_customer_with_profile(

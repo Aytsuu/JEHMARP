@@ -22,7 +22,6 @@ type Props = {
   feedback?: AdminActionFeedback;
   dashboardData?: AdminDashboardData;
   contentMaxWidth?: string;
-  fullHeight?: boolean;
 };
 
 const {
@@ -35,7 +34,6 @@ const {
   feedback,
   dashboardData,
   contentMaxWidth = "48rem",
-  fullHeight = false,
 } = Astro.props;
 const headingId = `${heading
   .toLowerCase()
