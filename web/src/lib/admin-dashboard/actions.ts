@@ -6,10 +6,8 @@ import { parseContactNumber } from "@/lib/formatters";
 import {
   requiredDateAndTimeFromFormData,
   requiredDateTimeFromFormData,
-  requiredDateTimePartsFromFormData,
 } from "@/lib/datetime";
-import { canAttachCustomerToAgentOrder } from "@/lib/agent-order-distribution";
-import { parseAttachCustomerEntriesJson, type AgentOrderAttachEntry } from "@/lib/agent-order-attach";
+import { parseAttachCustomerEntriesJson, assertAgentOrderAllowsCustomerAttach, type AgentOrderAttachEntry } from "@/lib/agent-order-attach";
 import {
   ensureSalesInvoiceBeforeAgentPaymentConfirmation,
   ensureSalesInvoiceWhenOrderFullyPaid,
@@ -302,10 +300,6 @@ export type AdminAction =
       type: "attach-agent-order-customer";
       agentOrderId: string;
       entries: AgentOrderAttachEntry[];
-      releaseSchedule: {
-        date: string;
-        time: string;
-      };
       requireApproval: boolean;
     }
   | {
@@ -581,14 +575,16 @@ export async function markUnreadAdminOrdersRead(
   const payload = adminReadPayload(adminUserId);
   const results = await Promise.all([
     supabase
-      .from("customer_order")
+      .from("order")
       .update(payload)
+      .in("order_kind", ["customer", "personal"])
       .eq("order_status", "pending")
       .neq("source", "admin_manual")
       .is("admin_read_at", null),
     supabase
-      .from("agent_order")
+      .from("order")
       .update(payload)
+      .eq("order_kind", "distribution")
       .in("order_status", ["pending_customers", "pending_order"])
       .is("admin_read_at", null),
   ]);
@@ -630,7 +626,7 @@ export async function markAdminOrderReadIfUnread(
   adminUserId: string,
 ) {
   const { error } = await createSupabaseServerClient(context)
-    .from("customer_order")
+    .from("order")
     .update(adminReadPayload(adminUserId))
     .eq("id", orderId)
     .eq("order_status", "pending")
@@ -710,13 +706,13 @@ export async function executeAdminAction(
     case "create-order":
       return await executeOrderCreate(supabase, action, options);
     case "update-order-status":
-      await executeTableUpdate(supabase, "customer_order", action.orderId, action.payload);
+      await executeTableUpdate(supabase, "order", action.orderId, action.payload);
       return;
     case "update-order-notes":
-      await executeTableUpdate(supabase, "customer_order", action.orderId, action.payload);
+      await executeTableUpdate(supabase, "order", action.orderId, action.payload);
       return;
     case "mark-order-read":
-      await markAdminRecordRead(supabase, "customer_order", action.orderId, adminReadPayload(adminUserId));
+      await markAdminRecordRead(supabase, "order", action.orderId, adminReadPayload(adminUserId));
       return;
     case "convert-customer-order-to-agent-distribution": {
       const { data, error } = await supabase.rpc("convert_customer_order_to_agent_distribution_order", {
@@ -733,14 +729,14 @@ export async function executeAdminAction(
     }
     case "update-commission":
       await assertOrderItemCommissionPayable(supabase, action.orderItemId, action.payload.agent_commission_paid);
-      await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
+      await executeTableUpdate(supabase, "order_item", action.orderItemId, action.payload);
       return;
     case "update-order-total-commission":
       await executeOrderTotalCommissionUpdate(supabase, action.orderId, action.amount, adminUserId);
       return;
     case "update-agent-order-commission":
       await assertAgentOrderItemCommissionEditable(supabase, action.agentOrderItemId);
-      await executeTableUpdate(supabase, "agent_order_item", action.agentOrderItemId, action.payload);
+      await executeTableUpdate(supabase, "order_item", action.agentOrderItemId, action.payload);
       return;
     case "update-agent-order-item-quantity": {
       const { error } = await supabase.rpc("update_agent_order_item_quantity", {
@@ -758,12 +754,12 @@ export async function executeAdminAction(
       await executeAgentOrderApproval(supabase, action);
       return;
     case "attach-agent-order-customer": {
-      await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
+      const releaseSchedule = await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
 
       for (const entry of action.entries) {
         const releaseSchedulePayload = {
-          releaseDate: action.releaseSchedule.date,
-          releaseTime: action.releaseSchedule.time,
+          releaseDate: releaseSchedule.date,
+          releaseTime: releaseSchedule.time,
         };
         const { data, error } = await supabase.rpc("attach_customer_to_agent_order", {
           target_agent_order_id: action.agentOrderId,
@@ -796,12 +792,12 @@ export async function executeAdminAction(
         quantity: action.payload.final_quantity,
         type: "update",
       });
-      await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
+      await executeTableUpdate(supabase, "order_item", action.orderItemId, action.payload);
       return;
     }
     case "add-order-item":
       await assertOrderProductsEditable(supabase, action.orderId);
-      await executeTableInsert(supabase, "customer_order_item", action.payload);
+      await executeTableInsert(supabase, "order_item", action.payload);
       return;
     case "remove-order-item": {
       const orderId = await assertOrderProductsEditableByItemId(supabase, action.orderItemId, {
@@ -811,7 +807,7 @@ export async function executeAdminAction(
         orderItemId: action.orderItemId,
         type: "remove",
       });
-      await executeTableDelete(supabase, "customer_order_item", action.orderItemId);
+      await executeTableDelete(supabase, "order_item", action.orderItemId);
       return;
     }
     case "update-order-item-quantity": {
@@ -821,7 +817,7 @@ export async function executeAdminAction(
         quantity: action.payload.partial_quantity,
         type: "update",
       });
-      await executeTableUpdate(supabase, "customer_order_item", action.orderItemId, action.payload);
+      await executeTableUpdate(supabase, "order_item", action.orderItemId, action.payload);
       return;
     }
     case "record-payment": {
@@ -836,7 +832,7 @@ export async function executeAdminAction(
       await ensureSalesInvoiceWhenOrderFullyPaid(supabase, action.payload.order_id);
       await markAdminRecordRead(
         supabase,
-        "customer_order",
+        "order",
         action.payload.order_id,
         adminReadPayload(action.payload.recorded_by),
       );
@@ -860,7 +856,7 @@ export async function executeAdminAction(
     case "save-invoice":
       await assertOrderCanGenerateInvoice(supabase, action.payload.order_id);
       await executeTableUpsert(supabase, "invoice", action.invoiceId, action.payload);
-      await markAdminRecordRead(supabase, "customer_order", action.payload.order_id, adminReadPayload(adminUserId));
+      await markAdminRecordRead(supabase, "order", action.payload.order_id, adminReadPayload(adminUserId));
       return;
     case "update-inquiry":
       await executeTableUpdate(supabase, "contact_inquiry", action.inquiryId, action.payload);
@@ -1175,16 +1171,11 @@ function parseAdminActionFormDataOrThrow(
       });
     case "attach-agent-order-customer": {
       const entriesJson = requiredString(formData, "attachCustomerEntries");
-      const releaseSchedule = requiredDateTimePartsFromFormData(formData, "releaseDate", "releaseTime");
 
       return success({
         type: "attach-agent-order-customer",
         agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
         entries: parseAttachCustomerEntriesJson(entriesJson),
-        releaseSchedule: {
-          date: releaseSchedule.date,
-          time: releaseSchedule.time,
-        },
         requireApproval: false,
       });
     }
@@ -1459,8 +1450,9 @@ async function executeOrderCreate(
 
   const customer = await resolveOrderCustomer(supabase, action.customer);
   const { data, error } = await supabase
-    .from("customer_order")
+    .from("order")
     .insert({
+      order_kind: "customer",
       customer_id: customer.customerId,
       ...action.payload,
     })
@@ -1474,8 +1466,12 @@ async function executeOrderCreate(
 
   const orderId = String(data.id);
   const { error: itemError } = await supabase
-    .from("customer_order_item")
-    .insert(action.items.map((item) => ({ ...item, order_id: orderId })));
+    .from("order_item")
+    .insert(action.items.map((item) => ({
+      ...item,
+      order_id: orderId,
+      order_kind: "customer",
+    })));
 
   if (itemError) {
     await cleanupCreatedOrder(supabase, orderId, customer.createdCustomerId, "Unable to create order items");
@@ -1658,7 +1654,7 @@ async function assertOrderCanGenerateInvoice(
   orderId: string,
 ) {
   const { data, error } = await supabase
-    .from("customer_order")
+    .from("order")
     .select("order_status")
     .eq("id", orderId)
     .maybeSingle();
@@ -1678,11 +1674,11 @@ async function applyPaymentCustomerTypePricing(
   customerType: PaymentCustomerType,
 ) {
   const { data: order, error: orderError } = await supabase
-    .from("customer_order")
+    .from("order")
     .select(`
       agent_id,
-      agent_order_id,
-      converted_to_agent_order_id,
+      parent_order_id,
+      converted_at,
       customer:customer_id ( is_reseller )
     `)
     .eq("id", orderId)
@@ -1694,8 +1690,8 @@ async function applyPaymentCustomerTypePricing(
 
   type PaymentPricingOrderRow = {
     agent_id?: unknown;
-    agent_order_id?: unknown;
-    converted_to_agent_order_id?: unknown;
+    parent_order_id?: unknown;
+    converted_at?: unknown;
     customer?: { is_reseller?: unknown } | Array<{ is_reseller?: unknown }> | null;
   };
   const orderRow = order as PaymentPricingOrderRow | null;
@@ -1706,8 +1702,7 @@ async function applyPaymentCustomerTypePricing(
   const isResellerCustomer = orderCustomer?.is_reseller === true;
   const hasAgentLink = Boolean(
     orderRow?.agent_id ||
-    orderRow?.agent_order_id ||
-    orderRow?.converted_to_agent_order_id,
+    orderRow?.parent_order_id,
   );
 
   if (isResellerCustomer && customerType !== "reseller") {
@@ -1725,7 +1720,7 @@ async function applyPaymentCustomerTypePricing(
   }
 
   const { data: items, error: itemError } = await supabase
-    .from("customer_order_item")
+    .from("order_item")
     .select(`
       id,
       product_id,
@@ -1829,7 +1824,7 @@ async function applyPaymentCustomerTypePricing(
 
   await Promise.all(normalizedItems.map(async (item) => {
     const { error } = await supabase
-      .from("customer_order_item")
+      .from("order_item")
       .update({
         price_type: targetPriceType,
         unit_price: item.unitPrice,
@@ -1908,7 +1903,7 @@ async function assertOrderItemInvoiceQuantityEditable(
   orderItemId: string,
 ): Promise<string> {
   const { data: orderItem, error: orderItemError } = await supabase
-    .from("customer_order_item")
+    .from("order_item")
     .select("order_id")
     .eq("id", orderItemId)
     .maybeSingle();
@@ -2126,7 +2121,7 @@ async function attachPromotedAgentToCustomerOrders(
   agentId: string,
 ) {
   const { data: processingOrders, error: processingOrdersError } = await supabase
-    .from("customer_order")
+    .from("order")
     .select("id")
     .eq("customer_id", customerId)
     .eq("order_status", "processing");
@@ -2136,7 +2131,7 @@ async function attachPromotedAgentToCustomerOrders(
   }
 
   const { error } = await supabase
-    .from("customer_order")
+    .from("order")
     .update({
       agent_id: agentId,
       updated_at: new Date().toISOString(),
@@ -2164,7 +2159,7 @@ async function initializePromotedAgentOrderCommissions(
   }
 
   const { data: orderItems, error: orderItemsError } = await supabase
-    .from("customer_order_item")
+    .from("order_item")
     .select(`
       id,
       final_quantity,
@@ -2196,7 +2191,7 @@ async function initializePromotedAgentOrderCommissions(
 
   const updateResults = await Promise.all(commissionUpdates.map((item) => (
     supabase
-      .from("customer_order_item")
+      .from("order_item")
       .update({
         agent_commission_amount: item.amount,
         agent_commission_paid: false,
@@ -2265,9 +2260,12 @@ async function executeAgentDistributionOrderCreate(
 
   const timestamp = new Date().toISOString();
   const { data, error } = await supabase
-    .from("agent_order")
+    .from("order")
     .insert({
+      order_kind: "distribution",
       agent_id: action.customer.agentId,
+      source: "agent_submitted",
+      payment_status: "unpaid",
       order_status: "pending_customers",
       notes: null,
       release_date: action.payload.release_date,
@@ -2285,16 +2283,18 @@ async function executeAgentDistributionOrderCreate(
 
   const agentOrderId = String(data.id);
   const { error: itemError } = await supabase
-    .from("agent_order_item")
+    .from("order_item")
     .insert(action.items.map((item) => ({
-      agent_order_id: agentOrderId,
+      order_id: agentOrderId,
+      order_kind: "distribution",
       product_id: item.product_id,
-      quantity: item.partial_quantity,
+      partial_quantity: item.partial_quantity,
+      final_quantity: item.partial_quantity,
       add_details: item.add_details,
     })));
 
   if (itemError) {
-    await executeTableDelete(supabase, "agent_order", agentOrderId);
+    await executeTableDelete(supabase, "order", agentOrderId);
     throw new Error("Unable to create agent distribution order items.");
   }
 
@@ -2310,7 +2310,7 @@ async function executeOrderTotalCommissionUpdate(
   adminUserId: string,
 ) {
   const { data: orderItems, error: orderItemsError } = await supabase
-    .from("customer_order_item")
+    .from("order_item")
     .select("id, final_quantity, unit_price")
     .eq("order_id", orderId);
 
@@ -2341,7 +2341,7 @@ async function executeOrderTotalCommissionUpdate(
   const now = new Date().toISOString();
   const updateResults = await Promise.all(allocatedCommissions.map((item) => (
     supabase
-      .from("customer_order_item")
+      .from("order_item")
       .update(item.amount <= 0
         ? {
             agent_commission_amount: 0,
@@ -2395,9 +2395,11 @@ async function executeAgentOrderApproval(
   action: Extract<AdminAction, { type: "approve-agent-order" }>,
 ) {
   const { data: linkedCustomerOrders, error: linkedCustomerOrdersError } = await supabase
-    .from("customer_order")
+    .from("order")
     .select("id")
-    .eq("agent_order_id", action.agentOrderId)
+    .in("order_kind", ["customer", "personal"])
+    .eq("parent_order_id", action.agentOrderId)
+    .is("converted_at", null)
     .limit(1);
 
   if (linkedCustomerOrdersError) {
@@ -2411,7 +2413,7 @@ async function executeAgentOrderApproval(
     ? "processing"
     : "pending_customers";
   const { error } = await supabase
-    .from("agent_order")
+    .from("order")
     .update({
       order_status: nextStatus,
       admin_read_at: timestamp,
@@ -2419,6 +2421,7 @@ async function executeAgentOrderApproval(
       updated_at: timestamp,
     })
     .eq("id", action.agentOrderId)
+    .eq("order_kind", "distribution")
     .eq("order_status", "pending_order");
 
   if (error) {
@@ -2544,7 +2547,7 @@ async function executeAdminAgentPaymentDistribution(
     await ensureSalesInvoiceWhenOrderFullyPaid(supabase, orderId);
     await markAdminRecordRead(
       supabase,
-      "customer_order",
+      "order",
       orderId,
       adminReadPayload(action.payload.recorded_by),
     );
@@ -2560,8 +2563,8 @@ async function loadAdminAgentOrderPaymentBalances(
 ) {
   const uniqueOrderIds = [...new Set(orderIds)];
   const { data: orders, error } = await adminClient
-    .from("customer_order")
-    .select("id, agent_order_id")
+    .from("order")
+    .select("id, parent_order_id")
     .in("id", uniqueOrderIds);
 
   if (error) {
@@ -2569,7 +2572,7 @@ async function loadAdminAgentOrderPaymentBalances(
   }
 
   const orderById = new Map(
-    ((orders ?? []) as Array<{ id?: unknown; agent_order_id?: unknown }>).flatMap((order) => {
+    ((orders ?? []) as Array<{ id?: unknown; parent_order_id?: unknown }>).flatMap((order) => {
       return typeof order.id === "string"
         ? [[order.id, order]]
         : [];
@@ -2579,7 +2582,7 @@ async function loadAdminAgentOrderPaymentBalances(
   return Promise.all(uniqueOrderIds.map(async (orderId) => {
     const order = orderById.get(orderId);
 
-    if (!order || order.agent_order_id !== agentOrderId) {
+    if (!order || order.parent_order_id !== agentOrderId) {
       throw new Error("One or more selected customer orders do not belong to this agent distribution order.");
     }
 
@@ -2699,7 +2702,7 @@ async function assertOrderProductsEditableByItemId(
   options: { requireMultipleItems?: boolean } = {},
 ): Promise<string> {
   const { data: orderItem, error: orderItemError } = await supabase
-    .from("customer_order_item")
+    .from("order_item")
     .select("order_id")
     .eq("id", orderItemId)
     .maybeSingle();
@@ -2740,7 +2743,7 @@ async function assertOrderProductsEditable(
 
   if (options.requireMultipleItems) {
     const { data: orderItems, error: orderItemsError } = await supabase
-      .from("customer_order_item")
+      .from("order_item")
       .select("id")
       .eq("order_id", orderId);
 
@@ -2771,19 +2774,19 @@ async function assertProjectedOrderReceivableCoversPayments(
   projection: ProductQuantityProjection,
 ) {
   const { data: order, error: orderError } = await supabase
-    .from("customer_order")
+    .from("order")
     .select(`
       id,
       agent_id,
-      agent_order_id,
-      converted_to_agent_order_id,
+      parent_order_id,
+      converted_at,
       customer:customer_id (
         promoted_to_agent_id
       ),
       payment (
         amount
       ),
-      customer_order_item (
+      order_item (
         id,
         final_quantity,
         unit_price,
@@ -2807,11 +2810,11 @@ async function assertProjectedOrderReceivableCoversPayments(
 
   const normalizedOrder = order as {
     agent_id?: unknown;
-    agent_order_id?: unknown;
-    converted_to_agent_order_id?: unknown;
+    parent_order_id?: unknown;
+    converted_at?: unknown;
     customer?: unknown;
     payment?: Array<{ amount?: unknown }> | null;
-    customer_order_item?: Array<{
+    order_item?: Array<{
       id?: unknown;
       final_quantity?: unknown;
       unit_price?: unknown;
@@ -2825,7 +2828,8 @@ async function assertProjectedOrderReceivableCoversPayments(
     return;
   }
 
-  const projectedItems = (normalizedOrder.customer_order_item ?? []).flatMap((item) => {
+  const orderItems = normalizedOrder.order_item ?? [];
+  const projectedItems = orderItems.flatMap((item) => {
     if (typeof item.id !== "string") {
       return [];
     }
@@ -2860,7 +2864,7 @@ async function assertProjectedOrderReceivableCoversPayments(
       }),
     }];
   });
-  const targetExists = (normalizedOrder.customer_order_item ?? []).some((item) => {
+  const targetExists = orderItems.some((item) => {
     return typeof item.id === "string" && item.id === projection.orderItemId;
   });
 
@@ -2870,8 +2874,7 @@ async function assertProjectedOrderReceivableCoversPayments(
 
   const deductCommission = Boolean(
     normalizedOrder.agent_id ||
-    normalizedOrder.agent_order_id ||
-    normalizedOrder.converted_to_agent_order_id,
+    normalizedOrder.parent_order_id,
   );
   const commissionTotal = deductCommission
     ? projectedItems.reduce((total, item) => total + item.commissionAmount, 0)
@@ -2915,7 +2918,7 @@ async function assertOrderItemCommissionPayable(
   }
 
   const { data: orderItem, error: orderItemError } = await supabase
-    .from("customer_order_item")
+    .from("order_item")
     .select("id, order_id, final_quantity, unit_price, agent_commission_paid")
     .eq("id", orderItemId)
     .maybeSingle();
@@ -2949,7 +2952,7 @@ async function assertOrderItemCommissionPayable(
   }
 
   const { data: orderItems, error: orderItemsError } = await supabase
-    .from("customer_order_item")
+    .from("order_item")
     .select("id, final_quantity, unit_price, agent_commission_paid")
     .eq("order_id", orderId);
 
@@ -2998,8 +3001,8 @@ async function assertAgentOrderItemCommissionEditable(
   agentOrderItemId: string,
 ) {
   const { data: agentOrderItem, error: agentOrderItemError } = await supabase
-    .from("agent_order_item")
-    .select("id, agent_order_id")
+    .from("order_item")
+    .select("id, order_id")
     .eq("id", agentOrderItemId)
     .maybeSingle();
 
@@ -3007,14 +3010,16 @@ async function assertAgentOrderItemCommissionEditable(
     throw new Error("Unable to verify agent order commission status.");
   }
 
-  if (!agentOrderItem || typeof agentOrderItem.agent_order_id !== "string") {
+  if (!agentOrderItem || typeof agentOrderItem.order_id !== "string") {
     throw new Error("Agent order item was not found.");
   }
 
   const { data: customerOrders, error: customerOrdersError } = await supabase
-    .from("customer_order")
+    .from("order")
     .select("id, payment_status")
-    .eq("agent_order_id", agentOrderItem.agent_order_id);
+    .in("order_kind", ["customer", "personal"])
+    .eq("parent_order_id", agentOrderItem.order_id)
+    .is("converted_at", null);
 
   if (customerOrdersError) {
     throw new Error("Unable to verify agent order payments before updating commission.");
@@ -3026,47 +3031,6 @@ async function assertAgentOrderItemCommissionEditable(
 
   if (isFullyPaid) {
     throw new Error("Agent order commission cannot be edited after all customer orders are fully paid.");
-  }
-}
-
-async function assertAgentOrderAllowsCustomerAttach(
-  supabase: SupabaseServerClient,
-  agentOrderId: string,
-) {
-  const { data: agentOrder, error: agentOrderError } = await supabase
-    .from("agent_order")
-    .select("order_status")
-    .eq("id", agentOrderId)
-    .maybeSingle();
-
-  if (agentOrderError) {
-    throw new Error("Unable to verify agent order status before attaching a customer.", {
-      cause: agentOrderError,
-    });
-  }
-
-  if (!agentOrder) {
-    throw new Error("Agent order was not found.");
-  }
-
-  const { data: customerOrders, error: customerOrdersError } = await supabase
-    .from("customer_order")
-    .select("payment_status")
-    .eq("agent_order_id", agentOrderId);
-
-  if (customerOrdersError) {
-    throw new Error("Unable to verify linked customer order payment statuses before attaching a customer.", {
-      cause: customerOrdersError,
-    });
-  }
-
-  if (!canAttachCustomerToAgentOrder({
-    order_status: String(agentOrder.order_status),
-    customer_order: (customerOrders ?? []).map((order) => ({
-      payment_status: String((order as { payment_status?: unknown }).payment_status ?? "unpaid"),
-    })),
-  })) {
-    throw new Error("Completed and paid agent orders cannot accept new customers.");
   }
 }
 
@@ -3089,7 +3053,7 @@ async function cleanupCreatedOrder(
   createdCustomerId: string | null,
   failureLabel: string,
 ) {
-  const { error: cleanupError } = await supabase.from("customer_order").delete().eq("id", orderId);
+  const { error: cleanupError } = await supabase.from("order").delete().eq("id", orderId);
 
   if (cleanupError) {
     throw new Error(`${failureLabel}. The order was created but cleanup failed.`);
@@ -3141,7 +3105,7 @@ async function executeTableDelete(
 }
 
 type AdminReadableTable =
-  | "customer_order"
+  | "order"
   | "contact_inquiry"
   | "reseller_application";
 
@@ -3188,8 +3152,9 @@ async function markAllAdminNotificationsRead(
   const payload = adminReadPayload(adminUserId);
   const results = await Promise.all([
     supabase
-      .from("customer_order")
+      .from("order")
       .update(payload)
+      .in("order_kind", ["customer", "personal"])
       .eq("order_status", "pending")
       .neq("source", "admin_manual")
       .is("admin_read_at", null),
@@ -3236,7 +3201,7 @@ function adminNotificationTarget(notificationId: string): {
 
   if (notificationId.startsWith("order-pending-")) {
     return {
-      table: "customer_order",
+      table: "order",
       id: uuidSchema.parse(notificationId.slice("order-pending-".length)),
     };
   }

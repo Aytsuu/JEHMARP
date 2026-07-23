@@ -24,6 +24,7 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
     is: vi.fn(() => builder),
     neq: vi.fn(() => builder),
     in: vi.fn(() => builder),
+    not: vi.fn(() => builder),
     gte: vi.fn(() => builder),
     lte: vi.fn(() => builder),
     or: vi.fn(() => builder),
@@ -43,7 +44,7 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
 function createMockOrder(overrides: Record<string, unknown> = {}) {
   return {
     id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-    agent_order_id: null,
+    parent_order_id: null,
     customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
     agent_id: null,
     source: "guest_shop",
@@ -154,7 +155,7 @@ describe("loadAdminDashboardData", () => {
   it("applies direct admin order filters to the database query", async () => {
     const orderBuilder = createQueryBuilder();
     const from = vi.fn((table: string) => (
-      table === "customer_order" ? orderBuilder : createQueryBuilder()
+      table === "order" ? orderBuilder : createQueryBuilder()
     ));
     createSupabaseAdminClient.mockReturnValue({ from });
     const { loadAdminDashboardData } = await import("./data");
@@ -170,7 +171,7 @@ describe("loadAdminDashboardData", () => {
     expect(orderBuilder.eq).toHaveBeenCalledWith("source", "guest_shop");
     expect(orderBuilder.eq).toHaveBeenCalledWith("order_status", "pending");
     expect(orderBuilder.eq).toHaveBeenCalledWith("payment_status", "partial");
-    expect(orderBuilder.is).toHaveBeenCalledWith("converted_to_agent_order_id", null);
+    expect(orderBuilder.is).toHaveBeenCalledWith("converted_at", null);
   });
 
   it("loads admin order management rows through the paginated order RPC", async () => {
@@ -192,7 +193,7 @@ describe("loadAdminDashboardData", () => {
     };
     const orderBuilder = createQueryBuilder();
     const from = vi.fn((table: string) => (
-      table === "customer_order" ? orderBuilder : createQueryBuilder()
+      table === "order" ? orderBuilder : createQueryBuilder()
     ));
     const rpc = vi.fn(() => Promise.resolve({
       data: [{ records: [orderRow], total_rows: "1" }],
@@ -499,21 +500,49 @@ describe("loadAdminDashboardData", () => {
       customer_order_item: [{ final_quantity: 3, unit_price: 100 }],
       payment: [{ amount: 50 }],
     });
-    const customerOrderBuilders = [
-      createQueryBuilder({ data: [assignedOrder], error: null }),
-      createQueryBuilder({ data: [agentOwnOrder], error: null }),
-    ];
+    const createOrderQueryMock = () => {
+      let lastCustomerIds: string[] = [];
+      const orderChain = {
+        select: vi.fn(function select() { return orderChain; }),
+        in: vi.fn((field: string, values: string[]) => {
+          if (field === "customer_id") {
+            lastCustomerIds = values;
+          }
+          return orderChain;
+        }),
+        eq: vi.fn((field: string, value: unknown) => {
+          if (field === "order_kind" && value === "distribution") {
+            return {
+              eq: vi.fn(() => ({
+                order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+              })),
+            };
+          }
+          return orderChain;
+        }),
+        is: vi.fn(() => orderChain),
+        order: vi.fn(() => ({
+          then: (resolve: (value: MockResponse) => unknown) => {
+            const data = lastCustomerIds.includes(assignedCustomerId)
+              ? [assignedOrder]
+              : lastCustomerIds.includes(agentCustomerId)
+                ? [agentOwnOrder]
+                : [];
+            return resolve({ data, error: null });
+          },
+        })),
+      };
+      return orderChain;
+    };
     const agentBuilder = createQueryBuilder({ data: [agentRow], error: null });
     const customerBuilder = createQueryBuilder({
       data: [assignedCustomerRow, agentCustomerRow],
       error: null,
     });
-    const agentOrderBuilder = createQueryBuilder();
     const from = vi.fn((table: string) => {
       if (table === "agent") return agentBuilder;
       if (table === "customer") return customerBuilder;
-      if (table === "customer_order") return customerOrderBuilders.shift() ?? createQueryBuilder();
-      if (table === "agent_order") return agentOrderBuilder;
+      if (table === "order") return createOrderQueryMock();
       return createQueryBuilder();
     });
     const listUsers = vi.fn(() => Promise.resolve({
@@ -560,14 +589,18 @@ describe("loadAdminDashboardData", () => {
     };
     const sourceOrder = createMockOrder({
       id: "source-order-1",
-      converted_to_agent_order_id: "agent-order-1",
+      parent_order_id: "agent-order-1",
+      converted_at: "2026-07-01T00:00:00.000Z",
       customer: null,
     });
     const agentOrderBuilder = createQueryBuilder({ data: [agentOrder], error: null });
     const sourceOrderBuilder = createQueryBuilder({ data: [sourceOrder], error: null });
+    let orderCall = 0;
     const from = vi.fn((table: string) => {
-      if (table === "agent_order") return agentOrderBuilder;
-      if (table === "customer_order") return sourceOrderBuilder;
+      if (table === "order") {
+        orderCall += 1;
+        return orderCall === 1 ? agentOrderBuilder : sourceOrderBuilder;
+      }
       return createQueryBuilder();
     });
     createSupabaseAdminClient.mockReturnValue({ from });
@@ -575,7 +608,7 @@ describe("loadAdminDashboardData", () => {
 
     const result = await loadAdminAgentOrder("agent-order-1");
 
-    expect(sourceOrderBuilder.eq).toHaveBeenCalledWith("converted_to_agent_order_id", "agent-order-1");
+    expect(sourceOrderBuilder.eq).toHaveBeenCalledWith("parent_order_id", "agent-order-1");
     expect(result?.converted_source_order?.id).toBe("source-order-1");
   });
 
@@ -682,7 +715,7 @@ describe("loadAdminDashboardData", () => {
       customer_order_status_history: null,
     };
     const from = vi.fn((table: string) => createQueryBuilder(
-      table === "customer_order"
+      table === "order"
         ? {
             data: [order],
             error: null,
@@ -730,7 +763,7 @@ describe("loadAdminDashboardData", () => {
 
     const result = await loadAdminOrder(order.id);
 
-    expect(from).toHaveBeenCalledWith("customer_order");
+    expect(from).toHaveBeenCalledWith("order");
     expect(builder.eq).toHaveBeenCalledWith("id", order.id);
     expect(result).toMatchObject({
       id: order.id,
@@ -783,7 +816,7 @@ describe("loadAdminDashboardData", () => {
   it("normalizes the parent distributed agent order for linked customer orders", async () => {
     const order = {
       id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
-      agent_order_id: "11111111-1111-4111-8111-111111111111",
+      parent_order_id: "11111111-1111-4111-8111-111111111111",
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
       source: "agent_submitted",
@@ -983,9 +1016,12 @@ describe("loadAdminDashboardData", () => {
       ],
       error: null,
     });
+    let orderCall = 0;
     const from = vi.fn((table: string) => {
-      if (table === "customer_order") return orderBuilder;
-      if (table === "agent_order") return agentOrderBuilder;
+      if (table === "order") {
+        orderCall += 1;
+        return orderCall === 1 ? orderBuilder : agentOrderBuilder;
+      }
       if (table === "agent") return agentBuilder;
       if (table === "customer") return customerBuilder;
       if (table === "contact_inquiry") return inquiryBuilder;

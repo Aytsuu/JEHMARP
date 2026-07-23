@@ -110,34 +110,6 @@ const orderRows = [
 
       <section class="order-create-section">
         <div class="order-create-section__header">
-          <h3 class="order-create-section__title">Release</h3>
-        </div>
-        <div class="order-create-section__body">
-          <div class="field-row-group field-row-group--datetime">
-            <label class="field-row field-row--date">
-              <span>Release date</span>
-              <input
-                name="releaseDate"
-                type="date"
-                required
-                disabled={!canSubmitOrder}
-              />
-            </label>
-            <label class="field-row field-row--time">
-              <span>Release time</span>
-              <input
-                name="releaseTime"
-                type="time"
-                required
-                disabled={!canSubmitOrder}
-              />
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <section class="order-create-section">
-        <div class="order-create-section__header">
           <h3 class="order-create-section__title">Order items</h3>
         </div>
         <div class="order-create-section__body">
@@ -236,6 +208,34 @@ const orderRows = [
             </svg>
             <span>Add Item</span>
           </button>
+
+          <div class="order-create-section order-create-section--subblock">
+            <div class="order-create-section__header">
+              <h3 class="order-create-section__title">Release</h3>
+            </div>
+            <div class="order-create-section__body">
+              <div class="order-create-form__field-pair">
+                <label class="field-row">
+                  <span>Release date</span>
+                  <input
+                    name="releaseDate"
+                    type="date"
+                    required
+                    disabled={!canSubmitOrder}
+                  />
+                </label>
+                <label class="field-row">
+                  <span>Release time</span>
+                  <input
+                    name="releaseTime"
+                    type="time"
+                    required
+                    disabled={!canSubmitOrder}
+                  />
+                </label>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

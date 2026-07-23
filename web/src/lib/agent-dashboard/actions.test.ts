@@ -274,8 +274,6 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
-    formData.set("releaseDate", "2026-07-22");
-    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -312,10 +310,6 @@ describe("parseAgentActionFormData", () => {
             ],
           },
         ],
-        releaseSchedule: {
-          date: "2026-07-22",
-          time: "08:30",
-        },
         requireApproval: true,
       },
     });
@@ -325,8 +319,6 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
-    formData.set("releaseDate", "2026-07-22");
-    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -374,10 +366,6 @@ describe("parseAgentActionFormData", () => {
             ],
           },
         ],
-        releaseSchedule: {
-          date: "2026-07-22",
-          time: "08:30",
-        },
         requireApproval: true,
       },
     });
@@ -387,8 +375,6 @@ describe("parseAgentActionFormData", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
-    formData.set("releaseDate", "2026-07-22");
-    formData.set("releaseTime", "08:30");
     formData.set(
       "attachCustomerEntries",
       JSON.stringify([
@@ -415,23 +401,34 @@ describe("parseAgentActionFormData", () => {
 describe("executeAgentAction", () => {
   it("attaches a customer order after verifying agent order status with explicit queries", async () => {
     const agentOrderMaybeSingle = vi.fn(() => Promise.resolve({
-      data: { order_status: "pending_customers" },
+      data: {
+        order_status: "pending_customers",
+        release_date: "2026-07-22T00:30:00.000Z",
+      },
       error: null,
     }));
-    const agentOrderEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
+    const agentOrderKindEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
+    const agentOrderEq = vi.fn(() => ({ eq: agentOrderKindEq }));
     const agentOrderSelect = vi.fn(() => ({ eq: agentOrderEq }));
-    const customerOrderEq = vi.fn(() => Promise.resolve({
+    const customerOrderIs = vi.fn(() => Promise.resolve({
       data: [],
       error: null,
     }));
-    const customerOrderSelect = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderEq = vi.fn(() => ({ is: customerOrderIs }));
+    const customerOrderIn = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderSelect = vi.fn(() => ({ in: customerOrderIn }));
     const rpc = vi.fn(() => Promise.resolve({
       data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       error: null,
     }));
+    let orderCall = 0;
     const from = vi.fn((table: string) => {
-      if (table === "agent_order") return { select: agentOrderSelect };
-      if (table === "customer_order") return { select: customerOrderSelect };
+      if (table === "order") {
+        orderCall += 1;
+        return orderCall === 1
+          ? { select: agentOrderSelect }
+          : { select: customerOrderSelect };
+      }
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -453,17 +450,14 @@ describe("executeAgentAction", () => {
           ],
         },
       ],
-      releaseSchedule: {
-        date: "2026-07-22",
-        time: "08:30",
-      },
       requireApproval: true,
     });
 
-    expect(agentOrderSelect).toHaveBeenCalledWith("order_status");
+    expect(agentOrderSelect).toHaveBeenCalledWith("order_status, release_date");
     expect(agentOrderEq).toHaveBeenCalledWith("id", "11111111-1111-4111-8111-111111111111");
+    expect(agentOrderKindEq).toHaveBeenCalledWith("order_kind", "distribution");
     expect(customerOrderSelect).toHaveBeenCalledWith("payment_status");
-    expect(customerOrderEq).toHaveBeenCalledWith("agent_order_id", "11111111-1111-4111-8111-111111111111");
+    expect(customerOrderEq).toHaveBeenCalledWith("parent_order_id", "11111111-1111-4111-8111-111111111111");
     expect(rpc).toHaveBeenCalledWith("attach_customer_to_agent_order", {
       target_agent_order_id: "11111111-1111-4111-8111-111111111111",
       target_customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",

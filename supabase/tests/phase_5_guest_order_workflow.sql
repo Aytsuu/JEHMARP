@@ -56,8 +56,9 @@ begin
 
   select customer_id
   into inserted_customer_id
-  from public.customer_order
+  from public."order"
   where id = test_order_id
+    and order_kind = 'customer'
     and source = 'guest_shop'
     and order_status = 'pending'
     and payment_status = 'unpaid'
@@ -88,7 +89,7 @@ begin
 
   select count(*)
   into item_count
-  from public.customer_order_item
+  from public.order_item
   where order_id = test_order_id
     and product_id = test_product_id
     and partial_quantity = 2
@@ -101,7 +102,7 @@ begin
 
   select unit_price, price_type
   into numeric_result, text_result
-  from public.customer_order_item
+  from public.order_item
   where order_id = test_order_id
     and product_id = test_product_id;
 

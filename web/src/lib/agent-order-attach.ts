@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import { releaseSchedulePartsFromIso } from "@/lib/datetime";
+import { canAttachCustomerToAgentOrder } from "@/lib/agent-order-distribution";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 const uuidSchema = z.uuid();
 
 export type AgentOrderAttachItemPayload = {
@@ -112,4 +116,56 @@ function requiredEntryField(value: string | undefined, message: string) {
   }
 
   return normalized;
+}
+
+type SupabaseServerClient = Pick<SupabaseClient, "from">;
+
+export async function assertAgentOrderAllowsCustomerAttach(
+  supabase: SupabaseServerClient,
+  agentOrderId: string,
+) {
+  const { data: agentOrder, error: agentOrderError } = await supabase
+    .from("order")
+    .select("order_status, release_date")
+    .eq("id", agentOrderId)
+    .eq("order_kind", "distribution")
+    .maybeSingle();
+
+  if (agentOrderError) {
+    throw new Error("Unable to verify agent order status before attaching a customer.", {
+      cause: agentOrderError,
+    });
+  }
+
+  if (!agentOrder) {
+    throw new Error("Agent order was not found.");
+  }
+
+  const { data: customerOrders, error: customerOrdersError } = await supabase
+    .from("order")
+    .select("payment_status")
+    .in("order_kind", ["customer", "personal"])
+    .eq("parent_order_id", agentOrderId)
+    .is("converted_at", null);
+
+  if (customerOrdersError) {
+    throw new Error("Unable to verify linked customer order payment statuses before attaching a customer.", {
+      cause: customerOrdersError,
+    });
+  }
+
+  if (!canAttachCustomerToAgentOrder({
+    order_status: String(agentOrder.order_status),
+    customer_order: (customerOrders ?? []).map((order) => ({
+      payment_status: String((order as { payment_status?: unknown }).payment_status ?? "unpaid"),
+    })),
+  })) {
+    throw new Error("Completed and paid agent orders cannot accept new customers.");
+  }
+
+  if (!agentOrder.release_date) {
+    throw new Error("Agent order release schedule is required before attaching customer orders.");
+  }
+
+  return releaseSchedulePartsFromIso(String(agentOrder.release_date));
 }

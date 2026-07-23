@@ -8,7 +8,7 @@ declare
   product_id uuid := '99999999-0000-4000-8000-000000000010';
   first_customer_id uuid := '99999999-0000-4000-8000-000000000011';
   second_customer_id uuid := '99999999-0000-4000-8000-000000000012';
-  agent_order_id uuid := '99999999-0000-4000-8000-000000000020';
+  distribution_order_id uuid := '99999999-0000-4000-8000-000000000020';
   first_order_id uuid := '99999999-0000-4000-8000-000000000021';
   second_order_id uuid := '99999999-0000-4000-8000-000000000022';
   text_result text;
@@ -109,51 +109,60 @@ begin
     (first_customer_id, '99999999-0000-4000-8000-000000000091', agent_profile_id),
     (second_customer_id, '99999999-0000-4000-8000-000000000092', agent_profile_id);
 
-  insert into public.agent_order (
+  insert into public."order" (
     id,
+    order_kind,
     agent_id,
+    source,
     order_status,
+    payment_status,
     submitted_by
   )
   values (
-    agent_order_id,
+    distribution_order_id,
+    'distribution',
     agent_profile_id,
+    'agent_submitted',
     'pending_customers',
+    'unpaid',
     agent_user_id
   );
 
-  insert into public.customer_order (
+  insert into public."order" (
     id,
+    order_kind,
     customer_id,
     agent_id,
-    agent_order_id,
+    parent_order_id,
     source,
     order_status,
     payment_status,
     submitted_by
   )
   values
-    (first_order_id, first_customer_id, agent_profile_id, agent_order_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id),
-    (second_order_id, second_customer_id, agent_profile_id, agent_order_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id);
+    (first_order_id, 'customer', first_customer_id, agent_profile_id, distribution_order_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id),
+    (second_order_id, 'customer', second_customer_id, agent_profile_id, distribution_order_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id);
 
   select order_status
   into text_result
-  from public.agent_order
-  where id = agent_order_id;
+  from public."order"
+  where id = distribution_order_id
+    and order_kind = 'distribution';
 
   if text_result <> 'processing' then
     raise exception 'Expected agent order with attached customer orders to become processing, got %', text_result;
   end if;
 
-  insert into public.customer_order_item (
+  insert into public.order_item (
+    order_kind,
     order_id,
     product_id,
     partial_quantity,
     final_quantity
   )
   values
-    (first_order_id, product_id, 2, 2),
-    (second_order_id, product_id, 1, 1);
+    ('customer', first_order_id, product_id, 2, 2),
+    ('customer', second_order_id, product_id, 1, 1);
 
   insert into public.invoice (order_id)
   values
@@ -177,7 +186,7 @@ begin
 
   select order_status
   into text_result
-  from public.customer_order
+  from public."order"
   where id = first_order_id;
 
   if text_result <> 'closed' then
@@ -186,7 +195,7 @@ begin
 
   select sale_date
   into timestamp_result
-  from public.customer_order
+  from public."order"
   where id = first_order_id;
 
   if timestamp_result is null then
@@ -195,8 +204,9 @@ begin
 
   select order_status
   into text_result
-  from public.agent_order
-  where id = agent_order_id;
+  from public."order"
+  where id = distribution_order_id
+    and order_kind = 'distribution';
 
   if text_result <> 'processing' then
     raise exception 'Expected agent order to remain processing while one linked order is unpaid, got %', text_result;
@@ -204,8 +214,9 @@ begin
 
   select sale_date
   into timestamp_result
-  from public.agent_order
-  where id = agent_order_id;
+  from public."order"
+  where id = distribution_order_id
+    and order_kind = 'distribution';
 
   if timestamp_result is not null then
     raise exception 'Expected agent order sale_date to remain empty before all linked orders are paid.';
@@ -228,7 +239,7 @@ begin
 
   select order_status
   into text_result
-  from public.customer_order
+  from public."order"
   where id = second_order_id;
 
   if text_result <> 'closed' then
@@ -237,8 +248,9 @@ begin
 
   select order_status
   into text_result
-  from public.agent_order
-  where id = agent_order_id;
+  from public."order"
+  where id = distribution_order_id
+    and order_kind = 'distribution';
 
   if text_result <> 'closed' then
     raise exception 'Expected agent order to close after all linked customer orders are paid, got %', text_result;
@@ -246,8 +258,9 @@ begin
 
   select sale_date
   into timestamp_result
-  from public.agent_order
-  where id = agent_order_id;
+  from public."order"
+  where id = distribution_order_id
+    and order_kind = 'distribution';
 
   if timestamp_result is null then
     raise exception 'Expected closed paid agent order to receive sale_date.';

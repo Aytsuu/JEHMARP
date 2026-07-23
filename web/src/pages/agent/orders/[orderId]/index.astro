@@ -86,14 +86,14 @@ const paidTotal = orderPaymentTotal(order);
 const commissionTotal = orderExpectedCommission(order);
 const grossTotal = orderTotal(order, orderQuantityKey);
 const orderCode = formatOrderCode(order.id);
-const backUrl = order.agent_order_id
-  ? `/agent/orders/multi-customers/${order.agent_order_id}`
+const backUrl = order.parent_order_id
+  ? `/agent/orders/multi-customers/${order.parent_order_id}`
   : "/agent/orders";
-const backLabel = order.agent_order_id
+const backLabel = order.parent_order_id
   ? "Back to distribution order"
   : "Back to orders";
-const parentAgentOrder = order.agent_order_id
-  ? data.agentOrders.find((cluster) => cluster.id === order.agent_order_id) ?? null
+const parentAgentOrder = order.parent_order_id
+  ? data.agentOrders.find((cluster) => cluster.id === order.parent_order_id) ?? null
   : null;
 const orderNavigationEntries = parentAgentOrder
   ? buildOrderDetailNavEntries({
@@ -120,6 +120,9 @@ const todayTime = manilaTimeInputValue();
 const productCount = order.customer_order_item.length;
 
 const customerDisplayName = order.customer ? fullName(order.customer) : "Guest";
+const customerViewHref = order.customer?.id
+  ? `/agent/customers/${order.customer.id}`
+  : null;
 const orderSlipPdfHref = `/agent/orders/${order.id}/order-slip.pdf`;
 const salesInvoicePdfHref = `/agent/orders/${order.id}/sales-invoice.pdf`;
 
@@ -243,9 +246,22 @@ const timelineItems = [
       </div>
 
       <div class="detail-field">
-        <span class="detail-field-label">Customer</span>
+        <div class="detail-field__header">
+          <span class="detail-field-label">Customer</span>
+          {
+            customerViewHref ? (
+              <a href={customerViewHref} class="detail-field-view-link">
+                View details
+              </a>
+            ) : null
+          }
+        </div>
         <p class="detail-field-value detail-field-value--name">{customerDisplayName}</p>
         <dl class="customer-detail-list">
+          <div>
+            <dt>Release</dt>
+            <dd>{formatDate(order.release_date ?? null)}</dd>
+          </div>
           <div>
             <dt>Phone</dt>
             <dd>
@@ -681,6 +697,29 @@ const timelineItems = [
     font-size: 0.82rem;
     font-weight: 500;
     color: var(--color-brand-muted-black);
+  }
+
+  .detail-field__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .detail-field-view-link {
+    flex-shrink: 0;
+    color: #661818;
+    font-size: 0.86rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+
+  .detail-field-view-link:hover,
+  .detail-field-view-link:focus-visible {
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+    outline: none;
   }
 
   .detail-field-value {

@@ -13,6 +13,23 @@ export function manilaTimeInputValue(date = new Date()) {
   }).format(date);
 }
 
+export function releaseSchedulePartsFromIso(value: string | null | undefined) {
+  if (!value) {
+    throw new Error("Release schedule is required.");
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("Release schedule is invalid.");
+  }
+
+  return {
+    date: manilaDateInputValue(parsed),
+    time: manilaTimeInputValue(parsed),
+  };
+}
+
 export function isDateOnlyString(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }

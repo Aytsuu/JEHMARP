@@ -253,13 +253,15 @@ declare
   unassigned_blocked boolean := false;
 begin
   begin
-    insert into public.customer_order (
+    insert into public."order" (
+      order_kind,
       customer_id,
       source,
       order_status,
       payment_status
     )
     values (
+      'customer',
       '70000000-0000-4000-8000-000000000072',
       'agent_submitted',
       'pending',
@@ -271,7 +273,7 @@ begin
   end;
 
   if not direct_insert_blocked then
-    raise exception 'Expected direct agent customer_order inserts to remain blocked';
+    raise exception 'Expected direct agent order inserts to remain blocked';
   end if;
 
   begin
@@ -352,8 +354,9 @@ begin
 
   if not exists (
     select 1
-    from public.agent_order
+    from public."order"
     where id = distribution_agent_order_id
+      and order_kind = 'distribution'
       and agent_id = agent_profile_id
       and order_status = 'pending_order'
       and release_date = timezone('Asia/Manila', timestamp '2026-07-21 00:00:00')
@@ -364,10 +367,11 @@ begin
 
   select count(*)
   into item_count
-  from public.agent_order_item
-  where agent_order_id = distribution_agent_order_id
+  from public.order_item
+  where order_id = distribution_agent_order_id
+    and order_kind = 'distribution'
     and product_id = '70000000-0000-4000-8000-000000000071'
-    and quantity = 10
+    and partial_quantity = 10
     and add_details = 'Phase 7 distribution order item';
 
   if item_count <> 1 then
@@ -376,33 +380,33 @@ begin
 
   if exists (
     select 1
-    from public.customer_order
+    from public."order"
     where id = distribution_agent_order_id
+      and order_kind in ('customer', 'personal')
   ) then
     raise exception 'Expected product-only agent order not to create a customer order with the same id';
   end if;
 
   if not exists (
     select 1
-    from public.customer_order
-    join public.agent
-      on agent.customer_id = customer_order.customer_id
-    where customer_order.id = personal_customer_order_id
-      and customer_order.agent_id = agent_profile_id
-      and customer_order.source = 'agent_submitted'
-      and customer_order.order_status = 'pending'
-      and customer_order.payment_status = 'unpaid'
-      and customer_order.release_date = timezone('Asia/Manila', timestamp '2026-07-22 00:00:00')
-      and customer_order.submitted_by = '22222222-2222-2222-2222-222222222222'
-      and agent.id = agent_profile_id
+    from public."order"
+    where id = personal_customer_order_id
+      and order_kind = 'personal'
+      and agent_id = agent_profile_id
+      and source = 'agent_submitted'
+      and order_status = 'pending'
+      and payment_status = 'unpaid'
+      and release_date = timezone('Asia/Manila', timestamp '2026-07-22 00:00:00')
+      and submitted_by = '22222222-2222-2222-2222-222222222222'
   ) then
     raise exception 'Expected personal agent order to create a normal linked customer order';
   end if;
 
   select count(*)
   into item_count
-  from public.customer_order_item
+  from public.order_item
   where order_id = personal_customer_order_id
+    and order_kind = 'personal'
     and product_id = '70000000-0000-4000-8000-000000000071'
     and partial_quantity = 3
     and final_quantity = 3
@@ -414,8 +418,9 @@ begin
 
   if not exists (
     select 1
-    from public.customer_order
+    from public."order"
     where id = submitted_order_id
+      and order_kind = 'customer'
       and customer_id = '70000000-0000-4000-8000-000000000072'
       and agent_id = agent_profile_id
       and source = 'agent_submitted'
@@ -428,8 +433,9 @@ begin
 
   select count(*)
   into item_count
-  from public.customer_order_item
+  from public.order_item
   where order_id = submitted_order_id
+    and order_kind = 'customer'
     and product_id = '70000000-0000-4000-8000-000000000071'
     and partial_quantity = 2
     and final_quantity = 2
@@ -441,8 +447,9 @@ begin
 
   select unit_price, price_type
   into numeric_result, text_result
-  from public.customer_order_item
-  where order_id = submitted_order_id;
+  from public.order_item
+  where order_id = submitted_order_id
+    and order_kind = 'customer';
 
   if numeric_result <> 100 or text_result <> 'retail' then
     raise exception 'Expected agent order item to use retail price 100, got % type %', numeric_result, text_result;
@@ -450,8 +457,9 @@ begin
 
   select customer_id
   into new_customer_id
-  from public.customer_order
+  from public."order"
     where id = new_customer_order_id
+      and order_kind = 'customer'
       and agent_id = agent_profile_id
       and source = 'agent_submitted'
       and order_status = 'pending'

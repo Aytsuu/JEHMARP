@@ -134,16 +134,15 @@ async function loadOrderInvoiceBalance(
   options: OrderInvoiceBalanceOptions = {},
 ): Promise<OrderInvoiceBalance | null> {
   const { data: order, error } = await supabase
-    .from("customer_order")
+    .from("order")
     .select(`
       order_status,
       agent_id,
-      agent_order_id,
-      converted_to_agent_order_id,
+      parent_order_id,
       payment (
         amount
       ),
-      customer_order_item (
+      order_item (
         final_quantity,
         unit_price,
         agent_commission_amount,
@@ -172,10 +171,9 @@ async function loadOrderInvoiceBalance(
   const normalizedOrder = order as {
     order_status?: unknown;
     agent_id?: unknown;
-    agent_order_id?: unknown;
-    converted_to_agent_order_id?: unknown;
+    parent_order_id?: unknown;
     payment?: Array<{ amount?: unknown }> | null;
-    customer_order_item?: Array<{
+    order_item?: Array<{
       final_quantity?: unknown;
       unit_price?: unknown;
       agent_commission_amount?: unknown;
@@ -187,10 +185,9 @@ async function loadOrderInvoiceBalance(
     : "";
   const commissionEffective = Boolean(
     normalizedOrder.agent_id ||
-    normalizedOrder.agent_order_id ||
-    normalizedOrder.converted_to_agent_order_id,
+    normalizedOrder.parent_order_id,
   );
-  const totals = (normalizedOrder.customer_order_item ?? []).reduce((current, item) => {
+  const totals = (normalizedOrder.order_item ?? []).reduce((current, item) => {
     const finalQuantity = Number(item.final_quantity ?? 0);
     const unitPrice = Number(item.unit_price ?? 0);
     const agentCommissionAmount = Number(item.agent_commission_amount ?? 0);
@@ -264,7 +261,7 @@ async function closeFullyPaidProcessingOrder(
   updatedAt: string,
 ) {
   const { error } = await supabase
-    .from("customer_order")
+    .from("order")
     .update({
       order_status: "closed",
       updated_at: updatedAt,

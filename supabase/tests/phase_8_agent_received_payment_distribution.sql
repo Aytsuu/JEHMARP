@@ -126,8 +126,9 @@ begin
     ('88888888-0000-4000-8000-000000000013', '88888888-0000-4000-8000-000000000093', agent_profile_id)
   on conflict (id) do nothing;
 
-  insert into public.customer_order (
+  insert into public."order" (
     id,
+    order_kind,
     customer_id,
     agent_id,
     source,
@@ -136,20 +137,21 @@ begin
     submitted_by
   )
   values
-    ('88888888-0000-4000-8000-000000000021', '88888888-0000-4000-8000-000000000011', agent_profile_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id),
-    ('88888888-0000-4000-8000-000000000022', '88888888-0000-4000-8000-000000000012', agent_profile_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id),
-    ('88888888-0000-4000-8000-000000000023', '88888888-0000-4000-8000-000000000013', agent_profile_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id);
+    ('88888888-0000-4000-8000-000000000021', 'customer', '88888888-0000-4000-8000-000000000011', agent_profile_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id),
+    ('88888888-0000-4000-8000-000000000022', 'customer', '88888888-0000-4000-8000-000000000012', agent_profile_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id),
+    ('88888888-0000-4000-8000-000000000023', 'customer', '88888888-0000-4000-8000-000000000013', agent_profile_id, 'agent_submitted', 'processing', 'unpaid', agent_user_id);
 
-  insert into public.customer_order_item (
+  insert into public.order_item (
+    order_kind,
     order_id,
     product_id,
     partial_quantity,
     final_quantity
   )
   values
-    ('88888888-0000-4000-8000-000000000021', '88888888-0000-4000-8000-000000000010', 20, 20),
-    ('88888888-0000-4000-8000-000000000022', '88888888-0000-4000-8000-000000000010', 10, 10),
-    ('88888888-0000-4000-8000-000000000023', '88888888-0000-4000-8000-000000000010', 10, 10);
+    ('customer', '88888888-0000-4000-8000-000000000021', '88888888-0000-4000-8000-000000000010', 20, 20),
+    ('customer', '88888888-0000-4000-8000-000000000022', '88888888-0000-4000-8000-000000000010', 10, 10),
+    ('customer', '88888888-0000-4000-8000-000000000023', '88888888-0000-4000-8000-000000000010', 10, 10);
 end $$;
 
 set local role authenticated;

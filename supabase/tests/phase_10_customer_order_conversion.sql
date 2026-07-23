@@ -116,27 +116,30 @@ begin
     (promoted_customer_id, promoted_profile_id, target_agent_id, target_agent_id, seeded_at, seeded_at, seeded_at),
     ('10101010-0000-4000-8000-000000000013', '10101010-0000-4000-8000-000000000092', target_agent_id, null, null, seeded_at, seeded_at);
 
-  insert into public.customer_order (
+  insert into public."order" (
     id,
+    order_kind,
     customer_id,
     agent_id,
     source,
     order_status,
     payment_status,
     notes,
+    release_date,
     submitted_by,
     created_at,
     updated_at
   )
   values
-    ('10101010-0000-4000-8000-000000000101', promoted_customer_id, null, 'admin_manual', 'processing', 'unpaid', 'Needs distribution stock.', admin_user_id, seeded_at, seeded_at),
-    ('10101010-0000-4000-8000-000000000102', promoted_customer_id, null, 'admin_manual', 'processing', 'partial', null, admin_user_id, seeded_at, seeded_at),
-    ('10101010-0000-4000-8000-000000000103', promoted_customer_id, null, 'admin_manual', 'processing', 'unpaid', null, admin_user_id, seeded_at, seeded_at),
-    ('10101010-0000-4000-8000-000000000104', promoted_customer_id, null, 'admin_manual', 'closed', 'unpaid', null, admin_user_id, seeded_at, seeded_at),
-    ('10101010-0000-4000-8000-000000000105', '10101010-0000-4000-8000-000000000013', null, 'admin_manual', 'processing', 'unpaid', null, admin_user_id, seeded_at, seeded_at),
-    ('10101010-0000-4000-8000-000000000106', promoted_customer_id, target_agent_id, 'admin_manual', 'processing', 'unpaid', null, admin_user_id, seeded_at, seeded_at);
+    ('10101010-0000-4000-8000-000000000101', 'customer', promoted_customer_id, null, 'admin_manual', 'processing', 'unpaid', 'Needs distribution stock.', '2026-07-25T10:00:00Z'::timestamptz, admin_user_id, seeded_at, seeded_at),
+    ('10101010-0000-4000-8000-000000000102', 'customer', promoted_customer_id, null, 'admin_manual', 'processing', 'partial', null, null, admin_user_id, seeded_at, seeded_at),
+    ('10101010-0000-4000-8000-000000000103', 'customer', promoted_customer_id, null, 'admin_manual', 'processing', 'unpaid', null, null, admin_user_id, seeded_at, seeded_at),
+    ('10101010-0000-4000-8000-000000000104', 'customer', promoted_customer_id, null, 'admin_manual', 'closed', 'unpaid', null, null, admin_user_id, seeded_at, seeded_at),
+    ('10101010-0000-4000-8000-000000000105', 'customer', '10101010-0000-4000-8000-000000000013', null, 'admin_manual', 'processing', 'unpaid', null, null, admin_user_id, seeded_at, seeded_at),
+    ('10101010-0000-4000-8000-000000000106', 'customer', promoted_customer_id, target_agent_id, 'admin_manual', 'processing', 'unpaid', null, null, admin_user_id, seeded_at, seeded_at);
 
-  insert into public.customer_order_item (
+  insert into public.order_item (
+    order_kind,
     order_id,
     product_id,
     partial_quantity,
@@ -145,12 +148,12 @@ begin
     add_details
   )
   values
-    ('10101010-0000-4000-8000-000000000101', product_id, 3.000, 3.000, 45.00, 'Copy me'),
-    ('10101010-0000-4000-8000-000000000102', product_id, 1.000, 1.000, 0, null),
-    ('10101010-0000-4000-8000-000000000103', product_id, 1.000, 1.000, 0, null),
-    ('10101010-0000-4000-8000-000000000104', product_id, 1.000, 1.000, 0, null),
-    ('10101010-0000-4000-8000-000000000105', product_id, 1.000, 1.000, 0, null),
-    ('10101010-0000-4000-8000-000000000106', product_id, 3.000, 3.000, 0, null);
+    ('customer', '10101010-0000-4000-8000-000000000101', product_id, 3.000, 3.000, 45.00, 'Copy me'),
+    ('customer', '10101010-0000-4000-8000-000000000102', product_id, 1.000, 1.000, 0, null),
+    ('customer', '10101010-0000-4000-8000-000000000103', product_id, 1.000, 1.000, 0, null),
+    ('customer', '10101010-0000-4000-8000-000000000104', product_id, 1.000, 1.000, 0, null),
+    ('customer', '10101010-0000-4000-8000-000000000105', product_id, 1.000, 1.000, 0, null),
+    ('customer', '10101010-0000-4000-8000-000000000106', product_id, 3.000, 3.000, 0, null);
 
   insert into public.invoice (order_id)
   values
@@ -201,19 +204,22 @@ begin
 
   if not exists (
     select 1
-    from public.agent_order
+    from public."order"
     where id = converted_agent_order_id
+      and order_kind = 'distribution'
       and agent_id = '10101010-0000-4000-8000-000000000012'
       and order_status = 'pending_customers'
+      and release_date = '2026-07-25T10:00:00Z'::timestamptz
       and notes like '%Converted from customer order 10101010-0000-4000-8000-000000000101%'
   ) then
     raise exception 'Expected a pending agent order linked to the promoted agent.';
   end if;
 
-  select quantity, add_details, agent_commission_amount
+  select partial_quantity, add_details, agent_commission_amount
   into copied_quantity, copied_details, copied_commission
-  from public.agent_order_item
-  where agent_order_id = converted_agent_order_id
+  from public.order_item
+  where order_id = converted_agent_order_id
+    and order_kind = 'distribution'
     and product_id = '10101010-0000-4000-8000-000000000020';
 
   if copied_quantity <> 3.000 or copied_details <> 'Copy me' or copied_commission <> 45.00 then
@@ -225,12 +231,11 @@ begin
 
   if not exists (
     select 1
-    from public.customer_order
+    from public."order"
     where id = '10101010-0000-4000-8000-000000000101'
-      and converted_to_agent_order_id = converted_agent_order_id
-      and converted_to_agent_order_at is not null
-      and converted_to_agent_order_by = '10101010-0000-4000-8000-000000000001'
-      and agent_order_id is null
+      and parent_order_id = converted_agent_order_id
+      and converted_at is not null
+      and converted_by = '10101010-0000-4000-8000-000000000001'
   ) then
     raise exception 'Expected source customer order to keep its original link and store conversion audit metadata.';
   end if;
@@ -265,8 +270,9 @@ begin
 
   if not exists (
     select 1
-    from public.agent_order
+    from public."order"
     where id = converted_agent_order_id
+      and order_kind = 'distribution'
       and agent_id = '10101010-0000-4000-8000-000000000012'
       and order_status = 'pending_customers'
   ) then
@@ -311,10 +317,10 @@ begin
       balance_total;
   end if;
 
-  select customer_order.payment_status, customer_order.order_status
+  select order_row.payment_status, order_row.order_status
   into order_payment_status, order_status
-  from public.customer_order
-  where id = '10101010-0000-4000-8000-000000000106';
+  from public."order" order_row
+  where order_row.id = '10101010-0000-4000-8000-000000000106';
 
   if order_payment_status <> 'paid' or order_status <> 'closed' then
     raise exception 'Expected promoted customer order to be paid/closed after net receivable payment, got %/%',
@@ -390,9 +396,9 @@ declare
   order_row_paid numeric;
   order_row_remaining numeric;
 begin
-  select converted_to_agent_order_id
+  select parent_order_id
   into converted_agent_order_id
-  from public.customer_order
+  from public."order"
   where id = '10101010-0000-4000-8000-000000000101';
 
   select
