@@ -54,7 +54,7 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
   } = options;
 
   const customerSearch = scope.querySelector<HTMLInputElement>("[data-customer-search]");
-  const customerIdInput = scope.querySelector<HTMLInputElement>("[data-customer-id]");
+  const customerIdInput = scope.querySelector<HTMLInputElement>("input[data-customer-id]");
   const customerPicker = scope.querySelector<HTMLElement>("[data-customer-picker]");
   const customerPickerToggle = scope.querySelector<HTMLButtonElement>("[data-customer-picker-toggle]");
   const customerPickerMenu = scope.querySelector<HTMLElement>("[data-customer-picker-menu]");
@@ -84,6 +84,7 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
   );
   const customerSearchCache = new Map<string, HTMLButtonElement[]>();
   let customerSearchTimer: number | undefined;
+  let selectedCustomerId = customerIdInput?.value.trim() ?? "";
 
   function setCustomerPickerOpen(isOpen: boolean) {
     if (!customerPicker || !customerPickerMenu || !customerPickerToggle) return;
@@ -224,13 +225,16 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
 
   function refreshCustomerMode() {
     const selectedCustomer = getSelectedCustomer();
-    const selectedCustomerId = selectedCustomer?.dataset.customerId ?? "";
+    const previousCustomerId = selectedCustomerId;
+    selectedCustomerId = selectedCustomer?.dataset.customerId ?? "";
 
     if (customerIdInput) {
       customerIdInput.value = selectedCustomerId;
     }
 
-    fillCustomerFields(selectedCustomer);
+    if (selectedCustomer || previousCustomerId.length > 0) {
+      fillCustomerFields(selectedCustomer);
+    }
     updateCustomerOrderNotice(selectedCustomer);
 
     const fields = newCustomerFields?.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(

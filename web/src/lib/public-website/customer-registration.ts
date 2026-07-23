@@ -1,13 +1,23 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 
+import { formatAgentCode } from "@/lib/admin-dashboard/view";
 import { parseContactNumber } from "@/lib/formatters";
+import {
+  assertProfileEmailIsAvailable,
+  assertProfilePhoneIsAvailable,
+  insertCustomerWithProfile,
+  asProfileIdentityClient,
+} from "@/lib/profile-identity";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
+const agentIdentifierSchema = z.string().trim().optional();
+const agentCodePattern = /^[0-9a-f]{6}$/i;
+
 const customerRegistrationSchema = z.object({
-  agentEmployeeId: z.string().trim().optional(),
+  agentCode: agentIdentifierSchema,
   firstName: z.string().trim().min(1, "First name is required.").max(100),
   lastName: z.string().trim().min(1, "Last name is required.").max(100),
   phoneNumber: z.string().trim().min(1, "Phone number is required."),
@@ -47,7 +57,7 @@ export function parseCustomerRegistrationFormData(
   formData: FormData,
 ): CustomerRegistrationParseResult {
   const result = customerRegistrationSchema.safeParse({
-    agentEmployeeId: formData.get("agentEmployeeId"),
+    agentCode: readAgentIdentifier(formData),
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
     phoneNumber: formData.get("phoneNumber"),
@@ -126,28 +136,32 @@ export async function submitCustomerRegistration(
   const assignedAgentId = await resolveAssignedAgentId(
     supabase,
     link.id,
-    payload.data.agentEmployeeId,
+    payload.data.agentCode,
   );
 
-  await assertCustomerIsUnique(supabase, payload.data.phoneNumber, payload.data.email ?? null);
+  await assertProfilePhoneIsAvailable(asProfileIdentityClient(supabase), payload.data.phoneNumber);
 
-  const { error: insertError } = await supabase.from("customer").insert({
-    first_name: payload.data.firstName,
-    last_name: payload.data.lastName,
-    phone_number: payload.data.phoneNumber,
-    email: payload.data.email ?? null,
-    address: payload.data.address,
-    assigned_agent_id: assignedAgentId,
-    is_reseller: false,
-    updated_at: new Date().toISOString(),
-  });
+  if (payload.data.email) {
+    await assertProfileEmailIsAvailable(asProfileIdentityClient(supabase), payload.data.email);
+  }
 
-  if (insertError) {
-    if (insertError.code === "23505") {
-      throw new Error("Phone number or email already exists for another customer.");
+  try {
+    await insertCustomerWithProfile(asProfileIdentityClient(supabase), {
+      first_name: payload.data.firstName,
+      last_name: payload.data.lastName,
+      phone_number: payload.data.phoneNumber,
+      email: payload.data.email ?? null,
+      address: payload.data.address,
+      assigned_agent_id: assignedAgentId,
+      is_reseller: false,
+      updated_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("already exists")) {
+      throw new Error("Phone number or email already exists for another customer.", { cause: error });
     }
 
-    throw new Error("Unable to register customer.");
+    throw error;
   }
 
   await supabase
@@ -181,89 +195,116 @@ async function loadRegistrationLinkByToken(
   } | null;
 }
 
+type RegistrationLinkAgent = {
+  id: string;
+  employee_id: string | null;
+  status: "active" | "inactive" | "suspended";
+};
+
 async function resolveAssignedAgentId(
   supabase: SupabaseAdminClient,
   linkId: string,
-  employeeId: string | undefined,
+  identifier: string | undefined,
 ) {
-  const normalizedEmployeeId = employeeId?.trim();
+  const normalizedIdentifier = identifier?.trim();
 
-  if (!normalizedEmployeeId) {
+  if (!normalizedIdentifier) {
     return null;
   }
 
   const { data, error } = await supabase
-    .from("agent_profile")
-    .select("id")
-    .eq("employee_id", normalizedEmployeeId)
-    .eq("status", "active")
-    .maybeSingle();
+    .from("customer_registration_link_agent")
+    .select("agent_id, agent:agent_id ( id, employee_id, status )")
+    .eq("link_id", linkId);
 
   if (error) {
-    throw new Error("Unable to validate agent employee ID.");
+    throw new Error("Unable to validate registration link agents.");
   }
 
-  if (!data?.id) {
-    throw new Error("Agent employee ID is not valid for this registration link.");
+  const candidates = (data ?? [])
+    .map((row) => normalizeRegistrationLinkAgent(row.agent))
+    .filter((agent): agent is RegistrationLinkAgent => agent !== null && agent.status === "active");
+
+  const matchedAgent = findRegistrationAgentMatch(candidates, normalizedIdentifier);
+
+  if (!matchedAgent) {
+    throw new Error("Agent code or employee ID is not valid for this registration link.");
   }
 
-  const { data: linkAgent, error: linkAgentError } = await supabase
-    .from("customer_registration_link_agent")
-    .select("agent_id")
-    .eq("link_id", linkId)
-    .eq("agent_id", String(data.id))
-    .limit(1)
-    .maybeSingle();
-
-  if (linkAgentError) {
-    throw new Error("Unable to validate registration link agent.");
-  }
-
-  if (!linkAgent?.agent_id) {
-    throw new Error("Agent employee ID is not valid for this registration link.");
-  }
-
-  return String(data.id);
+  return matchedAgent.id;
 }
 
-async function assertCustomerIsUnique(
-  supabase: SupabaseAdminClient,
-  phoneNumber: string,
-  email: string | null,
+function readAgentIdentifier(formData: FormData) {
+  const agentCode = formData.get("agentCode");
+  const legacyEmployeeId = formData.get("agentEmployeeId");
+
+  if (typeof agentCode === "string" && agentCode.trim()) {
+    return agentCode;
+  }
+
+  if (typeof legacyEmployeeId === "string" && legacyEmployeeId.trim()) {
+    return legacyEmployeeId;
+  }
+
+  return undefined;
+}
+
+function normalizeRegistrationLinkAgent(value: unknown): RegistrationLinkAgent | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const agent = value as Partial<RegistrationLinkAgent>;
+
+  if (!agent.id || !agent.status) {
+    return null;
+  }
+
+  return {
+    id: String(agent.id),
+    employee_id: agent.employee_id ? String(agent.employee_id) : null,
+    status: agent.status,
+  };
+}
+
+function findRegistrationAgentMatch(
+  candidates: RegistrationLinkAgent[],
+  identifier: string,
 ) {
-  const { data: phoneCustomer, error: phoneError } = await supabase
-    .from("customer")
-    .select("id")
-    .eq("phone_number", phoneNumber)
-    .limit(1)
-    .maybeSingle();
+  const normalizedIdentifier = identifier.trim();
+  const normalizedCode = normalizedIdentifier.replace(/^agent-/i, "");
 
-  if (phoneError) {
-    throw new Error("Unable to validate customer phone number.");
+  const uuidMatch = candidates.find((agent) => agent.id.toLowerCase() === normalizedIdentifier.toLowerCase());
+
+  if (uuidMatch) {
+    return uuidMatch;
   }
 
-  if (phoneCustomer?.id) {
-    throw new Error("Phone number already exists for another customer.");
+  const employeeMatch = candidates.find(
+    (agent) => agent.employee_id?.toLowerCase() === normalizedIdentifier.toLowerCase(),
+  );
+
+  if (employeeMatch) {
+    return employeeMatch;
   }
 
-  if (!email) {
-    return;
+  if (!agentCodePattern.test(normalizedCode)) {
+    return null;
   }
 
-  const { data: emailCustomer, error: emailError } = await supabase
-    .from("customer")
-    .select("id")
-    .ilike("email", email)
-    .limit(1)
-    .maybeSingle();
+  const codeMatches = candidates.filter(
+    (agent) => agent.id.slice(0, 6).toLowerCase() === normalizedCode.toLowerCase(),
+  );
 
-  if (emailError) {
-    throw new Error("Unable to validate customer email.");
+  if (codeMatches.length === 1) {
+    return codeMatches[0];
   }
 
-  if (emailCustomer?.id) {
-    throw new Error("Email already exists for another customer.");
+  if (codeMatches.length > 1) {
+    throw new Error(`Agent code ${formatAgentCode(codeMatches[0].id)} is ambiguous. Use the full agent ID instead.`);
   }
+
+  return null;
 }
 
 function hashRegistrationToken(token: string) {

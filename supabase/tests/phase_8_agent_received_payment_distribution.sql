@@ -48,47 +48,41 @@ begin
     updated_at = excluded.updated_at,
     deleted_at = null;
 
-  insert into public.profile (id, display_name, created_at, updated_at)
-  values (agent_user_id, 'Phase 8 Test Agent', seeded_at, seeded_at)
+  insert into public.profile (id, user_id, first_name, last_name, display_name, phone_number, created_at, updated_at)
+  values (agent_user_id, agent_user_id, 'Phase', 'Eight', 'Phase 8 Test Agent', '09170000008', seeded_at, seeded_at)
   on conflict (id) do update
   set
+    first_name = excluded.first_name,
+    last_name = excluded.last_name,
     display_name = excluded.display_name,
+    phone_number = excluded.phone_number,
     updated_at = excluded.updated_at;
 
-  insert into public.agent_profile (
+  insert into public.agent (
     user_id,
-    first_name,
-    last_name,
-    display_name,
+    profile_id,
     status,
-    contact,
     created_at,
     updated_at
   )
   values (
     agent_user_id,
-    'Phase',
-    'Eight',
-    'Phase 8 Test Agent',
+    agent_user_id,
     'active',
-    '09170000008',
     seeded_at,
     seeded_at
   )
   on conflict (user_id) do update
   set
-    first_name = excluded.first_name,
-    last_name = excluded.last_name,
-    display_name = excluded.display_name,
+    profile_id = excluded.profile_id,
     status = excluded.status,
-    contact = excluded.contact,
     updated_at = excluded.updated_at
   returning id into agent_profile_id;
 
   if agent_profile_id is null then
     select id
     into agent_profile_id
-    from public.agent_profile
+    from public.agent
     where user_id = agent_user_id;
   end if;
 
@@ -114,18 +108,22 @@ begin
   )
   on conflict (id) do nothing;
 
+  insert into public.profile (id, first_name, last_name, phone_number, address, created_at, updated_at)
+  values
+    ('88888888-0000-4000-8000-000000000091', 'Customer', 'One', '09170000811', 'Phase 8 Address 1', seeded_at, seeded_at),
+    ('88888888-0000-4000-8000-000000000092', 'Customer', 'Two', '09170000812', 'Phase 8 Address 2', seeded_at, seeded_at),
+    ('88888888-0000-4000-8000-000000000093', 'Customer', 'Three', '09170000813', 'Phase 8 Address 3', seeded_at, seeded_at)
+  on conflict (id) do nothing;
+
   insert into public.customer (
     id,
-    first_name,
-    last_name,
-    phone_number,
-    address,
+    profile_id,
     assigned_agent_id
   )
   values
-    ('88888888-0000-4000-8000-000000000011', 'Customer', 'One', '09170000811', 'Phase 8 Address 1', agent_profile_id),
-    ('88888888-0000-4000-8000-000000000012', 'Customer', 'Two', '09170000812', 'Phase 8 Address 2', agent_profile_id),
-    ('88888888-0000-4000-8000-000000000013', 'Customer', 'Three', '09170000813', 'Phase 8 Address 3', agent_profile_id)
+    ('88888888-0000-4000-8000-000000000011', '88888888-0000-4000-8000-000000000091', agent_profile_id),
+    ('88888888-0000-4000-8000-000000000012', '88888888-0000-4000-8000-000000000092', agent_profile_id),
+    ('88888888-0000-4000-8000-000000000013', '88888888-0000-4000-8000-000000000093', agent_profile_id)
   on conflict (id) do nothing;
 
   insert into public.customer_order (

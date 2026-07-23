@@ -1,4 +1,27 @@
-import type { AgentDashboardData, AgentOrder, AgentOrderCluster, AgentPaymentSummary } from "./data";
+import type { AgentDashboardData, AgentOrder, AgentOrderCluster, AgentPaymentSummary, AgentProfile } from "./data";
+
+export type AgentMyOrderCandidate = Pick<
+  AgentOrder,
+  "agent_id" | "agent_order_id" | "converted_to_agent_order_id"
+>;
+
+export function isAgentMyOrder(
+  order: AgentMyOrderCandidate,
+  agent: Pick<AgentProfile, "id">,
+) {
+  return order.agent_id === agent.id;
+}
+
+export function isAgentMyStandaloneOrder(
+  order: AgentMyOrderCandidate,
+  agent: Pick<AgentProfile, "id">,
+) {
+  if (order.agent_order_id || order.converted_to_agent_order_id) {
+    return false;
+  }
+
+  return isAgentMyOrder(order, agent);
+}
 
 export function fullName(customer: { first_name: string; last_name: string } | null) {
   return customer ? `${customer.first_name} ${customer.last_name}` : "Unassigned customer";
@@ -12,7 +35,13 @@ export function formatCurrency(value: number) {
 }
 
 export function formatDate(value: string | null) {
-  return value ? new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(new Date(value)) : "Not set";
+  if (!value) return "Not set";
+
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Manila",
+  }).format(new Date(value));
 }
 
 export function formatPaymentStatus(status: AgentOrder["payment_status"]) {
@@ -42,6 +71,23 @@ export function agentOrderTotal(order: AgentOrderCluster) {
   }, 0);
 
   return roundCurrency(subtotal);
+}
+
+export function agentOrderCommissionTotal(order: Pick<AgentOrderCluster, "agent_order_item">) {
+  return roundCurrency(
+    order.agent_order_item.reduce((total, item) => total + item.agent_commission_amount, 0),
+  );
+}
+
+export function agentOrderRemittanceTotal(order: AgentOrderCluster) {
+  return roundCurrency(Math.max(agentOrderTotal(order) - agentOrderCommissionTotal(order), 0));
+}
+
+export function orderRemittanceTotal(
+  order: AgentOrder,
+  quantityKey: "partial_quantity" | "final_quantity",
+) {
+  return roundCurrency(Math.max(orderTotal(order, quantityKey) - orderExpectedCommission(order), 0));
 }
 
 export function agentOrderPaymentStatus(
@@ -95,7 +141,7 @@ export function buildAgentSummary(
   data: Pick<AgentDashboardData, "agent" | "customers" | "agentOrders" | "orders">,
   now = new Date(),
 ) {
-  const agentOrders = data.orders.filter((order) => order.agent_id === data.agent.id);
+  const agentOrders = data.orders.filter((order) => isAgentMyOrder(order, data.agent));
   const monthKey = monthIdentifier(now);
   const dayKey = dayIdentifier(now);
 
@@ -112,7 +158,7 @@ export function buildAgentSummary(
       .filter((order) => order.payment_status === "unpaid" || order.payment_status === "partial")
       .reduce((total, order) => total + Math.max(orderExpectedCommission(order) - orderEarnedCommission(order), 0), 0)),
     outstandingBalance: roundCurrency(data.orders
-      .filter(isOutstandingBalanceOrder)
+      .filter((order) => isAgentMyOrder(order, data.agent) && isOutstandingBalanceOrder(order))
       .reduce((total, order) => total + orderBalance(order), 0)),
   };
 }

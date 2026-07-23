@@ -4,7 +4,6 @@ import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
-  getAllowedNextOrderStatuses,
   handleAdminDashboardAction,
   markAdminOrderReadIfUnread,
 } from "@/lib/admin-dashboard/actions";
@@ -14,13 +13,20 @@ import {
 } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import {
+  canConvertPromotedCustomerOrderToDistribution,
+  customerOrderDistributionConversionBlockMessage,
   defaultProductCommissionAmount,
   formatCurrency,
   formatDate,
   formatDateTime,
   fullName,
+  getCustomerOrderDistributionConversionBlockReason,
   orderBalance,
+  orderCommissionTotal,
+  orderDistributionConversionAgentId,
   orderPaymentTotal,
+  orderReceivableTotal,
+  shouldShowCustomerOrderDistributionConversionCard,
 } from "@/lib/admin-dashboard/view";
 import {
   buildOrderSlipLayout,
@@ -28,9 +34,10 @@ import {
   getDocumentColumnTemplate,
 } from "@/lib/order-documents/layout";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
 import {
   getOrderStatusBadgeLabel,
-  getOrderStatusOptionLabel,
+  isAdminOrderDetailNavOrder,
 } from "@/lib/order-status-display";
 
 export const prerender = false;
@@ -51,7 +58,6 @@ const orderDetailTabIds = [
   "products",
   "order-slip",
   "sales-invoice",
-  "commission",
   "payment-record",
   "timeline",
   "notes",
@@ -80,15 +86,35 @@ if (!order) {
   return Astro.redirect("/admin/orders", 302);
 }
 
+type CustomerOrderItem = NonNullable<typeof order>["customer_order_item"][number];
+
 await markAdminOrderReadIfUnread(Astro, orderId, adminRoute.userId);
 
 const rawFeedback = formatAdminActionFeedback(Astro.url);
+const hiddenInlineValidationErrors = new Set([
+  "Quantity must be greater than zero.",
+  "Order product quantities cannot be reduced below the recorded payment total.",
+]);
 const feedback =
   rawFeedback.status === "Order marked as read." ||
-  rawFeedback.status === "Commission updated." ||
-  rawFeedback.status === "Order notes saved." ||
-  rawFeedback.status === "Order status updated."
-    ? { ...rawFeedback, status: undefined }
+    rawFeedback.status === "Commission updated." ||
+    rawFeedback.status === "Order notes saved." ||
+    rawFeedback.status === "Order status updated." ||
+    (rawFeedback.error && hiddenInlineValidationErrors.has(rawFeedback.error))
+    ? {
+        ...rawFeedback,
+        status:
+          rawFeedback.status === "Order marked as read." ||
+          rawFeedback.status === "Commission updated." ||
+          rawFeedback.status === "Order notes saved." ||
+          rawFeedback.status === "Order status updated."
+            ? undefined
+            : rawFeedback.status,
+        error:
+          rawFeedback.error && hiddenInlineValidationErrors.has(rawFeedback.error)
+            ? undefined
+            : rawFeedback.error,
+      }
     : rawFeedback;
 
 const invoice = order.invoice[0] ?? null;
@@ -102,11 +128,11 @@ const pendingAgentReceivedTotal = pendingAgentReceivedPayments.reduce(
   (total, payment) => total + payment.amount,
   0,
 );
-const canEditOrderProducts = !hasSalesInvoice && !hasPayments;
+const canEditOrderProducts = !hasSalesInvoice;
 const canGenerateInvoice = order.order_status === "processing";
 const paidTotal = orderPaymentTotal(order);
 const balance = orderBalance(order);
-const canCreatePaymentRecord = hasSalesInvoice && balance > 0;
+const totalCommission = orderCommissionTotal(order);
 type PaymentFormCustomerType = "regular" | "wholesale" | "reseller";
 const isResellerCustomer = Boolean(order.customer?.is_reseller);
 const paymentCustomerType: PaymentFormCustomerType = (() => {
@@ -122,11 +148,39 @@ const paymentCustomerType: PaymentFormCustomerType = (() => {
 const paymentOrderTotal = order.customer_order_item.reduce((total, item) => {
   return total + item.final_quantity * item.unit_price;
 }, 0);
-const canEditInvoiceQuantities = hasSalesInvoice && !hasPayments;
-const hasCommissionTab = Boolean(order.customer?.assigned_agent ?? order.agent);
-const availableOrderDetailTabs = orderDetailTabIds.filter(
-  (tab) => tab !== "commission" || hasCommissionTab,
+const isAgentLinkedOrder = Boolean(
+  order.agent_id ||
+  order.agent_order_id ||
+  order.converted_to_agent_order_id ||
+  totalCommission > 0,
 );
+const commissionAdjustedOrderTotal = orderReceivableTotal(
+  order,
+  "final_quantity",
+);
+const paymentFormCommissionTotal = isAgentLinkedOrder ? totalCommission : 0;
+const paymentFormOrderTotal = isAgentLinkedOrder
+  ? commissionAdjustedOrderTotal
+  : paymentOrderTotal;
+const paymentFormBalance = Math.max(paymentFormOrderTotal - paidTotal, 0);
+const canCreatePaymentRecord = paymentFormBalance > 0;
+const receivable = isAgentLinkedOrder ? commissionAdjustedOrderTotal : balance;
+const showOrigOrderTotal = isAgentLinkedOrder
+  ? commissionAdjustedOrderTotal < paymentOrderTotal
+  : paidTotal > 0 && receivable < paymentOrderTotal;
+const canEditInvoiceQuantities = hasSalesInvoice;
+const distributionConversionAgentId = orderDistributionConversionAgentId(order);
+const distributionConversionBlockReason =
+  getCustomerOrderDistributionConversionBlockReason(order, distributionConversionAgentId);
+const distributionConversionBlockMessage =
+  customerOrderDistributionConversionBlockMessage(distributionConversionBlockReason);
+const canConvertToDistributionOrder =
+  canConvertPromotedCustomerOrderToDistribution(order, distributionConversionAgentId);
+const showDistributionConversionPrompt =
+  shouldShowCustomerOrderDistributionConversionCard(order, distributionConversionAgentId);
+const paymentDateDefault = manilaDateInputValue();
+const paymentTimeDefault = manilaTimeInputValue();
+const availableOrderDetailTabs = orderDetailTabIds;
 const activeOrderDetailTab =
   requestedOrderDetailTab &&
   availableOrderDetailTabs.includes(
@@ -138,36 +192,79 @@ const isOrderDetailTabActive = (tab: string) => tab === activeOrderDetailTab;
 const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
 const orderSlipPdfHref = `/admin/orders/customer/${order.id}/order-slip.pdf`;
 const salesInvoicePdfHref = `/admin/orders/customer/${order.id}/sales-invoice.pdf`;
+const paymentRecordReturnPath = `/admin/orders/customer/${order.id}?tab=payment-record`;
 
 function sanitizeAttachmentFileName(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") || "file";
+  return (
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "file"
+  );
 }
 
 const orderSlipPdfFileName = `order-slip-${sanitizeAttachmentFileName(fullName(order.customer))}-${order.id.slice(0, 8)}.pdf`;
 const salesInvoicePdfFileName = invoice
   ? `sales-invoice-${sanitizeAttachmentFileName(fullName(order.customer))}-${invoice.invoice_number}.pdf`
   : null;
-const totalCommission = order.customer_order_item.reduce((total, item) => {
-  return total + item.agent_commission_amount;
-}, 0);
-const totalPaidCommissionCoverage = order.customer_order_item.reduce(
-  (total, item) => {
-    if (!item.agent_commission_paid) {
-      return total;
-    }
+const commissionProjectionTrigger = Boolean(
+  order.agent_id ||
+    order.agent_order_id ||
+    order.converted_to_agent_order_id ||
+    order.customer?.promoted_to_agent_id,
+);
 
-    return total + item.final_quantity * item.unit_price;
-  },
+function projectedItemCommission(
+  item: CustomerOrderItem,
+  quantity: number,
+) {
+  if (item.agent_commission_amount > 0) {
+    return Math.max(item.agent_commission_amount, 0);
+  }
+
+  return defaultProductCommissionAmount({
+    product: item.product,
+    quantity,
+    unitPrice: item.unit_price,
+  });
+}
+
+const paymentProjectionSubtotal = order.customer_order_item.reduce(
+  (total, item) => total + item.final_quantity * item.unit_price,
   0,
 );
-const totalAvailableCommissionCoverage = Math.max(
-  paidTotal - totalPaidCommissionCoverage,
+const paymentProjectionCommissionTotal = order.customer_order_item.reduce(
+  (total, item) => total + projectedItemCommission(item, item.final_quantity),
   0,
 );
+
+function quantityValidationDataset(
+  item: CustomerOrderItem,
+  originalQuantity: number,
+) {
+  const currentSubtotal = item.final_quantity * item.unit_price;
+  const currentCommission = projectedItemCommission(item, item.final_quantity);
+
+  return {
+    "data-order-product-quantity-form": true,
+    "data-order-quantity-original": originalQuantity,
+    "data-order-quantity-paid-total": paidTotal,
+    "data-order-quantity-subtotal-without-item":
+      paymentProjectionSubtotal - currentSubtotal,
+    "data-order-quantity-commission-without-item":
+      paymentProjectionCommissionTotal - currentCommission,
+    "data-order-quantity-unit-price": item.unit_price,
+    "data-order-quantity-agent-commission-amount": item.agent_commission_amount,
+    "data-order-quantity-agent-commission-type":
+      item.product?.agent_commission_type ?? "",
+    "data-order-quantity-agent-commission-value":
+      item.product?.agent_commission_value ?? 0,
+    "data-order-quantity-commission-trigger": commissionProjectionTrigger
+      ? "true"
+      : "false",
+  };
+}
 const orderSlipLayout = buildOrderSlipLayout(order);
 const salesInvoiceLayout = buildSalesInvoiceLayout(order);
 const orderSlipGridTemplate = getDocumentColumnTemplate(
@@ -176,132 +273,9 @@ const orderSlipGridTemplate = getDocumentColumnTemplate(
 const salesInvoiceGridTemplate = getDocumentColumnTemplate(
   salesInvoiceLayout.columns,
 );
-const nextStatuses = getAllowedNextOrderStatuses(
-  order.order_status,
-  order.payment_status,
-);
-const availableStatuses = [order.order_status, ...nextStatuses].filter(
-  (value, index, values) => values.indexOf(value) === index,
-);
-const canChangeOrderStatus = availableStatuses.length > 1;
-const orderStatusBadgeLabel = (status: (typeof availableStatuses)[number]) =>
+const isPendingOrder = order.order_status === "pending";
+const orderStatusBadgeLabel = (status: typeof order.order_status) =>
   getOrderStatusBadgeLabel(status);
-const orderStatusOptionLabel = (status: (typeof availableStatuses)[number]) =>
-  getOrderStatusOptionLabel(order.order_status, status);
-
-const commissionItemTotal = (quantity: number, unitPrice: number) =>
-  quantity * unitPrice;
-const commissionCoverageRemaining = (itemId: string) => {
-  const paidCoverageExcludingCurrent = order.customer_order_item.reduce(
-    (total, item) => {
-      if (!item.agent_commission_paid || item.id === itemId) {
-        return total;
-      }
-
-      return total + commissionItemTotal(item.final_quantity, item.unit_price);
-    },
-    0,
-  );
-
-  return Math.max(paidTotal - paidCoverageExcludingCurrent, 0);
-};
-const getCommissionPayabilityNotice = (
-  item: (typeof order.customer_order_item)[number],
-  itemTotalAmount: number,
-  availableCoverageForItem: number,
-) => {
-  if (item.agent_commission_paid) {
-    return {
-      tone: "paid" as const,
-      message: "Marked as paid.",
-    };
-  }
-
-  if (item.agent_commission_amount <= 0) {
-    return {
-      tone: "blocked" as const,
-      message: "Set a commission amount before marking as paid.",
-    };
-  }
-
-  if (!hasPayments) {
-    return {
-      tone: "blocked" as const,
-      message: "Record a payment before marking as paid.",
-    };
-  }
-
-  if (itemTotalAmount > availableCoverageForItem) {
-    return {
-      tone: "blocked" as const,
-      message: `Item total exceeds remaining paid coverage (${formatCurrency(availableCoverageForItem)} available).`,
-    };
-  }
-
-  return {
-    tone: "ready" as const,
-    message: "Can be marked as paid.",
-  };
-};
-const commissionItems = order.customer_order_item.map((item) => {
-  const itemTotalAmount = commissionItemTotal(
-    item.final_quantity,
-    item.unit_price,
-  );
-  const availableCoverageForItem = commissionCoverageRemaining(item.id);
-  const canMarkCommissionPaid =
-    hasPayments && itemTotalAmount <= availableCoverageForItem;
-
-  return {
-    item,
-    itemTotalAmount,
-    availableCoverageForItem,
-    paidCheckboxDisabled: !item.agent_commission_paid && !canMarkCommissionPaid,
-    payabilityNotice: getCommissionPayabilityNotice(
-      item,
-      itemTotalAmount,
-      availableCoverageForItem,
-    ),
-  };
-});
-const commissionItemsWithAmount = commissionItems.filter(
-  ({ item }) => item.agent_commission_amount > 0,
-);
-const markAllCommissionPaid =
-  commissionItemsWithAmount.length > 0 &&
-  commissionItemsWithAmount.every(({ item }) => item.agent_commission_paid);
-const markAllCommissionPaidIndeterminate =
-  commissionItemsWithAmount.some(({ item }) => item.agent_commission_paid) &&
-  !markAllCommissionPaid;
-const markAllCommissionPaidDisabledReason = (() => {
-  if (commissionItemsWithAmount.length === 0) {
-    return "Set commission amounts before marking all as paid.";
-  }
-
-  const unpaidWithAmount = commissionItemsWithAmount.filter(
-    ({ item }) => !item.agent_commission_paid,
-  );
-
-  if (unpaidWithAmount.length === 0) {
-    return null;
-  }
-
-  if (!hasPayments) {
-    return "Record a payment before marking all commissions as paid.";
-  }
-
-  const cannotMarkAllUnpaid = unpaidWithAmount.some(
-    ({ paidCheckboxDisabled }) => paidCheckboxDisabled,
-  );
-
-  if (cannotMarkAllUnpaid) {
-    return `Recorded payments leave only ${formatCurrency(totalAvailableCommissionCoverage)} available for paid commissions.`;
-  }
-
-  return null;
-})();
-const markAllCommissionPaidDisabled =
-  markAllCommissionPaidDisabledReason !== null;
 
 const customerDisplayName = order.customer
   ? fullName(order.customer)
@@ -309,11 +283,11 @@ const customerDisplayName = order.customer
 const customerAddress = order.customer?.address ?? "No address on file";
 const customerPhone = order.customer?.phone_number ?? "No contact number";
 const customerEmail = order.customer?.email ?? "No email address";
-const agentDisplayName =
-  order.customer?.assigned_agent?.display_name ?? "No assigned agent";
-const agentPhone =
-  order.customer?.assigned_agent?.contact ?? "No contact number";
-const agentEmail = order.customer?.assigned_agent?.email ?? "No email address";
+const orderedByAgent = order.agent_order_id ? order.agent_order?.agent ?? null : null;
+const orderedByAgentDisplayName =
+  orderedByAgent?.display_name ?? "Agent details unavailable";
+const orderedByAgentPhone = orderedByAgent?.contact ?? "No contact number";
+const orderedByAgentEmail = orderedByAgent?.email ?? "No email address";
 const orderedProductIds = new Set(
   order.customer_order_item.map((item) => item.product_id),
 );
@@ -322,9 +296,7 @@ const addableProducts = dashboardData.products.filter(
 );
 const orderProductEditLockReason = hasSalesInvoice
   ? "Order products are locked after a sales invoice has been created."
-  : hasPayments
-    ? "Order products are locked after a payment record has been created."
-    : null;
+  : null;
 
 const timelineItems = [
   ...order.payment.map((payment) => ({
@@ -373,6 +345,20 @@ const backHref =
 const backLabel = backHref.startsWith("/admin/customers/")
   ? "Back to customer record"
   : "Back to orders";
+const orderNavigationEntries = [...dashboardData.orders]
+  .filter((entry) => isAdminOrderDetailNavOrder(entry))
+  .sort(
+    (left, right) =>
+      new Date(right.created_at).getTime() -
+      new Date(left.created_at).getTime(),
+  )
+  .map((entry) => ({
+    id: entry.id,
+    code: `Order-${entry.id.slice(0, 6).toUpperCase()}`,
+    createdAt: entry.created_at,
+    href: `/admin/orders/customer/${entry.id}?returnTo=${encodeURIComponent(backHref)}`,
+    isCurrent: entry.id === order.id,
+  }));
 ---
 
 <AdminPageFrame
@@ -383,7 +369,11 @@ const backLabel = backHref.startsWith("/admin/customers/")
   feedback={feedback}
   dashboardData={dashboardData}
 >
-  <div class="order-detail-page" data-order-detail-page>
+  <div
+    class="order-detail-page"
+    data-order-detail-page
+    data-dashboard-record-page
+  >
     <aside class="order-detail-sidebar">
       <div class="order-sidebar-header">
         <p class="order-detail-eyebrow">Order / Order Details</p>
@@ -393,72 +383,174 @@ const backLabel = backHref.startsWith("/admin/customers/")
             <RouteBackButton href={backHref} label={backLabel} />
 
             <div class="order-title-copy">
-              <h1>{orderCode}</h1>
+              <div class="order-detail-nav" data-order-detail-nav>
+                <button
+                  type="button"
+                  class="order-detail-nav__trigger"
+                  data-order-detail-nav-trigger
+                  aria-haspopup="listbox"
+                  aria-expanded="false"
+                >
+                  <h1>{orderCode}</h1>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                </button>
+                <div
+                  class="order-detail-nav__menu"
+                  data-order-detail-nav-menu
+                  hidden
+                >
+                  <ul role="listbox" aria-label="Other orders">
+                    {
+                      orderNavigationEntries.map((entry) => (
+                        <li>
+                          <a
+                            href={entry.href}
+                            class:list={[
+                              "order-detail-nav__option",
+                              entry.isCurrent && "is-current",
+                            ]}
+                            aria-current={entry.isCurrent ? "page" : undefined}
+                          >
+                            <span>{entry.code}</span>
+                            <time datetime={entry.createdAt}>
+                              {formatDateTime(entry.createdAt)}
+                            </time>
+                          </a>
+                        </li>
+                      ))
+                    }
+                  </ul>
+                </div>
+              </div>
               <p>{formatOrderSource(order.source)}</p>
             </div>
           </div>
 
-          <div
-            class="order-summary-top__status"
-            data-order-status-panel
-            data-save-url={`/admin/orders/customer/${order.id}`}
-          >
+          <div class="order-summary-top__status">
+            <StatusBadge
+              kind="order"
+              status={order.order_status}
+              label={orderStatusBadgeLabel(order.order_status)}
+            />
+          </div>
+        </div>
+
+        <section
+          class="order-information"
+          aria-labelledby="order-information-title"
+        >
+          <dl class="order-information__list">
+            <div class="order-information__item">
+              <dt>Date</dt>
+              <dd>{formatDateTime(order.created_at)}</dd>
+            </div>
+            <div class="order-information__item">
+              <dt>Payment status</dt>
+              <dd>
+                <StatusBadge
+                  kind="payment"
+                  status={order.payment_status}
+                  label={autoCapitalize(order.payment_status)}
+                />
+              </dd>
+            </div>
+            <div class="order-information__item">
+              <dt>Paid</dt>
+              <dd>{formatCurrency(paidTotal)}</dd>
+            </div>
             {
-              canChangeOrderStatus ? (
-                <>
-                  <button
-                    type="button"
-                    class="order-status-trigger"
-                    data-order-status-trigger
-                    data-open-cell-popover
-                    data-popover-title={`Update status: ${orderCode}`}
-                    aria-label={`Order status: ${orderStatusBadgeLabel(order.order_status)}. Click to update.`}
-                  >
-                    <StatusBadge
-                      kind="order"
-                      status={order.order_status}
-                      label={orderStatusBadgeLabel(order.order_status)}
-                    />
-                  </button>
-                  <div class="hidden-popover-form-holder">
-                    <form
-                      method="post"
-                      action={`/admin/orders/customer/${order.id}`}
-                      class="order-status-popover-form"
-                      data-order-status-form
-                    >
+              isAgentLinkedOrder && (
+                <div class="order-information__item">
+                  <dt>Commission</dt>
+                  <dd>
+                    <form method="post" class="order-commission-form" data-astro-reload>
                       <input
                         type="hidden"
                         name="action"
-                        value="update-order-status"
+                        value="update-order-total-commission"
                       />
                       <input type="hidden" name="orderId" value={order.id} />
-                      <label>
-                        <span>Status</span>
-                        <select name="orderStatus" required>
-                          {availableStatuses.map((status) => (
-                            <option
-                              value={status}
-                              selected={status === order.order_status}
-                            >
-                              {orderStatusOptionLabel(status)}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                      <input
+                        type="number"
+                        name="amount"
+                        min="0"
+                        step="0.01"
+                        value={totalCommission.toFixed(2)}
+                        aria-label="Total commission"
+                      />
+                      <button type="submit">Save</button>
                     </form>
-                  </div>
-                </>
-              ) : (
-                <StatusBadge
-                  kind="order"
-                  status={order.order_status}
-                  label={orderStatusBadgeLabel(order.order_status)}
-                />
+                  </dd>
+                </div>
               )
             }
-          </div>
-        </div>
+            <div class="order-information__item">
+              <dt>Receivable</dt>
+              <dd class="order-information__amount">
+                <span>{formatCurrency(receivable)}</span>
+                {
+                  showOrigOrderTotal && (
+                    <span class="order-information__orig-amount">
+                      Orig. {formatCurrency(paymentOrderTotal)}
+                    </span>
+                  )
+                }
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        {
+          showDistributionConversionPrompt && (
+            <section
+              class="order-conversion-card"
+              aria-labelledby="order-conversion-title"
+            >
+              <h2 id="order-conversion-title">
+                Do you want to convert this into an agent distribution order?
+              </h2>
+              <p>
+                The products will move into a new agent order with pending
+                customers status, ready for distribution to the agent's
+                customers.
+              </p>
+              {
+                canConvertToDistributionOrder ? (
+                  <form method="post" data-astro-reload>
+                    <input
+                      type="hidden"
+                      name="action"
+                      value="convert-customer-order-to-agent-distribution"
+                    />
+                    <input type="hidden" name="orderId" value={order.id} />
+                    <input type="hidden" name="returnTo" value={backHref} />
+                    <button type="submit">Proceed Conversion</button>
+                  </form>
+                ) : (
+                  <div class="order-conversion-card__blocked">
+                    <p>{distributionConversionBlockMessage}</p>
+                    <button type="button" disabled>Proceed Conversion</button>
+                  </div>
+                )
+              }
+            </section>
+          )
+        }
+
+        {
+          isPendingOrder && (
+            <form method="post" class="order-accept-form" data-astro-reload>
+              <input type="hidden" name="action" value="update-order-status" />
+              <input type="hidden" name="orderId" value={order.id} />
+              <input type="hidden" name="orderStatus" value="processing" />
+              <button type="submit" class="order-accept-form__button">
+                Accept order
+              </button>
+            </form>
+          )
+        }
 
         <div class="order-party-cards">
           <article class="order-party-card order-party-card--customer">
@@ -548,80 +640,89 @@ const backLabel = backHref.startsWith("/admin/customers/")
             </ul>
           </article>
 
-          <article class="order-party-card order-party-card--agent">
-            <div class="order-party-card__identity">
-              <div class="order-party-card__identity-copy">
-                <span class="order-party-card__eyebrow">Assigned agent</span>
-                <p class="order-party-card__name">{agentDisplayName}</p>
-              </div>
-            </div>
+          {
+            order.agent_order_id && (
+              <article class="order-party-card order-party-card--agent">
+                <div class="order-party-card__identity">
+                  <div class="order-party-card__identity-copy">
+                    <span class="order-party-card__eyebrow">Ordered by</span>
+                    <p class="order-party-card__name">
+                      {orderedByAgentDisplayName}
+                    </p>
+                  </div>
+                </div>
 
-            <ul class="order-party-card__meta-list">
-              <li
-                class:list={[
-                  "order-party-card__meta-item",
-                  {
-                    "is-placeholder": !order.customer?.assigned_agent?.contact,
-                  },
-                ]}
-              >
-                <span class="order-party-card__meta-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z"
-                    ></path>
-                  </svg>
-                </span>
-                {
-                  order.customer?.assigned_agent?.contact ? (
-                    <a
-                      class="order-party-card__meta-link"
-                      href={`tel:${order.customer.assigned_agent.contact}`}
-                    >
-                      {agentPhone}
-                    </a>
-                  ) : (
-                    <span class="order-party-card__meta-text">
-                      {agentPhone}
+                <ul class="order-party-card__meta-list">
+                  <li
+                    class:list={[
+                      "order-party-card__meta-item",
+                      { "is-placeholder": !orderedByAgent?.contact },
+                    ]}
+                  >
+                    <span class="order-party-card__meta-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path
+                          d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z"
+                        ></path>
+                      </svg>
                     </span>
-                  )
-                }
-              </li>
-              <li
-                class:list={[
-                  "order-party-card__meta-item",
-                  { "is-placeholder": !order.customer?.assigned_agent?.email },
-                ]}
-              >
-                <span class="order-party-card__meta-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24">
-                    <path
-                      d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-                    ></path>
-                    <path d="m22 6-10 7L2 6"></path>
-                  </svg>
-                </span>
-                {
-                  order.customer?.assigned_agent?.email ? (
-                    <a
-                      class="order-party-card__meta-link"
-                      href={`mailto:${order.customer.assigned_agent.email}`}
-                    >
-                      {agentEmail}
-                    </a>
-                  ) : (
-                    <span class="order-party-card__meta-text">
-                      {agentEmail}
+                    {
+                      orderedByAgent?.contact ? (
+                        <a
+                          class="order-party-card__meta-link"
+                          href={`tel:${orderedByAgent.contact}`}
+                        >
+                          {orderedByAgentPhone}
+                        </a>
+                      ) : (
+                        <span class="order-party-card__meta-text">
+                          {orderedByAgentPhone}
+                        </span>
+                      )
+                    }
+                  </li>
+                  <li
+                    class:list={[
+                      "order-party-card__meta-item",
+                      { "is-placeholder": !orderedByAgent?.email },
+                    ]}
+                  >
+                    <span class="order-party-card__meta-icon" aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path
+                          d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+                        ></path>
+                        <path d="m22 6-10 7L2 6"></path>
+                      </svg>
                     </span>
-                  )
-                }
-              </li>
-            </ul>
-          </article>
+                    {
+                      orderedByAgent?.email ? (
+                        <a
+                          class="order-party-card__meta-link"
+                          href={`mailto:${orderedByAgent.email}`}
+                        >
+                          {orderedByAgentEmail}
+                        </a>
+                      ) : (
+                        <span class="order-party-card__meta-text">
+                          {orderedByAgentEmail}
+                        </span>
+                      )
+                    }
+                  </li>
+                </ul>
+              </article>
+            )
+          }
         </div>
 
-        <section class="order-attachments" aria-labelledby="order-attachments-title">
-          <h2 id="order-attachments-title" class="order-attachments__title">Attachments</h2>
+        <section
+          class="order-attachments"
+          aria-labelledby="order-attachments-title"
+        >
+          <h2 id="order-attachments-title" class="order-attachments__title">
+            Attachments
+          </h2>
           <ul class="order-attachments__list">
             <li class="order-attachments__item">
               <a
@@ -650,7 +751,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
           </ul>
         </section>
       </div>
-
     </aside>
 
     <section class="order-detail-main" data-order-detail-tabs>
@@ -677,7 +777,9 @@ const backLabel = backHref.startsWith("/admin/customers/")
           data-order-detail-tab-trigger
           data-tab-target="order-slip"
           role="tab"
-          aria-selected={isOrderDetailTabActive("order-slip") ? "true" : "false"}
+          aria-selected={isOrderDetailTabActive("order-slip")
+            ? "true"
+            : "false"}
         >
           Order Slip
         </button>
@@ -690,27 +792,12 @@ const backLabel = backHref.startsWith("/admin/customers/")
           data-order-detail-tab-trigger
           data-tab-target="sales-invoice"
           role="tab"
-          aria-selected={isOrderDetailTabActive("sales-invoice") ? "true" : "false"}
+          aria-selected={isOrderDetailTabActive("sales-invoice")
+            ? "true"
+            : "false"}
         >
           Sales Invoice
         </button>
-        {
-          hasCommissionTab && (
-            <button
-              type="button"
-              class:list={[
-                "order-tab",
-                isOrderDetailTabActive("commission") && "is-active",
-              ]}
-              data-order-detail-tab-trigger
-              data-tab-target="commission"
-              role="tab"
-              aria-selected={isOrderDetailTabActive("commission") ? "true" : "false"}
-            >
-              Commission
-            </button>
-          )
-        }
         <button
           type="button"
           class:list={[
@@ -720,7 +807,9 @@ const backLabel = backHref.startsWith("/admin/customers/")
           data-order-detail-tab-trigger
           data-tab-target="payment-record"
           role="tab"
-          aria-selected={isOrderDetailTabActive("payment-record") ? "true" : "false"}
+          aria-selected={isOrderDetailTabActive("payment-record")
+            ? "true"
+            : "false"}
         >
           Payment Record
         </button>
@@ -767,7 +856,8 @@ const backLabel = backHref.startsWith("/admin/customers/")
               <div>
                 <h3 class="order-products-panel__title">Order Products</h3>
                 <p class="order-products-panel__copy">
-                  Finalize products and order slip quantities before opening or printing the order slip.
+                  Finalize products and order slip quantities before opening or
+                  printing the order slip.
                 </p>
               </div>
               {
@@ -788,75 +878,82 @@ const backLabel = backHref.startsWith("/admin/customers/")
                 <span role="columnheader">Details</span>
                 <span role="columnheader">Action</span>
               </div>
-              {order.customer_order_item.map((item) => {
-                const itemSubtotal = item.partial_quantity * item.unit_price;
-                const canRemoveOrderProduct =
-                  canEditOrderProducts && order.customer_order_item.length > 1;
+              {
+                order.customer_order_item.map((item) => {
+                  const itemSubtotal = item.partial_quantity * item.unit_price;
+                  const canRemoveOrderProduct =
+                    canEditOrderProducts &&
+                    order.customer_order_item.length > 1;
 
-                return (
-                  <div class="order-products-table__row" role="row">
-                    <span role="cell">
-                      <strong>
-                        {item.product?.name ?? "Missing product"}
-                      </strong>
-                      <small>{item.product?.unit_label ?? "unit"}</small>
-                    </span>
-                    <span role="cell">
-                      <form method="post" class="order-product-quantity-form">
-                        <input
-                          type="hidden"
-                          name="action"
-                          value="update-order-item-quantity"
-                        />
-                        <input
-                          type="hidden"
-                          name="orderItemId"
-                          value={item.id}
-                        />
-                        <input
-                          type="number"
-                          name="quantity"
-                          min="0.001"
-                          step="0.001"
-                          value={item.partial_quantity}
-                          disabled={!canEditOrderProducts}
-                          required
-                        />
-                        <button
-                          type="submit"
-                          disabled={!canEditOrderProducts}
+                  return (
+                    <div class="order-products-table__row" role="row">
+                      <span role="cell">
+                        <strong>
+                          {item.product?.name ?? "Missing product"}
+                        </strong>
+                        <small>{item.product?.unit_label ?? "unit"}</small>
+                      </span>
+                      <span role="cell">
+                        <form
+                          method="post"
+                          class="order-product-quantity-form"
+                          {...quantityValidationDataset(item, item.partial_quantity)}
                         >
-                          Save
-                        </button>
-                      </form>
-                    </span>
-                    <span role="cell">{formatCurrency(item.unit_price)}</span>
-                    <span role="cell">{formatCurrency(itemSubtotal)}</span>
-                    <span role="cell">{item.add_details ?? "None"}</span>
-                    <span role="cell">
-                      <form method="post" class="order-product-remove-form">
-                        <input
-                          type="hidden"
-                          name="action"
-                          value="remove-order-item"
-                        />
-                        <input
-                          type="hidden"
-                          name="orderItemId"
-                          value={item.id}
-                        />
-                        <button
-                          type="submit"
-                          class="order-product-remove-form__button"
-                          disabled={!canRemoveOrderProduct}
-                        >
-                          Remove
-                        </button>
-                      </form>
-                    </span>
-                  </div>
-                );
-              })}
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="update-order-item-quantity"
+                          />
+                          <input
+                            type="hidden"
+                            name="orderItemId"
+                            value={item.id}
+                          />
+                          <input
+                            type="number"
+                            name="quantity"
+                            min="0.001"
+                            step="0.001"
+                            value={item.partial_quantity}
+                            disabled={!canEditOrderProducts}
+                            required
+                          />
+                          <button
+                            type="submit"
+                            disabled={!canEditOrderProducts}
+                          >
+                            Save
+                          </button>
+                        </form>
+                      </span>
+                      <span role="cell">{formatCurrency(item.unit_price)}</span>
+                      <span role="cell">{formatCurrency(itemSubtotal)}</span>
+                      <span role="cell">{item.add_details ?? "None"}</span>
+                      <span role="cell">
+                        <form method="post" class="order-product-remove-form">
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="remove-order-item"
+                          />
+                          <input
+                            type="hidden"
+                            name="orderItemId"
+                            value={item.id}
+                          />
+                          <button
+                            type="submit"
+                            class="order-product-remove-form__button"
+                            disabled={!canRemoveOrderProduct}
+                          >
+                            Remove
+                          </button>
+                        </form>
+                      </span>
+                    </div>
+                  );
+                })
+              }
             </div>
 
             <form method="post" class="order-product-add-form">
@@ -866,19 +963,24 @@ const backLabel = backHref.startsWith("/admin/customers/")
                 <span>Product</span>
                 <select
                   name="productId"
-                  disabled={!canEditOrderProducts || addableProducts.length === 0}
+                  disabled={!canEditOrderProducts ||
+                    addableProducts.length === 0}
                   required
                 >
                   <option value="">Select product</option>
-                  {addableProducts.map((product) => (
-                    <option value={product.id}>
-                      {product.name} - {formatCurrency(
-                        order.customer?.is_reseller
-                          ? product.reseller_price
-                          : product.default_price,
-                      )} / {product.unit_label}
-                    </option>
-                  ))}
+                  {
+                    addableProducts.map((product) => (
+                      <option value={product.id}>
+                        {product.name} -{" "}
+                        {formatCurrency(
+                          order.customer?.is_reseller
+                            ? product.reseller_price
+                            : product.default_price,
+                        )}{" "}
+                        / {product.unit_label}
+                      </option>
+                    ))
+                  }
                 </select>
               </label>
               <label>
@@ -888,7 +990,8 @@ const backLabel = backHref.startsWith("/admin/customers/")
                   name="quantity"
                   min="0.001"
                   step="0.001"
-                  disabled={!canEditOrderProducts || addableProducts.length === 0}
+                  disabled={!canEditOrderProducts ||
+                    addableProducts.length === 0}
                   required
                 />
               </label>
@@ -897,7 +1000,8 @@ const backLabel = backHref.startsWith("/admin/customers/")
                 <input
                   type="text"
                   name="addDetails"
-                  disabled={!canEditOrderProducts || addableProducts.length === 0}
+                  disabled={!canEditOrderProducts ||
+                    addableProducts.length === 0}
                 />
               </label>
               <button
@@ -924,108 +1028,110 @@ const backLabel = backHref.startsWith("/admin/customers/")
           role="tabpanel"
           hidden={!isOrderDetailTabActive("order-slip")}
         >
-          <div class="document-preview-body document-preview--pdf-like document-preview--rounded-sm">
-          <header class="pdf-preview-header">
-            <div class="pdf-preview-brand">
-              {
-                orderSlipLayout.brandLines.map((line, index) => (
-                  <p
-                    class:list={[
-                      "pdf-preview-brand-line",
-                      index === 0 && "pdf-preview-brand-line--strong",
-                    ]}
-                  >
-                    {line}
-                  </p>
-                ))
-              }
-            </div>
-            <div class="pdf-preview-logo">LOGO</div>
-            <h3 class="pdf-preview-title">{orderSlipLayout.title}</h3>
-          </header>
-
-          <div class="pdf-preview-fields pdf-preview-fields--two-column">
-            <div class="pdf-preview-field-line">
-              <span>{orderSlipLayout.dateLabel}</span>
-            </div>
-            <div></div>
-            <div class="pdf-preview-field-line">
-              <span>{orderSlipLayout.sellerLabel}</span>
-            </div>
-            <div class="pdf-preview-field-line">
-              <span>{orderSlipLayout.orderedByLabel}</span>
-            </div>
-          </div>
-
           <div
-            class="pdf-preview-table"
-            style={`--pdf-grid-template:${orderSlipGridTemplate};`}
+            class="document-preview-body document-preview--pdf-like document-preview--rounded-sm"
           >
-            <div class="pdf-preview-table__head">
-              {
-                orderSlipLayout.columns.map((column) => (
-                  <span class:list={[column.align && `is-${column.align}`]}>
-                    {column.label}
-                  </span>
-                ))
-              }
-            </div>
-            {
-              orderSlipLayout.rows.map((row) => (
-                <div class="pdf-preview-table__row">
-                  {row.cells.map((cell, cellIndex) => (
-                    <span
+            <header class="pdf-preview-header">
+              <div class="pdf-preview-brand">
+                {
+                  orderSlipLayout.brandLines.map((line, index) => (
+                    <p
                       class:list={[
-                        orderSlipLayout.columns[cellIndex]?.align &&
-                          `is-${orderSlipLayout.columns[cellIndex]?.align}`,
+                        "pdf-preview-brand-line",
+                        index === 0 && "pdf-preview-brand-line--strong",
                       ]}
                     >
-                      {cell || "\u00A0"}
+                      {line}
+                    </p>
+                  ))
+                }
+              </div>
+              <div class="pdf-preview-logo">LOGO</div>
+              <h3 class="pdf-preview-title">{orderSlipLayout.title}</h3>
+            </header>
+
+            <div class="pdf-preview-fields pdf-preview-fields--two-column">
+              <div class="pdf-preview-field-line">
+                <span>{orderSlipLayout.dateLabel}</span>
+              </div>
+              <div></div>
+              <div class="pdf-preview-field-line">
+                <span>{orderSlipLayout.sellerLabel}</span>
+              </div>
+              <div class="pdf-preview-field-line">
+                <span>{orderSlipLayout.orderedByLabel}</span>
+              </div>
+            </div>
+
+            <div
+              class="pdf-preview-table"
+              style={`--pdf-grid-template:${orderSlipGridTemplate};`}
+            >
+              <div class="pdf-preview-table__head">
+                {
+                  orderSlipLayout.columns.map((column) => (
+                    <span class:list={[column.align && `is-${column.align}`]}>
+                      {column.label}
                     </span>
-                  ))}
-                </div>
-              ))
-            }
-          </div>
-
-          <div class="pdf-preview-total-row">
-            <span>{orderSlipLayout.totalLabel}</span>
-          </div>
-
-          <div class="pdf-preview-copy-block">
-            <h4>{orderSlipLayout.deliveryHeading}</h4>
-            {orderSlipLayout.deliveryLines.map((line) => <p>{line}</p>)}
-          </div>
-
-          <div class="pdf-preview-copy-block">
-            <h4>{orderSlipLayout.paymentHeading}</h4>
-            {orderSlipLayout.paymentLines.map((line) => <p>{line}</p>)}
-          </div>
-
-          <p class="pdf-preview-confirmation">
-            {orderSlipLayout.confirmationText}
-          </p>
-
-          <footer class="pdf-preview-signatures">
-            <div class="pdf-preview-signature-block">
-              <p class="pdf-preview-signature-heading">
-                {orderSlipLayout.buyerSignatureLines[0]}
-              </p>
-              <p>{orderSlipLayout.buyerSignatureLines[1]}</p>
-              <p>{orderSlipLayout.buyerSignatureLines[2]}</p>
-              <p>{orderSlipLayout.buyerSignatureLines[3]}</p>
+                  ))
+                }
+              </div>
+              {
+                orderSlipLayout.rows.map((row) => (
+                  <div class="pdf-preview-table__row">
+                    {row.cells.map((cell, cellIndex) => (
+                      <span
+                        class:list={[
+                          orderSlipLayout.columns[cellIndex]?.align &&
+                            `is-${orderSlipLayout.columns[cellIndex]?.align}`,
+                        ]}
+                      >
+                        {cell || "\u00A0"}
+                      </span>
+                    ))}
+                  </div>
+                ))
+              }
             </div>
-            <div class="pdf-preview-signature-block">
-              <p class="pdf-preview-signature-heading">
-                {orderSlipLayout.sellerSignatureHeading}
-              </p>
-              <p class="pdf-preview-signature-name">
-                {orderSlipLayout.sellerSignatureLines[0]}
-              </p>
-              <p>{orderSlipLayout.sellerSignatureLines[1]}</p>
-              <p>{orderSlipLayout.sellerSignatureLines[2]}</p>
+
+            <div class="pdf-preview-total-row">
+              <span>{orderSlipLayout.totalLabel}</span>
             </div>
-          </footer>
+
+            <div class="pdf-preview-copy-block">
+              <h4>{orderSlipLayout.deliveryHeading}</h4>
+              {orderSlipLayout.deliveryLines.map((line) => <p>{line}</p>)}
+            </div>
+
+            <div class="pdf-preview-copy-block">
+              <h4>{orderSlipLayout.paymentHeading}</h4>
+              {orderSlipLayout.paymentLines.map((line) => <p>{line}</p>)}
+            </div>
+
+            <p class="pdf-preview-confirmation">
+              {orderSlipLayout.confirmationText}
+            </p>
+
+            <footer class="pdf-preview-signatures">
+              <div class="pdf-preview-signature-block">
+                <p class="pdf-preview-signature-heading">
+                  {orderSlipLayout.buyerSignatureLines[0]}
+                </p>
+                <p>{orderSlipLayout.buyerSignatureLines[1]}</p>
+                <p>{orderSlipLayout.buyerSignatureLines[2]}</p>
+                <p>{orderSlipLayout.buyerSignatureLines[3]}</p>
+              </div>
+              <div class="pdf-preview-signature-block">
+                <p class="pdf-preview-signature-heading">
+                  {orderSlipLayout.sellerSignatureHeading}
+                </p>
+                <p class="pdf-preview-signature-name">
+                  {orderSlipLayout.sellerSignatureLines[0]}
+                </p>
+                <p>{orderSlipLayout.sellerSignatureLines[1]}</p>
+                <p>{orderSlipLayout.sellerSignatureLines[2]}</p>
+              </div>
+            </footer>
           </div>
         </section>
 
@@ -1076,250 +1182,131 @@ const backLabel = backHref.startsWith("/admin/customers/")
             ) : (
               <>
                 <div class="document-preview-body document-preview--pdf-like document-preview--rounded-sm">
-                <header class="pdf-preview-header">
-                  <div class="pdf-preview-brand">
-                    {salesInvoiceLayout.brandLines.map((line, index) => (
-                      <p
-                        class:list={[
-                          "pdf-preview-brand-line",
-                          index === 0 && "pdf-preview-brand-line--strong",
-                        ]}
-                      >
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                  <div class="pdf-preview-logo">LOGO</div>
-                  <h3 class="pdf-preview-title">{salesInvoiceLayout.title}</h3>
-                </header>
-
-                <div class="pdf-preview-fields pdf-preview-fields--two-column">
-                  <div class="pdf-preview-field-line">
-                    <span>{salesInvoiceLayout.dateLabel}</span>
-                  </div>
-                  <div class="pdf-preview-field-line">
-                    <span>{salesInvoiceLayout.invoiceNumberLabel}</span>
-                  </div>
-                  <div class="pdf-preview-field-line">
-                    <span>{salesInvoiceLayout.soldToLabel}</span>
-                  </div>
-                  <div class="pdf-preview-field-line">
-                    <span>{salesInvoiceLayout.addressLabel}</span>
-                  </div>
-                </div>
-
-                <div
-                  class="pdf-preview-table"
-                  style={`--pdf-grid-template:${salesInvoiceGridTemplate};`}
-                >
-                  <div class="pdf-preview-table__head">
-                    {salesInvoiceLayout.columns.map((column) => (
-                      <span class:list={[column.align && `is-${column.align}`]}>
-                        {column.label}
-                      </span>
-                    ))}
-                  </div>
-                  {order.customer_order_item.map((item, index) => (
-                    <div class="pdf-preview-table__row pdf-preview-table__row--editable">
-                      <span>
-                        {salesInvoiceLayout.rows[index]?.cells[0] ??
-                          "Missing product"}
-                      </span>
-                      <form method="post" class="pdf-preview-quantity-form">
-                        <input
-                          type="hidden"
-                          name="action"
-                          value="update-invoice-item-quantity"
-                        />
-                        <input
-                          type="hidden"
-                          name="orderItemId"
-                          value={item.id}
-                        />
-                        <input
-                          type="number"
-                          name="quantity"
-                          min="0.001"
-                          step="0.001"
-                          value={item.final_quantity}
-                          disabled={!canEditInvoiceQuantities}
-                          required
-                        />
-                        <button
-                          type="submit"
-                          disabled={!canEditInvoiceQuantities}
+                  <header class="pdf-preview-header">
+                    <div class="pdf-preview-brand">
+                      {salesInvoiceLayout.brandLines.map((line, index) => (
+                        <p
+                          class:list={[
+                            "pdf-preview-brand-line",
+                            index === 0 && "pdf-preview-brand-line--strong",
+                          ]}
                         >
-                          Save
-                        </button>
-                      </form>
-                      <span class="is-right">
-                        {salesInvoiceLayout.rows[index]?.cells[2] ?? ""}
-                      </span>
-                      <span class="is-right">
-                        {salesInvoiceLayout.rows[index]?.cells[3] ?? ""}
-                      </span>
+                          {line}
+                        </p>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                    <div class="pdf-preview-logo">LOGO</div>
+                    <h3 class="pdf-preview-title">
+                      {salesInvoiceLayout.title}
+                    </h3>
+                  </header>
 
-                <div class="pdf-preview-total-row">
-                  <span>{salesInvoiceLayout.totalLabel}</span>
-                </div>
-
-                <div class="pdf-preview-copy-block">
-                  <h4>Delivery Preference</h4>
-                  <p>{salesInvoiceLayout.paymentLines[0]}</p>
-                  <p>{salesInvoiceLayout.paymentLines[1]}</p>
-                </div>
-
-                <div class="pdf-preview-copy-block">
-                  <h4>{salesInvoiceLayout.paymentHeading}</h4>
-                  <p>{salesInvoiceLayout.paymentLines[2]}</p>
-                </div>
-
-                <footer class="pdf-preview-invoice-footer">
-                  <div class="pdf-preview-issuer">
-                    <p class="pdf-preview-signature-heading">
-                      {salesInvoiceLayout.issuerHeading}
-                    </p>
-                    <p class="pdf-preview-signature-name">
-                      {salesInvoiceLayout.issuerName}
-                    </p>
-                    <p>{salesInvoiceLayout.issuerSubline}</p>
+                  <div class="pdf-preview-fields pdf-preview-fields--two-column">
+                    <div class="pdf-preview-field-line">
+                      <span>{salesInvoiceLayout.dateLabel}</span>
+                    </div>
+                    <div class="pdf-preview-field-line">
+                      <span>{salesInvoiceLayout.invoiceNumberLabel}</span>
+                    </div>
+                    <div class="pdf-preview-field-line">
+                      <span>{salesInvoiceLayout.soldToLabel}</span>
+                    </div>
+                    <div class="pdf-preview-field-line">
+                      <span>{salesInvoiceLayout.addressLabel}</span>
+                    </div>
                   </div>
-                </footer>
+
+                  <div
+                    class="pdf-preview-table"
+                    style={`--pdf-grid-template:${salesInvoiceGridTemplate};`}
+                  >
+                    <div class="pdf-preview-table__head">
+                      {salesInvoiceLayout.columns.map((column) => (
+                        <span
+                          class:list={[column.align && `is-${column.align}`]}
+                        >
+                          {column.label}
+                        </span>
+                      ))}
+                    </div>
+                    {order.customer_order_item.map((item, index) => (
+                      <div class="pdf-preview-table__row pdf-preview-table__row--editable">
+                        <span>
+                          {salesInvoiceLayout.rows[index]?.cells[0] ??
+                            "Missing product"}
+                        </span>
+                        <form
+                          method="post"
+                          class="pdf-preview-quantity-form"
+                          {...quantityValidationDataset(item, item.final_quantity)}
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="update-invoice-item-quantity"
+                          />
+                          <input
+                            type="hidden"
+                            name="orderItemId"
+                            value={item.id}
+                          />
+                          <input
+                            type="number"
+                            name="quantity"
+                            min="0.001"
+                            step="0.001"
+                            value={item.final_quantity}
+                            disabled={!canEditInvoiceQuantities}
+                            required
+                          />
+                          <button
+                            type="submit"
+                            disabled={!canEditInvoiceQuantities}
+                          >
+                            Save
+                          </button>
+                        </form>
+                        <span class="is-right">
+                          {salesInvoiceLayout.rows[index]?.cells[2] ?? ""}
+                        </span>
+                        <span class="is-right">
+                          {salesInvoiceLayout.rows[index]?.cells[3] ?? ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div class="pdf-preview-total-row">
+                    <span>{salesInvoiceLayout.totalLabel}</span>
+                  </div>
+
+                  <div class="pdf-preview-copy-block">
+                    <h4>Delivery Preference</h4>
+                    <p>{salesInvoiceLayout.paymentLines[0]}</p>
+                    <p>{salesInvoiceLayout.paymentLines[1]}</p>
+                  </div>
+
+                  <div class="pdf-preview-copy-block">
+                    <h4>{salesInvoiceLayout.paymentHeading}</h4>
+                    <p>{salesInvoiceLayout.paymentLines[2]}</p>
+                  </div>
+
+                  <footer class="pdf-preview-invoice-footer">
+                    <div class="pdf-preview-issuer">
+                      <p class="pdf-preview-signature-heading">
+                        {salesInvoiceLayout.issuerHeading}
+                      </p>
+                      <p class="pdf-preview-signature-name">
+                        {salesInvoiceLayout.issuerName}
+                      </p>
+                      <p>{salesInvoiceLayout.issuerSubline}</p>
+                    </div>
+                  </footer>
                 </div>
               </>
             )
           }
         </section>
-
-        {
-          hasCommissionTab && (
-            <section
-              class:list={[
-                "order-tab-panel",
-                isOrderDetailTabActive("commission") && "is-active",
-              ]}
-              data-order-detail-tab-panel="commission"
-              role="tabpanel"
-              hidden={!isOrderDetailTabActive("commission")}
-            >
-              <div class="metrics-grid">
-                <div class="metric-card">
-                  <span>Total Commission</span>
-                  <strong>{formatCurrency(totalCommission)}</strong>
-                </div>
-                <div class="metric-card">
-                  <span>Payment Available For Paid Commissions</span>
-                  <strong>
-                    {formatCurrency(totalAvailableCommissionCoverage)}
-                  </strong>
-                </div>
-              </div>
-
-              <div
-                class="commission-panel"
-                data-commission-editor
-                data-save-url={`/admin/orders/customer/${order.id}`}
-                data-has-payments={hasPayments ? "true" : "false"}
-                data-total-available-coverage={totalAvailableCommissionCoverage}
-              >
-                <div class="commission-panel__header">
-                  <h3 class="commission-panel__title">Order Items</h3>
-                  <label
-                    class="commission-mark-all"
-                    title={markAllCommissionPaidDisabledReason ?? undefined}
-                  >
-                    <input
-                      type="checkbox"
-                      data-commission-mark-all
-                      checked={markAllCommissionPaid}
-                      disabled={markAllCommissionPaidDisabled}
-                      data-indeterminate={
-                        markAllCommissionPaidIndeterminate ? "true" : undefined
-                      }
-                    />
-                    <span>Mark all as paid</span>
-                  </label>
-                </div>
-
-                <div class="commission-list">
-                  {commissionItems.map(
-                    ({
-                      item,
-                      itemTotalAmount,
-                      paidCheckboxDisabled,
-                      availableCoverageForItem,
-                      payabilityNotice,
-                    }) => {
-                      const defaultCommission = defaultProductCommissionAmount({
-                        product: item.product,
-                        quantity: item.partial_quantity,
-                        unitPrice: item.unit_price,
-                      });
-
-                      return (
-                        <div
-                          class:list={[
-                            "commission-row",
-                            item.agent_commission_paid && "is-paid",
-                          ]}
-                          data-commission-row
-                          data-order-item-id={item.id}
-                          data-item-total={itemTotalAmount}
-                          data-available-coverage={availableCoverageForItem}
-                          data-has-payments={hasPayments ? "true" : "false"}
-                        >
-                          <div class="commission-row__content">
-                            <input
-                              type="checkbox"
-                              class="commission-row__paid"
-                              checked={item.agent_commission_paid}
-                              disabled={paidCheckboxDisabled}
-                              aria-label={`Mark commission paid for ${item.product?.name ?? "item"}`}
-                            />
-                            <div class="commission-row__details">
-                              <span class="commission-row__label">
-                                <span class="commission-row__product">
-                                  {item.product?.name ?? "Missing product"}
-                                </span>
-                                <span class="commission-row__separator">-</span>
-                                <span class="commission-row__total">
-                                  {formatCurrency(itemTotalAmount)}
-                                </span>
-                              </span>
-                              <span class="commission-row__default">
-                                Default {formatCurrency(defaultCommission)}
-                              </span>
-                              <p
-                                class:list={[
-                                  "commission-row__notice",
-                                  `commission-row__notice--${payabilityNotice.tone}`,
-                                ]}
-                              >
-                                {payabilityNotice.message}
-                              </p>
-                            </div>
-                            <input
-                              type="number"
-                              class="commission-row__amount"
-                              min="0"
-                              step="0.01"
-                              value={item.agent_commission_amount}
-                              aria-label={`Commission for ${item.product?.name ?? "item"}`}
-                            />
-                          </div>
-                          <p class="commission-row__error" hidden />
-                        </div>
-                      );
-                    },
-                  )}
-                </div>
-              </div>
-            </section>
-          )
-        }
 
         <section
           class:list={[
@@ -1335,11 +1322,8 @@ const backLabel = backHref.startsWith("/admin/customers/")
               <div class="payment-panel__intro">
                 <h3 class="payment-panel__title">Payment History</h3>
                 <p>
-                  {
-                    hasSalesInvoice
-                      ? "Track payments made against the invoice, including agent-received payments awaiting confirmation."
-                      : "Create a sales invoice before recording any payment."
-                  }
+                  Track payments made against this order, including
+                  agent-received payments awaiting confirmation.
                 </p>
               </div>
               <button
@@ -1363,7 +1347,8 @@ const backLabel = backHref.startsWith("/admin/customers/")
                     <div>
                       <h4>Agent Received Payments</h4>
                       <p>
-                        {formatCurrency(pendingAgentReceivedTotal)} awaiting admin confirmation.
+                        {formatCurrency(pendingAgentReceivedTotal)} awaiting
+                        admin confirmation.
                       </p>
                     </div>
                   </div>
@@ -1392,7 +1377,11 @@ const backLabel = backHref.startsWith("/admin/customers/")
                           {" â€¢ "}
                           {payment.notes ?? "No notes"}
                         </p>
-                        <form method="post" class="agent-received-row__actions">
+                        <form
+                          method="post"
+                          class="agent-received-row__actions"
+                          data-astro-reload
+                        >
                           <input
                             type="hidden"
                             name="action"
@@ -1406,7 +1395,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
                           <button
                             type="submit"
                             class="primary-panel-button primary-panel-button--compact"
-                            disabled={!hasSalesInvoice}
                           >
                             Confirm Payment Received
                           </button>
@@ -1418,63 +1406,78 @@ const backLabel = backHref.startsWith("/admin/customers/")
               )
             }
 
-            <form method="post" class="payment-form" data-payment-form hidden>
+            <form
+              action={paymentRecordReturnPath}
+              method="post"
+              class="payment-form"
+              data-payment-form
+              data-astro-reload
+              data-payment-paid-total={paidTotal}
+              data-payment-order-total={paymentOrderTotal}
+              data-payment-commission-total={paymentFormCommissionTotal}
+              hidden
+            >
               <input type="hidden" name="action" value="record-payment" />
               <input type="hidden" name="orderId" value={order.id} />
-              {(hasPayments || isResellerCustomer) && (
-                <input
-                  type="hidden"
-                  name="customerType"
-                  value={paymentCustomerType}
-                />
-              )}
-              <input type="hidden" data-payment-paid-total value={paidTotal} />
+              <input type="hidden" name="returnTo" value={paymentRecordReturnPath} />
+              {
+                (hasPayments || isResellerCustomer) && (
+                  <input
+                    type="hidden"
+                    name="customerType"
+                    value={paymentCustomerType}
+                  />
+                )
+              }
               <div data-payment-pricing-items hidden>
-                {order.customer_order_item.map((item) => (
-                  <span
-                    data-payment-pricing-item
-                    data-final-quantity={item.final_quantity}
-                    data-default-price={item.product?.default_price ?? item.unit_price}
-                    data-reseller-price={item.product?.reseller_price ?? item.unit_price}
-                  ></span>
-                ))}
-              </div>
-
-              <div class="payment-form__summary">
-                <div class="payment-form__summary-card">
-                  <span>Total Value</span>
-                  <strong data-payment-total-value>{formatCurrency(paymentOrderTotal)}</strong>
-                </div>
-                <div class="payment-form__summary-card">
-                  <span>Total Paid</span>
-                  <strong>{formatCurrency(paidTotal)}</strong>
-                </div>
-                <div class="payment-form__summary-card">
-                  <span>Remaining Balance</span>
-                  <strong data-payment-balance-value>{formatCurrency(balance)}</strong>
-                </div>
+                {
+                  order.customer_order_item.map((item) => (
+                    <span
+                      data-payment-pricing-item
+                      data-final-quantity={item.final_quantity}
+                      data-default-price={
+                        item.product?.default_price ?? item.unit_price
+                      }
+                      data-reseller-price={
+                        item.product?.reseller_price ?? item.unit_price
+                      }
+                    />
+                  ))
+                }
               </div>
 
               <div class="payment-form__grid">
-                {isResellerCustomer ? (
-                  <div class="payment-form__readonly-field">
-                    <span>Customer Type</span>
-                    <strong>Reseller</strong>
-                  </div>
-                ) : (
-                  <label>
-                    <span>Customer Type</span>
-                    <select
-                      name="customerType"
-                      data-payment-customer-type
-                      disabled={hasPayments}
-                    >
-                      <option value="regular" selected={paymentCustomerType === "regular"}>Regular</option>
-                      <option value="wholesale">Wholesale</option>
-                      <option value="reseller" selected={paymentCustomerType === "reseller"}>Reseller</option>
-                    </select>
-                  </label>
-                )}
+                {
+                  isResellerCustomer ? (
+                    <div class="payment-form__readonly-field">
+                      <span>Customer Type</span>
+                      <strong>Reseller</strong>
+                    </div>
+                  ) : (
+                    <label>
+                      <span>Customer Type</span>
+                      <select
+                        name="customerType"
+                        data-payment-customer-type
+                        disabled={hasPayments}
+                      >
+                        <option
+                          value="regular"
+                          selected={paymentCustomerType === "regular"}
+                        >
+                          Regular
+                        </option>
+                        <option value="wholesale">Wholesale</option>
+                        <option
+                          value="reseller"
+                          selected={paymentCustomerType === "reseller"}
+                        >
+                          Reseller
+                        </option>
+                      </select>
+                    </label>
+                  )
+                }
                 <label>
                   <span>Amount</span>
                   <input
@@ -1482,18 +1485,15 @@ const backLabel = backHref.startsWith("/admin/customers/")
                     name="amount"
                     min="0.01"
                     step="0.01"
-                    max={balance > 0 ? balance : undefined}
-                    value={balance > 0 ? balance.toFixed(2) : undefined}
+                    max={paymentFormBalance.toFixed(2)}
+                    value="0.00"
                     data-payment-amount
                     required
                   />
                 </label>
                 <label>
                   <span>Method</span>
-                  <select
-                    name="paymentMethod"
-                    required
-                  >
+                  <select name="paymentMethod" required>
                     <option value="">Select method</option>
                     <option value="Cash">Cash</option>
                     <option value="Check">Check</option>
@@ -1503,7 +1503,9 @@ const backLabel = backHref.startsWith("/admin/customers/")
                   <span>Payment Terms</span>
                   <select name="paymentTerms" required>
                     <option value="">Select payment terms</option>
-                    <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+                    <option value="Cash on Delivery (COD)"
+                      >Cash on Delivery (COD)</option
+                    >
                     <option value="Bank Transfer">Bank Transfer</option>
                     <option value="Gcash">Gcash</option>
                   </select>
@@ -1513,7 +1515,16 @@ const backLabel = backHref.startsWith("/admin/customers/")
                   <input
                     type="date"
                     name="paymentDate"
-                    value={new Date().toISOString().slice(0, 10)}
+                    value={paymentDateDefault}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Payment Time</span>
+                  <input
+                    type="time"
+                    name="paymentTime"
+                    value={paymentTimeDefault}
                     required
                   />
                 </label>
@@ -1610,17 +1621,19 @@ const backLabel = backHref.startsWith("/admin/customers/")
                 <span role="columnheader">Details</span>
                 <span role="columnheader">Date</span>
               </div>
-              {timelineItems.map((item) => (
-                <div class="order-timeline-table__row" role="row">
-                  <span role="cell">
-                    <strong>{item.title}</strong>
-                  </span>
-                  <span role="cell">{item.meta}</span>
-                  <time role="cell" datetime={item.timestamp}>
-                    {formatDateTime(item.timestamp)}
-                  </time>
-                </div>
-              ))}
+              {
+                timelineItems.map((item) => (
+                  <div class="order-timeline-table__row" role="row">
+                    <span role="cell">
+                      <strong>{item.title}</strong>
+                    </span>
+                    <span role="cell">{item.meta}</span>
+                    <time role="cell" datetime={item.timestamp}>
+                      {formatDateTime(item.timestamp)}
+                    </time>
+                  </div>
+                ))
+              }
             </div>
           </div>
         </section>
@@ -1914,312 +1927,11 @@ const backLabel = backHref.startsWith("/admin/customers/")
   </div>
 </AdminPageFrame>
 
+<script>
+  import "@/lib/client/order-detail-nav";
+</script>
+
 <script is:inline>
-  const commissionEditor = document.querySelector("[data-commission-editor]");
-
-  if (commissionEditor instanceof HTMLElement) {
-    const saveUrl = commissionEditor.dataset.saveUrl;
-    const debounceMs = 500;
-    const saveTimers = new WeakMap();
-
-    const formatCommissionCurrency = (value) =>
-      new Intl.NumberFormat("en-PH", {
-        style: "currency",
-        currency: "PHP",
-      }).format(value);
-
-    const updatePayabilityNotice = (row) => {
-      const notice = row.querySelector(".commission-row__notice");
-      const amountInput = row.querySelector(".commission-row__amount");
-      const paidInput = row.querySelector(".commission-row__paid");
-
-      if (!(notice instanceof HTMLElement)) {
-        return;
-      }
-
-      if (!(amountInput instanceof HTMLInputElement)) {
-        return;
-      }
-
-      if (!(paidInput instanceof HTMLInputElement)) {
-        return;
-      }
-
-      const itemTotal = Number(row.dataset.itemTotal ?? "0");
-      const availableCoverage = Number(row.dataset.availableCoverage ?? "0");
-      const hasPaymentsRecorded = row.dataset.hasPayments === "true";
-      const amount = Number(amountInput.value);
-
-      notice.classList.remove(
-        "commission-row__notice--paid",
-        "commission-row__notice--ready",
-        "commission-row__notice--blocked",
-      );
-
-      if (paidInput.checked && amount > 0) {
-        notice.textContent = "Marked as paid.";
-        notice.classList.add("commission-row__notice--paid");
-        return;
-      }
-
-      if (!Number.isFinite(amount) || amount <= 0) {
-        notice.textContent = "Set a commission amount before marking as paid.";
-        notice.classList.add("commission-row__notice--blocked");
-        return;
-      }
-
-      if (!hasPaymentsRecorded) {
-        notice.textContent = "Record a payment before marking as paid.";
-        notice.classList.add("commission-row__notice--blocked");
-        return;
-      }
-
-      if (itemTotal > availableCoverage) {
-        notice.textContent = `Item total exceeds remaining paid coverage (${formatCommissionCurrency(availableCoverage)} available).`;
-        notice.classList.add("commission-row__notice--blocked");
-        return;
-      }
-
-      notice.textContent = "Can be marked as paid.";
-      notice.classList.add("commission-row__notice--ready");
-    };
-
-    const syncPaidState = (row) => {
-      const amountInput = row.querySelector(".commission-row__amount");
-      const paidInput = row.querySelector(".commission-row__paid");
-
-      if (!(amountInput instanceof HTMLInputElement)) {
-        return;
-      }
-
-      if (!(paidInput instanceof HTMLInputElement)) {
-        return;
-      }
-
-      const amount = Number(amountInput.value);
-
-      if (!Number.isFinite(amount) || amount <= 0) {
-        paidInput.checked = false;
-      }
-
-      row.classList.toggle(
-        "is-paid",
-        paidInput.checked && Number(amountInput.value) > 0,
-      );
-      updatePayabilityNotice(row);
-    };
-
-    const syncMarkAllState = () => {
-      const markAllCheckbox = commissionEditor.querySelector(
-        "[data-commission-mark-all]",
-      );
-      const markAllLabel = commissionEditor.querySelector(
-        ".commission-mark-all",
-      );
-
-      if (!(markAllCheckbox instanceof HTMLInputElement)) {
-        return;
-      }
-
-      const payableRows = Array.from(
-        commissionEditor.querySelectorAll("[data-commission-row]"),
-      ).filter((row) => {
-        const amountInput = row.querySelector(".commission-row__amount");
-        return (
-          amountInput instanceof HTMLInputElement &&
-          Number(amountInput.value) > 0
-        );
-      });
-
-      const paidCount = payableRows.filter((row) => {
-        const paidInput = row.querySelector(".commission-row__paid");
-        return paidInput instanceof HTMLInputElement && paidInput.checked;
-      }).length;
-
-      const unpaidRows = payableRows.filter((row) => {
-        const paidInput = row.querySelector(".commission-row__paid");
-        return paidInput instanceof HTMLInputElement && !paidInput.checked;
-      });
-
-      const hasPaymentsRecorded =
-        commissionEditor.dataset.hasPayments === "true";
-      const availableCoverage = Number(
-        commissionEditor.dataset.totalAvailableCoverage ?? "0",
-      );
-
-      let disabledReason = null;
-
-      if (payableRows.length === 0) {
-        disabledReason = "Set commission amounts before marking all as paid.";
-      } else if (unpaidRows.length > 0) {
-        if (!hasPaymentsRecorded) {
-          disabledReason =
-            "Record a payment before marking all commissions as paid.";
-        } else if (
-          unpaidRows.some((row) => {
-            const paidInput = row.querySelector(".commission-row__paid");
-            return paidInput instanceof HTMLInputElement && paidInput.disabled;
-          })
-        ) {
-          disabledReason = `Recorded payments leave only ${formatCommissionCurrency(availableCoverage)} available for paid commissions.`;
-        }
-      }
-
-      markAllCheckbox.checked =
-        payableRows.length > 0 && paidCount === payableRows.length;
-      markAllCheckbox.indeterminate =
-        paidCount > 0 && paidCount < payableRows.length;
-      markAllCheckbox.disabled = disabledReason !== null;
-
-      if (markAllLabel instanceof HTMLLabelElement) {
-        if (disabledReason) {
-          markAllLabel.title = disabledReason;
-        } else {
-          markAllLabel.removeAttribute("title");
-        }
-      }
-    };
-
-    const saveCommissionRow = async (row) => {
-      if (!saveUrl) {
-        return;
-      }
-
-      const amountInput = row.querySelector(".commission-row__amount");
-      const paidInput = row.querySelector(".commission-row__paid");
-      const errorEl = row.querySelector(".commission-row__error");
-
-      if (!(amountInput instanceof HTMLInputElement)) {
-        return;
-      }
-
-      if (!(paidInput instanceof HTMLInputElement)) {
-        return;
-      }
-
-      if (!(errorEl instanceof HTMLElement)) {
-        return;
-      }
-
-      const formData = new FormData();
-      formData.set("action", "update-commission");
-      formData.set("orderItemId", row.dataset.orderItemId ?? "");
-      formData.set("amount", amountInput.value);
-
-      if (paidInput.checked) {
-        formData.set("isPaid", "on");
-      }
-
-      try {
-        const response = await fetch(saveUrl, {
-          method: "POST",
-          body: formData,
-          credentials: "same-origin",
-          headers: {
-            Accept: "text/html",
-          },
-        });
-
-        const resultUrl = new URL(response.url);
-        const error = resultUrl.searchParams.get("error");
-
-        if (error) {
-          errorEl.textContent = error;
-          errorEl.hidden = false;
-          return;
-        }
-
-        errorEl.hidden = true;
-        errorEl.textContent = "";
-        syncPaidState(row);
-        syncMarkAllState();
-      } catch {
-        errorEl.textContent = "Unable to save commission.";
-        errorEl.hidden = false;
-      }
-    };
-
-    commissionEditor
-      .querySelectorAll("[data-commission-row]")
-      .forEach((row) => {
-        const amountInput = row.querySelector(".commission-row__amount");
-        const paidInput = row.querySelector(".commission-row__paid");
-
-        amountInput?.addEventListener("input", () => {
-          updatePayabilityNotice(row);
-          const existingTimer = saveTimers.get(row);
-          if (existingTimer) {
-            clearTimeout(existingTimer);
-          }
-
-          saveTimers.set(
-            row,
-            setTimeout(() => {
-              saveCommissionRow(row);
-            }, debounceMs),
-          );
-        });
-
-        paidInput?.addEventListener("change", () => {
-          const existingTimer = saveTimers.get(row);
-          if (existingTimer) {
-            clearTimeout(existingTimer);
-          }
-
-          saveCommissionRow(row);
-        });
-      });
-
-    const markAllCheckbox = commissionEditor.querySelector(
-      "[data-commission-mark-all]",
-    );
-
-    if (markAllCheckbox instanceof HTMLInputElement) {
-      if (markAllCheckbox.dataset.indeterminate === "true") {
-        markAllCheckbox.indeterminate = true;
-      }
-
-      markAllCheckbox.addEventListener("change", async () => {
-        const shouldMarkPaid = markAllCheckbox.checked;
-        const rows = Array.from(
-          commissionEditor.querySelectorAll("[data-commission-row]"),
-        );
-
-        for (const row of rows) {
-          const amountInput = row.querySelector(".commission-row__amount");
-          const paidInput = row.querySelector(".commission-row__paid");
-
-          if (!(amountInput instanceof HTMLInputElement)) {
-            continue;
-          }
-
-          if (!(paidInput instanceof HTMLInputElement)) {
-            continue;
-          }
-
-          if (Number(amountInput.value) <= 0) {
-            continue;
-          }
-
-          if (shouldMarkPaid && paidInput.disabled) {
-            continue;
-          }
-
-          if (paidInput.checked === shouldMarkPaid) {
-            continue;
-          }
-
-          paidInput.checked = shouldMarkPaid;
-          await saveCommissionRow(row);
-        }
-
-        syncMarkAllState();
-      });
-    }
-
-    syncMarkAllState();
-  }
-
   const notesPanel = document.querySelector("[data-order-notes-panel]");
 
   if (notesPanel instanceof HTMLElement) {
@@ -2485,7 +2197,9 @@ const backLabel = backHref.startsWith("/admin/customers/")
     padding: 0;
   }
 
-  :global(.dashboard-main:has([data-order-detail-page]) .dashboard-main__content) {
+  :global(
+    .dashboard-main:has([data-order-detail-page]) .dashboard-main__content
+  ) {
     display: flex;
     flex: 1;
     flex-direction: column;
@@ -2637,56 +2351,269 @@ const backLabel = backHref.startsWith("/admin/customers/")
     padding-top: 0.15rem;
   }
 
-  .order-status-trigger {
+  .order-detail-nav {
+    position: relative;
+    min-width: 0;
+  }
+
+  .order-detail-nav__trigger {
     display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
     border: none;
     background: transparent;
     padding: 0;
     cursor: pointer;
-    border-radius: 999px;
+    color: inherit;
+    text-align: left;
   }
 
-  .order-status-trigger:hover,
-  .order-status-trigger:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 2px rgba(127, 29, 29, 0.18);
+  .order-detail-nav__trigger h1 {
+    margin: 0;
+    font-size: inherit;
+    line-height: 1.15;
   }
 
-  .order-status-popover-form {
+  .order-detail-nav__trigger svg {
+    width: 1rem;
+    height: 1rem;
+    color: rgba(17, 24, 39, 0.55);
+    flex-shrink: 0;
+  }
+
+  .order-detail-nav__menu {
+    position: absolute;
+    top: calc(100% + 0.45rem);
+    left: 0;
+    z-index: 20;
+    width: min(22rem, calc(100vw - 2rem));
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid rgba(17, 24, 39, 0.1);
+    border-radius: 0.85rem;
+    background: #fff;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+  }
+
+  .order-detail-nav__menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0.35rem;
+  }
+
+  .order-detail-nav__option {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
     gap: 0.75rem;
-    min-width: 14rem;
-  }
-
-  .order-status-popover-form label {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-  }
-
-  .order-status-popover-form span {
-    color: rgba(17, 24, 39, 0.58);
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .order-status-popover-form select {
-    min-height: 2.5rem;
-    border-radius: 0.75rem;
-    border: 1px solid rgba(17, 24, 39, 0.12);
-    background: #ffffff;
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.6rem;
     color: #111827;
-    padding: 0 0.85rem;
-    font: inherit;
+    text-decoration: none;
+    font-size: 0.86rem;
     font-weight: 600;
   }
 
-  .order-status-popover-form[data-order-status-saving="true"] select {
-    cursor: wait;
-    opacity: 0.68;
+  .order-detail-nav__option time {
+    color: rgba(17, 24, 39, 0.56);
+    font-size: 0.76rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .order-detail-nav__option:hover,
+  .order-detail-nav__option:focus-visible {
+    background: rgba(17, 24, 39, 0.05);
+    outline: none;
+  }
+
+  .order-detail-nav__option.is-current {
+    background: rgba(127, 29, 29, 0.08);
+  }
+
+  .order-information {
+    margin-bottom: 1rem;
+    padding: 0.95rem 1rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.9rem;
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .order-information__title {
+    margin: 0 0 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(17, 24, 39, 0.56);
+  }
+
+  .order-information__list {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0;
+  }
+
+  .order-information__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .order-information__item dt {
+    margin: 0;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .order-information__item dd {
+    margin: 0;
+    color: #111827;
+    font-size: 0.88rem;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .order-information__amount {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.15rem;
+  }
+
+  .order-information__orig-amount {
+    color: rgba(17, 24, 39, 0.42);
+    font-size: 0.76rem;
+    font-weight: 600;
+  }
+
+  .order-commission-form {
+    display: grid;
+    grid-template-columns: minmax(0, 7.5rem) auto;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+  }
+
+  .order-commission-form input {
+    min-width: 0;
+    width: 100%;
+    border: 1px solid rgba(17, 24, 39, 0.14);
+    border-radius: 0.55rem;
+    background: #ffffff;
+    color: #111827;
+    padding: 0.42rem 0.5rem;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .order-commission-form button {
+    border: 0;
+    border-radius: 0.55rem;
+    background: #111827;
+    color: #fff;
+    padding: 0.47rem 0.58rem;
+    font: inherit;
+    font-size: 0.76rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .order-commission-form button:hover,
+  .order-commission-form button:focus-visible {
+    background: #374151;
+    outline: none;
+  }
+
+  .order-conversion-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    margin-bottom: 1rem;
+    border: 1px solid #bfdbfe;
+    border-radius: 0.9rem;
+    background: #eff6ff;
+    padding: 0.95rem 1rem;
+    color: #1e3a8a;
+  }
+
+  .order-conversion-card h2 {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.25;
+    font-weight: 800;
+    color: #1e3a8a;
+  }
+
+  .order-conversion-card p {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.45;
+    color: #1d4ed8;
+  }
+
+  .order-conversion-card form {
+    margin: 0;
+  }
+
+  .order-conversion-card__blocked {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .order-conversion-card__blocked p {
+    color: #7c2d12;
+  }
+
+  .order-conversion-card button {
+    width: 100%;
+    border: 0;
+    border-radius: 0.7rem;
+    background: #1d4ed8;
+    color: #fff;
+    padding: 0.72rem 0.9rem;
+    font-size: 0.84rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .order-conversion-card button:disabled {
+    background: #cbd5e1;
+    color: #475569;
+    cursor: not-allowed;
+  }
+
+  .order-conversion-card button:not(:disabled):hover,
+  .order-conversion-card button:not(:disabled):focus-visible {
+    background: #1e40af;
+    outline: none;
+  }
+
+  .order-accept-form {
+    margin-bottom: 1rem;
+  }
+
+  .order-accept-form__button {
+    width: 100%;
+    border: none;
+    border-radius: 0.75rem;
+    background: #7f1d1d;
+    color: #fff;
+    padding: 0.8rem 1rem;
+    font-size: 0.88rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .order-accept-form__button:hover,
+  .order-accept-form__button:focus-visible {
+    background: #991b1b;
+    outline: none;
   }
 
   .order-party-cards {
@@ -3446,185 +3373,6 @@ const backLabel = backHref.startsWith("/admin/customers/")
     gap: 0.85rem;
   }
 
-  .commission-panel {
-    margin-top: 1rem;
-    border-top: 1px solid rgba(17, 24, 39, 0.08);
-  }
-
-  .commission-panel__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.95rem 0 0.75rem;
-  }
-
-  .commission-panel__title {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 700;
-    color: #111827;
-  }
-
-  .commission-mark-all {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.55rem;
-    color: #111827;
-    font: inherit;
-    cursor: pointer;
-    flex-shrink: 0;
-  }
-
-  .commission-mark-all:has(input:disabled) {
-    cursor: not-allowed;
-    opacity: 0.65;
-  }
-
-  .commission-mark-all input {
-    width: 1rem;
-    height: 1rem;
-    margin: 0;
-    flex-shrink: 0;
-    accent-color: #111827;
-  }
-
-  .commission-mark-all span {
-    font-size: 0.92rem;
-    font-weight: 600;
-  }
-
-  .commission-list {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .commission-row {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-    padding: 0.9rem 0;
-    border-bottom: 1px solid rgba(17, 24, 39, 0.08);
-  }
-
-  .commission-row:last-child {
-    border-bottom: none;
-  }
-
-  .commission-row__content {
-    position: relative;
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) 7rem;
-    align-items: start;
-    gap: 0.85rem;
-  }
-
-  .commission-row__details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-    min-width: 0;
-  }
-
-  .commission-row__notice {
-    margin: 0;
-    font-size: 0.78rem;
-    line-height: 1.35;
-  }
-
-  .commission-row__default {
-    display: block;
-    color: rgba(17, 24, 39, 0.55);
-    font-size: 0.78rem;
-    line-height: 1.35;
-  }
-
-  .commission-row__notice--ready {
-    color: rgba(17, 24, 39, 0.58);
-  }
-
-  .commission-row__notice--blocked {
-    color: #b54708;
-  }
-
-  .commission-row__notice--paid {
-    color: rgba(17, 24, 39, 0.5);
-  }
-
-  .commission-row__paid {
-    flex-shrink: 0;
-    width: 1rem;
-    height: 1rem;
-    margin: 0.15rem 0 0;
-    accent-color: #111827;
-  }
-
-  .commission-row__label {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    min-width: 0;
-    flex-wrap: wrap;
-  }
-
-  .commission-row__product {
-    font-weight: 600;
-    color: #111827;
-  }
-
-  .commission-row__separator,
-  .commission-row__total {
-    color: rgba(17, 24, 39, 0.72);
-  }
-
-  .commission-row__amount {
-    width: 100%;
-    justify-self: end;
-    border-radius: 0.75rem;
-    border: 1px solid rgba(17, 24, 39, 0.12);
-    background: #ffffff;
-    color: #111827;
-    padding: 0.55rem 0.75rem;
-    font: inherit;
-    text-align: right;
-  }
-
-  .commission-row__error {
-    margin: 0;
-    font-size: 0.78rem;
-    color: #b42318;
-  }
-
-  .commission-row.is-paid .commission-row__content {
-    color: rgba(17, 24, 39, 0.42);
-  }
-
-  .commission-row.is-paid .commission-row__product,
-  .commission-row.is-paid .commission-row__separator,
-  .commission-row.is-paid .commission-row__total,
-  .commission-row.is-paid .commission-row__amount,
-  .commission-row.is-paid .commission-row__notice {
-    color: rgba(17, 24, 39, 0.42);
-  }
-
-  .commission-row.is-paid .commission-row__paid {
-    opacity: 0.45;
-    accent-color: rgba(17, 24, 39, 0.42);
-  }
-
-  .commission-row.is-paid .commission-row__content::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 50%;
-    height: 1px;
-    background: rgba(17, 24, 39, 0.28);
-    pointer-events: none;
-  }
-
   .document-table-head,
   .document-table-row,
   .invoice-edit-row {
@@ -4193,35 +3941,10 @@ const backLabel = backHref.startsWith("/admin/customers/")
     font-weight: 700;
   }
 
-  .order-detail-section,
-  .order-tab-panel {
-    scrollbar-width: thin;
-    scrollbar-color: rgba(17, 24, 39, 0.24) transparent;
-  }
-
-  .order-detail-section::-webkit-scrollbar,
-  .order-tab-panel::-webkit-scrollbar,
-  .order-activity-card__body::-webkit-scrollbar {
-    width: 10px;
-  }
-
-  .order-detail-section::-webkit-scrollbar-track,
-  .order-tab-panel::-webkit-scrollbar-track,
-  .order-activity-card__body::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .order-detail-section::-webkit-scrollbar-thumb,
-  .order-tab-panel::-webkit-scrollbar-thumb,
-  .order-activity-card__body::-webkit-scrollbar-thumb {
-    background: rgba(17, 24, 39, 0.22);
-    border: 2px solid transparent;
-    border-radius: 999px;
-    background-clip: padding-box;
-  }
-
   @media (max-width: 1080px) {
-    :global(.dashboard-main:has([data-order-detail-page]) .dashboard-main__content) {
+    :global(
+      .dashboard-main:has([data-order-detail-page]) .dashboard-main__content
+    ) {
       height: auto;
       overflow: visible;
     }

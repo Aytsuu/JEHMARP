@@ -1,4 +1,4 @@
-const tabsInitializedFlag = "orderDetailTabsInitialized";
+const tabsInitializedPathKey = "orderDetailTabsInitPath";
 const tabParamName = "tab";
 
 function getTabTriggers(container: ParentNode) {
@@ -65,6 +65,8 @@ function setActiveTab(
 }
 
 export function initOrderDetailTabs(root: ParentNode = document) {
+  const currentPath = window.location.pathname;
+
   root.querySelectorAll<HTMLElement>("[data-order-detail-tabs]").forEach(
     (container) => {
       const triggers = getTabTriggers(container);
@@ -76,8 +78,8 @@ export function initOrderDetailTabs(root: ParentNode = document) {
 
       setActiveTab(triggers, panels, initialTab, { updateUrl: false });
 
-      if (container.dataset[tabsInitializedFlag] === "true") return;
-      container.dataset[tabsInitializedFlag] = "true";
+      if (container.dataset[tabsInitializedPathKey] === currentPath) return;
+      container.dataset[tabsInitializedPathKey] = currentPath;
 
       triggers.forEach((trigger) => {
         trigger.addEventListener("click", () => {

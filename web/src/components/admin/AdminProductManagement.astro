@@ -59,6 +59,7 @@ function formatStockStatus(status: string): string {
       enctype="multipart/form-data"
       class="admin-form product-create-form"
       aria-label="Create product"
+      data-astro-reload
     >
       <input type="hidden" name="action" value="save-product" />
       <input type="hidden" name="isActive" value="on" />
@@ -328,6 +329,7 @@ function formatStockStatus(status: string): string {
         <table class="product-table-skeleton dashboard-table dashboard-table--products">
           <thead>
             <tr>
+              <th scope="col">Date Created</th>
               <th scope="col" class="dashboard-table__cell--product">
                 Product
               </th>
@@ -335,7 +337,6 @@ function formatStockStatus(status: string): string {
               <th scope="col">Pricing</th>
               <th scope="col">Commission</th>
               <th scope="col">Status</th>
-              <th scope="col">Date Created</th>
               <th scope="col">Action</th>
             </tr>
           </thead>
@@ -349,7 +350,18 @@ function formatStockStatus(status: string): string {
               ) : (
                 data.products.map((product) => (
                   <tr data-status={product.is_active ? "active" : "inactive"}>
-                    {/* 1. Product Cell (Editable Product Popover) */}
+                    <td>
+                      {new Date(product.created_at).toLocaleDateString(
+                        "en-US",
+                        {
+                          year: "numeric",
+                          month: "short",
+                          day: "numeric",
+                        },
+                      )}
+                    </td>
+
+                    {/* Product Cell (Editable Product Popover) */}
                     <td class="dashboard-table__cell--product">
                       <button
                         type="button"
@@ -1001,18 +1013,6 @@ function formatStockStatus(status: string): string {
                       </div>
                     </td>
 
-                    {/* 6. Date Created Cell (Static) */}
-                    <td>
-                      {new Date(product.created_at).toLocaleDateString(
-                        "en-US",
-                        {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        },
-                      )}
-                    </td>
-
                     <td></td>
                   </tr>
                 ))
@@ -1034,21 +1034,24 @@ function formatStockStatus(status: string): string {
         <caption class="sr-only">Loading filtered products</caption>
         <thead>
           <tr>
+            <th scope="col">Date Created</th>
             <th scope="col" class="dashboard-table__cell--product">
               Product
             </th>
-              <th scope="col">Description</th>
-              <th scope="col">Pricing</th>
-              <th scope="col">Commission</th>
-              <th scope="col">Status</th>
-              <th scope="col">Date Created</th>
-              <th scope="col">Action</th>
+            <th scope="col">Description</th>
+            <th scope="col">Pricing</th>
+            <th scope="col">Commission</th>
+            <th scope="col">Status</th>
+            <th scope="col">Action</th>
           </tr>
         </thead>
         <tbody>
           {
             skeletonRows.map(() => (
               <tr>
+                <td>
+                  <span class="table-skeleton-block" />
+                </td>
                 <td class="dashboard-table__cell--product">
                   <div class="dashboard-table__product-skeleton">
                     <span class="table-skeleton-block table-skeleton-block--image" />
@@ -1057,9 +1060,6 @@ function formatStockStatus(status: string): string {
                 </td>
                 <td>
                   <span class="table-skeleton-block table-skeleton-block--wide" />
-                </td>
-                <td>
-                  <span class="table-skeleton-block" />
                 </td>
                 <td>
                   <span class="table-skeleton-block" />
@@ -1083,278 +1083,20 @@ function formatStockStatus(status: string): string {
 </section>
 
 <script>
-  import {
-    readDashboardFragmentCache,
-    writeDashboardFragmentCache,
-  } from "@/lib/client/dashboard-fragment-cache";
+  import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
 
   function initAdminProductFilters() {
-    const form = document.querySelector<HTMLFormElement>(
-      "[data-product-filter-form]",
-    );
-    const tableShell = document.querySelector<HTMLElement>(
-      "[data-product-table-shell]",
-    );
-    const skeletonTemplate = document.querySelector<HTMLTemplateElement>(
-      "[data-product-filter-skeleton]",
-    );
-
-    if (!form || !tableShell || !skeletonTemplate) return;
-    if (form.dataset.productFilterInitialized === "true") return;
-    form.dataset.productFilterInitialized = "true";
-    const activeForm = form;
-    const activeTableShell = tableShell;
-    const activeSkeletonTemplate = skeletonTemplate;
-
-    const cacheKey = "admin-products-filter-cache-v2";
-    const fragmentPath = "/admin/products-fragment";
-    const filterKeys = ["search", "category", "stockStatus"] as const;
-    const autoSubmitFields =
-      activeForm.querySelectorAll<HTMLSelectElement>("select");
-    const searchInput = activeForm.querySelector<HTMLInputElement>(
-      "[data-product-search-input]",
-    );
-    let submitTimer: number | undefined;
-    let searchTimer: number | undefined;
-    let activeFetchController: AbortController | undefined;
-
-    function applyPaginationParams(
-      params: URLSearchParams,
-      page: number,
-      pageSize: number,
-    ) {
-      if (page > 1) {
-        params.set("page", String(page));
-      } else {
-        params.delete("page");
-      }
-
-      if (pageSize !== 10) {
-        params.set("pageSize", String(pageSize));
-      } else {
-        params.delete("pageSize");
-      }
-    }
-
-    function normalizeParams(params: URLSearchParams) {
-      const normalized = new URLSearchParams();
-
-      filterKeys.forEach((key) => {
-        const value = params.get(key)?.trim();
-        if (value) normalized.set(key, value);
-      });
-
-      const page = Number(params.get("page") ?? "1");
-      const pageSize = Number(params.get("pageSize") ?? "10");
-      applyPaginationParams(
-        normalized,
-        Number.isInteger(page) && page > 0 ? page : 1,
-        [10, 50, 100].includes(pageSize) ? pageSize : 10,
-      );
-
-      return normalized.toString();
-    }
-
-    function currentPageSize() {
-      const limitSelect = document.querySelector<HTMLSelectElement>(
-        "[data-product-table-shell] ~ .dashboard-interactive-table__footer [data-limit-select]",
-      );
-      const value = Number(limitSelect?.value ?? "10");
-
-      return [10, 50, 100].includes(value) ? value : 10;
-    }
-
-    function normalizeFormQuery(options: { page?: number; pageSize?: number } = {}) {
-      const params = new URLSearchParams();
-      const formData = new FormData(activeForm);
-
-      filterKeys.forEach((key) => {
-        const value = formData.get(key);
-        if (typeof value === "string" && value.trim()) {
-          params.set(key, value.trim());
-        }
-      });
-
-      applyPaginationParams(
-        params,
-        options.page ?? 1,
-        options.pageSize ?? currentPageSize(),
-      );
-
-      return params.toString();
-    }
-
-    function buildUrl(path: string, targetQuery: string) {
-      return targetQuery ? `${path}?${targetQuery}` : path;
-    }
-
-    function submitFilters() {
-      window.clearTimeout(submitTimer);
-      submitTimer = window.setTimeout(() => {
-        void applyFilters(normalizeFormQuery());
-      }, 120);
-    }
-
-    function showSkeletonForQuery(targetQuery: string) {
-      const currentQuery = normalizeParams(
-        new URLSearchParams(window.location.search),
-      );
-      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
-
-      if (targetQuery === currentQuery || cachedFragment) {
-        return;
-      }
-
-      const skeleton =
-        activeSkeletonTemplate.content.firstElementChild?.cloneNode(true);
-      if (!skeleton) return;
-
-      activeTableShell.replaceChildren(skeleton);
-    }
-
-    function replaceProductsFragment(fragmentHtml: string) {
-      const parsed = new DOMParser().parseFromString(fragmentHtml, "text/html");
-      const nextTableShell = parsed.querySelector<HTMLElement>(
-        "[data-product-table-shell]",
-      );
-
-      if (!nextTableShell) {
-        throw new Error("Products fragment did not include a product table.");
-      }
-
-      const nextFooter = parsed.querySelector<HTMLElement>(
-        "[data-server-pagination-footer]",
-      );
-      const currentFooter = activeTableShell.parentElement?.querySelector<HTMLElement>(
-        "[data-server-pagination-footer]",
-      );
-
-      activeTableShell.innerHTML = nextTableShell.innerHTML;
-      if (nextFooter && currentFooter) {
-        currentFooter.innerHTML = nextFooter.innerHTML;
-        Object.entries(nextFooter.dataset).forEach(([key, value]) => {
-          currentFooter.dataset[key] = value;
-        });
-      }
-
-      bindPaginationControls();
-      document.dispatchEvent(new Event("dashboard:interactive-table-updated"));
-    }
-
-    function bindPaginationControls() {
-      const footer = activeTableShell.parentElement?.querySelector<HTMLElement>(
-        "[data-server-pagination-footer]",
-      );
-      if (!footer) return;
-
-      const limitSelect = footer.querySelector<HTMLSelectElement>("[data-limit-select]");
-      limitSelect?.addEventListener("change", () => {
-        const pageSize = Number(limitSelect.value);
-        void applyFilters(normalizeFormQuery({
-          page: 1,
-          pageSize: [10, 50, 100].includes(pageSize) ? pageSize : 10,
-        }));
-      }, { once: true });
-
-      footer.querySelectorAll<HTMLButtonElement>("[data-page]").forEach((button) => {
-        button.addEventListener("click", () => {
-          const page = Number(button.dataset.page ?? "1");
-          void applyFilters(normalizeFormQuery({
-            page: Number.isInteger(page) && page > 0 ? page : 1,
-            pageSize: currentPageSize(),
-          }));
-        }, { once: true });
-      });
-    }
-
-    async function applyFilters(
-      targetQuery: string,
-      options: { updateHistory?: boolean } = {},
-    ) {
-      const updateHistory = options.updateHistory ?? true;
-      const currentQuery = normalizeParams(
-        new URLSearchParams(window.location.search),
-      );
-
-      if (targetQuery === currentQuery && updateHistory) {
-        return;
-      }
-
-      const cachedFragment = readDashboardFragmentCache(cacheKey, targetQuery);
-      if (cachedFragment) {
-        if (updateHistory) {
-          window.history.replaceState(
-            { productFilterQuery: targetQuery },
-            "",
-            buildUrl("/admin/products", targetQuery),
-          );
-        }
-
-        replaceProductsFragment(cachedFragment);
-        activeForm.dataset.currentFilterQuery = targetQuery;
-        return;
-      }
-
-      showSkeletonForQuery(targetQuery);
-      activeFetchController?.abort();
-
-      const fetchController = new AbortController();
-      activeFetchController = fetchController;
-
-      try {
-        const response = await fetch(buildUrl(fragmentPath, targetQuery), {
-          headers: {
-            "X-Requested-With": "fetch",
-          },
-          signal: fetchController.signal,
-        });
-
-        const fragmentHtml = await window.readDashboardFragmentResponse(response);
-        if (updateHistory) {
-          window.history.replaceState(
-            { productFilterQuery: targetQuery },
-            "",
-            buildUrl("/admin/products", targetQuery),
-          );
-        }
-
-        replaceProductsFragment(fragmentHtml);
-        activeForm.dataset.currentFilterQuery = targetQuery;
-        writeDashboardFragmentCache(cacheKey, targetQuery, fragmentHtml);
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") {
-          return;
-        }
-
-        window.location.href = buildUrl("/admin/products", targetQuery);
-      } finally {
-        if (activeFetchController === fetchController) {
-          activeFetchController = undefined;
-        }
-      }
-    }
-
-    writeDashboardFragmentCache(
-      cacheKey,
-      normalizeParams(new URLSearchParams(window.location.search)),
-      activeTableShell.outerHTML,
-    );
-
-    form.addEventListener("submit", (event) => {
-      event.preventDefault();
-      void applyFilters(normalizeFormQuery());
+    initDashboardFragmentTable({
+      cacheKey: "admin-products-filter-cache-v2",
+      fragmentPath: "/admin/products-fragment",
+      pagePath: "/admin/products",
+      formSelector: "[data-product-filter-form]",
+      tableShellSelector: "[data-product-table-shell]",
+      skeletonTemplateSelector: "[data-product-filter-skeleton]",
+      filterKeys: ["search", "category", "stockStatus"],
+      searchInputSelector: "[data-product-search-input]",
+      historyStateKey: "productFilterQuery",
     });
-
-    autoSubmitFields.forEach((field) => {
-      field.addEventListener("change", submitFilters);
-    });
-
-    searchInput?.addEventListener("input", () => {
-      window.clearTimeout(searchTimer);
-      searchTimer = window.setTimeout(submitFilters, 450);
-    });
-
-    bindPaginationControls();
   }
 
   document.addEventListener("DOMContentLoaded", initAdminProductFilters);

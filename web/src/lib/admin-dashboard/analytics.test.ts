@@ -9,26 +9,23 @@ describe("buildAdminAnalytics", () => {
     const analytics = buildAdminAnalytics(createAnalyticsData(), new Date("2026-07-04T12:00:00.000Z"));
 
     expect(analytics.summary).toEqual({
-      grossSales: 400,
+      grossSales: 120,
       totalPaidAmount: 310,
-      outstandingBalance: 90,
-      pendingOrderPayments: 90,
+      outstandingBalance: 20,
+      pendingOrderPayments: 20,
       orderCount: 3,
       newResellerApplications: 1,
       newContactInquiries: 1,
-      agentMonthlyEarnings: 88.5,
-      agentEarnedToday: 38.5,
-      agentExpectedCommission: 31.5,
+      agentMonthlyEarnings: 109.23,
+      agentEarnedToday: 59.23,
+      agentExpectedCommission: 10.77,
       assignedCustomerCount: 2,
     });
     expect(analytics.salesByDay).toEqual([
-      { label: "2026-06-28", orderCount: 1, grossSales: 80 },
       { label: "2026-07-03", orderCount: 1, grossSales: 120 },
-      { label: "2026-07-04", orderCount: 1, grossSales: 200 },
     ]);
     expect(analytics.salesByMonth).toEqual([
-      { label: "2026-06", orderCount: 1, grossSales: 80 },
-      { label: "2026-07", orderCount: 2, grossSales: 320 },
+      { label: "2026-07", orderCount: 1, grossSales: 120 },
     ]);
     expect(analytics.ordersByStatus.find((item) => item.label === "processing")).toEqual({
       label: "processing",
@@ -40,12 +37,12 @@ describe("buildAdminAnalytics", () => {
     });
     expect(analytics.topProducts[0]).toEqual({
       label: "Chicken Thigh",
-      quantitySold: 3,
-      grossSales: 270,
+      quantitySold: 1,
+      grossSales: 90,
     });
     expect(analytics.salesByCategory).toEqual([
-      { label: "chicken", quantitySold: 3, grossSales: 270 },
-      { label: "pork", quantitySold: 3, grossSales: 130 },
+      { label: "chicken", quantitySold: 1, grossSales: 90 },
+      { label: "pork", quantitySold: 1, grossSales: 30 },
     ]);
     expect(analytics.weeklyProductOrders.peakDay).toEqual({
       label: "Saturday",
@@ -135,10 +132,10 @@ describe("buildAdminAnalytics", () => {
       {
         label: "JEHMARP Agent",
         orderCount: 2,
-        grossSales: 320,
+        grossSales: 120,
         paidAmount: 230,
-        earnedCommission: 88.5,
-        expectedCommission: 31.5,
+        earnedCommission: 109.23,
+        expectedCommission: 10.77,
       },
     ]);
     expect(analytics.pendingCustomerBalances).toEqual([
@@ -146,7 +143,24 @@ describe("buildAdminAnalytics", () => {
         customerId: "customer-one",
         customerName: "Assigned Customer",
         orderCount: 1,
-        unpaidBalance: 90,
+        unpaidBalance: 20,
+        grossTotal: 200,
+        commissionTotal: 70,
+        receivableTotal: 130,
+        paidTotal: 110,
+        orders: [
+          {
+            orderId: "order-1",
+            orderCode: "Order-ORDER-",
+            createdAt: "2026-07-04T09:00:00.000Z",
+            grossTotal: 200,
+            commissionTotal: 70,
+            receivableTotal: 130,
+            paidTotal: 110,
+            unpaidBalance: 20,
+            hasCommissionAdjustment: true,
+          },
+        ],
       },
     ]);
     expect(analytics.recentOrders[0]).toEqual({
@@ -161,7 +175,7 @@ describe("buildAdminAnalytics", () => {
     expect(analytics.recentResellerApplications[0]?.name).toBe("Reseller Lead");
   });
 
-  it("keeps closed unpaid orders in outstanding balance totals", () => {
+  it("keeps closed unpaid orders in outstanding balance but not receivables", () => {
     const data = createAnalyticsData();
 
     data.orders = [
@@ -181,14 +195,31 @@ describe("buildAdminAnalytics", () => {
 
     const analytics = buildAdminAnalytics(data, new Date("2026-07-04T12:00:00.000Z"));
 
-    expect(analytics.summary.outstandingBalance).toBe(590);
-    expect(analytics.summary.pendingOrderPayments).toBe(590);
+    expect(analytics.summary.outstandingBalance).toBe(520);
+    expect(analytics.summary.pendingOrderPayments).toBe(20);
     expect(analytics.pendingCustomerBalances).toEqual([
       {
         customerId: "customer-one",
         customerName: "Assigned Customer",
-        orderCount: 2,
-        unpaidBalance: 590,
+        orderCount: 1,
+        unpaidBalance: 20,
+        grossTotal: 200,
+        commissionTotal: 70,
+        receivableTotal: 130,
+        paidTotal: 110,
+        orders: [
+          {
+            orderId: "order-1",
+            orderCode: "Order-ORDER-",
+            createdAt: "2026-07-04T09:00:00.000Z",
+            grossTotal: 200,
+            commissionTotal: 70,
+            receivableTotal: 130,
+            paidTotal: 110,
+            unpaidBalance: 20,
+            hasCommissionAdjustment: true,
+          },
+        ],
       },
     ]);
     expect(analytics.ordersByStatus.find((item) => item.label === "closed")).toEqual({
@@ -197,7 +228,77 @@ describe("buildAdminAnalytics", () => {
     });
   });
 
-  it("attributes admin-created orders to the customer's assigned agent in agent performance analytics", () => {
+  it("does not count a fully paid commission-adjusted order as dashboard receivable", () => {
+    const data = createAnalyticsData();
+
+    data.orders = [
+      order({
+        id: "commission-adjusted-paid-order",
+        agentId: "agent-id",
+        status: "processing",
+        paymentStatus: "paid",
+        createdAt: "2026-07-04T13:30:00.000Z",
+        paymentAmounts: [840],
+        items: [
+          item("product-chicken", "Chicken Thigh", "chicken", 3, 300, 60, false),
+        ],
+      }),
+    ];
+
+    const analytics = buildAdminAnalytics(data, new Date("2026-07-04T14:00:00.000Z"));
+
+    expect(analytics.summary.outstandingBalance).toBe(0);
+    expect(analytics.summary.pendingOrderPayments).toBe(0);
+    expect(analytics.pendingCustomerBalances).toEqual([]);
+  });
+
+  it("builds a gross-to-balance breakdown for direct orders without commission", () => {
+    const data = createAnalyticsData();
+
+    data.orders = [
+      order({
+        id: "direct-order",
+        agentId: null,
+        status: "processing",
+        paymentStatus: "partial",
+        createdAt: "2026-07-04T13:00:00.000Z",
+        paymentAmounts: [50],
+        items: [
+          item("product-pork", "Pork Belly", "pork", 2, 100, 0, false),
+        ],
+      }),
+    ];
+
+    const analytics = buildAdminAnalytics(data, new Date("2026-07-04T14:00:00.000Z"));
+
+    expect(analytics.pendingCustomerBalances).toEqual([
+      {
+        customerId: "customer-one",
+        customerName: "Assigned Customer",
+        orderCount: 1,
+        unpaidBalance: 150,
+        grossTotal: 200,
+        commissionTotal: 0,
+        receivableTotal: 200,
+        paidTotal: 50,
+        orders: [
+          {
+            orderId: "direct-order",
+            orderCode: "Order-DIRECT",
+            createdAt: "2026-07-04T13:00:00.000Z",
+            grossTotal: 200,
+            commissionTotal: 0,
+            receivableTotal: 200,
+            paidTotal: 50,
+            unpaidBalance: 150,
+            hasCommissionAdjustment: false,
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("does not attribute direct customer orders to the customer's assigned agent in commission analytics", () => {
     const data = createAnalyticsData();
 
     data.orders = [
@@ -219,16 +320,7 @@ describe("buildAdminAnalytics", () => {
 
     const analytics = buildAdminAnalytics(data, new Date("2026-07-04T14:00:00.000Z"));
 
-    expect(analytics.salesByAgent).toEqual([
-      {
-        label: "JEHMARP Agent",
-        orderCount: 1,
-        grossSales: 200,
-        paidAmount: 50,
-        earnedCommission: 5,
-        expectedCommission: 15,
-      },
-    ]);
+    expect(analytics.salesByAgent).toEqual([]);
   });
 });
 

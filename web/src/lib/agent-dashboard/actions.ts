@@ -1,6 +1,7 @@
 import type { APIContext } from "astro";
 import { z } from "zod";
 
+import { logDevelopmentActionError } from "@/lib/request-logger";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { canAttachCustomerToAgentOrder } from "@/lib/agent-order-distribution";
 import {
@@ -13,13 +14,17 @@ import {
   createAgentProfileAdminClient,
 } from "@/lib/agent-profile-update";
 import { loadAgentDashboardData } from "./data";
+import {
+  requiredDateTimeFromFormData,
+  requiredDateTimePartsFromFormData,
+} from "@/lib/datetime";
 
 const uuidSchema = z.uuid();
 const agentOrderSubmissionModes = ["distribution", "personal"] as const;
 const paymentMethods = ["Cash", "Check"] as const;
 const paymentTermsOptions = ["Cash on Delivery (COD)", "Bank Transfer", "Gcash"] as const;
 
-type AgentDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect">;
+type AgentDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect"> & Partial<Pick<APIContext, "url">>;
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 type AgentOrderSubmissionMode = (typeof agentOrderSubmissionModes)[number];
 
@@ -35,7 +40,8 @@ export type AgentAction =
       agentId: string;
       payload: {
         mode: AgentOrderSubmissionMode;
-        releaseDate: string | null;
+        releaseDate: string;
+        releaseTime: string;
         items: AgentOrderItemPayload[];
       };
     }
@@ -69,6 +75,10 @@ export type AgentAction =
       type: "attach-agent-order-customer";
       agentOrderId: string;
       entries: AgentOrderAttachEntry[];
+      releaseSchedule: {
+        date: string;
+        time: string;
+      };
       requireApproval: boolean;
     }
   | {
@@ -102,6 +112,8 @@ export function parseAgentActionFormData(
     const action = requiredString(formData, "action");
 
     if (action === "create-agent-order") {
+      const releaseSchedule = requiredDateTimePartsFromFormData(formData, "releaseDate", "releaseTime");
+
       return {
         success: true,
         action: {
@@ -109,7 +121,8 @@ export function parseAgentActionFormData(
           agentId,
           payload: {
             mode: enumValue(formData, "orderSubmissionMode", agentOrderSubmissionModes),
-            releaseDate: optionalDateString(formData, "releaseDate"),
+            releaseDate: releaseSchedule.date,
+            releaseTime: releaseSchedule.time,
             items: parseOrderItems(formData),
           },
         },
@@ -127,7 +140,7 @@ export function parseAgentActionFormData(
             amount: positiveNumber(formData, "amount"),
             paymentMethod: enumValue(formData, "paymentMethod", paymentMethods),
             paymentTerms: enumValue(formData, "paymentTerms", paymentTermsOptions),
-            paymentDate: dateString(formData, "paymentDate"),
+            paymentDate: requiredDateTimeFromFormData(formData, "paymentDate", "paymentTime"),
             referenceNumber: optionalString(formData, "referenceNumber"),
             notes: optionalString(formData, "notes"),
           },
@@ -146,7 +159,7 @@ export function parseAgentActionFormData(
             amount: positiveNumber(formData, "amount"),
             paymentMethod: enumValue(formData, "paymentMethod", paymentMethods),
             paymentTerms: enumValue(formData, "paymentTerms", paymentTermsOptions),
-            paymentDate: dateString(formData, "paymentDate"),
+            paymentDate: requiredDateTimeFromFormData(formData, "paymentDate", "paymentTime"),
             referenceNumber: optionalString(formData, "referenceNumber"),
             notes: optionalString(formData, "notes"),
           },
@@ -156,6 +169,7 @@ export function parseAgentActionFormData(
 
     if (action === "attach-agent-order-customer") {
       const entriesJson = requiredString(formData, "attachCustomerEntries");
+      const releaseSchedule = requiredDateTimePartsFromFormData(formData, "releaseDate", "releaseTime");
 
       return {
         success: true,
@@ -163,6 +177,10 @@ export function parseAgentActionFormData(
           type: "attach-agent-order-customer",
           agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
           entries: parseAttachCustomerEntriesJson(entriesJson, { assignedCustomerIds }),
+          releaseSchedule: {
+            date: releaseSchedule.date,
+            time: releaseSchedule.time,
+          },
           requireApproval: true,
         },
       };
@@ -190,6 +208,13 @@ export function parseAgentActionFormData(
   }
 }
 
+function actionNameForLog(formData: FormData) {
+  const action = formData.get("action");
+  return typeof action === "string" && action.trim().length > 0
+    ? action.trim()
+    : "unknown";
+}
+
 export async function handleAgentDashboardAction(
   context: AgentDashboardContext,
   agentUserId: string,
@@ -206,8 +231,18 @@ export async function handleAgentDashboardAction(
     dashboardData.agent.id,
     assignedCustomerIds,
   );
+  const logUrl = context.url ?? new URL(returnPath, "http://localhost");
 
   if (!parsed.success) {
+    logDevelopmentActionError({
+      action: actionNameForLog(formData),
+      enabled: import.meta.env.DEV,
+      error: new Error(parsed.errors.join(" ")),
+      phase: "validation",
+      scope: "agent",
+      url: logUrl,
+    });
+
     return context.redirect(`${returnPath}?error=${encodeURIComponent(parsed.errors.join(" "))}`, 303);
   }
 
@@ -215,6 +250,15 @@ export async function handleAgentDashboardAction(
     await executeAgentAction(createSupabaseServerClient(context), parsed.action);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Agent action failed.";
+    logDevelopmentActionError({
+      action: parsed.action.type,
+      enabled: import.meta.env.DEV,
+      error,
+      phase: "execution",
+      scope: "agent",
+      url: logUrl,
+    });
+
     return context.redirect(`${returnPath}?error=${encodeURIComponent(message)}`, 303);
   }
 
@@ -233,6 +277,7 @@ export async function executeAgentAction(
         customer_payload: getAgentOrderCustomerPayload(
           action.payload.mode,
           action.payload.releaseDate,
+          action.payload.releaseTime,
         ),
       });
 
@@ -280,19 +325,24 @@ export async function executeAgentAction(
       await assertAgentOrderAllowsCustomerAttach(supabase, action.agentOrderId);
 
       for (const entry of action.entries) {
+        const releaseSchedulePayload = {
+          releaseDate: action.releaseSchedule.date,
+          releaseTime: action.releaseSchedule.time,
+        };
         const { data, error } = await supabase.rpc("attach_customer_to_agent_order", {
           target_agent_order_id: action.agentOrderId,
           target_customer_id: entry.customer.type === "existing" ? entry.customer.customerId : null,
           item_payload: entry.items,
           customer_payload: entry.customer.type === "new"
             ? {
+                ...releaseSchedulePayload,
                 firstName: entry.customer.payload.firstName,
                 lastName: entry.customer.payload.lastName,
                 phoneNumber: entry.customer.payload.phoneNumber,
                 email: entry.customer.payload.email,
                 address: entry.customer.payload.address,
               }
-            : null,
+            : releaseSchedulePayload,
           require_approval: action.requireApproval,
         });
 
@@ -306,7 +356,7 @@ export async function executeAgentAction(
     case "update-agent-profile": {
       const adminClient = createAgentProfileAdminClient();
       const { data: currentProfile, error } = await adminClient
-        .from("agent_profile")
+        .from("agent")
         .select("status")
         .eq("id", action.agentId)
         .maybeSingle();
@@ -326,19 +376,20 @@ export async function executeAgentAction(
 
 function getAgentOrderCustomerPayload(
   mode: AgentOrderSubmissionMode,
-  releaseDate: string | null,
+  releaseDate: string,
+  releaseTime: string,
 ) {
   switch (mode) {
     case "distribution":
-      return releaseDate
-        ? {
-            releaseDate,
-          }
-        : null;
+      return {
+        releaseDate,
+        releaseTime,
+      };
     case "personal":
       return {
         orderFor: "personal",
         releaseDate,
+        releaseTime,
       };
   }
 }
@@ -347,29 +398,36 @@ async function assertAgentOrderAllowsCustomerAttach(
   supabase: SupabaseServerClient,
   agentOrderId: string,
 ) {
-  const { data, error } = await supabase
+  const { data: agentOrder, error: agentOrderError } = await supabase
     .from("agent_order")
-    .select("order_status, customer_order ( payment_status )")
+    .select("order_status")
     .eq("id", agentOrderId)
     .maybeSingle();
 
-  if (error) {
-    throw new Error("Unable to verify agent order status before attaching a customer.");
+  if (agentOrderError) {
+    throw new Error("Unable to verify agent order status before attaching a customer.", {
+      cause: agentOrderError,
+    });
   }
 
-  if (!data) {
+  if (!agentOrder) {
     throw new Error("Agent order was not found.");
   }
 
-  const customerOrders = Array.isArray(data.customer_order)
-    ? data.customer_order
-    : data.customer_order
-      ? [data.customer_order]
-      : [];
+  const { data: customerOrders, error: customerOrdersError } = await supabase
+    .from("customer_order")
+    .select("payment_status")
+    .eq("agent_order_id", agentOrderId);
+
+  if (customerOrdersError) {
+    throw new Error("Unable to verify linked customer order payment statuses before attaching a customer.", {
+      cause: customerOrdersError,
+    });
+  }
 
   if (!canAttachCustomerToAgentOrder({
-    order_status: String(data.order_status),
-    customer_order: customerOrders.map((order) => ({
+    order_status: String(agentOrder.order_status),
+    customer_order: (customerOrders ?? []).map((order) => ({
       payment_status: String((order as { payment_status?: unknown }).payment_status ?? "unpaid"),
     })),
   })) {
@@ -468,28 +526,6 @@ function enumValue<T extends string>(
   }
 
   return found;
-}
-
-function optionalDateString(formData: FormData, key: string) {
-  const value = optionalString(formData, key);
-
-  if (!value) return null;
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`${toSentenceLabel(key)} must be a date.`);
-  }
-
-  return value;
-}
-
-function dateString(formData: FormData, key: string) {
-  const value = requiredString(formData, key);
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error(`${toSentenceLabel(key)} must be a date.`);
-  }
-
-  return value;
 }
 
 function positiveNumber(formData: FormData, key: string) {

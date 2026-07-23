@@ -6,6 +6,7 @@ import {
   loadAdminProductOptionData,
 } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { setDashboardFragmentResponseHeaders } from "@/lib/dashboard/fragment-response";
 import {
   buildProductCategoryOptions,
   buildProductUnitOptions,
@@ -26,6 +27,8 @@ const adminRoute = await requireAdminRoute(Astro);
 if (!adminRoute.ready) {
   return adminRoute.response;
 }
+
+setDashboardFragmentResponseHeaders(Astro);
 
 const productFilters = parseAdminProductFilters(Astro.url);
 const productPagination = parseAdminPagination(Astro.url);

@@ -2,8 +2,16 @@ import type { APIContext } from "astro";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { throwLoadError } from "@/lib/load-error";
+import {
+  agentWithProfileSelect,
+  customerWithProfileSelect,
+  mapAgentWithProfile,
+  mapCustomerWithProfile,
+  mapNestedOrderCustomer,
+  profileIdentitySelect,
+} from "@/lib/profile-identity";
 import type { InvoiceStatus, OrderStatus, ProductCategory, StockStatus } from "@/lib/admin-dashboard/actions";
-import { buildAgentPaymentSummary, buildAgentSummary } from "./view";
+import { buildAgentPaymentSummary, buildAgentSummary, isAgentMyOrder } from "./view";
 
 type AgentDashboardContext = Pick<APIContext, "cookies" | "request">;
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
@@ -11,22 +19,21 @@ type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 const agentOrderSelect = `
   id,
   agent_order_id,
+  converted_to_agent_order_id,
   customer_id,
   agent_id,
   source,
   order_status,
   payment_status,
+  release_date,
+  sale_date,
   approved_at,
   created_at,
   updated_at,
   customer:customer_id (
     id,
-    first_name,
-    last_name,
-    phone_number,
-    email,
-    address,
-    is_reseller
+    is_reseller,
+    profile:profile_id (${profileIdentitySelect})
   ),
   customer_order_item (
     id,
@@ -94,6 +101,8 @@ const agentOrderClusterSelect = `
   id,
   agent_id,
   order_status,
+  release_date,
+  sale_date,
   notes,
   submitted_by,
   admin_read_at,
@@ -117,25 +126,24 @@ const agentOrderClusterSelect = `
       default_price
     )
   ),
-  customer_order (
+  customer_order!customer_order_agent_order_id_fkey (
     id,
     agent_order_id,
+    converted_to_agent_order_id,
     customer_id,
     agent_id,
     source,
     order_status,
     payment_status,
+    release_date,
+    sale_date,
     approved_at,
     created_at,
     updated_at,
     customer:customer_id (
       id,
-      first_name,
-      last_name,
-      phone_number,
-      email,
-      address,
-      is_reseller
+      is_reseller,
+      profile:profile_id (${profileIdentitySelect})
     ),
     customer_order_item (
       id,
@@ -203,6 +211,7 @@ const agentOrderClusterSelect = `
 export type AgentProfile = {
   id: string;
   user_id: string;
+  customer_id: string | null;
   employee_id: string | null;
   first_name: string;
   last_name: string;
@@ -221,6 +230,8 @@ export type AgentCustomer = {
   address: string;
   assigned_agent_id: string | null;
   is_reseller: boolean;
+  credit_limit: number;
+  credit_limit_exceeded: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -324,11 +335,14 @@ export type AgentOrderClusterItem = {
 export type AgentOrder = {
   id: string;
   agent_order_id?: string | null;
+  converted_to_agent_order_id?: string | null;
   customer_id: string;
   agent_id: string | null;
   source: "guest_shop" | "agent_submitted" | "admin_manual";
   order_status: OrderStatus;
   payment_status: "unpaid" | "partial" | "paid" | "refunded";
+  release_date?: string | null;
+  sale_date?: string | null;
   approved_at: string | null;
   created_at: string;
   updated_at: string;
@@ -344,6 +358,8 @@ export type AgentOrderCluster = {
   id: string;
   agent_id: string;
   order_status: AgentOrderClusterStatus;
+  release_date?: string | null;
+  sale_date?: string | null;
   notes: string | null;
   submitted_by: string | null;
   admin_read_at?: string | null;
@@ -398,6 +414,8 @@ export async function loadAgentDashboardData(
     loadAccessibleOrders(supabase),
   ]);
 
+  const myOrders = orders.filter((order) => isAgentMyOrder(order, agent));
+
   return {
     agent,
     customers,
@@ -405,8 +423,8 @@ export async function loadAgentDashboardData(
     agentOrders,
     registrationLinks,
     orders,
-    summary: buildAgentSummary({ agent, customers, agentOrders, orders }),
-    paymentSummary: buildAgentPaymentSummary(orders),
+    summary: buildAgentSummary({ agent, customers, agentOrders, orders: myOrders }),
+    paymentSummary: buildAgentPaymentSummary(myOrders),
   };
 }
 
@@ -428,7 +446,7 @@ export async function loadAgentOrder(
     .eq("id", orderId)
     .maybeSingle();
 
-  if (error) throwLoadError("Unable to load agent order.");
+  if (error) throwLoadError("Unable to load agent order.", error);
 
   return data ? normalizeAgentOrder(data) : null;
 }
@@ -436,35 +454,37 @@ export async function loadAgentOrder(
 async function loadAgentProfile(supabase: SupabaseServerClient, userId: string) {
   const [{ data, error }, { data: authData, error: authError }] = await Promise.all([
     supabase
-      .from("agent_profile")
-      .select("id, user_id, employee_id, first_name, last_name, display_name, contact, status")
+      .from("agent")
+      .select(agentWithProfileSelect)
       .eq("user_id", userId)
       .eq("status", "active")
       .maybeSingle(),
     supabase.auth.getUser(),
   ]);
 
-  if (error) throwLoadError("Unable to load agent profile.");
+  if (error) throwLoadError("Unable to load agent profile.", error);
   if (!data) throw new Error("Active agent profile was not found.");
 
   const email =
     authError || authData.user?.id !== userId ? null : authData.user.email ?? null;
 
-  return {
-    ...data,
+  return mapAgentWithProfile(
+    data as Parameters<typeof mapAgentWithProfile>[0],
     email,
-  } as AgentProfile;
+  ) as AgentProfile;
 }
 
 async function loadAssignedCustomers(supabase: SupabaseServerClient) {
   const { data, error } = await supabase
     .from("customer")
-    .select("id, first_name, last_name, phone_number, email, address, assigned_agent_id, is_reseller, created_at, updated_at")
+    .select(customerWithProfileSelect)
     .order("created_at", { ascending: false });
 
-  if (error) throwLoadError("Unable to load assigned customers.");
+  if (error) throwLoadError("Unable to load assigned customers.", error);
 
-  return (data ?? []) as AgentCustomer[];
+  return ((data ?? []) as Parameters<typeof mapCustomerWithProfile>[0][]).map((row) =>
+    mapCustomerWithProfile(row),
+  ) as AgentCustomer[];
 }
 
 async function loadActiveProducts(supabase: SupabaseServerClient) {
@@ -474,7 +494,7 @@ async function loadActiveProducts(supabase: SupabaseServerClient) {
     .eq("is_active", true)
     .order("name", { ascending: true });
 
-  if (error) throwLoadError("Unable to load active products.");
+  if (error) throwLoadError("Unable to load active products.", error);
 
   return (data ?? []) as AgentProduct[];
 }
@@ -486,7 +506,7 @@ async function loadAccessibleOrders(supabase: SupabaseServerClient) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) throwLoadError("Unable to load agent orders.");
+  if (error) throwLoadError("Unable to load agent orders.", error);
 
   return ((data ?? []) as unknown[]).map(normalizeAgentOrder);
 }
@@ -498,7 +518,7 @@ async function loadAccessibleAgentOrders(supabase: SupabaseServerClient) {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  if (error) throwLoadError("Unable to load agent orders.");
+  if (error) throwLoadError("Unable to load agent orders.", error);
 
   return ((data ?? []) as unknown[]).map(normalizeAgentOrderCluster);
 }
@@ -512,16 +532,33 @@ async function loadAgentRegistrationLinks(supabase: SupabaseServerClient) {
     .order("created_at", { ascending: false })
     .limit(20);
 
-  if (error) throwLoadError("Unable to load customer registration links.");
+  if (error) throwLoadError("Unable to load customer registration links.", error);
 
   return (data ?? []) as AgentCustomerRegistrationLink[];
 }
 
 function normalizeAgentOrder(order: unknown): AgentOrder {
+  const raw = order as Record<string, unknown>;
   const agentOrder = order as AgentOrder;
+
+  const normalizedCustomer = raw.customer
+    ? (() => {
+        const mapped = mapNestedOrderCustomer(raw.customer as Parameters<typeof mapNestedOrderCustomer>[0]);
+        return {
+          id: mapped.id,
+          first_name: mapped.first_name,
+          last_name: mapped.last_name,
+          phone_number: mapped.phone_number,
+          email: mapped.email,
+          address: mapped.address,
+          is_reseller: mapped.is_reseller,
+        };
+      })()
+    : null;
 
   return {
     ...agentOrder,
+    customer: normalizedCustomer,
     customer_order_item: Array.isArray(agentOrder.customer_order_item) ? agentOrder.customer_order_item : [],
     payment: Array.isArray(agentOrder.payment) ? agentOrder.payment : [],
     agent_received_payment: Array.isArray(agentOrder.agent_received_payment)

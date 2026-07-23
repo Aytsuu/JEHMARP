@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { initFormSubmissionState } from "./form-submission-state";
+import {
+  initFormSubmissionState,
+  resetFormSubmissionState,
+} from "./form-submission-state";
 
 function createTestDocument(html: string) {
   const testDocument = document.implementation.createHTMLDocument("test");
@@ -92,6 +95,29 @@ describe("initFormSubmissionState", () => {
     expect(skippedButton.disabled).toBe(false);
   });
 
+  it("does not lock the submit button when another handler cancels submission", () => {
+    const testDocument = createTestDocument(`
+      <form method="post">
+        <button type="submit">Create order</button>
+      </form>
+    `);
+    const form = testDocument.querySelector("form")!;
+    const button = form.querySelector("button")!;
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+    });
+
+    initFormSubmissionState(testDocument);
+    const event = submitForm(form, button);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(form.dataset.isSubmitting).toBeUndefined();
+    expect(button.disabled).toBe(false);
+    expect(button.classList.contains("form-submit-button--loading")).toBe(false);
+    expect(button.getAttribute("aria-busy")).toBeNull();
+  });
+
   it("only installs one submit listener", () => {
     const testDocument = createTestDocument(`
       <form method="post">
@@ -157,5 +183,25 @@ describe("initFormSubmissionState", () => {
     expect(event.defaultPrevented).toBe(false);
     expect(button.disabled).toBe(true);
     expect(button.classList.contains("form-submit-button--loading")).toBe(true);
+  });
+});
+
+describe("resetFormSubmissionState", () => {
+  it("restores submit buttons after a cancelled submission", () => {
+    const testDocument = createTestDocument(`
+      <form id="create-form" method="post"></form>
+      <button type="submit" form="create-form">Create</button>
+    `);
+    const form = testDocument.querySelector("form")!;
+    const button = testDocument.querySelector("button")!;
+
+    initFormSubmissionState(testDocument);
+    submitForm(form, button);
+    resetFormSubmissionState(form);
+
+    expect(form.dataset.isSubmitting).toBeUndefined();
+    expect(button.disabled).toBe(false);
+    expect(button.classList.contains("form-submit-button--loading")).toBe(false);
+    expect(button.getAttribute("aria-busy")).toBeNull();
   });
 });

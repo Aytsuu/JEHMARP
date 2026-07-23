@@ -1,7 +1,9 @@
 import {
   fullName,
+  orderCommissionTotal,
   orderBalance,
   orderPaymentTotal,
+  orderReceivableTotal,
   orderTotal,
 } from "./view";
 
@@ -83,11 +85,28 @@ export type AgentSalesMetric = {
   expectedCommission: number;
 };
 
+export type PendingCustomerBalanceOrderMetric = {
+  orderId: string;
+  orderCode: string;
+  createdAt: string;
+  grossTotal: number;
+  commissionTotal: number;
+  receivableTotal: number;
+  paidTotal: number;
+  unpaidBalance: number;
+  hasCommissionAdjustment: boolean;
+};
+
 export type PendingCustomerBalanceMetric = {
   customerId: string;
   customerName: string;
   orderCount: number;
   unpaidBalance: number;
+  grossTotal: number;
+  commissionTotal: number;
+  receivableTotal: number;
+  paidTotal: number;
+  orders: PendingCustomerBalanceOrderMetric[];
 };
 
 export type RecentOrderMetric = {
@@ -130,23 +149,35 @@ const weekDayLabels = [
   { label: "Sunday", shortLabel: "Sun" },
 ] as const;
 
+function isCompletedPaidOrder(order: AdminOrder): boolean {
+  return order.order_status === "closed" && order.payment_status === "paid";
+}
+
+function isProcessingReceivable(order: AdminOrder): boolean {
+  return order.order_status === "processing" && orderBalance(order) > 0;
+}
+
 export function buildAdminAnalytics(
   data: AdminDashboardData,
   now = new Date(),
 ): AdminAnalytics {
-  const agentOrders = data.orders.filter((order) => getAnalyticsAgentId(order, data) !== null);
+  const completedPaidOrders = data.orders.filter(isCompletedPaidOrder);
+  const agentOrders = data.orders.filter((order) => getAnalyticsAgentId(order) !== null);
   const currentMonth = monthIdentifier(now);
   const currentDay = dayIdentifier(now);
 
   return {
     summary: {
-      grossSales: roundCurrency(data.orders.reduce((total, order) => total + orderTotal(order, "final_quantity"), 0)),
+      grossSales: roundCurrency(completedPaidOrders.reduce(
+        (total, order) => total + orderTotal(order, "final_quantity"),
+        0,
+      )),
       totalPaidAmount: roundCurrency(data.orders.reduce((total, order) => total + orderPaymentTotal(order), 0)),
       outstandingBalance: roundCurrency(data.orders
         .filter(isOutstandingBalanceOrder)
         .reduce((total, order) => total + orderBalance(order), 0)),
       pendingOrderPayments: roundCurrency(data.orders
-        .filter(hasPendingPayment)
+        .filter(isProcessingReceivable)
         .reduce((total, order) => total + orderBalance(order), 0)),
       orderCount: data.orders.length,
       newResellerApplications: data.resellerApplications.filter(
@@ -164,8 +195,8 @@ export function buildAdminAnalytics(
         .reduce((total, order) => total + Math.max(orderExpectedCommission(order) - orderEarnedCommission(order), 0), 0)),
       assignedCustomerCount: data.customers.filter((customer) => customer.assigned_agent_id).length,
     },
-    salesByDay: Array.from(buildSalesPeriods(data.orders, "day").values()).sort(byLabel),
-    salesByMonth: Array.from(buildSalesPeriods(data.orders, "month").values()).sort(byLabel),
+    salesByDay: Array.from(buildSalesPeriods(completedPaidOrders, "day").values()).sort(byLabel),
+    salesByMonth: Array.from(buildSalesPeriods(completedPaidOrders, "month").values()).sort(byLabel),
     ordersByStatus: orderStatuses.map((status) => ({
       label: status,
       count: data.orders.filter((order) => order.order_status === status).length,
@@ -174,8 +205,8 @@ export function buildAdminAnalytics(
       label: status,
       count: data.orders.filter((order) => order.payment_status === status).length,
     })),
-    topProducts: buildProductSales(data).slice(0, 5),
-    salesByCategory: buildCategorySales(data),
+    topProducts: buildProductSales(data, completedPaidOrders).slice(0, 5),
+    salesByCategory: buildCategorySales(data, completedPaidOrders),
     weeklyProductOrders: buildWeeklyProductOrders(data, now),
     salesByAgent: buildAgentSales(data),
     pendingCustomerBalances: buildPendingCustomerBalances(data),
@@ -206,10 +237,13 @@ function buildSalesPeriods(
   }, new Map<string, SalesPeriodMetric>());
 }
 
-function buildProductSales(data: AdminDashboardData): ProductSalesMetric[] {
+function buildProductSales(
+  data: AdminDashboardData,
+  orders: AdminOrder[],
+): ProductSalesMetric[] {
   const metrics = new Map<string, ProductSalesMetric>();
 
-  for (const order of data.orders) {
+  for (const order of orders) {
     for (const item of order.customer_order_item) {
       const label = item.product?.name ?? productName(data, item.product_id);
       const current = metrics.get(item.product_id) ?? {
@@ -229,10 +263,13 @@ function buildProductSales(data: AdminDashboardData): ProductSalesMetric[] {
   return Array.from(metrics.values()).sort((left, right) => right.grossSales - left.grossSales);
 }
 
-function buildCategorySales(data: AdminDashboardData): ProductSalesMetric[] {
+function buildCategorySales(
+  data: AdminDashboardData,
+  orders: AdminOrder[],
+): ProductSalesMetric[] {
   const metrics = new Map<string, ProductSalesMetric>();
 
-  for (const order of data.orders) {
+  for (const order of orders) {
     for (const item of order.customer_order_item) {
       const label = productCategory(data, item.product_id);
       const current = metrics.get(label) ?? {
@@ -256,7 +293,7 @@ function buildAgentSales(data: AdminDashboardData): AgentSalesMetric[] {
   const metrics = new Map<string, AgentSalesMetric>();
 
   for (const order of data.orders) {
-    const agentId = getAnalyticsAgentId(order, data);
+    const agentId = getAnalyticsAgentId(order);
 
     if (!agentId) continue;
 
@@ -274,7 +311,11 @@ function buildAgentSales(data: AdminDashboardData): AgentSalesMetric[] {
     metrics.set(agentId, {
       label: current.label,
       orderCount: current.orderCount + 1,
-      grossSales: roundCurrency(current.grossSales + orderTotal(order, "final_quantity")),
+      grossSales: roundCurrency(
+        current.grossSales + (isCompletedPaidOrder(order)
+          ? orderTotal(order, "final_quantity")
+          : 0),
+      ),
       paidAmount: roundCurrency(current.paidAmount + orderPaymentTotal(order)),
       earnedCommission: roundCurrency(current.earnedCommission + orderEarnedCommission(order)),
       expectedCommission: roundCurrency(current.expectedCommission + Math.max(
@@ -391,15 +432,37 @@ function buildPendingCustomerBalances(data: AdminDashboardData): PendingCustomer
   for (const order of data.orders) {
     const balance = roundCurrency(orderBalance(order));
 
-    if (balance <= 0 || !hasPendingPayment(order)) continue;
+    if (balance <= 0 || !isProcessingReceivable(order)) continue;
 
     const customerId = order.customer_id;
+    if (!customerId) continue;
+
     const customer = order.customer ?? data.customers.find((item) => item.id === customerId) ?? null;
+    const grossTotal = roundCurrency(orderTotal(order, "final_quantity"));
+    const commissionTotal = roundCurrency(orderCommissionTotal(order));
+    const receivableTotal = roundCurrency(orderReceivableTotal(order, "final_quantity"));
+    const paidTotal = roundCurrency(orderPaymentTotal(order));
+    const orderMetric: PendingCustomerBalanceOrderMetric = {
+      orderId: order.id,
+      orderCode: `Order-${order.id.slice(0, 6).toUpperCase()}`,
+      createdAt: order.created_at,
+      grossTotal,
+      commissionTotal,
+      receivableTotal,
+      paidTotal,
+      unpaidBalance: balance,
+      hasCommissionAdjustment: commissionTotal > 0,
+    };
     const current = metrics.get(customerId) ?? {
       customerId,
       customerName: fullName(customer),
       orderCount: 0,
       unpaidBalance: 0,
+      grossTotal: 0,
+      commissionTotal: 0,
+      receivableTotal: 0,
+      paidTotal: 0,
+      orders: [],
     };
 
     metrics.set(customerId, {
@@ -407,13 +470,26 @@ function buildPendingCustomerBalances(data: AdminDashboardData): PendingCustomer
       customerName: current.customerName,
       orderCount: current.orderCount + 1,
       unpaidBalance: roundCurrency(current.unpaidBalance + balance),
+      grossTotal: roundCurrency(current.grossTotal + grossTotal),
+      commissionTotal: roundCurrency(current.commissionTotal + commissionTotal),
+      receivableTotal: roundCurrency(current.receivableTotal + receivableTotal),
+      paidTotal: roundCurrency(current.paidTotal + paidTotal),
+      orders: [...current.orders, orderMetric],
     });
   }
 
-  return Array.from(metrics.values()).sort((left, right) => (
-    right.unpaidBalance - left.unpaidBalance ||
-    left.customerName.localeCompare(right.customerName)
-  ));
+  return Array.from(metrics.values())
+    .map((customer) => ({
+      ...customer,
+      orders: [...customer.orders].sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+      ),
+    }))
+    .sort((left, right) => (
+      right.unpaidBalance - left.unpaidBalance ||
+      left.customerName.localeCompare(right.customerName)
+    ));
 }
 
 function buildRecentOrders(data: AdminDashboardData): RecentOrderMetric[] {
@@ -427,12 +503,9 @@ function buildRecentOrders(data: AdminDashboardData): RecentOrderMetric[] {
   }));
 }
 
-function getAnalyticsAgentId(order: AdminOrder, data: AdminDashboardData): string | null {
+function getAnalyticsAgentId(order: AdminOrder): string | null {
   return order.agent_id
     ?? order.agent?.id
-    ?? order.customer?.assigned_agent_id
-    ?? order.customer?.assigned_agent?.id
-    ?? data.customers.find((customer) => customer.id === order.customer_id)?.assigned_agent_id
     ?? null;
 }
 
@@ -442,23 +515,16 @@ function getAnalyticsAgentLabel(
   agentId: string,
 ): string | null {
   return order.agent?.display_name
-    ?? order.customer?.assigned_agent?.display_name
     ?? data.agents.find((agent) => agent.id === agentId)?.display_name
     ?? null;
 }
 
 function orderExpectedCommission(order: AdminOrder): number {
-  return roundCurrency(order.customer_order_item.reduce((total, item) => {
-    if (item.agent_commission_amount <= 0) {
-      return total;
-    }
-
-    return total + item.agent_commission_amount;
-  }, 0));
+  return orderCommissionTotal(order);
 }
 
 function orderEarnedCommission(order: AdminOrder): number {
-  const invoiceTotal = orderTotal(order, "final_quantity");
+  const invoiceTotal = orderReceivableTotal(order, "final_quantity");
   const expectedCommission = orderExpectedCommission(order);
 
   if (invoiceTotal <= 0) return 0;
@@ -468,10 +534,6 @@ function orderEarnedCommission(order: AdminOrder): number {
 
 function isOutstandingBalanceOrder(order: AdminOrder): boolean {
   return order.order_status !== "closed" || order.payment_status !== "paid";
-}
-
-function hasPendingPayment(order: AdminOrder): boolean {
-  return order.payment_status !== "paid" && orderBalance(order) > 0;
 }
 
 function productName(data: AdminDashboardData, productId: string): string {

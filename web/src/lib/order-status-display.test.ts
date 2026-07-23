@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getOrderStatusBadgeLabel,
   getOrderStatusOptionLabel,
+  isAdminOrderDetailNavOrder,
 } from "./order-status-display";
 
 describe("order status display labels", () => {
@@ -15,5 +16,15 @@ describe("order status display labels", () => {
     expect(getOrderStatusOptionLabel("closed", "processing")).toBe("Open");
     expect(getOrderStatusBadgeLabel("processing")).toBe("Processing");
     expect(getOrderStatusOptionLabel("pending", "processing")).toBe("Processing");
+  });
+
+  it("limits order detail navigation to pending and processing orders", () => {
+    expect(isAdminOrderDetailNavOrder({ order_status: "pending" })).toBe(true);
+    expect(isAdminOrderDetailNavOrder({ order_status: "processing" })).toBe(true);
+    expect(isAdminOrderDetailNavOrder({ order_status: "closed" })).toBe(false);
+    expect(isAdminOrderDetailNavOrder({
+      order_status: "processing",
+      payment_status: "paid",
+    })).toBe(false);
   });
 });

@@ -1,17 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import type { AdminOrder } from "./data";
+import type { AdminAgentOrder, AdminOrder } from "./data";
 import {
+  agentCustomerBalance,
+  agentOrderCommissionTotal,
   agentOrderPaymentStatus,
+  agentOrderReceivableTotal,
+  canConvertPromotedCustomerOrderToDistribution,
   canManageOrderCommissions,
+  customerOrderDistributionConversionBlockMessage,
   defaultProductCommissionAmount,
   formatCompactCurrency,
   formatDateTime,
+  formatSalePaymentSummary,
+  getCustomerOrderDistributionConversionBlockReason,
+  isOrderCommissionEffective,
   orderBalance,
+  orderCommissionTotal,
+  orderDistributionConversionAgentId,
+  orderItemEffectiveCommissionAmount,
   orderPaymentTotal,
+  orderReceivableTotal,
   orderTotal,
   productAgentCommissionLabel,
   productDisplayLabel,
+  shouldShowCustomerOrderDistributionConversionCard,
 } from "./view";
 
 describe("orderTotal", () => {
@@ -108,6 +121,186 @@ describe("orderPaymentTotal", () => {
   });
 });
 
+describe("orderCommissionTotal", () => {
+  it("sums item-level commission for a customer order linked to an agent", () => {
+    const order = {
+      agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+      customer_order_item: [
+        {
+          final_quantity: 3,
+          unit_price: 300,
+          agent_commission_amount: 60,
+        },
+        {
+          final_quantity: 1,
+          unit_price: 120,
+          agent_commission_amount: 15,
+        },
+      ],
+    } as AdminOrder;
+
+    expect(orderCommissionTotal(order)).toBe(75);
+    expect(orderReceivableTotal(order, "final_quantity")).toBe(945);
+  });
+
+  it("uses the product default commission when the stored customer order commission is zero", () => {
+    const order = {
+      agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+      customer_order_item: [
+        {
+          final_quantity: 3,
+          unit_price: 300,
+          agent_commission_amount: 0,
+          product: {
+            agent_commission_type: "value",
+            agent_commission_value: 20,
+          },
+        },
+      ],
+    } as AdminOrder;
+
+    expect(orderItemEffectiveCommissionAmount(
+      order.customer_order_item[0],
+      "final_quantity",
+    )).toBe(60);
+    expect(orderCommissionTotal(order)).toBe(60);
+    expect(orderReceivableTotal(order, "final_quantity")).toBe(840);
+  });
+
+  it("uses product default commission for promoted customer processing orders attached to the new agent", () => {
+    const order = {
+      agent_id: "agent-1",
+      agent_order_id: null,
+      converted_to_agent_order_id: null,
+      customer: {
+        promoted_to_agent_id: "agent-1",
+      },
+      customer_order_item: [
+        {
+          final_quantity: 3,
+          unit_price: 300,
+          agent_commission_amount: 0,
+          product: {
+            agent_commission_type: "value",
+            agent_commission_value: 20,
+          },
+        },
+      ],
+    } as AdminOrder;
+
+    expect(orderCommissionTotal(order)).toBe(60);
+    expect(orderReceivableTotal(order, "final_quantity")).toBe(840);
+  });
+
+  it("does not use commission for direct customer orders just because the customer has an assigned agent", () => {
+    const order = {
+      agent_id: null,
+      agent_order_id: null,
+      converted_to_agent_order_id: null,
+      customer: {
+        assigned_agent_id: "agent-1",
+      },
+      customer_order_item: [
+        {
+          final_quantity: 3,
+          unit_price: 300,
+          agent_commission_amount: 60,
+          product: {
+            agent_commission_type: "value",
+            agent_commission_value: 20,
+          },
+        },
+      ],
+    } as AdminOrder;
+
+    expect(isOrderCommissionEffective(order)).toBe(false);
+    expect(orderCommissionTotal(order)).toBe(0);
+    expect(orderReceivableTotal(order, "final_quantity")).toBe(900);
+  });
+
+  it("does not use product default commission for regular customer orders", () => {
+    const order = {
+      agent_id: null,
+      agent_order_id: null,
+      converted_to_agent_order_id: null,
+      customer_order_item: [
+        {
+          final_quantity: 3,
+          unit_price: 300,
+          agent_commission_amount: 0,
+          product: {
+            agent_commission_type: "value",
+            agent_commission_value: 20,
+          },
+        },
+      ],
+    } as AdminOrder;
+
+    expect(orderCommissionTotal(order)).toBe(0);
+    expect(orderReceivableTotal(order, "final_quantity")).toBe(900);
+  });
+
+  it("does not display a negative customer order receivable", () => {
+    const order = {
+      agent_id: "agent-1",
+      customer_order_item: [
+        {
+          final_quantity: 1,
+          unit_price: 50,
+          agent_commission_amount: 75,
+        },
+      ],
+    } as AdminOrder;
+
+    expect(orderReceivableTotal(order, "final_quantity")).toBe(0);
+  });
+});
+
+describe("agentOrderReceivableTotal", () => {
+  it("deducts distribution order commission from the gross order amount", () => {
+    const order = {
+      agent_order_item: [
+        {
+          quantity: 3,
+          agent_commission_amount: 60,
+          product: {
+            default_price: 300,
+          },
+        },
+        {
+          quantity: 2,
+          agent_commission_amount: 20,
+          product: {
+            default_price: 125,
+          },
+        },
+      ],
+    } as AdminAgentOrder;
+
+    expect(agentOrderCommissionTotal(order)).toBe(80);
+    expect(agentOrderReceivableTotal(order)).toBe(1070);
+  });
+
+  it("uses the product default commission when the stored agent order commission is zero", () => {
+    const order = {
+      agent_order_item: [
+        {
+          quantity: 3,
+          agent_commission_amount: 0,
+          product: {
+            default_price: 300,
+            agent_commission_type: "value",
+            agent_commission_value: 20,
+          },
+        },
+      ],
+    } as AdminAgentOrder;
+
+    expect(agentOrderCommissionTotal(order)).toBe(60);
+    expect(agentOrderReceivableTotal(order)).toBe(840);
+  });
+});
+
 describe("agentOrderPaymentStatus", () => {
   it("aggregates linked customer order payment statuses", () => {
     expect(agentOrderPaymentStatus({ customer_order: [] })).toBe("unpaid");
@@ -138,6 +331,54 @@ describe("agentOrderPaymentStatus", () => {
   });
 });
 
+describe("agentCustomerBalance", () => {
+  it("sums unpaid balances from customer orders linked to the agent's own customer record only", () => {
+    const agentCustomerId = "customer-agent";
+    const orders = [
+      {
+        customer_id: agentCustomerId,
+        customer_order_item: [
+          {
+            final_quantity: 2,
+            unit_price: 150,
+          },
+        ],
+        payment: [
+          { amount: 75 },
+        ],
+      },
+      {
+        customer_id: "assigned-customer",
+        customer_order_item: [
+          {
+            final_quantity: 3,
+            unit_price: 100,
+          },
+        ],
+        payment: [],
+      },
+      {
+        customer_id: agentCustomerId,
+        customer_order_item: [
+          {
+            final_quantity: 1,
+            unit_price: 80,
+          },
+        ],
+        payment: [
+          { amount: 100 },
+        ],
+      },
+    ] as AdminOrder[];
+
+    expect(agentCustomerBalance(orders, agentCustomerId)).toBe(225);
+  });
+
+  it("returns zero when the agent does not have a customer record", () => {
+    expect(agentCustomerBalance([], null)).toBe(0);
+  });
+});
+
 describe("orderBalance", () => {
   it("returns the unpaid invoice balance without going below zero", () => {
     const order = {
@@ -154,12 +395,122 @@ describe("orderBalance", () => {
 
     expect(orderBalance(order)).toBe(0);
   });
+
+  it("uses the commission-adjusted receivable for agent orders", () => {
+    const order = {
+      agent_id: "agent-1",
+      customer_order_item: [
+        {
+          final_quantity: 3,
+          unit_price: 300,
+          agent_commission_amount: 0,
+          product: {
+            agent_commission_type: "value",
+            agent_commission_value: 20,
+          },
+        },
+      ],
+      payment: [
+        { amount: 840 },
+      ],
+    } as AdminOrder;
+
+    expect(orderReceivableTotal(order, "final_quantity")).toBe(840);
+    expect(orderBalance(order)).toBe(0);
+  });
 });
 
 describe("canManageOrderCommissions", () => {
-  it("requires an agent linked directly to the customer order", () => {
+  it("requires a directly linked agent on a processing order", () => {
     expect(canManageOrderCommissions({ agent_id: null } as AdminOrder)).toBe(false);
-    expect(canManageOrderCommissions({ agent_id: "64568f81-108b-42bd-b926-7e825dad67c6" } as AdminOrder)).toBe(true);
+    expect(canManageOrderCommissions({
+      agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+      order_status: "closed",
+    } as AdminOrder)).toBe(false);
+    expect(canManageOrderCommissions({
+      agent_id: "64568f81-108b-42bd-b926-7e825dad67c6",
+      order_status: "processing",
+    } as AdminOrder)).toBe(true);
+  });
+});
+
+describe("canConvertPromotedCustomerOrderToDistribution", () => {
+  const baseOrder = {
+    customer_order_item: [{ final_quantity: 1, unit_price: 100 }],
+    payment: [],
+    agent_received_payment: [],
+    invoice: [],
+    order_status: "processing",
+    payment_status: "unpaid",
+    agent_order_id: null,
+    converted_to_agent_order_id: null,
+  } as unknown as AdminOrder;
+
+  it("allows unpaid promoted customer orders without payment records", () => {
+    expect(canConvertPromotedCustomerOrderToDistribution(baseOrder, "agent-1")).toBe(true);
+    expect(getCustomerOrderDistributionConversionBlockReason(baseOrder, "agent-1")).toBeNull();
+  });
+
+  it("does not hide conversion for invoice-only orders without payment records", () => {
+    const order = {
+      ...baseOrder,
+      invoice: [{ id: "invoice-1" }],
+    } as AdminOrder;
+
+    expect(canConvertPromotedCustomerOrderToDistribution(order, "agent-1")).toBe(true);
+    expect(getCustomerOrderDistributionConversionBlockReason(order, "agent-1")).toBeNull();
+  });
+
+  it("derives the conversion agent from the promoted customer when the order has no direct agent id", () => {
+    const order = {
+      ...baseOrder,
+      agent_id: null,
+      customer: {
+        promoted_to_agent_id: "agent-1",
+      },
+    } as AdminOrder;
+
+    const promotedAgentId = orderDistributionConversionAgentId(order);
+
+    expect(promotedAgentId).toBe("agent-1");
+    expect(shouldShowCustomerOrderDistributionConversionCard(order, promotedAgentId)).toBe(true);
+    expect(canConvertPromotedCustomerOrderToDistribution(order, promotedAgentId)).toBe(true);
+  });
+
+  it("keeps the conversion card visible for promoted-customer orders even when payment blocks submission", () => {
+    const order = {
+      ...baseOrder,
+      agent_id: null,
+      payment_status: "partial",
+      payment: [{ id: "payment-1", amount: 25 }],
+      customer: {
+        promoted_to_agent_id: "agent-1",
+      },
+    } as AdminOrder;
+    const promotedAgentId = orderDistributionConversionAgentId(order);
+    const blockReason = getCustomerOrderDistributionConversionBlockReason(order, promotedAgentId);
+
+    expect(shouldShowCustomerOrderDistributionConversionCard(order, promotedAgentId)).toBe(true);
+    expect(canConvertPromotedCustomerOrderToDistribution(order, promotedAgentId)).toBe(false);
+    expect(customerOrderDistributionConversionBlockMessage(blockReason)).toBe(
+      "This order already has a payment record, so it cannot be converted.",
+    );
+  });
+
+  it("describes blocked conversion reasons", () => {
+    expect(getCustomerOrderDistributionConversionBlockReason(baseOrder, null)).toBe("Not promoted");
+    expect(getCustomerOrderDistributionConversionBlockReason({
+      ...baseOrder,
+      converted_to_agent_order_id: "agent-order-1",
+    } as AdminOrder, "agent-1")).toBe("Converted");
+    expect(getCustomerOrderDistributionConversionBlockReason({
+      ...baseOrder,
+      payment_status: "partial",
+    } as AdminOrder, "agent-1")).toBe("Has payment");
+    expect(getCustomerOrderDistributionConversionBlockReason({
+      ...baseOrder,
+      customer_order_item: [],
+    } as AdminOrder, "agent-1")).toBe("No items");
   });
 });
 
@@ -167,6 +518,14 @@ describe("formatDateTime", () => {
   it("formats ISO timestamps for the Philippines timezone", () => {
     expect(formatDateTime("2026-07-11T18:54:27.430254+00:00")).toBe("Jul 12, 2026, 2:54 AM");
     expect(formatDateTime(null)).toBe("Not set");
+  });
+});
+
+describe("formatSalePaymentSummary", () => {
+  it("describes how many payment records completed the sale", () => {
+    expect(formatSalePaymentSummary(0)).toBe("No payments recorded");
+    expect(formatSalePaymentSummary(1)).toBe("Paid in full once");
+    expect(formatSalePaymentSummary(3)).toBe("Paid 3 times");
   });
 });
 

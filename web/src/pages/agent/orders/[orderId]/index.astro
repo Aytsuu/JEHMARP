@@ -1,27 +1,33 @@
 ---
+import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
 import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
-import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
-import OrderPdfLinks from "@/components/OrderPdfLinks.astro";
 import {
   formatAgentActionFeedback,
   handleAgentDashboardAction,
 } from "@/lib/agent-dashboard/actions";
-import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
+import {
+  loadAgentDashboardData,
+  loadAgentOrder,
+} from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
 import {
   formatCurrency,
   formatDate,
   fullName,
-  orderTotal,
-  orderPaymentTotal,
+  isAgentMyOrder,
   orderBalance,
   orderExpectedCommission,
-  orderEarnedCommission,
+  orderPaymentTotal,
+  orderTotal,
 } from "@/lib/agent-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
 
 export const prerender = false;
+
+const orderDetailTabIds = ["products", "payment-record", "timeline"] as const;
+type OrderDetailTabId = (typeof orderDetailTabIds)[number];
 
 const agentRoute = await requireAgentRoute(Astro);
 
@@ -35,22 +41,51 @@ if (!orderId) {
   return Astro.redirect("/agent/orders", 302);
 }
 
+const requestedOrderDetailTab = Astro.url.searchParams.get("tab");
+
 if (Astro.request.method === "POST") {
-  return handleAgentDashboardAction(
-    Astro,
-    agentRoute.userId,
-    `/agent/orders/${orderId}`,
-  );
+  const returnPath =
+    requestedOrderDetailTab &&
+    orderDetailTabIds.includes(requestedOrderDetailTab as OrderDetailTabId)
+      ? `/agent/orders/${orderId}?tab=${encodeURIComponent(requestedOrderDetailTab)}`
+      : `/agent/orders/${orderId}`;
+
+  return handleAgentDashboardAction(Astro, agentRoute.userId, returnPath);
 }
 
-const data = await loadAgentDashboardData(Astro, agentRoute.userId);
-const order = data.orders.find((o) => o.id === orderId);
+const [data, order] = await Promise.all([
+  loadAgentDashboardData(Astro, agentRoute.userId),
+  loadAgentOrder(Astro, orderId),
+]);
 
-if (!order) {
+if (!order || !isAgentMyOrder(order, data.agent)) {
   return Astro.redirect("/agent/orders", 302);
 }
 
+function isOrderDetailTabActive(tab: OrderDetailTabId) {
+  if (
+    requestedOrderDetailTab &&
+    orderDetailTabIds.includes(requestedOrderDetailTab as OrderDetailTabId)
+  ) {
+    return requestedOrderDetailTab === tab;
+  }
+
+  return tab === "products";
+}
+
 const feedback = formatAgentActionFeedback(Astro.url);
+const orderQuantityKey =
+  order.invoice.length > 0 ? "final_quantity" : "partial_quantity";
+const paidTotal = orderPaymentTotal(order);
+const commissionTotal = orderExpectedCommission(order);
+const grossTotal = orderTotal(order, orderQuantityKey);
+const orderCode = `Order-${order.id.slice(0, 6).toUpperCase()}`;
+const backUrl = order.agent_order_id
+  ? `/agent/orders/multi-customers/${order.agent_order_id}`
+  : "/agent/orders";
+const backLabel = order.agent_order_id
+  ? "Back to distribution order"
+  : "Back to orders";
 const agentReceivedPayments = order.agent_received_payment ?? [];
 const pendingAgentReceivedPayments = agentReceivedPayments.filter(
   (payment) => payment.status === "pending_admin_confirmation",
@@ -64,258 +99,741 @@ const remainingRecordableBalance = Math.max(
   0,
 );
 const canRecordAgentPayment = remainingRecordableBalance > 0;
-const todayDate = new Date().toISOString().slice(0, 10);
+const todayDate = manilaDateInputValue();
+const todayTime = manilaTimeInputValue();
+const productCount = order.customer_order_item.length;
+
+const customerDisplayName = order.customer ? fullName(order.customer) : "Guest";
+const orderSlipPdfHref = `/agent/orders/${order.id}/order-slip.pdf`;
+const salesInvoicePdfHref = `/agent/orders/${order.id}/sales-invoice.pdf`;
+
+const timelineItems = [
+  ...order.payment.map((payment) => ({
+    id: `payment-${payment.id}`,
+    title: `Payment recorded via ${payment.payment_method}`,
+    timestamp: payment.created_at,
+    meta: `${formatCurrency(payment.amount)}${payment.reference_number ? ` • Ref ${payment.reference_number}` : ""}`,
+  })),
+  ...agentReceivedPayments.map((payment) => ({
+    id: `agent-payment-${payment.id}`,
+    title:
+      payment.status === "pending_admin_confirmation"
+        ? "Agent payment submitted for confirmation"
+        : payment.status === "confirmed"
+          ? "Agent payment confirmed"
+          : "Agent payment rejected",
+    timestamp: payment.created_at,
+    meta: `${formatCurrency(payment.amount)} via ${payment.payment_method}`,
+  })),
+  ...order.customer_order_status_history.map((entry) => ({
+    id: `status-${entry.id}`,
+    title: `Order moved to ${autoCapitalize(entry.to_status)}`,
+    timestamp: entry.changed_at,
+    meta:
+      entry.notes ??
+      (entry.from_status
+        ? `From ${autoCapitalize(entry.from_status)}`
+        : "Status update"),
+  })),
+  ...(order.invoice[0]
+    ? [
+        {
+          id: `invoice-${order.invoice[0].id}`,
+          title: "Invoice created",
+          timestamp: order.invoice[0].created_at,
+          meta: order.invoice[0].invoice_number,
+        },
+      ]
+    : []),
+  {
+    id: `created-${order.id}`,
+    title: "Order created",
+    timestamp: order.created_at,
+    meta: formatOrderSource(order.source),
+  },
+].sort(
+  (left, right) =>
+    new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime(),
+);
 ---
 
 <AgentRecordPageLayout
-  title={`Order Details #${order.id.slice(0, 8)} - JEHMARP`}
-  description="Agent order detail view, commissions, and PDFs."
-  heading="Order Details"
-  intro={`Review order items, details, commissions, and generate invoices/slips for Order #${order.id.slice(0, 8)}.`}
+  title={`${orderCode} - JEHMARP`}
+  description="Agent customer order details, products, payments, and timeline."
+  heading={orderCode}
   feedback={feedback}
   dashboardData={data}
-  backUrl="/agent/orders"
-  backLabel="Back to orders"
+  backUrl={backUrl}
+  backLabel={backLabel}
 >
-  <div class="dashboard-detail-stack">
-    <div class="content-section">
-      <h3>Order Information</h3>
-      
-      <div class="dashboard-detail-grid dashboard-detail-grid--compact">
-        <div class="detail-field">
-          <span class="detail-field-label">Customer</span>
-          <div class="detail-field-value">
-            {order.customer ? fullName(order.customer) : "Guest"}
-          </div>
-        </div>
-        
-        <div class="detail-field">
-          <span class="detail-field-label">Source</span>
-          <div class="detail-field-value">
-            {formatOrderSource(order.source)}
-          </div>
-        </div>
+  <ul slot="heading-meta" class="record-meta" aria-label="Order date">
+    <li class="record-meta__item">
+      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </svg>
+      <span class="record-meta__text">{formatDate(order.created_at)}</span>
+    </li>
+    <li class="record-meta__item">
+      <span class="record-meta__text">{formatOrderSource(order.source)}</span>
+    </li>
+  </ul>
 
-        <div class="detail-field">
-          <span class="detail-field-label">Order Status</span>
-          <div class="detail-field-value">
-            <StatusBadge kind="order" status={order.order_status} label={autoCapitalize(order.order_status)} />
-          </div>
-        </div>
+  <div slot="heading-aside" class="record-heading-badges">
+    <StatusBadge
+      kind="order"
+      status={order.order_status}
+      label={autoCapitalize(order.order_status)}
+    />
+    <StatusBadge
+      kind="payment"
+      status={order.payment_status}
+      label={autoCapitalize(order.payment_status)}
+    />
+  </div>
 
-        <div class="detail-field">
-          <span class="detail-field-label">Payment Status</span>
-          <div class="detail-field-value">
-            <StatusBadge kind="payment" status={order.payment_status} label={autoCapitalize(order.payment_status)} />
-          </div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Order Total</span>
-          <div class="detail-field-value">
-            {formatCurrency(orderTotal(order, "partial_quantity"))}
-          </div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Invoice Total</span>
-          <div class="detail-field-value">
-            {formatCurrency(orderTotal(order, "final_quantity"))}
-          </div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Paid</span>
-          <div class="detail-field-value">
-            {formatCurrency(orderPaymentTotal(order))}
-          </div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Agent Received</span>
-          <div class="detail-field-value">
-            {formatCurrency(pendingAgentReceivedTotal)}
-          </div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Balance</span>
-          <div class="detail-field-value">
-            {formatCurrency(orderBalance(order))}
-          </div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Expected Commission</span>
-          <div class="detail-field-value">
-            {formatCurrency(orderExpectedCommission(order))}
-          </div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Earned Commission</span>
-          <div class="detail-field-value">
-            {formatCurrency(orderEarnedCommission(order))}
-          </div>
-        </div>
-
-        <div class="detail-field">
-          <span class="detail-field-label">Approved At</span>
-          <div class="detail-field-value">
-            {formatDate(order.approved_at)}
-          </div>
-        </div>
-      </div>
-
-      <div class="pdf-links-container">
-        <OrderPdfLinks
-          orderId={order.id}
-          basePath="/agent/orders"
-          showSalesInvoice={order.invoice.length > 0}
+  <div
+    class="agent-record-content flex max-w-full flex-col gap-4 md:gap-8"
+    data-order-detail-tabs
+  >
+    <div class="grid grid-cols-1 gap-3 md:gap-4">
+      <div class="detail-field">
+        <AgentOrderCalculationSummary
+          paid={paidTotal}
+          commission={commissionTotal}
+          grossTotal={grossTotal}
+          variant="customer"
         />
+        {
+          pendingAgentReceivedTotal > 0 && (
+            <p class="detail-field-note">
+              {formatCurrency(pendingAgentReceivedTotal)} pending admin confirmation
+            </p>
+          )
+        }
+      </div>
+
+      <div class="detail-field">
+        <span class="detail-field-label">Customer</span>
+        <p class="detail-field-value detail-field-value--name">{customerDisplayName}</p>
+        <dl class="customer-detail-list">
+          <div>
+            <dt>Phone</dt>
+            <dd>
+              {
+                order.customer?.phone_number ? (
+                  <a href={`tel:${order.customer.phone_number}`}>
+                    {order.customer.phone_number}
+                  </a>
+                ) : (
+                  "No phone on file"
+                )
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd>
+              {
+                order.customer?.email ? (
+                  <a href={`mailto:${order.customer.email}`}>{order.customer.email}</a>
+                ) : (
+                  "No email on file"
+                )
+              }
+            </dd>
+          </div>
+          <div>
+            <dt>Address</dt>
+            <dd>{order.customer?.address?.trim() || "No address on file"}</dd>
+          </div>
+        </dl>
+        <div class="detail-field-links">
+          <a href={orderSlipPdfHref} target="_blank" rel="noreferrer">
+            Order slip PDF
+          </a>
+          {
+            order.invoice.length > 0 ? (
+              <a href={salesInvoicePdfHref} target="_blank" rel="noreferrer">
+                Sales invoice PDF
+              </a>
+            ) : null
+          }
+        </div>
       </div>
     </div>
 
-    <div class="content-section">
-      <h3>Order Items</h3>
-      <DashboardTableBoard>
-        <table class="dashboard-table">
-          <thead>
-            <tr>
-              <th scope="col">Product</th>
-              <th scope="col">Quantity</th>
-              <th scope="col">Commission</th>
-            </tr>
-          </thead>
-          <tbody>
-            {order.customer_order_item.map((item) => (
-              <tr>
-                <td>
-                  {item.product?.name ?? "Missing product"}<br />
-                  <span class="dashboard-table__muted-line">
-                    {formatCurrency(item.unit_price)} {item.price_type}
-                  </span>
-                </td>
-                <td>
-                  {item.partial_quantity}
-                </td>
-                <td>{formatCurrency(item.agent_commission_amount)} - {item.agent_commission_paid ? "Paid" : "Unpaid"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </DashboardTableBoard>
+    <div
+      class="agent-order-tabs flex border-b border-gray-200 md:hidden"
+      role="tablist"
+      aria-label="Order detail sections"
+    >
+      <button
+        type="button"
+        class:list={["agent-order-tab", isOrderDetailTabActive("products") && "is-active"]}
+        data-order-detail-tab-trigger
+        data-tab-target="products"
+        role="tab"
+        aria-selected={isOrderDetailTabActive("products") ? "true" : "false"}
+      >
+        Products ({productCount})
+      </button>
+      <button
+        type="button"
+        class:list={[
+          "agent-order-tab",
+          isOrderDetailTabActive("payment-record") && "is-active",
+        ]}
+        data-order-detail-tab-trigger
+        data-tab-target="payment-record"
+        role="tab"
+        aria-selected={isOrderDetailTabActive("payment-record") ? "true" : "false"}
+      >
+        Payment
+      </button>
+      <button
+        type="button"
+        class:list={["agent-order-tab", isOrderDetailTabActive("timeline") && "is-active"]}
+        data-order-detail-tab-trigger
+        data-tab-target="timeline"
+        role="tab"
+        aria-selected={isOrderDetailTabActive("timeline") ? "true" : "false"}
+      >
+        Timeline
+      </button>
     </div>
 
-    <div class="content-section">
-      <h3>Payment History</h3>
-      <form method="post" class="agent-payment-form">
-        <input type="hidden" name="action" value="record-agent-payment" />
-        <input type="hidden" name="orderId" value={order.id} />
-        <div class="agent-payment-form__grid">
-          <label>
-            <span>Amount</span>
-            <input
-              type="number"
-              name="amount"
-              min="0.01"
-              step="0.01"
-              max={canRecordAgentPayment ? remainingRecordableBalance : undefined}
-              value={canRecordAgentPayment ? remainingRecordableBalance.toFixed(2) : undefined}
+    <div class="agent-order-tab-panels flex flex-col gap-8">
+      <section
+        class:list={[
+          "record-section agent-order-tab-panel",
+          isOrderDetailTabActive("products") && "is-active",
+        ]}
+        data-order-detail-tab-panel="products"
+        hidden={!isOrderDetailTabActive("products")}
+        aria-label={`Products (${productCount})`}
+      >
+        <h2 class="record-section__title">Products</h2>
+        {
+          productCount === 0 ? (
+            <p class="empty-state">No products on this order.</p>
+          ) : (
+            <>
+              <div class="grid gap-3 md:hidden">
+                {
+                  order.customer_order_item.map((item) => {
+                    const quantity = item[orderQuantityKey];
+                    const subtotal = quantity * item.unit_price;
+
+                    return (
+                      <article class="agent-order-detail-card rounded-xl border border-gray-200 bg-white p-4">
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <h3 class="text-[0.95rem] font-bold text-gray-900">
+                              {item.product?.name ?? "Missing product"}
+                            </h3>
+                            <p class="mt-0.5 text-[0.82rem] text-gray-500">
+                              {formatCurrency(item.unit_price)} /{" "}
+                              {item.product?.unit_label ?? "unit"} •{" "}
+                              {autoCapitalize(item.price_type)}
+                            </p>
+                          </div>
+                          <strong class="shrink-0 text-[0.95rem] font-bold text-gray-900">
+                            {formatCurrency(subtotal)}
+                          </strong>
+                        </div>
+                        <dl class="mt-3 grid grid-cols-1 gap-2.5">
+                          <div>
+                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                              Quantity
+                            </dt>
+                            <dd class="text-[0.9rem] font-semibold text-gray-900">
+                              {quantity} {item.product?.unit_label ?? ""}
+                              {
+                                orderQuantityKey === "final_quantity" &&
+                                  item.partial_quantity !== item.final_quantity && (
+                                    <span class="pending-indicator">
+                                      Orig. {item.partial_quantity}
+                                    </span>
+                                  )
+                              }
+                            </dd>
+                          </div>
+                          <div>
+                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                              Details
+                            </dt>
+                            <dd class="text-[0.9rem] font-semibold text-gray-900">
+                              {item.add_details ?? "N/A"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
+                              Commission
+                            </dt>
+                            <dd class="text-[0.9rem] font-semibold text-gray-900">
+                              {formatCurrency(item.agent_commission_amount)} •{" "}
+                              {item.agent_commission_paid ? "Paid" : "Unpaid"}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+                    );
+                  })
+                }
+              </div>
+
+              <div class="order-record-table-wrap hidden md:block">
+                <table class="agent-customers-table agent-order-products-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Product</th>
+                      <th scope="col">Quantity</th>
+                      <th scope="col">Unit price</th>
+                      <th scope="col">Subtotal</th>
+                      <th scope="col">Details</th>
+                      <th scope="col">Commission</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {
+                      order.customer_order_item.map((item) => {
+                        const quantity = item[orderQuantityKey];
+                        const subtotal = quantity * item.unit_price;
+
+                        return (
+                          <tr>
+                            <td>
+                              {item.product?.name ?? "Missing product"}
+                              <span class="agent-order-products-table__meta">
+                                {item.product?.unit_label ?? "unit"} •{" "}
+                                {autoCapitalize(item.price_type)}
+                              </span>
+                            </td>
+                            <td>
+                              {quantity} {item.product?.unit_label ?? ""}
+                              {
+                                orderQuantityKey === "final_quantity" &&
+                                  item.partial_quantity !== item.final_quantity && (
+                                    <span class="agent-order-products-table__meta">
+                                      Orig. {item.partial_quantity}
+                                    </span>
+                                  )
+                              }
+                            </td>
+                            <td>{formatCurrency(item.unit_price)}</td>
+                            <td>{formatCurrency(subtotal)}</td>
+                            <td>{item.add_details ?? "N/A"}</td>
+                            <td>
+                              {formatCurrency(item.agent_commission_amount)}
+                              <span class="agent-order-products-table__meta">
+                                {item.agent_commission_paid ? "Paid" : "Unpaid"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )
+        }
+      </section>
+
+      <section
+        class:list={[
+          "record-section agent-order-tab-panel",
+          isOrderDetailTabActive("payment-record") && "is-active",
+        ]}
+        data-order-detail-tab-panel="payment-record"
+        hidden={!isOrderDetailTabActive("payment-record")}
+        aria-label="Payment record"
+      >
+        <h2 class="record-section__title">Payment record</h2>
+
+        {
+          pendingAgentReceivedPayments.length > 0 && (
+            <div class="pending-payment-notice">
+              <strong>{formatCurrency(pendingAgentReceivedTotal)}</strong>
+              <span>awaiting admin confirmation</span>
+            </div>
+          )
+        }
+
+        <form method="post" class="agent-payment-form">
+          <input type="hidden" name="action" value="record-agent-payment" />
+          <input type="hidden" name="orderId" value={order.id} />
+          <div class="agent-payment-form__grid">
+            <label>
+              <span>Amount</span>
+              <input
+                type="number"
+                name="amount"
+                min="0.01"
+                step="0.01"
+                max={canRecordAgentPayment ? remainingRecordableBalance : undefined}
+                value={canRecordAgentPayment
+                  ? remainingRecordableBalance.toFixed(2)
+                  : undefined}
+                disabled={!canRecordAgentPayment}
+                required
+              />
+            </label>
+            <label>
+              <span>Method</span>
+              <select
+                name="paymentMethod"
+                disabled={!canRecordAgentPayment}
+                required
+              >
+                <option value="">Select method</option>
+                <option value="Cash">Cash</option>
+                <option value="Check">Check</option>
+              </select>
+            </label>
+            <label>
+              <span>Payment terms</span>
+              <select
+                name="paymentTerms"
+                disabled={!canRecordAgentPayment}
+                required
+              >
+                <option value="">Select payment terms</option>
+                <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="Gcash">Gcash</option>
+              </select>
+            </label>
+            <label>
+              <span>Date</span>
+              <input
+                type="date"
+                name="paymentDate"
+                value={todayDate}
+                disabled={!canRecordAgentPayment}
+                required
+              />
+            </label>
+            <label>
+              <span>Time</span>
+              <input
+                type="time"
+                name="paymentTime"
+                value={todayTime}
+                disabled={!canRecordAgentPayment}
+                required
+              />
+            </label>
+            <label>
+              <span>Reference</span>
+              <input
+                type="text"
+                name="referenceNumber"
+                disabled={!canRecordAgentPayment}
+              />
+            </label>
+          </div>
+          <label class="agent-payment-form__notes">
+            <span>Notes</span>
+            <textarea
+              name="notes"
+              rows="2"
               disabled={!canRecordAgentPayment}
-              required
-            />
+            ></textarea>
           </label>
-          <label>
-            <span>Method</span>
-            <select
-              name="paymentMethod"
-              disabled={!canRecordAgentPayment}
-              required
-            >
-              <option value="">Select method</option>
-              <option value="Cash">Cash</option>
-              <option value="Check">Check</option>
-            </select>
-          </label>
-          <label>
-            <span>Payment Terms</span>
-            <select
-              name="paymentTerms"
-              disabled={!canRecordAgentPayment}
-              required
-            >
-              <option value="">Select payment terms</option>
-              <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
-              <option value="Bank Transfer">Bank Transfer</option>
-              <option value="Gcash">Gcash</option>
-            </select>
-          </label>
-          <label>
-            <span>Date</span>
-            <input
-              type="date"
-              name="paymentDate"
-              value={todayDate}
-              disabled={!canRecordAgentPayment}
-              required
-            />
-          </label>
-          <label>
-            <span>Reference</span>
-            <input
-              type="text"
-              name="referenceNumber"
-              disabled={!canRecordAgentPayment}
-            />
-          </label>
-        </div>
-        <label class="agent-payment-form__notes">
-          <span>Notes</span>
-          <textarea
-            name="notes"
-            rows="2"
-            disabled={!canRecordAgentPayment}
-          ></textarea>
-        </label>
-        <button type="submit" disabled={!canRecordAgentPayment}>
-          Submit for admin confirmation
-        </button>
-      </form>
-      {pendingAgentReceivedPayments.length > 0 && (
-        <ul class="compact-list dashboard-payment-list agent-received-list">
-          {pendingAgentReceivedPayments.map((payment) => (
-            <li>
-              <span>
-                {payment.payment_method} - {payment.payment_terms} on {formatDate(payment.payment_date)}
-                {" - pending admin confirmation"}
-              </span>
-              <strong>{formatCurrency(payment.amount)}</strong>
-            </li>
-          ))}
-        </ul>
-      )}
-      {order.payment.length === 0 ? (
-        <p class="empty-state">No payments recorded.</p>
-      ) : (
-        <ul class="compact-list dashboard-payment-list">
-          {order.payment.map((payment) => (
-            <li>
-              <span>{payment.payment_method} - {payment.payment_terms} on {formatDate(payment.payment_date)}</span>
-              <strong>{formatCurrency(payment.amount)}</strong>
-            </li>
-          ))}
-        </ul>
-      )}
+          <button type="submit" disabled={!canRecordAgentPayment}>
+            Submit for admin confirmation
+          </button>
+        </form>
+
+        {
+          pendingAgentReceivedPayments.length > 0 && (
+            <ul class="payment-history-list">
+              {
+                pendingAgentReceivedPayments.map((payment) => (
+                  <li class="payment-history-list__item payment-history-list__item--pending">
+                    <div>
+                      <strong>{payment.payment_method}</strong>
+                      <span>
+                        {formatDate(payment.payment_date)} • {payment.payment_terms}
+                      </span>
+                    </div>
+                    <div class="payment-history-list__amount">
+                      {formatCurrency(payment.amount)}
+                    </div>
+                  </li>
+                ))
+              }
+            </ul>
+          )
+        }
+
+        {
+          order.payment.length === 0 ? (
+            <p class="empty-state">No confirmed payments recorded yet.</p>
+          ) : (
+            <ul class="payment-history-list">
+              {
+                order.payment.map((payment) => (
+                  <li class="payment-history-list__item">
+                    <div>
+                      <strong>{payment.payment_method}</strong>
+                      <span>
+                        {formatDate(payment.payment_date)} • {payment.payment_terms}
+                      </span>
+                    </div>
+                    <div class="payment-history-list__amount">
+                      {formatCurrency(payment.amount)}
+                    </div>
+                  </li>
+                ))
+              }
+            </ul>
+          )
+        }
+      </section>
+
+      <section
+        class:list={[
+          "record-section agent-order-tab-panel",
+          isOrderDetailTabActive("timeline") && "is-active",
+        ]}
+        data-order-detail-tab-panel="timeline"
+        hidden={!isOrderDetailTabActive("timeline")}
+        aria-label="Order timeline"
+      >
+        <h2 class="record-section__title">Timeline</h2>
+        {
+          timelineItems.length === 0 ? (
+            <p class="empty-state">No timeline events yet.</p>
+          ) : (
+            <ul class="timeline-list">
+              {
+                timelineItems.map((item) => (
+                  <li class="timeline-list__item">
+                    <div class="timeline-list__copy">
+                      <strong>{item.title}</strong>
+                      <span>{item.meta}</span>
+                    </div>
+                    <time datetime={item.timestamp}>{formatDate(item.timestamp)}</time>
+                  </li>
+                ))
+              }
+            </ul>
+          )
+        }
+      </section>
     </div>
   </div>
 </AgentRecordPageLayout>
 
 <style>
+  .record-heading-badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+  }
+
+  .detail-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
+    padding: 1rem;
+  }
+
+  .detail-field-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--color-brand-muted-black);
+  }
+
+  .detail-field-value {
+    font-size: 1.35rem;
+    line-height: 1.15;
+    color: #111827;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .detail-field-value--name {
+    margin: 0;
+    font-size: 1.1rem;
+  }
+
+  .detail-field-note {
+    margin: 0.35rem 0 0;
+    color: #b45309;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .customer-detail-list {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0.35rem 0 0;
+  }
+
+  .customer-detail-list div {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .customer-detail-list dt {
+    color: rgba(17, 24, 39, 0.45);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .customer-detail-list dd {
+    margin: 0;
+    color: #111827;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  .customer-detail-list a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .customer-detail-list a:hover,
+  .customer-detail-list a:focus-visible {
+    color: var(--color-brand-red);
+    outline: none;
+  }
+
+  .detail-field-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem 1rem;
+    margin-top: 0.5rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .detail-field-links a {
+    color: #1d4ed8;
+    font-size: 0.86rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .detail-field-links a:hover,
+  .detail-field-links a:focus-visible {
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .record-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .record-section__title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .agent-order-tab {
+    flex: 1;
+    min-height: 2.5rem;
+    margin-bottom: -1px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: #6b7280;
+    padding: 0.55rem 0.75rem;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .agent-order-tab.is-active {
+    border-bottom-color: var(--color-brand-red);
+    color: var(--color-brand-red);
+  }
+
+  .agent-order-tab-panel[hidden] {
+    display: none;
+  }
+
+  .pending-indicator {
+    margin-left: 0.35rem;
+    color: #b45309;
+    font-size: 0.82em;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .order-record-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+  }
+
+  .agent-customers-table {
+    table-layout: fixed;
+    width: 100%;
+    margin: 0;
+    border: 0;
+  }
+
+  .agent-customers-table th,
+  .agent-customers-table td {
+    padding: 1.1rem 0.75rem;
+    vertical-align: middle;
+  }
+
+  .agent-order-products-table {
+    min-width: 760px;
+  }
+
+  .agent-order-products-table__meta {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.8rem;
+    color: var(--color-brand-muted-black);
+  }
+
+  .pending-payment-notice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid #fde68a;
+    border-radius: 0.75rem;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 0.86rem;
+  }
+
+  .pending-payment-notice strong {
+    color: #b45309;
+    font-size: 0.95rem;
+  }
+
   .agent-payment-form {
     display: grid;
     gap: 0.85rem;
-    margin-bottom: 1rem;
     padding: 1rem;
     border: 1px solid rgba(17, 24, 39, 0.1);
     border-radius: 0.9rem;
@@ -335,14 +853,14 @@ const todayDate = new Date().toISOString().slice(0, 10);
 
   .agent-payment-form span {
     color: rgba(17, 24, 39, 0.58);
-    font-size: 0.76rem;
+    font-size: 0.74rem;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0;
   }
 
   .agent-payment-form input,
-  .agent-payment-form textarea {
+  .agent-payment-form textarea,
+  .agent-payment-form select {
     width: 100%;
     min-width: 0;
     border: 1px solid rgba(17, 24, 39, 0.14);
@@ -357,7 +875,7 @@ const todayDate = new Date().toISOString().slice(0, 10);
     resize: vertical;
   }
 
-  .agent-payment-form button {
+  .agent-payment-form button[type="submit"] {
     justify-self: end;
     min-height: 2.45rem;
     border: 0;
@@ -376,8 +894,106 @@ const todayDate = new Date().toISOString().slice(0, 10);
     opacity: 0.55;
   }
 
-  .agent-received-list {
-    margin-bottom: 1rem;
+  .payment-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .payment-history-list__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+    background: #ffffff;
+  }
+
+  .payment-history-list__item:last-child {
+    border-bottom: 0;
+  }
+
+  .payment-history-list__item--pending {
+    background: #fffbeb;
+  }
+
+  .payment-history-list__item strong {
+    display: block;
+    color: #111827;
+    font-size: 0.9rem;
+  }
+
+  .payment-history-list__item span {
+    display: block;
+    margin-top: 0.15rem;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.8rem;
+  }
+
+  .payment-history-list__amount {
+    color: #111827;
+    font-size: 0.95rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .timeline-list__item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+    background: #ffffff;
+  }
+
+  .timeline-list__item:last-child {
+    border-bottom: 0;
+  }
+
+  .timeline-list__copy {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  .timeline-list__copy strong {
+    color: #111827;
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+
+  .timeline-list__copy span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .timeline-list__item time {
+    flex-shrink: 0;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    white-space: nowrap;
   }
 
   @media (max-width: 720px) {
@@ -385,8 +1001,28 @@ const todayDate = new Date().toISOString().slice(0, 10);
       grid-template-columns: 1fr;
     }
 
-    .agent-payment-form button {
+    .agent-payment-form button[type="submit"] {
       justify-self: stretch;
+      width: 100%;
+    }
+
+    .timeline-list__item {
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .record-section__title {
+      display: none;
+    }
+
+    .agent-order-tab-panel {
+      display: block !important;
+    }
+
+    .agent-order-tab-panel[hidden] {
+      display: block !important;
     }
   }
 </style>

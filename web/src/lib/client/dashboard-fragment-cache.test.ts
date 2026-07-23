@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearDashboardFragmentCaches,
+  consumeDashboardFragmentRefreshNeeded,
+  markDashboardFragmentRefreshNeeded,
   readDashboardFragmentCache,
   writeDashboardFragmentCache,
 } from "./dashboard-fragment-cache";
@@ -83,5 +85,27 @@ describe("dashboard fragment cache", () => {
       readDashboardFragmentCache("products", "search=chicken"),
     ).toBeUndefined();
     expect(sessionStorage.getItem("other-cache")).toBe("keep");
+  });
+
+  it("marks a fragment refresh when caches are cleared", () => {
+    clearDashboardFragmentCaches();
+
+    expect(consumeDashboardFragmentRefreshNeeded()).toBe(true);
+    expect(consumeDashboardFragmentRefreshNeeded()).toBe(false);
+  });
+
+  it("can clear cached fragments without forcing a record page refresh", () => {
+    writeDashboardFragmentCache("customers", "page=2", "cached customers");
+
+    clearDashboardFragmentCaches({ markRefreshNeeded: false });
+
+    expect(readDashboardFragmentCache("customers", "page=2")).toBeUndefined();
+    expect(consumeDashboardFragmentRefreshNeeded()).toBe(false);
+  });
+
+  it("tracks refresh intent independently from cached fragments", () => {
+    markDashboardFragmentRefreshNeeded();
+
+    expect(consumeDashboardFragmentRefreshNeeded()).toBe(true);
   });
 });

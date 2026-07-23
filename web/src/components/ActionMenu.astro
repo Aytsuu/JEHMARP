@@ -82,6 +82,11 @@ const triggerClasses = [
               role="menuitem"
               aria-disabled={item.disabled ? "true" : undefined}
               tabindex={item.disabled ? -1 : undefined}
+              data-astro-prefetch={
+                item.target === "_blank" || item.href?.endsWith(".pdf")
+                  ? undefined
+                  : "false"
+              }
             >
               {icon === "external-pdf" && (
                 <svg viewBox="0 0 24 24" aria-hidden="true">

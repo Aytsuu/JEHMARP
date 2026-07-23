@@ -1,4 +1,4 @@
-import { isAgentNavActive } from "@/lib/dashboard/agent-navigation";
+import { isAgentMobilePrimaryRoute, isAgentNavActive } from "@/lib/dashboard/agent-navigation";
 
 const AGENT_MOBILE_QUERY = "(max-width: 47.99rem)";
 
@@ -20,6 +20,10 @@ export function syncAgentBodyClass(pathname = window.location.pathname) {
 
 export function syncAgentMobileChrome(pathname = window.location.pathname) {
   syncAgentBodyClass(pathname);
+  document.body.classList.toggle(
+    "dashboard-body--agent-mobile-primary",
+    isAgentRoute(pathname) && isAgentMobilePrimaryRoute(pathname),
+  );
 
   document.querySelectorAll<HTMLAnchorElement>("[data-agent-nav-link]").forEach((link) => {
     const href = link.getAttribute("href") ?? "";

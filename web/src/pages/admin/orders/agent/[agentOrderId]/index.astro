@@ -2,6 +2,7 @@
 import ActionMenu from "@/components/ActionMenu.astro";
 import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
+import AgentOrderDistributionSummaryCard from "@/components/agent/AgentOrderDistributionSummaryCard.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import {
@@ -14,25 +15,30 @@ import {
   type AdminOrder,
 } from "@/lib/admin-dashboard/data";
 import {
+  agentOrderCommissionTotal,
   agentOrderPaymentStatus,
+  agentOrderReceivableTotal,
   agentOrderTotal,
   defaultProductCommissionAmount,
   formatCurrency,
   formatDate,
   fullName,
+  orderBalance,
   orderPaymentTotal,
-  orderTotal,
+  orderReceivableTotal,
 } from "@/lib/admin-dashboard/view";
 import {
   canAttachCustomerToAgentOrder,
   buildAttachCustomerProductOptions,
   formatPendingIndicator,
+  formatAgentOrderDistributionStatus,
   getAgentOrderProductDistribution,
   minimumAgentOrderItemQuantity,
   sumPendingCustomerOrderAmount,
 } from "@/lib/agent-order-distribution";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
 
 export const prerender = false;
 
@@ -89,7 +95,39 @@ const attachCustomerProducts = buildAttachCustomerProductOptions({
   agentOrder,
   products: dashboardData.products,
 });
-const attachCustomerCustomers = dashboardData.customers.map((customer) => ({
+const customerBalanceById = dashboardData.orders.reduce<Record<string, number>>((balances, order) => {
+  if (!order.customer_id) return balances;
+
+  const balance = orderBalance(order);
+  if (balance <= 0) return balances;
+
+  return {
+    ...balances,
+    [order.customer_id]: (balances[order.customer_id] ?? 0) + balance,
+  };
+}, {});
+const attachedCustomerIds = agentOrder.customer_order.flatMap((order) =>
+  order.customer_id ? [order.customer_id] : [],
+);
+const paymentNoticeByCustomerId = dashboardData.orders.reduce<Record<string, "unpaid" | "partial">>((notices, order) => {
+  const paymentNotice = order.payment_status === "unpaid" || order.payment_status === "partial"
+    ? order.payment_status
+    : null;
+
+  if (!order.customer_id || !paymentNotice) {
+    return notices;
+  }
+
+  return {
+    ...notices,
+    [order.customer_id]: notices[order.customer_id] === "unpaid"
+      ? "unpaid"
+      : paymentNotice,
+  };
+}, {});
+const attachCustomerCustomers = dashboardData.customers
+  .filter((customer) => !attachedCustomerIds.includes(customer.id))
+  .map((customer) => ({
   id: customer.id,
   label: fullName(customer),
   firstName: customer.first_name,
@@ -97,18 +135,23 @@ const attachCustomerCustomers = dashboardData.customers.map((customer) => ({
   phoneNumber: customer.phone_number,
   email: customer.email ?? "",
   address: customer.address,
+  balance: customerBalanceById[customer.id] ?? 0,
+  creditLimit: customer.credit_limit,
+  creditExceeded: customer.credit_limit_exceeded,
+  paymentNotice: paymentNoticeByCustomerId[customer.id] ?? null,
 }));
 const totalPaid = agentOrder.customer_order.reduce(
   (sum, order) => sum + orderPaymentTotal(order),
   0,
 );
-const totalCommission = agentOrder.agent_order_item.reduce(
-  (sum, item) => sum + item.agent_commission_amount,
-  0,
-);
+const totalCommission = agentOrderCommissionTotal(agentOrder);
+const totalReceivable = agentOrderReceivableTotal(agentOrder);
+const todayDate = manilaDateInputValue();
+const todayTime = manilaTimeInputValue();
 const agentName = agentOrder.agent?.display_name ?? "Unassigned agent";
 const agentOrderCode = `Order-${agentOrder.id.slice(0, 6).toUpperCase()}`;
 const orderHeading = `${agentName}'s Order`;
+const isPendingAgentOrderApproval = agentOrder.order_status === "pending_order";
 const agentOrderReturnTo = encodeURIComponent(
   `/admin/orders/agent/${agentOrder.id}`,
 );
@@ -149,7 +192,6 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
   feedback={feedback}
   dashboardData={dashboardData}
   contentMaxWidth="72rem"
-  fullHeight
 >
   <ul slot="heading-meta" class="record-meta" aria-label="Agent order details">
     <li class="record-meta__item">
@@ -185,44 +227,35 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
     />
   </div>
 
+  {
+    isPendingAgentOrderApproval ? (
+      <section class="agent-order-approval-panel" aria-labelledby="agent-order-approval-heading">
+        <div class="agent-order-approval-panel__content">
+          <span class="agent-order-approval-panel__eyebrow">Admin approval required</span>
+          <h2 id="agent-order-approval-heading">Pending Order</h2>
+          <p>
+            This agent submitted an order for admin approval. Approve it before managing products,
+            customer distribution, payment confirmations, or summary totals.
+          </p>
+        </div>
+        <form method="post" class="agent-order-approval-panel__action">
+          <input type="hidden" name="action" value="approve-agent-order" />
+          <input type="hidden" name="agentOrderId" value={agentOrder.id} />
+          <button type="submit">Approve Order</button>
+        </form>
+      </section>
+    ) : (
+      <>
   <div class="agent-record-content">
-    <div class="assigned-summary-grid">
-      <div class="detail-field">
-        <div class="detail-field-value detail-field-value--amount">
-          <span class="amount-ratio">
-            <span class="amount-ratio__paid">{formatCurrency(totalPaid)}</span>
-            <span class="amount-ratio__total"
-              >/{formatAmountValue(totalAmount)}</span
-            >
-            {
-              pendingCustomerOrderAmount > 0 && (
-                <span class="pending-indicator">
-                  {formatPendingIndicator(pendingCustomerOrderAmount, formatCurrency)}
-                </span>
-              )
-            }
-          </span>
-        </div>
-        <span class="detail-field-label">Total amount</span>
-      </div>
-
-      <div class="detail-field">
-        <div class="detail-field-value">{formatCurrency(totalCommission)}</div>
-        <span class="detail-field-label">Total commission</span>
-      </div>
-
-      <div class="detail-field">
-        <div class="detail-field-value">
-          {agentOrder.agent_order_item.length}
-        </div>
-        <span class="detail-field-label">Products</span>
-      </div>
-
-      <div class="detail-field">
-        <div class="detail-field-value">{agentOrder.customer_order.length}</div>
-        <span class="detail-field-label">Customers</span>
-      </div>
-    </div>
+    <AgentOrderDistributionSummaryCard
+      paid={totalPaid}
+      commission={totalCommission}
+      grossTotal={totalAmount}
+      primaryLabel="Receivable"
+      primaryAmount={totalReceivable}
+      pendingAcceptanceAmount={pendingCustomerOrderAmount > 0 ? pendingCustomerOrderAmount : null}
+      summaryLabel="Agent order receivable summary"
+    />
 
     <div class="record-section">
       <h2 class="section-line-heading">
@@ -262,8 +295,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                   const minQuantity = minimumAgentOrderItemQuantity(
                     distribution.approvedDistributedQuantity,
                   );
-                  const canEditQuantity = isQuantityEditable &&
-                    distribution.remainingQuantity > 0;
+                  const canEditQuantity = isQuantityEditable;
 
                   return (
                     <tr>
@@ -298,7 +330,6 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                               type="number"
                               name="quantity"
                               min={minQuantity}
-                              max={item.quantity - 0.001}
                               step="0.001"
                               value={item.quantity}
                               required
@@ -321,12 +352,10 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                           )
                         }
                         <span class="agent-order-products-table__meta">
-                          {distribution.remainingQuantity > 0
-                            ? `${distribution.remainingQuantity} ${item.product?.unit_label ?? "unit"} remaining`
-                            : "Fully distributed"}
-                          {!canEditQuantity && isQuantityEditable
-                            ? " - locked when fully distributed"
-                            : ""}
+                          {formatAgentOrderDistributionStatus({
+                            remainingQuantity: distribution.remainingQuantity,
+                            unitLabel: item.product?.unit_label ?? "unit",
+                          })}
                         </span>
                       </td>
                       <td>{item.add_details ?? "N/A"}</td>
@@ -379,7 +408,11 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
       }
     </div>
 
-    <div class="record-section" id="agent-order-customers">
+    <div
+      class="record-section"
+      id="agent-order-customers"
+      data-admin-agent-payment-distribution-section
+    >
       <h2 class="section-line-heading">
         <span class="section-line-heading__line" aria-hidden="true"></span>
         <span class="section-line-heading__label">Customers</span>
@@ -534,6 +567,83 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
           <p class="empty-state">No customer orders have been attached yet.</p>
         ) : (
           <>
+            <form
+              method="post"
+              class="admin-agent-payment-distribution-form"
+              data-admin-agent-payment-distribution-form
+            >
+              <input
+                type="hidden"
+                name="action"
+                value="record-admin-agent-payment-distribution"
+              />
+              <input
+                type="hidden"
+                name="agentOrderId"
+                value={agentOrder.id}
+              />
+              <div data-selected-payment-order-inputs hidden></div>
+
+              <div class="admin-agent-payment-distribution-form__panel">
+                <label>
+                  <span>Total received</span>
+                  <input
+                    type="number"
+                    name="amount"
+                    min="0.01"
+                    step="0.01"
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Method</span>
+                  <select name="paymentMethod" required>
+                    <option value="">Select method</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Check">Check</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Payment Terms</span>
+                  <select name="paymentTerms" required>
+                    <option value="">Select payment terms</option>
+                    <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Gcash">Gcash</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Date</span>
+                  <input
+                    type="date"
+                    name="paymentDate"
+                    value={todayDate}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Time</span>
+                  <input
+                    type="time"
+                    name="paymentTime"
+                    value={todayTime}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Reference</span>
+                  <input type="text" name="referenceNumber" />
+                </label>
+                <label class="admin-agent-payment-distribution-form__notes">
+                  <span>Notes</span>
+                  <textarea name="notes" rows="2"></textarea>
+                </label>
+                <button type="submit">
+                  Record selected payments
+                </button>
+              </div>
+            </form>
+
             <div class="order-record-table-wrap">
               <table class="agent-customers-table agent-order-customer-orders-table">
                 <thead>
@@ -544,8 +654,8 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                         <input type="checkbox" data-order-select-all />
                       </label>
                     </th>
+                    <th scope="col">Date Created</th>
                     <th scope="col">Customer</th>
-                    <th scope="col">Date</th>
                     <th scope="col">Source</th>
                     <th scope="col">Order Status</th>
                     <th scope="col">Payment Status</th>
@@ -557,7 +667,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                 <tbody>
                   {agentOrder.customer_order.map((order) => {
                     const invoice = order.invoice[0];
-                    const orderAmount = orderTotal(
+                    const orderAmount = orderReceivableTotal(
                       order,
                       invoice ? "final_quantity" : "partial_quantity",
                     );
@@ -569,7 +679,10 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                       (sum, payment) => sum + payment.amount,
                       0,
                     );
-                    const hasSalesInvoice = Boolean(invoice);
+                    const remainingPaymentBalance = Math.max(
+                      orderAmount - orderPaid - pendingAgentPaymentTotal,
+                      0,
+                    );
                     const customerName = order.customer
                       ? fullName(order.customer)
                       : "Guest";
@@ -584,11 +697,13 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                               value={order.id}
                               data-order-row-checkbox
                               data-order-row-type="customer"
+                              data-payment-order-checkbox
+                              data-payment-order-balance={remainingPaymentBalance}
                             />
                           </label>
                         </td>
-                        <td>{customerName}</td>
                         <td>{formatDate(order.created_at)}</td>
+                        <td>{customerName}</td>
                         <td>{formatOrderSource(order.source)}</td>
                         <td>
                           <StatusBadge
@@ -612,14 +727,14 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                             <span class="amount-ratio__total">
                               /{formatAmountValue(orderAmount)}
                             </span>
-                            {
-                              isPendingOrder && (
-                                <span class="pending-indicator">
-                                  {formatPendingIndicator(orderAmount, formatCurrency)}
-                                </span>
-                              )
-                            }
                           </span>
+                          {
+                            isPendingOrder && (
+                              <span class="pending-acceptance-note">
+                                Awaiting acceptance
+                              </span>
+                            )
+                          }
                         </td>
                         <td>
                           <div class="payment-confirmation-cell">
@@ -704,7 +819,6 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                                         <button
                                           type="submit"
                                           class="payment-confirmation-submit"
-                                          disabled={!hasSalesInvoice}
                                         >
                                           Confirm Payment Received
                                         </button>
@@ -717,9 +831,26 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                           </div>
                         </td>
                         <td>
-                          <ViewButton
-                            href={`/admin/orders/customer/${order.id}?returnTo=${agentOrderReturnTo}`}
-                          />
+                          {
+                            isPendingOrder ? (
+                              <form
+                                method="post"
+                                class="order-table-action-form"
+                                data-astro-reload
+                              >
+                                <input type="hidden" name="action" value="update-order-status" />
+                                <input type="hidden" name="orderId" value={order.id} />
+                                <input type="hidden" name="orderStatus" value="processing" />
+                                <button type="submit" class="btn-table-manage">
+                                  Accept order
+                                </button>
+                              </form>
+                            ) : (
+                              <ViewButton
+                                href={`/admin/orders/customer/${order.id}?returnTo=${agentOrderReturnTo}`}
+                              />
+                            )
+                          }
                         </td>
                       </tr>
                     );
@@ -740,19 +871,24 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
     mode="admin"
     canAttachCustomer={canAttachCustomer}
   />
+      </>
+    )
+  }
 </AdminNotificationsPageLayout>
 
 <script>
   import { initAgentOrderCustomerBulkPdf } from "@/lib/client/admin-order-bulk-pdf";
+  import { initAdminAgentPaymentDistributionForms } from "@/lib/client/admin-agent-payment-distribution-form";
 
-  function initAgentOrderCustomerBulkPdfControls() {
+  function initAgentOrderCustomerControls() {
     initAgentOrderCustomerBulkPdf();
+    initAdminAgentPaymentDistributionForms();
   }
 
-  document.addEventListener("DOMContentLoaded", initAgentOrderCustomerBulkPdfControls);
-  document.addEventListener("astro:after-swap", initAgentOrderCustomerBulkPdfControls);
+  document.addEventListener("DOMContentLoaded", initAgentOrderCustomerControls);
+  document.addEventListener("astro:after-swap", initAgentOrderCustomerControls);
   if (document.readyState !== "loading") {
-    initAgentOrderCustomerBulkPdfControls();
+    initAgentOrderCustomerControls();
   }
 </script>
 
@@ -772,36 +908,63 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
     gap: 0.45rem;
   }
 
-  .assigned-summary-grid {
+  .agent-order-approval-panel {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 1rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1.5rem;
+    border: 1px solid #fde68a;
+    border-radius: 0.85rem;
+    background: #fffbeb;
+    padding: 1.25rem;
+    color: #78350f;
   }
 
-  .detail-field {
+  .agent-order-approval-panel__content {
     display: flex;
+    min-width: 0;
     flex-direction: column;
-    gap: 0.35rem;
-    border: 1px solid rgba(17, 24, 39, 0.08);
-    border-radius: 1rem;
-    background: linear-gradient(135deg, #ffffff 0%, #fff7f7 100%);
-    padding: 1rem;
+    gap: 0.45rem;
   }
 
-  .detail-field-label {
-    font-size: 0.82rem;
-    font-weight: 500;
-    color: var(--color-brand-muted-black);
-    text-transform: none;
-    letter-spacing: normal;
+  .agent-order-approval-panel__eyebrow {
+    color: #92400e;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
   }
 
-  .detail-field-value {
-    font-size: 1.35rem;
-    line-height: 1.15;
+  .agent-order-approval-panel h2 {
+    margin: 0;
     color: #111827;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  .agent-order-approval-panel p {
+    margin: 0;
+    max-width: 42rem;
+    color: #78350f;
+    font-size: 0.93rem;
+    line-height: 1.5;
+  }
+
+  .agent-order-approval-panel__action {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .agent-order-approval-panel__action button {
+    min-height: 2.5rem;
+    border: none;
+    border-radius: 0.55rem;
+    background: #991b1b;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    padding: 0 1rem;
   }
 
   .amount-ratio {
@@ -821,6 +984,16 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
     font-size: 0.78em;
     font-weight: 500;
     color: #9ca3af;
+  }
+
+  .pending-acceptance-note {
+    display: block;
+    margin-top: 0.2rem;
+    color: #b45309;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: nowrap;
   }
 
   .record-section {
@@ -976,6 +1149,72 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
   .customer-orders-table-toolbar__add-customer:disabled {
     cursor: not-allowed;
     opacity: 0.55;
+  }
+
+  .admin-agent-payment-distribution-form {
+    display: block;
+  }
+
+  .admin-agent-payment-distribution-form__panel {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.85rem;
+    border: 1px solid rgba(17, 24, 39, 0.1);
+    border-radius: 0.75rem;
+    background: #f9fafb;
+    padding: 1rem;
+  }
+
+  .admin-agent-payment-distribution-form label {
+    display: grid;
+    gap: 0.35rem;
+    margin: 0;
+  }
+
+  .admin-agent-payment-distribution-form label span {
+    color: rgba(17, 24, 39, 0.64);
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .admin-agent-payment-distribution-form input,
+  .admin-agent-payment-distribution-form select,
+  .admin-agent-payment-distribution-form textarea {
+    width: 100%;
+    border: 1px solid rgba(17, 24, 39, 0.16);
+    border-radius: 0.5rem;
+    background: #ffffff;
+    color: #111827;
+    font: inherit;
+    min-height: 2.45rem;
+    padding: 0.55rem 0.7rem;
+  }
+
+  .admin-agent-payment-distribution-form textarea {
+    min-height: 4.25rem;
+    resize: vertical;
+  }
+
+  .admin-agent-payment-distribution-form__notes {
+    grid-column: span 2;
+  }
+
+  .admin-agent-payment-distribution-form button {
+    align-self: end;
+    min-height: 2.45rem;
+    border: 0;
+    border-radius: 0.5rem;
+    background: var(--color-brand-red);
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    padding: 0.65rem 0.9rem;
+  }
+
+  .admin-agent-payment-distribution-form button:hover,
+  .admin-agent-payment-distribution-form button:focus-visible {
+    background: #9f1d21;
   }
 
   .payment-confirmation-cell {
@@ -1241,9 +1480,27 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
   }
 
   @media (max-width: 640px) {
+    .agent-order-approval-panel {
+      grid-template-columns: 1fr;
+      align-items: stretch;
+    }
+
+    .agent-order-approval-panel__action,
+    .agent-order-approval-panel__action button {
+      width: 100%;
+    }
+
     .customer-orders-table-toolbar {
       align-items: stretch;
       flex-direction: column;
+    }
+
+    .admin-agent-payment-distribution-form__panel {
+      grid-template-columns: 1fr;
+    }
+
+    .admin-agent-payment-distribution-form__notes {
+      grid-column: auto;
     }
 
     .customer-orders-table-toolbar__action,

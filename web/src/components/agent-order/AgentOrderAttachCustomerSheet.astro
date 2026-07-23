@@ -12,6 +12,10 @@ type CustomerOption = {
   phoneNumber: string;
   email: string;
   address: string;
+  balance?: number;
+  creditLimit?: number;
+  creditExceeded?: boolean;
+  paymentNotice?: "unpaid" | "partial" | null;
 };
 
 type ProductOption = {
@@ -71,6 +75,7 @@ function productOptionLabel(product: ProductOption) {
     class="order-create-form"
     data-agent-order-attach-form
     data-can-submit={String(canSubmit)}
+    data-astro-reload
   >
     <input type="hidden" name="action" value={actionName} />
     <input type="hidden" name="agentOrderId" value={agentOrderId} />
@@ -86,9 +91,40 @@ function productOptionLabel(product: ProductOption) {
       </p>
     )}
 
+    <section class="order-create-section">
+      <div class="order-create-section__header">
+        <h3 class="order-create-section__title">Release</h3>
+      </div>
+      <div class="order-create-section__body">
+        <div class="field-row-group field-row-group--datetime">
+          <label class="field-row field-row--date">
+            <span>Release date</span>
+            <input
+              name="releaseDate"
+              type="date"
+              required
+              disabled={!canSubmit}
+            />
+          </label>
+          <label class="field-row field-row--time">
+            <span>Release time</span>
+            <input
+              name="releaseTime"
+              type="time"
+              required
+              disabled={!canSubmit}
+            />
+          </label>
+        </div>
+      </div>
+    </section>
+
     <div class="order-create-section" data-customer-entries>
       <Accordion class="customer-entry-accordion" open data-customer-entry>
-        <span slot="title" data-customer-entry-title>New customer</span>
+        <span slot="title" class="customer-entry-accordion__title-row">
+          <span data-customer-entry-title>New customer</span>
+          <strong data-customer-entry-total>{formatCurrency(0)}</strong>
+        </span>
         <button
           slot="actions"
           type="button"
@@ -110,6 +146,11 @@ function productOptionLabel(product: ProductOption) {
             <label class="field-row">
               <span>Existing customer</span>
               <OrderCustomerPicker disabled={!canSubmit} />
+              <p
+                class="order-create-form__existing-customer-notice"
+                hidden
+                data-customer-order-notice
+              ></p>
             </label>
           </div>
         </section>
@@ -156,6 +197,8 @@ function productOptionLabel(product: ProductOption) {
                   class="order-item-accordion__remove"
                   data-remove-order-item
                   aria-label="Remove item"
+                  hidden
+                  disabled
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
@@ -224,6 +267,10 @@ function productOptionLabel(product: ProductOption) {
           data-customer-phone-number={customer.phoneNumber}
           data-customer-email={customer.email}
           data-customer-address={customer.address}
+          data-customer-balance={customer.balance ?? 0}
+          data-customer-credit-limit={customer.creditLimit ?? 1000}
+          data-customer-credit-exceeded={String(customer.creditExceeded ?? false)}
+          data-customer-payment-notice={customer.paymentNotice ?? ""}
         >
           {customer.label}
         </button>
@@ -233,7 +280,10 @@ function productOptionLabel(product: ProductOption) {
     <template data-customer-entry-template>
       <details class="ui-accordion customer-entry-accordion" data-customer-entry>
         <summary class="ui-accordion__summary">
-          <span class="ui-accordion__title" data-customer-entry-title>New customer</span>
+          <span class="ui-accordion__title customer-entry-accordion__title-row">
+            <span data-customer-entry-title>New customer</span>
+            <strong data-customer-entry-total>{formatCurrency(0)}</strong>
+          </span>
           <span class="ui-accordion__summary-actions">
             <button type="button" class="order-item-accordion__remove" data-remove-customer-entry aria-label="Remove customer">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -283,6 +333,11 @@ function productOptionLabel(product: ProductOption) {
                     </p>
                   </div>
                 </div>
+                <p
+                  class="order-create-form__existing-customer-notice"
+                  hidden
+                  data-customer-order-notice
+                ></p>
                 <input type="hidden" data-customer-id />
               </label>
             </div>
@@ -326,7 +381,7 @@ function productOptionLabel(product: ProductOption) {
                   <summary class="ui-accordion__summary">
                     <span class="ui-accordion__title" data-order-item-title>Select product</span>
                     <span class="ui-accordion__summary-actions">
-                      <button type="button" class="order-item-accordion__remove" data-remove-order-item aria-label="Remove item">
+                      <button type="button" class="order-item-accordion__remove" data-remove-order-item aria-label="Remove item" hidden disabled>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                           <path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>
                         </svg>
@@ -464,6 +519,20 @@ function productOptionLabel(product: ProductOption) {
 
   .customer-entry-accordion + .customer-entry-accordion {
     margin-top: 0.75rem;
+  }
+
+  .customer-entry-accordion__title-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  .customer-entry-accordion__title-row strong {
+    color: #111827;
+    font-size: 0.82rem;
+    font-weight: 800;
+    white-space: nowrap;
   }
 
   .order-create-form__add-customer {

@@ -45,6 +45,10 @@ export function isAgentOrderCompletedAndPaid(order: AgentOrderAttachEligibilityS
 }
 
 export function canAttachCustomerToAgentOrder(order: AgentOrderAttachEligibilitySource) {
+  if (order.order_status === "pending_order") {
+    return false;
+  }
+
   return !isAgentOrderCompletedAndPaid(order);
 }
 
@@ -148,6 +152,17 @@ export function canDecreaseAgentOrderItemQuantity(input: {
 
 export function minimumAgentOrderItemQuantity(approvedDistributedQuantity: number) {
   return Math.max(approvedDistributedQuantity, 0);
+}
+
+export function formatAgentOrderDistributionStatus(input: {
+  remainingQuantity: number;
+  unitLabel: string;
+}) {
+  if (input.remainingQuantity <= 0) {
+    return "Fully Distributed";
+  }
+
+  return `${input.remainingQuantity} ${input.unitLabel} remaining for distribution`;
 }
 
 export function sumPendingCustomerOrderAmount(

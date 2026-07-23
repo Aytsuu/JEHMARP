@@ -58,6 +58,7 @@ function createAgentDashboardData(): AgentDashboardData {
     agent: {
       id: "agent-1",
       user_id: "user-1",
+      customer_id: null,
       employee_id: "EMP-001",
       first_name: "Agent",
       last_name: "One",
@@ -75,6 +76,8 @@ function createAgentDashboardData(): AgentDashboardData {
       address: "Manila",
       assigned_agent_id: "agent-1",
       is_reseller: false,
+      credit_limit: 1000,
+      credit_limit_exceeded: false,
       created_at: "2026-07-10T08:00:00.000Z",
       updated_at: "2026-07-10T08:00:00.000Z",
     }],

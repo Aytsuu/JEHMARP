@@ -1,5 +1,5 @@
 ---
-import { adminPaginationPageSizes, type AdminPagination } from "@/lib/admin-dashboard/pagination";
+import { adminPaginationPageSizes, formatRecordCount, type AdminPagination } from "@/lib/admin-dashboard/pagination";
 
 type Props = {
   pagination?: AdminPagination;
@@ -9,6 +9,7 @@ type Props = {
 const { pagination, variant = "full" } = Astro.props;
 const showSummary = variant === "full" || variant === "summary";
 const showControls = variant === "full" || variant === "controls";
+const hasRecords = !pagination || pagination.totalRows > 0;
 ---
 
 <footer
@@ -31,71 +32,89 @@ const showControls = variant === "full" || variant === "controls";
     ]}
   >
     {
-      showSummary && (
-        <div class="table-pagination__summary">
-          <span data-page-info>
-            {pagination
-              ? pagination.totalRows === 0
-                ? "No records found"
-                : `Showing ${pagination.fromRow}-${pagination.toRow} of ${pagination.totalRows}`
-              : ""}
-          </span>
-          <label class="table-pagination__limit">
-            <select data-limit-select>
-              {adminPaginationPageSizes.map((pageSize) => (
-                <option value={pageSize} selected={pagination?.pageSize === pageSize}>
-                  {pageSize} rows
-                </option>
-              ))}
-            </select>
-          </label>
+      !hasRecords && pagination ? (
+        <div class="table-pagination__empty" data-page-info>
+          No records found
         </div>
-      )
-    }
-    {
-      showControls && (
-    <div class="table-pagination__controls">
-      <button
-        type="button"
-        data-pagination-prev
-        data-page={pagination ? Math.max(pagination.page - 1, 1) : undefined}
-        class="btn-secondary"
-        aria-label="Previous page"
-        disabled={pagination ? pagination.page <= 1 : undefined}
-      >
-        <svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="m15 18-6-6 6-6"></path>
-        </svg>
-      </button>
-      <div data-pagination-numbers class="table-pagination__numbers">
-        {pagination && Array.from({ length: pagination.totalPages }, (_, index) => index + 1).map((page) => (
-          <button
-            type="button"
-            data-pagination-page
-            data-page={page}
-            class:list={[
-              "table-pagination__page-button",
-              page === pagination.page && "btn-active-page",
-            ]}
-            aria-current={page === pagination.page ? "page" : undefined}
-          >
-            {page}
-          </button>
-        ))}
-      </div>
-      <button
-        type="button"
-        data-pagination-next
-        data-page={pagination ? Math.min(pagination.page + 1, pagination.totalPages) : undefined}
-        class="btn-secondary"
-        aria-label="Next page"
-        disabled={pagination ? pagination.page >= pagination.totalPages : undefined}
-      >
-        <svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="m9 18 6-6-6-6"></path>
-        </svg>
-      </button>
-    </div>
+      ) : (
+        <div class="table-pagination__controls table-pagination__controls--merged">
+          {
+            showControls && (
+              <button
+                type="button"
+                data-pagination-prev
+                data-page={pagination ? Math.max(pagination.page - 1, 1) : undefined}
+                class="btn-secondary table-pagination__arrow"
+                aria-label="Previous page"
+                disabled={pagination ? pagination.page <= 1 : undefined}
+              >
+                <svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m15 18-6-6 6-6"></path>
+                </svg>
+              </button>
+            )
+          }
+
+          {
+            showControls && (
+              <div class="table-pagination__page-editor" data-page-info>
+                <span class="table-pagination__page-label">Page</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  data-pagination-page-input
+                  data-digits-only
+                  class="table-pagination__page-input"
+                  value={pagination?.page ?? "1"}
+                  aria-label="Current page"
+                />
+                <span class="table-pagination__page-total">
+                  of <span data-total-pages>{pagination?.totalPages ?? "1"}</span>
+                </span>
+              </div>
+            )
+          }
+
+          {
+            showControls && (
+              <button
+                type="button"
+                data-pagination-next
+                data-page={pagination ? Math.min(pagination.page + 1, pagination.totalPages) : undefined}
+                class="btn-secondary table-pagination__arrow"
+                aria-label="Next page"
+                disabled={pagination ? pagination.page >= pagination.totalPages : undefined}
+              >
+                <svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m9 18 6-6-6-6"></path>
+                </svg>
+              </button>
+            )
+          }
+
+          {
+            showSummary && (
+              <label class="table-pagination__limit">
+                <select data-limit-select>
+                  {adminPaginationPageSizes.map((pageSize) => (
+                    <option value={pageSize} selected={pagination?.pageSize === pageSize}>
+                      {pageSize} rows
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )
+          }
+
+          {
+            showSummary && (
+              <span class="table-pagination__record-count" data-total-records>
+                {pagination ? formatRecordCount(pagination.totalRows) : ""}
+              </span>
+            )
+          }
+        </div>
       )
     }
   </div>

@@ -3,10 +3,22 @@ import { describe, expect, it } from "vitest";
 import {
   adminPaginationRange,
   buildAdminPagination,
+  formatRecordCount,
   mergeAdminPaginationQuery,
   parseAdminPagination,
   serializeAdminPagination,
 } from "./pagination";
+
+describe("formatRecordCount", () => {
+  it("uses singular record for one row", () => {
+    expect(formatRecordCount(1)).toBe("1 record");
+  });
+
+  it("uses plural records for zero or multiple rows", () => {
+    expect(formatRecordCount(0)).toBe("0 records");
+    expect(formatRecordCount(2)).toBe("2 records");
+  });
+});
 
 describe("parseAdminPagination", () => {
   it("parses supported page and page size values", () => {

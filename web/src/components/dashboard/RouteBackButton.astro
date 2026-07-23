@@ -5,9 +5,17 @@ type Props = {
 };
 
 const { href, label = "Go back" } = Astro.props;
+const shouldDisablePrefetch =
+  !href.endsWith(".pdf") &&
+  (/^\/admin(\/|$)/.test(href) || /^\/agent(\/|$)/.test(href));
 ---
 
-<a href={href} class="route-back-button" aria-label={label}>
+<a
+  href={href}
+  class="route-back-button"
+  aria-label={label}
+  data-astro-prefetch={shouldDisablePrefetch ? "false" : undefined}
+>
   <svg viewBox="0 0 24 24" aria-hidden="true">
     <path d="m15 18-6-6 6-6"></path>
   </svg>

@@ -2,14 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   agentOrderPaymentStatus,
+  agentOrderCommissionTotal,
+  agentOrderRemittanceTotal,
+  agentOrderTotal,
   buildAgentPaymentSummary,
   buildAgentSummary,
   formatCurrency,
   formatPaymentStatus,
+  isAgentMyOrder,
+  isAgentMyStandaloneOrder,
   orderBalance,
   orderEarnedCommission,
   orderExpectedCommission,
   orderPaymentTotal,
+  orderRemittanceTotal,
   orderTotal,
 } from "./view";
 import type { AgentDashboardData, AgentOrder, AgentProfile } from "./data";
@@ -20,6 +26,7 @@ function createAgentProfile(overrides: Partial<AgentProfile> = {}): AgentProfile
   return {
     id: agentId,
     user_id: "22222222-2222-2222-2222-222222222222",
+    customer_id: null,
     employee_id: "EMP-001",
     first_name: "NMC",
     last_name: "Agent",
@@ -159,7 +166,7 @@ describe("agent dashboard calculations", () => {
       monthlyEarnings: 46.88,
       earnedToday: 46.88,
       expectedCommission: 106.24,
-      outstandingBalance: 825,
+      outstandingBalance: 425,
     });
   });
 
@@ -196,6 +203,43 @@ describe("agent dashboard calculations", () => {
       paid: 1,
       refunded: 1,
     });
+  });
+
+  it("identifies agent-owned orders by agent assignment instead of customer assignment", () => {
+    const agent = createAgentProfile();
+
+    expect(isAgentMyOrder(createOrder(), agent)).toBe(true);
+    expect(isAgentMyOrder(createOrder({ agent_id: null }), agent)).toBe(false);
+    expect(isAgentMyOrder(createOrder({ agent_id: "other-agent" }), agent)).toBe(false);
+    expect(isAgentMyStandaloneOrder(createOrder({ agent_order_id: "cluster-1" }), agent)).toBe(false);
+    expect(isAgentMyStandaloneOrder(createOrder({ converted_to_agent_order_id: "cluster-2" }), agent)).toBe(false);
+    expect(isAgentMyStandaloneOrder(createOrder(), agent)).toBe(true);
+  });
+
+  it("derives agent distribution remittance totals from gross and commission", () => {
+    const cluster = {
+      agent_order_item: [
+        { quantity: 10, product: { default_price: 300 }, agent_commission_amount: 140 },
+      ],
+    } as Parameters<typeof agentOrderRemittanceTotal>[0];
+
+    expect(agentOrderCommissionTotal(cluster)).toBe(140);
+    expect(agentOrderTotal(cluster)).toBe(3000);
+    expect(agentOrderRemittanceTotal(cluster)).toBe(2860);
+
+    const order = createOrder({
+      customer_order_item: [
+        {
+          ...createOrder().customer_order_item[0],
+          partial_quantity: 2,
+          final_quantity: 2,
+          unit_price: 100,
+          agent_commission_amount: 40,
+        },
+      ],
+    });
+
+    expect(orderRemittanceTotal(order, "final_quantity")).toBe(160);
   });
 
   it("aggregates agent order payment status from linked customer orders", () => {
