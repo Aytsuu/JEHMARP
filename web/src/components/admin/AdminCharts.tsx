@@ -20,6 +20,7 @@ import type { TooltipContentProps } from "recharts";
 
 import type {
   AdminAnalytics,
+  SalesPeriodMetric,
   WeeklyProductOrderProductMetric,
 } from "@/lib/admin-dashboard/analytics";
 import DashboardTableEmptyStateContent from "@/components/dashboard/DashboardTableEmptyStateContent";
@@ -293,6 +294,18 @@ function OrderStatusTooltip({ active, payload }: TooltipContentProps) {
   );
 }
 
+function ChartEmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex h-full min-h-[220px] items-center justify-center rounded-lg border border-dashed border-gray-300 px-6 text-center text-sm text-gray-500">
+      {message}
+    </div>
+  );
+}
+
+function hasSalesTrendData(data: SalesPeriodMetric[]) {
+  return data.some((period) => period.grossSales > 0 || period.orderCount > 0);
+}
+
 export default function AdminCharts({ analytics }: AdminChartsProps) {
   const [salesPeriod, setSalesPeriod] = useState<"day" | "month">("month");
   const [recentActivityTab, setRecentActivityTab] =
@@ -310,6 +323,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
 
   const salesData =
     salesPeriod === "day" ? analytics.salesByDay : analytics.salesByMonth;
+  const hasRevenueTrendData = hasSalesTrendData(salesData);
   const weeklyProductSeries = analytics.weeklyProductOrders.productSeries.map(
     (series, index) => ({
       ...series,
@@ -421,57 +435,61 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
             </div>
 
             <div className="h-[350px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={salesData}
-                  margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="5%"
-                        stopColor={colors.brandRed}
-                        stopOpacity={0.2}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor={colors.brandRed}
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#f3f4f6"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="label"
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value: number) => `${pesoPrefix}${formatNumber(value)}`}
-                  />
-                  <Tooltip content={CurrencyTooltip} />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="grossSales"
-                    name="Gross Sales"
-                    stroke={colors.brandRed}
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#colorSales)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              {hasRevenueTrendData ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={salesData}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                        <stop
+                          offset="5%"
+                          stopColor={colors.brandRed}
+                          stopOpacity={0.2}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor={colors.brandRed}
+                          stopOpacity={0}
+                        />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f3f4f6"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      stroke="#9ca3af"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="#9ca3af"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value: number) => `${pesoPrefix}${formatNumber(value)}`}
+                    />
+                    <Tooltip content={CurrencyTooltip} />
+                    <Legend />
+                    <Area
+                      type="monotone"
+                      dataKey="grossSales"
+                      name="Gross Sales"
+                      stroke={colors.brandRed}
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#colorSales)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartEmptyState message="No closed and paid sales to chart yet. Revenue will appear after orders are closed and fully paid." />
+              )}
             </div>
           </div>
 
@@ -721,43 +739,47 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
               Top 5 products ranked by gross sales
             </p>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={analytics.topProducts}
-                  layout="vertical"
-                  margin={{ top: 10, right: 10, left: 30, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#f3f4f6"
-                    horizontal={false}
-                  />
-                  <XAxis
-                    type="number"
-                    stroke="#9ca3af"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value: number) => `${pesoPrefix}${formatNumber(value)}`}
-                  />
-                  <YAxis
-                    dataKey="label"
-                    type="category"
-                    stroke="#4b5563"
-                    fontSize={11}
-                    tickLine={false}
-                    axisLine={false}
-                    width={120}
-                  />
-                  <Tooltip content={CurrencyTooltip} />
-                  <Bar
-                    dataKey="grossSales"
-                    name="Sales Value"
-                    fill={colors.brandRed}
-                    radius={[0, 4, 4, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {analytics.topProducts.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={analytics.topProducts}
+                    layout="vertical"
+                    margin={{ top: 10, right: 10, left: 30, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f3f4f6"
+                      horizontal={false}
+                    />
+                    <XAxis
+                      type="number"
+                      stroke="#9ca3af"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value: number) => `${pesoPrefix}${formatNumber(value)}`}
+                    />
+                    <YAxis
+                      dataKey="label"
+                      type="category"
+                      stroke="#4b5563"
+                      fontSize={11}
+                      tickLine={false}
+                      axisLine={false}
+                      width={120}
+                    />
+                    <Tooltip content={CurrencyTooltip} />
+                    <Bar
+                      dataKey="grossSales"
+                      name="Sales Value"
+                      fill={colors.brandRed}
+                      radius={[0, 4, 4, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartEmptyState message="No product sales recorded yet. Top products will appear after closed and paid orders include line items." />
+              )}
             </div>
           </div>
 
@@ -769,39 +791,43 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
               Quantity and revenue grouped by category
             </p>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={analytics.salesByCategory}
-                  margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="#f3f4f6"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="label"
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#9ca3af"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value: number) => `${pesoPrefix}${formatNumber(value)}`}
-                  />
-                  <Tooltip content={CurrencyTooltip} />
-                  <Bar
-                    dataKey="grossSales"
-                    name="Gross Sales"
-                    fill={colors.brandGold}
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              {analytics.salesByCategory.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={analytics.salesByCategory}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#f3f4f6"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      stroke="#9ca3af"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="#9ca3af"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value: number) => `${pesoPrefix}${formatNumber(value)}`}
+                    />
+                    <Tooltip content={CurrencyTooltip} />
+                    <Bar
+                      dataKey="grossSales"
+                      name="Gross Sales"
+                      fill={colors.brandGold}
+                      radius={[4, 4, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ChartEmptyState message="No category sales recorded yet. Categories will appear after closed and paid orders are grouped by product category." />
+              )}
             </div>
           </div>
         </div>
