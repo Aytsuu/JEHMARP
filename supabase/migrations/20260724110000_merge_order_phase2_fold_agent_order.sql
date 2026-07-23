@@ -1,6 +1,48 @@
 -- migration-safety: destructive-reviewed
 -- Phase 2: Fold agent_order into unified order table
 
+-- Distribution orders use pending_customers/pending_order statuses in history rows.
+alter table public.order_status_history
+  drop constraint if exists customer_order_status_history_from_status_check;
+
+alter table public.order_status_history
+  drop constraint if exists customer_order_status_history_to_status_check;
+
+alter table public.order_status_history
+  drop constraint if exists order_status_history_from_status_check;
+
+alter table public.order_status_history
+  drop constraint if exists order_status_history_to_status_check;
+
+alter table public.order_status_history
+  add constraint order_status_history_from_status_check
+  check (
+    from_status is null
+    or from_status = any (
+      array[
+        'pending'::text,
+        'processing'::text,
+        'closed'::text,
+        'pending_customers'::text,
+        'pending_order'::text
+      ]
+    )
+  );
+
+alter table public.order_status_history
+  add constraint order_status_history_to_status_check
+  check (
+    to_status = any (
+      array[
+        'pending'::text,
+        'processing'::text,
+        'closed'::text,
+        'pending_customers'::text,
+        'pending_order'::text
+      ]
+    )
+  );
+
 insert into public."order" (
   id,
   agent_id,
