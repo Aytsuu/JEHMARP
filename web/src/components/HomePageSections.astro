@@ -3,6 +3,7 @@ import type {
   PublicFeaturedProduct,
   PublicPageSectionRecord,
 } from "@/lib/public-website/content";
+import MissionExpandableText from "@/components/MissionExpandableText.astro";
 import { toAdminContentPreviewHref } from "@/lib/public-website/admin-content-preview";
 import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
@@ -27,49 +28,43 @@ const shopInfoSource = sections.find(
   (section) => section.type === "images_gallery",
 );
 
-const coreValues = asStringArray(missionVisionCoreValues?.content.coreValues);
+const coreValuesText = coreValuesContent(
+  missionVisionCoreValues?.content.coreValues,
+);
 const taglineItems = asStringArray(taglines?.content.items);
 const storefrontBenefits = [
   {
     title: "Direct from Local Farmers",
     desc: "Partnering with trusted local farmers ensures the delivery of the best quality meat while supporting local agriculture.",
     class: "why-buy-card--0",
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>`,
   },
   {
     title: "Guaranteed Freshness",
     desc: "Every product is freshly delivered and carefully handled daily to meet strict standards of top-notch freshness.",
     class: "why-buy-card--1",
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>`,
   },
   {
     title: "Affordable & Fair Pricing",
     desc: "Premium quality meat is offered at fair, budget-friendly prices accessible to every family.",
     class: "why-buy-card--2",
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
   },
   {
     title: "Trusted Family Experience",
     desc: "A multi-generational, family-run business built on a foundation of honesty, dedication, and genuine care for its customers.",
     class: "why-buy-card--3",
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>`,
   },
   {
     title: "Community-Centered Business",
     desc: "Dedicated to giving back, supporting community livelihoods, and uplifting the local neighborhood that has supported the business throughout the years.",
     class: "why-buy-card--4",
+    icon: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
   },
 ];
-const orderingSteps = [
-  "Choose your cuts and preferred quantities.",
-  "Confirm pickup or delivery details with the shop.",
-  "Receive fresh meat packed and ready for cooking.",
-];
-const storeDetails = [
-  { label: "Store hours", value: "Open Daily (3:00AM - 8:00PM)" },
-  { label: "Phone", value: "09322159289 / 09177770118" },
-  { label: "Location", value: "Compostela Public Market / Consolacion Public Market" },
-  {
-    label: "Email",
-    value: "jehmarp2020@gmail.com",
-  },
-];
+
 const faqItems = [
   {
     question: "Is the meat fresh or frozen?",
@@ -109,6 +104,16 @@ function asStringArray(value: unknown): string[] {
   );
 }
 
+function coreValuesContent(value: unknown): string | undefined {
+  const text = stringValue(value);
+  if (text) {
+    return text;
+  }
+
+  const items = asStringArray(value);
+  return items.length > 0 ? items.join(" ") : undefined;
+}
+
 function getProductImage(name: string): string {
   const normalized = name.toLowerCase();
   if (normalized.includes("pork belly")) return "/images/pork_belly.png";
@@ -121,8 +126,87 @@ function getProductImage(name: string): string {
 }
 
 function getFeaturedProductImage(product: PublicFeaturedProduct): string {
-  return resolvePublicStorageUrl(product.image_path) ?? getProductImage(product.name);
+  return (
+    resolvePublicStorageUrl(product.image_path) ?? getProductImage(product.name)
+  );
 }
+
+const defaultBestSellers = [
+  {
+    id: "best-1",
+    name: "Pork Belly Prime Cut",
+    price: "₱380.00",
+    image: "/images/pork_belly.png",
+    description:
+      "Freshly cut pork belly with ideal fat-to-meat ratio, perfect for grilling or crisp roasting.",
+    badge: null,
+    availability: "Freshly packed daily",
+  },
+  {
+    id: "best-2",
+    name: "Chicken Breast (Skinless)",
+    price: "₱240.00",
+    image: "/images/chicken_breast.png",
+    description:
+      "Lean, tender chicken breast prepared fresh daily, ideal for healthy home meals.",
+    badge: null,
+    availability: "Freshly packed daily",
+  },
+  {
+    id: "best-3",
+    name: "Beef Short Ribs",
+    price: "From ₱420.00",
+    image: "/images/beef_short_ribs.png",
+    description:
+      "Richly marbled beef short ribs cut for slow stewing, braising, or smoking.",
+    badge: "SOLD OUT",
+    availability: "Out of stock",
+  },
+  {
+    id: "best-4",
+    name: "Special Ground Pork",
+    price: "₱260.00",
+    image: "/images/ground_pork.png",
+    description:
+      "Freshly ground pork prepared from lean cuts, perfect for lumpia, patties, and sauces.",
+    badge: null,
+    availability: "Freshly packed daily",
+  },
+];
+
+const bestSellersList = defaultBestSellers.map((defaultItem, index) => {
+  const dbProduct = featuredProducts[index];
+  if (dbProduct) {
+    return {
+      id: dbProduct.id,
+      name: dbProduct.name,
+      price: defaultItem.price,
+      image: getFeaturedProductImage(dbProduct),
+      description: dbProduct.description ?? defaultItem.description,
+      badge: defaultItem.badge,
+      availability: defaultItem.availability,
+    };
+  }
+  return defaultItem;
+});
+
+const featuredProductsList =
+  featuredProducts.length > 0
+    ? featuredProducts.map((prod, i) => ({
+        id: prod.id,
+        name: prod.name,
+        price: defaultBestSellers[i]?.price ?? "₱250.00",
+        image: getFeaturedProductImage(prod),
+        description:
+          prod.description ??
+          defaultBestSellers[i]?.description ??
+          "Fresh local cut prepared daily.",
+        category_name: "Fresh Cut",
+      }))
+    : defaultBestSellers.map((item) => ({
+        ...item,
+        category_name: "Fresh Cut",
+      }));
 
 function formatTagline(tagline: string): string {
   let formatted = tagline;
@@ -155,13 +239,13 @@ function formatTagline(tagline: string): string {
             <div class="about-section__image-container">
               <img
                 src="/images/about_photo.png"
-                alt="JEHMARP fresh local cuts and shop photo"
+                alt="JEHMARP local meatshop interior and storefront"
                 class="about-section__image"
               />
             </div>
             <div class="about-section__content">
               <h2 id="home-about" class="about-section__title">
-                THE MEATSHOP
+                The Meatshop
               </h2>
               {stringValue(about.content.summary) && (
                 <p class="about-section__summary">
@@ -190,38 +274,80 @@ function formatTagline(tagline: string): string {
           >
             <div class="mission-section__grid">
               <article class="mission-card mission-card--mission">
-                <h3 class="mission-card__heading">
-                  Mission
-                </h3>
-                <p class="mission-card__text">
-                  {stringValue(missionVisionCoreValues.content.mission) ??
-                    "Mission content is not available yet."}
-                </p>
+                <div class="mission-card__icon-wrapper">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="mission-card__icon"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="6" />
+                    <circle cx="12" cy="12" r="2" />
+                  </svg>
+                </div>
+                <h3 class="mission-card__heading">Mission</h3>
+                <MissionExpandableText
+                  text={
+                    stringValue(missionVisionCoreValues.content.mission) ?? ""
+                  }
+                  fallback="Mission content is not available yet."
+                />
               </article>
               <article class="mission-card mission-card--vision">
-                <h3 class="mission-card__heading">
-                  Vision
-                </h3>
-                <p class="mission-card__text">
-                  {stringValue(missionVisionCoreValues.content.vision) ??
-                    "Vision content is not available yet."}
-                </p>
+                <div class="mission-card__icon-wrapper">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="mission-card__icon"
+                  >
+                    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                </div>
+                <h3 class="mission-card__heading">Vision</h3>
+                <MissionExpandableText
+                  text={
+                    stringValue(missionVisionCoreValues.content.vision) ?? ""
+                  }
+                  fallback="Vision content is not available yet."
+                />
               </article>
               <article class="mission-card mission-card--values">
-                <h3 class="mission-card__heading">
-                  Core Values
-                </h3>
-                {coreValues.length > 0 ? (
-                  <ul class="mission-card__list">
-                    {coreValues.map((value) => (
-                      <li class="mission-card__list-item">{value}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p class="mission-card__text">
-                    Core values have not been added yet.
-                  </p>
-                )}
+                <div class="mission-card__icon-wrapper">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="28"
+                    height="28"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="mission-card__icon"
+                  >
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                </div>
+                <h3 class="mission-card__heading">Core Values</h3>
+                <MissionExpandableText
+                  text={coreValuesText ?? ""}
+                  fallback="Core values have not been added yet."
+                />
               </article>
             </div>
           </section>
@@ -229,6 +355,155 @@ function formatTagline(tagline: string): string {
       </div>
     )
   }
+
+  <div class="category-range-section">
+    <div class="home-container">
+      <section aria-labelledby="home-category-range">
+        <div class="category-range__header">
+          <h2 id="home-category-range" class="category-range__title">
+            Our Product Range
+          </h2>
+          <p class="category-range__subtitle">
+            At JEHMARP, we have a wide variety of options to suit different
+            cooking styles and preferences. Our collection includes:
+          </p>
+        </div>
+
+        <div class="category-range__grid">
+          <article class="category-range-card category-range-card--chicken">
+            <div class="category-range-card__image-container">
+              <img
+                src="/images/chicken_breast.png"
+                alt="Fresh Chicken Cuts"
+                class="category-range-card__image"
+                loading="lazy"
+              />
+            </div>
+            <div class="category-range-card__body">
+              <span class="category-range-card__tag">Fresh & Local Cut</span>
+              <h3 class="category-range-card__title">Chicken</h3>
+              <p class="category-range-card__desc">
+                From fresh whole chicken to prime cuts, ideal for daily family
+                meals.
+              </p>
+              <a
+                href={linkHref("/shop?category=chicken")}
+                class="category-range-card__button"
+              >
+                Show more
+              </a>
+            </div>
+          </article>
+
+          <article class="category-range-card category-range-card--pork">
+            <div class="category-range-card__image-container">
+              <img
+                src="/images/pork_belly.png"
+                alt="Premium Pork Cuts"
+                class="category-range-card__image"
+                loading="lazy"
+              />
+            </div>
+            <div class="category-range-card__body">
+              <span class="category-range-card__tag">Premium Choice Cut</span>
+              <h3 class="category-range-card__title">Pork</h3>
+              <p class="category-range-card__desc">
+                Juicy belly, chops, and ground pork carefully prepared for any
+                recipe.
+              </p>
+              <a
+                href={linkHref("/shop?category=pork")}
+                class="category-range-card__button"
+              >
+                Show more
+              </a>
+            </div>
+          </article>
+
+          <article class="category-range-card category-range-card--egg">
+            <div class="category-range-card__image-container">
+              <img
+                src="/images/fresh_eggs.png"
+                alt="Farm Fresh Eggs"
+                class="category-range-card__image"
+                loading="lazy"
+              />
+            </div>
+            <div class="category-range-card__body">
+              <span class="category-range-card__tag">Farm Fresh Daily</span>
+              <h3 class="category-range-card__title">Egg</h3>
+              <p class="category-range-card__desc">
+                Nutrient-rich, farm-fresh eggs gathered daily for top quality &
+                taste.
+              </p>
+              <a
+                href={linkHref("/shop?category=egg")}
+                class="category-range-card__button"
+              >
+                Show more
+              </a>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="best-sellers-section">
+    <div class="home-container">
+      <section aria-labelledby="home-best-sellers">
+        <div class="best-sellers__header">
+          <h2 id="home-best-sellers" class="best-sellers__title">
+            Best Sellers
+          </h2>
+          <p class="best-sellers__description">
+            Finding good meat shouldn't be a challenge. That's why JEHMARP makes
+            it simple and reliable. Our products are selected with care from
+            trusted local suppliers who share our commitment to quality. Each
+            item you see has been chosen for its freshness, taste, and
+            consistency so you get great results whether you're grilling,
+            roasting, stewing, or frying. We take great pride in offering fresh,
+            top-grade meat cuts that customers can trust daily.
+          </p>
+        </div>
+
+        <div class="best-sellers__grid">
+          {
+            bestSellersList.map((product) => (
+              <article class="best-seller-card">
+                <div class="best-seller-card__image-container">
+                  {product.badge && (
+                    <span class="best-seller-card__badge">{product.badge}</span>
+                  )}
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    class="best-seller-card__image"
+                    loading="lazy"
+                  />
+                </div>
+                <div class="best-seller-card__content">
+                  <span class="best-seller-card__price">{product.price}</span>
+                  <h3 class="best-seller-card__name">{product.name}</h3>
+                  <p class="best-seller-card__desc">{product.description}</p>
+                  <div class="best-seller-card__footer">
+                    <span class="best-seller-card__dot">○</span>
+                    <span>{product.availability}</span>
+                  </div>
+                </div>
+              </article>
+            ))
+          }
+        </div>
+
+        <div class="best-sellers__action">
+          <a href={linkHref("/shop")} class="best-sellers__button">
+            View all products
+          </a>
+        </div>
+      </section>
+    </div>
+  </div>
 
   {
     taglines && (
@@ -260,83 +535,105 @@ function formatTagline(tagline: string): string {
   {
     shopInfoSource && (
       <>
-        <div class="why-buy-section">
+        <div class="featured-products-section">
           <div class="home-container">
-            <section aria-labelledby="home-why-buy">
-              <h2
-                id="home-why-buy"
-                class="why-buy-section__title"
-              >
-                Why Choose JEHMARP
-              </h2>
-              <div class="why-buy-section__grid">
-                {storefrontBenefits.map((benefit) => {
-                  return (
-                    <div class={`why-buy-card ${benefit.class}`}>
-                      <div class="why-buy-card__content">
-                        <h3 class="why-buy-card__title">{benefit.title}</h3>
-                        <p class="why-buy-card__desc">{benefit.desc}</p>
+            <section aria-labelledby="home-featured-products">
+              <div class="featured-products__header">
+                <div>
+                  <h2
+                    id="home-featured-products"
+                    class="featured-products__title"
+                  >
+                    Featured Products
+                  </h2>
+                  <p class="featured-products__description">
+                    Handpicked fresh cuts, prepared daily by our expert butchers
+                    for top taste and quality.
+                  </p>
+                </div>
+                <a
+                  href={linkHref("/shop")}
+                  class="featured-products__header-link"
+                >
+                  Explore All Products →
+                </a>
+              </div>
+
+              <div class="featured-products__grid">
+                {featuredProductsList.map((product) => (
+                  <article class="featured-product-card">
+                    <div class="featured-product-card__image-container">
+                      {product.category_name && (
+                        <span class="featured-product-card__badge">
+                          {product.category_name}
+                        </span>
+                      )}
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        class="featured-product-card__image"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div class="featured-product-card__content">
+                      <span class="featured-product-card__price">
+                        {product.price}
+                      </span>
+                      <h3 class="featured-product-card__name">
+                        {product.name}
+                      </h3>
+                      <p class="featured-product-card__desc">
+                        {product.description}
+                      </p>
+                      <div class="featured-product-card__footer">
+                        <a
+                          href={linkHref(`/shop`)}
+                          class="featured-product-card__button"
+                        >
+                          Order Now
+                        </a>
                       </div>
                     </div>
-                  );
-                })}
+                  </article>
+                ))}
               </div>
             </section>
           </div>
         </div>
 
-        <div class="featured-products-section">
+        <div class="why-choose-banner-section">
           <div class="home-container">
-            <section aria-labelledby="home-featured-products">
-              <div class="featured-products__header">
-                <h2
-                  id="home-featured-products"
-                  class="featured-products__title"
-                >
-                  Featured products
-                </h2>
-                <a href={linkHref("/shop")} class="featured-products__link">
-                  Browse all products
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2.5"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <>
-                      <line x1="5" y1="12" x2="19" y2="12" />
-                      <polyline points="12 5 19 12 12 19" />
-                    </>
-                  </svg>
-                </a>
+            <section aria-labelledby="home-why-buy" class="why-choose-banner">
+              <div class="why-choose-banner__image-wrapper">
+                <img
+                  src="/images/why_choose_banner.png"
+                  alt="Why Choose JEHMARP - Prime Cuts & Quality Meat"
+                  class="why-choose-banner__image"
+                  loading="lazy"
+                />
               </div>
-              <div class="products-grid">
-                {featuredProducts.length > 0 ? (
-                  featuredProducts.map((product) => (
-                    <article class="product-card">
-                      <div class="product-card__image-container">
-                        <img
-                          src={getFeaturedProductImage(product)}
-                          alt={product.name}
-                          class="product-card__image"
-                        />
-                      </div>
-                      <div class="product-card__content">
-                        <h3 class="product-card__title">{product.name}</h3>
-                        <p class="product-card__description">
-                          {product.description ?? "Fresh, carefully prepared cuts available from the JEHMARP product catalog."}
-                        </p>
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <p class="empty-state">No active products are available yet.</p>
-                )}
+
+              <div class="why-choose-banner__content">
+                <h2 id="home-why-buy" class="why-choose-banner__title">
+                  Why Choose JEHMARP
+                </h2>
+
+                <div class="why-choose-banner__benefits">
+                  {storefrontBenefits.map((benefit) => (
+                    <div class="why-choose-benefit-pill">
+                      <div
+                        class="why-choose-benefit-pill__icon"
+                        set:html={benefit.icon}
+                      />
+                      <span class="why-choose-benefit-pill__title">
+                        {benefit.title}
+                      </span>
+                      <span class="why-choose-benefit-pill__desc">
+                        {benefit.desc}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
           </div>
@@ -345,104 +642,145 @@ function formatTagline(tagline: string): string {
         <div class="ordering-works-section">
           <div class="home-container">
             <section aria-labelledby="home-ordering-process">
-              <h2
-                id="home-ordering-process"
-                class="ordering-section__title"
-              >
-                How ordering works
-              </h2>
-              <div class="ordering-stepper">
-                {orderingSteps.map((step, index) => (
-                  <div class="stepper-step">
-                    <div class="stepper-step__number">0{index + 1}</div>
-                    <p class="stepper-step__text">{step}</p>
-                  </div>
-                ))}
+              <div class="ordering-works__header">
+                <h2 id="home-ordering-process" class="ordering-works__title">
+                  How Ordering Works (Cebu Only)
+                </h2>
+                <p class="ordering-works__description">
+                  Getting fresh local cuts delivered or ready for pickup is
+                  quick and straightforward. Follow these three simple steps to
+                  complete your order.
+                </p>
               </div>
-            </section>
-          </div>
-        </div>
+              <div class="ordering-stepper">
+                <div class="ordering-stepper__line" aria-hidden="true" />
 
-        <div class="store-details-section">
-          <div class="home-container">
-            <section aria-labelledby="home-store-details">
-              <h2
-                id="home-store-details"
-                class="store-details__title"
-              >
-                Store details
-              </h2>
-              <div class="store-details__grid">
-                {storeDetails.map((detail, index) => (
-                  <div class="detail-card">
-                    <div class="detail-card__icon">
-                      {index === 0 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                      )}
-                      {index === 1 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                        </svg>
-                      )}
-                      {index === 2 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                          <circle cx="12" cy="10" r="3" />
-                        </svg>
-                      )}
-                      {index === 3 && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                        </svg>
-                      )}
-                    </div>
-                    <h3 class="detail-card__label">{detail.label}</h3>
-                    <p class="detail-card__value">{detail.value}</p>
+                <div class="stepper-step">
+                  <div class="stepper-step__icon-node">
+                    <span class="stepper-step__badge">01</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="stepper-step__icon"
+                    >
+                      <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+                      <line x1="3" y1="6" x2="21" y2="6" />
+                      <path d="M16 10a4 4 0 0 1-8 0" />
+                    </svg>
                   </div>
-                ))}
+                  <div class="stepper-step__content">
+                    <h3 class="stepper-step__title">Select Your Cuts</h3>
+                    <p class="stepper-step__text">
+                      Choose your cuts and preferred quantities.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="stepper-step">
+                  <div class="stepper-step__icon-node">
+                    <span class="stepper-step__badge">02</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="stepper-step__icon"
+                    >
+                      <rect x="1" y="3" width="15" height="13" rx="2" />
+                      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+                      <circle cx="5.5" cy="18.5" r="2.5" />
+                      <circle cx="18.5" cy="18.5" r="2.5" />
+                    </svg>
+                  </div>
+                  <div class="stepper-step__content">
+                    <h3 class="stepper-step__title">Confirm Details</h3>
+                    <p class="stepper-step__text">
+                      Confirm pickup or delivery details with the shop.
+                    </p>
+                  </div>
+                </div>
+
+                <div class="stepper-step">
+                  <div class="stepper-step__icon-node">
+                    <span class="stepper-step__badge">03</span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="stepper-step__icon"
+                    >
+                      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                      <path d="m3.3 7 8.7 5 8.7-5" />
+                      <path d="M12 22V12" />
+                    </svg>
+                  </div>
+                  <div class="stepper-step__content">
+                    <h3 class="stepper-step__title">Enjoy Fresh Meat</h3>
+                    <p class="stepper-step__text">
+                      Receive fresh meat packed and ready for cooking.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="ordering-works__video-wrapper">
+                <div
+                  class="ordering-works__video-placeholder"
+                  role="img"
+                  aria-label="Video placeholder showing how ordering works"
+                >
+                  <div class="ordering-works__video-backdrop">
+                    <img
+                      src="/images/hero_carousel_2.jpg"
+                      alt="JEHMARP ordering process video thumbnail preview"
+                      class="ordering-works__video-bg-image"
+                      loading="lazy"
+                    />
+                    <div class="ordering-works__video-overlay" />
+                  </div>
+                  <div class="ordering-works__video-content">
+                    <button
+                      type="button"
+                      class="ordering-works__play-button"
+                      aria-label="Play video walkthrough"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="28"
+                        height="28"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        class="ordering-works__play-icon"
+                      >
+                        <polygon points="6 3 20 12 6 21 6 3" />
+                      </svg>
+                    </button>
+                    <span class="ordering-works__video-title">
+                      Watch How Ordering & Delivery Works
+                    </span>
+                    <span class="ordering-works__video-duration">
+                      01:30 Quick Overview
+                    </span>
+                  </div>
+                </div>
               </div>
             </section>
           </div>
@@ -498,4 +836,40 @@ function formatTagline(tagline: string): string {
       }
     });
   });
+
+  function initMissionTextExpand() {
+    document.querySelectorAll("[data-mission-text-expand]").forEach((wrap) => {
+      const text = wrap.querySelector(".mission-card__text");
+      const button = wrap.querySelector("[data-mission-text-toggle]");
+      if (
+        !(text instanceof HTMLElement) ||
+        !(button instanceof HTMLButtonElement)
+      ) {
+        return;
+      }
+
+      const isOverflowing = () => text.scrollHeight > text.clientHeight + 1;
+
+      const syncToggleVisibility = () => {
+        if (wrap.classList.contains("is-expanded")) {
+          button.hidden = false;
+          return;
+        }
+
+        button.hidden = !isOverflowing();
+      };
+
+      syncToggleVisibility();
+      window.addEventListener("resize", syncToggleVisibility);
+
+      button.addEventListener("click", () => {
+        const expanded = wrap.classList.toggle("is-expanded");
+        button.textContent = expanded ? "View less" : "View more";
+        button.setAttribute("aria-expanded", String(expanded));
+        syncToggleVisibility();
+      });
+    });
+  }
+
+  initMissionTextExpand();
 </script>

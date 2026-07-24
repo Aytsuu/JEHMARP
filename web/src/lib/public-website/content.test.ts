@@ -66,6 +66,7 @@ describe("public product content loading", () => {
           name: "Chicken Breast",
           description: null,
           image_path: null,
+          category: "chicken",
         },
       ],
       error: null,
@@ -86,6 +87,7 @@ describe("public product content loading", () => {
 
     expect(mocks.createSupabasePublicClient).toHaveBeenCalledTimes(1);
     expect(from).toHaveBeenCalledWith("product");
+    expect(select).toHaveBeenCalledWith("id, name, description, image_path, category");
     expect(limit).toHaveBeenCalledWith(1);
     expect(products).toEqual([
       {
@@ -93,6 +95,7 @@ describe("public product content loading", () => {
         name: "Chicken Breast",
         description: null,
         image_path: null,
+        category: "chicken",
       },
     ]);
   });

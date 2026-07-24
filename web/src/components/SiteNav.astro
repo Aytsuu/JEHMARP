@@ -124,15 +124,21 @@ const navItems = [
 
 <script>
   import { initSiteNavMobileMenu } from "@/lib/client/site-nav-mobile-menu";
+  import { initPublicSiteHeaderHeight } from "@/lib/client/public-site-header-height";
 
-  document.addEventListener("DOMContentLoaded", initSiteNavMobileMenu);
-  document.addEventListener("astro:after-swap", initSiteNavMobileMenu);
+  function initSiteNav() {
+    initSiteNavMobileMenu();
+    initPublicSiteHeaderHeight();
+  }
+
+  document.addEventListener("DOMContentLoaded", initSiteNav);
+  document.addEventListener("astro:after-swap", initSiteNav);
 
   if (
     document.readyState === "complete" ||
     document.readyState === "interactive"
   ) {
-    initSiteNavMobileMenu();
+    initSiteNav();
   }
 </script>
 
@@ -147,6 +153,10 @@ const navItems = [
 
       window.addEventListener("resize", () => {
         navbarHeight = navbar.getBoundingClientRect().height;
+        document.documentElement.style.setProperty(
+          "--public-site-header-height",
+          `${navbar.offsetHeight}px`,
+        );
       });
 
       window.addEventListener("scroll", () => {

@@ -1,0 +1,29 @@
+---
+type Props = {
+  text: string;
+  fallback: string;
+};
+
+const { text, fallback } = Astro.props;
+const content = text.trim().length > 0 ? text : fallback;
+const textId = `mission-text-${crypto.randomUUID()}`;
+---
+
+<div class="mission-card__text-wrap" data-mission-text-expand>
+  <p
+    id={textId}
+    class="mission-card__text mission-card__text--clamped"
+  >
+    {content}
+  </p>
+  <button
+    type="button"
+    class="mission-card__toggle"
+    data-mission-text-toggle
+    aria-expanded="false"
+    aria-controls={textId}
+    hidden
+  >
+    View more
+  </button>
+</div>

@@ -6,6 +6,14 @@ import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'astro/config';
 
+const transitionVirtualModules = [
+  'astro/virtual-modules/transitions.js',
+  'astro/virtual-modules/transitions-events.js',
+  'astro/virtual-modules/transitions-router.js',
+  'astro/virtual-modules/transitions-swap-functions.js',
+  'astro/virtual-modules/transitions-types.js',
+];
+
 // https://astro.build/config
 export default defineConfig({
   output: 'server',
@@ -18,15 +26,32 @@ export default defineConfig({
     port: 4321
   },
   vite: {
-    plugins: [tailwindcss()],
+    plugins: [
+      tailwindcss(),
+      {
+        name: 'jehmarp-optimize-ssr-deps',
+        configEnvironment(name) {
+          if (name === 'client') {
+            return;
+          }
+
+          return {
+            optimizeDeps: {
+              include: [
+                ...transitionVirtualModules,
+                '@supabase/ssr',
+                '@supabase/supabase-js',
+                'zod',
+              ],
+            },
+          };
+        },
+      },
+    ],
     optimizeDeps: {
       include: [
         'recharts',
-        'astro/virtual-modules/transitions.js',
-        'astro/virtual-modules/transitions-events.js',
-        'astro/virtual-modules/transitions-router.js',
-        'astro/virtual-modules/transitions-swap-functions.js',
-        'astro/virtual-modules/transitions-types.js',
+        ...transitionVirtualModules,
       ],
     },
     resolve: {
