@@ -1811,6 +1811,20 @@
     -webkit-overflow-scrolling: touch;
   }
 
+  .admin-notifications-page[data-admin-notifications-page-scroll-parent="true"] {
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-notifications-page[data-admin-notifications-page-scroll-parent="true"] .admin-notifications-page__inner {
+    flex: none;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
   .admin-notifications-page__header {
     margin-bottom: 1.25rem;
   }
@@ -2706,6 +2720,80 @@
   .dashboard-interactive-table__footer .table-pagination {
     margin-top: 0;
     padding: 0.75rem var(--dashboard-page-inset-x);
+  }
+
+  .dashboard-interactive-table.customer-record-table {
+    --customer-record-table-row-height: 3rem;
+    --customer-record-table-visible-rows: 10;
+    --customer-record-table-fixed-height: calc(
+      var(--customer-record-table-row-height) * (var(--customer-record-table-visible-rows) + 1)
+    );
+    gap: 1.25rem;
+    row-gap: 1.25rem;
+    height: auto;
+    min-height: 0;
+    grid-template-rows: auto auto auto;
+  }
+
+  .dashboard-interactive-table.customer-record-table > .table-filters,
+  .dashboard-interactive-table.customer-record-table > .order-management-toolbar {
+    margin-bottom: 0;
+    padding: 0;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__surface {
+    flex: none;
+    height: var(--customer-record-table-fixed-height);
+    min-height: var(--customer-record-table-fixed-height);
+    max-height: var(--customer-record-table-fixed-height);
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board {
+    height: 100%;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board > table,
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board > .dashboard-table {
+    height: 100%;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board thead {
+    flex-shrink: 0;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board tbody {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__footer {
+    min-height: 0;
+    border-top: 0;
+    background: transparent;
+    align-self: stretch;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__footer .table-pagination {
+    padding: 0;
+  }
+
+  .dashboard-interactive-table.customer-record-table .order-management-toolbar__document-menu {
+    min-height: 2.35rem;
   }
 
   .sr-only {
@@ -6828,6 +6916,148 @@
     }
   }
 
+  #customer-record-payment-sheet .customer-payment-sheet__orders-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    padding: 1rem 1.1rem;
+    overflow: hidden;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__orders-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__orders-toggle:focus-visible {
+    outline: 2px solid rgba(102, 24, 24, 0.35);
+    outline-offset: 2px;
+    border-radius: 0.375rem;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__orders-title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #374151;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__orders-chevron {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    color: #6b7280;
+    transition: transform 0.2s ease;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__orders-card.is-collapsed .customer-payment-sheet__orders-chevron {
+    transform: rotate(-90deg);
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__orders-panel {
+    max-height: 14rem;
+    margin-top: 0.85rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__orders-card.is-collapsed .customer-payment-sheet__orders-panel {
+    display: none;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__empty {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__selected {
+    display: grid;
+    gap: 0;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__order-row {
+    padding: 0.7rem 0;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__order-row:first-child {
+    padding-top: 0;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__order-row:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__order-top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__order-code {
+    font-weight: 600;
+    color: #111827;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__order-amount {
+    font-weight: 600;
+    color: #111827;
+    white-space: nowrap;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__order-date {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__footer-total {
+    display: flex;
+    min-width: 10rem;
+    flex-direction: column;
+    justify-content: center;
+    gap: 0.25rem;
+    margin-right: auto;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__footer-total span {
+    color: #6b7280;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  #customer-record-payment-sheet .customer-payment-sheet__footer-total strong {
+    color: #111827;
+    font-size: 1.1rem;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
   .order-create-form__customer-grid {
     grid-template-columns: 1fr !important;
   }
@@ -7171,6 +7401,8 @@
     border-radius: 0.375rem;
     font-weight: 600;
     font-size: 0.85rem;
+    text-transform: none;
+    letter-spacing: normal;
     cursor: pointer;
     transition: background-color 0.2s ease;
   }
@@ -7755,6 +7987,33 @@
   .dashboard-interactive-table .dashboard-table th:first-child,
   .dashboard-interactive-table .dashboard-table td:first-child {
     padding-left: var(--dashboard-page-inset-x);
+  }
+
+  .dashboard-interactive-table .dashboard-table th.dashboard-table__select-column,
+  .dashboard-interactive-table .dashboard-table td.dashboard-table__select-column {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    max-width: 2.75rem;
+    padding-left: 0.75rem;
+    padding-right: 0.5rem;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .dashboard-table__select-all,
+  .dashboard-table__row-select {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+  }
+
+  .dashboard-table__select-column input[type="checkbox"] {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--color-brand-red);
+    cursor: pointer;
   }
 
   .dashboard-table .table-cell-trigger {

@@ -12,17 +12,49 @@ const bulkPdfActionMap: Record<string, BulkOrderPdfKind> = {
   "bulk-order-slip-pdf": "order-slip",
 };
 
+export const ORDER_SELECTION_CHANGED_EVENT = "dashboard:order-selection-changed";
+
+const bulkPdfControllers = new WeakMap<HTMLElement, { refresh: () => void }>();
+
 export type OrderBulkPdfInitOptions = {
   sectionSelector: string;
   menuTriggerSelector: string;
 };
+
+export function syncOrderRowSelectionFromSelectAll(
+  section: ParentNode,
+  selectAll: HTMLInputElement,
+) {
+  const shouldSelectAll = selectAll.checked;
+
+  section.querySelectorAll<HTMLInputElement>("[data-order-row-checkbox]:not(:disabled)").forEach(
+    (checkbox) => {
+      checkbox.checked = shouldSelectAll;
+    },
+  );
+
+  selectAll.indeterminate = false;
+}
+
+function notifyOrderSelectionChanged(section: HTMLElement) {
+  section.dispatchEvent(
+    new CustomEvent(ORDER_SELECTION_CHANGED_EVENT, { bubbles: true }),
+  );
+}
 
 export function initOrderBulkPdf({
   sectionSelector,
   menuTriggerSelector,
 }: OrderBulkPdfInitOptions) {
   const section = document.querySelector<HTMLElement>(sectionSelector);
-  if (!section || section.dataset.bulkPdfInitialized === "true") return;
+  if (!section) return;
+
+  const existingController = bulkPdfControllers.get(section);
+  if (section.dataset.bulkPdfInitialized === "true") {
+    existingController?.refresh();
+    return;
+  }
+
   section.dataset.bulkPdfInitialized = "true";
   const activeSection = section;
 
@@ -32,7 +64,7 @@ export function initOrderBulkPdf({
 
   function getRowCheckboxes() {
     return Array.from(
-      activeSection.querySelectorAll<HTMLInputElement>("[data-order-row-checkbox]"),
+      activeSection.querySelectorAll<HTMLInputElement>("[data-order-row-checkbox]:not(:disabled)"),
     );
   }
 
@@ -65,6 +97,12 @@ export function initOrderBulkPdf({
     selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < rowCheckboxes.length;
   }
 
+  function refreshSelectionUi() {
+    updateDocumentMenuState();
+    updateSelectAllState();
+    notifyOrderSelectionChanged(activeSection);
+  }
+
   function resetSelection() {
     getRowCheckboxes().forEach((checkbox) => {
       checkbox.checked = false;
@@ -77,7 +115,7 @@ export function initOrderBulkPdf({
     }
 
     closeActiveTableActionMenu();
-    updateDocumentMenuState();
+    refreshSelectionUi();
   }
 
   function openBulkPdf(kind: BulkOrderPdfKind) {
@@ -98,18 +136,13 @@ export function initOrderBulkPdf({
     if (!(target instanceof HTMLInputElement)) return;
 
     if (target.matches("[data-order-row-checkbox]")) {
-      updateDocumentMenuState();
-      updateSelectAllState();
+      refreshSelectionUi();
       return;
     }
 
     if (target.matches("[data-order-select-all]")) {
-      const shouldSelectAll = target.checked;
-      getRowCheckboxes().forEach((checkbox) => {
-        checkbox.checked = shouldSelectAll;
-      });
-      target.indeterminate = false;
-      updateDocumentMenuState();
+      syncOrderRowSelectionFromSelectAll(activeSection, target);
+      refreshSelectionUi();
     }
   });
 
@@ -129,8 +162,8 @@ export function initOrderBulkPdf({
 
   document.addEventListener("dashboard:interactive-table-updated", resetSelection);
 
-  updateDocumentMenuState();
-  updateSelectAllState();
+  bulkPdfControllers.set(activeSection, { refresh: refreshSelectionUi });
+  refreshSelectionUi();
 }
 
 export function initAdminOrderBulkPdf() {

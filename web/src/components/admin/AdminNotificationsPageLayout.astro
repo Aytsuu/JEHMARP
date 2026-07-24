@@ -23,6 +23,7 @@ type Props = {
   feedback?: AdminActionFeedback;
   dashboardData?: AdminDashboardData;
   contentMaxWidth?: string;
+  scrollOnParent?: boolean;
 };
 
 const {
@@ -35,6 +36,7 @@ const {
   feedback,
   dashboardData,
   contentMaxWidth = "48rem",
+  scrollOnParent = false,
 } = Astro.props;
 const headingId = `${heading
   .toLowerCase()
@@ -80,6 +82,7 @@ const hasHeadingTitle = Astro.slots.has("heading-title");
     data-dashboard-record-page
     data-admin-record-page
     data-admin-notifications-page
+    data-admin-notifications-page-scroll-parent={scrollOnParent ? "true" : undefined}
   >
     <div
       class="admin-notifications-page__inner"

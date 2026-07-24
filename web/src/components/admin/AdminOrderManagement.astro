@@ -16,6 +16,7 @@ import {
   formatDate,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { formatOrderCode } from "@/lib/order-detail-nav";
 
 type Props = {
   data: AdminOrderManagementData;
@@ -566,6 +567,7 @@ function pendingCustomerOrderLabel(count: number) {
                 </label>
               </th>
               <th scope="col">Date Created</th>
+              <th scope="col">Order ID</th>
               <th scope="col">Customer</th>
               <th scope="col">Source</th>
               <th scope="col">Order Status</th>
@@ -578,7 +580,7 @@ function pendingCustomerOrderLabel(count: number) {
           <tbody>
             {orderRows.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={9}
+                colspan={10}
                 message="No orders match the selected filters."
               />
             ) : orderRows.map((order) => {
@@ -596,6 +598,7 @@ function pendingCustomerOrderLabel(count: number) {
                     </label>
                   </td>
                   <td>{formatDate(order.created_at)}</td>
+                  <td>{formatOrderCode(order.id)}</td>
                   <td class="dashboard-table__cell--truncate">
                     <span class="order-customer-cell">
                       <span class="order-customer-cell__name">{order.customer_label}</span>
@@ -681,6 +684,7 @@ function pendingCustomerOrderLabel(count: number) {
               <span class="table-skeleton-block table-skeleton-block--short"></span>
             </th>
             <th scope="col">Date Created</th>
+            <th scope="col">Order ID</th>
             <th scope="col">Customer</th>
             <th scope="col">Source</th>
             <th scope="col">Order Status</th>
@@ -695,6 +699,7 @@ function pendingCustomerOrderLabel(count: number) {
             <tr>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
@@ -1292,32 +1297,6 @@ function pendingCustomerOrderLabel(count: number) {
 
   .order-management-toolbar__document-menu {
     min-height: 2.35rem;
-  }
-
-  .dashboard-table__select-column {
-    width: 2.75rem;
-    min-width: 2.75rem;
-    max-width: 2.75rem;
-    padding-left: 0.75rem;
-    padding-right: 0.5rem;
-    text-align: center;
-    vertical-align: middle;
-  }
-
-  .dashboard-table__select-all,
-  .dashboard-table__row-select {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-  }
-
-  .dashboard-table__select-column input[type="checkbox"] {
-    width: 1rem;
-    height: 1rem;
-    margin: 0;
-    accent-color: var(--color-brand-red);
-    cursor: pointer;
   }
 
   .order-status-cell {

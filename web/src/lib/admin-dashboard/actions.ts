@@ -189,6 +189,24 @@ export type AdminAction =
       };
     }
   | {
+      type: "revoke-customer-agent-promotion";
+      customerId: string;
+    }
+  | {
+      type: "apply-customer-orders-payment";
+      payload: {
+        customer_id: string;
+        order_ids: string[];
+        amount: number;
+        payment_method: PaymentMethod;
+        payment_terms: PaymentTerms;
+        payment_date: string;
+        recorded_by: string;
+        reference_number: string | null;
+        notes: string | null;
+      };
+    }
+  | {
       type: "update-agent";
       agentId: string;
       payload: ReturnType<typeof parseAgentProfileUpdateFields>;
@@ -700,6 +718,9 @@ export async function executeAdminAction(
     case "promote-customer-to-agent":
       await executeCustomerPromotionToAgent(action.customerId, action.account);
       return;
+    case "revoke-customer-agent-promotion":
+      await executeRevokeCustomerAgentPromotion(action.customerId);
+      return;
     case "update-agent":
       await executeAgentProfileUpdate(createSupabaseAdminClient(), action.agentId, action.payload);
       return;
@@ -849,6 +870,9 @@ export async function executeAdminAction(
       return;
     case "apply-customer-payment":
       await executeCustomerPaymentDistribution(action.payload);
+      return;
+    case "apply-customer-orders-payment":
+      await executeCustomerOrdersPayment(supabase, action);
       return;
     case "create-customer-registration-link":
       await executeCustomerRegistrationLinkCreate(action.payload);
@@ -1038,6 +1062,11 @@ function parseAdminActionFormDataOrThrow(
         type: "promote-customer-to-agent",
         customerId: uuidSchema.parse(requiredString(formData, "customerId")),
         account: parsePromoteCustomerAccountPayload(formData),
+      });
+    case "revoke-customer-agent-promotion":
+      return success({
+        type: "revoke-customer-agent-promotion",
+        customerId: uuidSchema.parse(requiredString(formData, "customerId")),
       });
     case "update-agent":
       return success({
@@ -1264,6 +1293,21 @@ function parseAdminActionFormDataOrThrow(
         type: "apply-customer-payment",
         payload: {
           customer_id: uuidSchema.parse(requiredString(formData, "customerId")),
+          amount: positiveNumber(formData, "amount"),
+          payment_method: enumValue(formData, "paymentMethod", paymentMethods),
+          payment_terms: enumValue(formData, "paymentTerms", paymentTermsOptions),
+          payment_date: requiredDateTimeFromFormData(formData, "paymentDate", "paymentTime"),
+          recorded_by: adminUserId,
+          reference_number: optionalString(formData, "referenceNumber"),
+          notes: optionalString(formData, "notes"),
+        },
+      });
+    case "apply-customer-orders-payment":
+      return success({
+        type: "apply-customer-orders-payment",
+        payload: {
+          customer_id: uuidSchema.parse(requiredString(formData, "customerId")),
+          order_ids: requiredUuidList(formData, "orderId", "At least one order is required."),
           amount: positiveNumber(formData, "amount"),
           payment_method: enumValue(formData, "paymentMethod", paymentMethods),
           payment_terms: enumValue(formData, "paymentTerms", paymentTermsOptions),
@@ -2486,6 +2530,209 @@ async function executeCustomerPaymentDistribution(
   }
 }
 
+async function executeRevokeCustomerAgentPromotion(customerId: string) {
+  const adminClient = createSupabaseAdminClient();
+  const { data: customer, error: customerError } = await adminClient
+    .from("customer")
+    .select("id, promoted_to_agent_id")
+    .eq("id", customerId)
+    .maybeSingle();
+
+  if (customerError) {
+    throw new Error("Unable to load customer promotion status.");
+  }
+
+  const agentId = typeof customer?.promoted_to_agent_id === "string"
+    ? customer.promoted_to_agent_id
+    : null;
+
+  if (!agentId) {
+    throw new Error("This customer is not promoted to an agent.");
+  }
+
+  const { data: agent, error: agentError } = await adminClient
+    .from("agent")
+    .select("id, promoted_from_customer_id")
+    .eq("id", agentId)
+    .maybeSingle();
+
+  if (agentError || !agent) {
+    throw new Error("Unable to load linked agent record.");
+  }
+
+  if (agent.promoted_from_customer_id !== customerId) {
+    throw new Error("This customer is not linked to a promoted agent record.");
+  }
+
+  const { error: detachOrdersError } = await adminClient
+    .from("order")
+    .update({
+      agent_id: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("customer_id", customerId)
+    .eq("order_status", "processing");
+
+  if (detachOrdersError) {
+    throw new Error("Unable to detach agent from active customer orders.");
+  }
+
+  const { error: customerUpdateError } = await adminClient
+    .from("customer")
+    .update({
+      promoted_to_agent_id: null,
+      promoted_to_agent_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", customerId);
+
+  if (customerUpdateError) {
+    throw new Error("Unable to clear customer promotion status.");
+  }
+
+  const { error: agentUpdateError } = await adminClient
+    .from("agent")
+    .update({
+      status: "inactive",
+      promoted_from_customer_id: null,
+      promoted_from_customer_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", agentId);
+
+  if (agentUpdateError) {
+    throw new Error("Unable to deactivate promoted agent record.");
+  }
+}
+
+async function executeCustomerOrdersPayment(
+  supabase: SupabaseServerClient,
+  action: Extract<AdminAction, { type: "apply-customer-orders-payment" }>,
+) {
+  assertPositivePaymentAmount(action.payload.amount);
+
+  const adminClient = createSupabaseAdminClient();
+  const balances = await loadCustomerOrderPaymentBalances(
+    adminClient,
+    action.payload.customer_id,
+    action.payload.order_ids,
+  );
+  const payableBalances = balances.filter((balance) => balance.balance > 0);
+
+  if (payableBalances.length === 0) {
+    throw new Error("Selected orders do not have remaining balances.");
+  }
+
+  const minimumAmount = minimumPaymentAmountForSelectedBalances(
+    payableBalances.map((balance) => balance.balance),
+  );
+  const maximumAmount = roundCurrency(
+    payableBalances.reduce((total, balance) => total + balance.balance, 0),
+  );
+
+  if (action.payload.amount < minimumAmount - 0.005) {
+    throw new Error(
+      `Payment amount must be at least ${minimumAmount.toFixed(2)} so the last selected order receives a payment.`,
+    );
+  }
+
+  if (action.payload.amount > maximumAmount + 0.005) {
+    throw new Error("Payment amount cannot exceed selected order balances.");
+  }
+
+  let remainingAmount = roundCurrency(action.payload.amount);
+
+  for (const { orderId, balance } of payableBalances) {
+    if (remainingAmount <= 0) {
+      break;
+    }
+
+    const amount = roundCurrency(Math.min(remainingAmount, balance));
+
+    if (amount <= 0) {
+      continue;
+    }
+
+    await executeTableInsert(supabase, "payment", {
+      order_id: orderId,
+      amount,
+      payment_method: action.payload.payment_method,
+      payment_terms: action.payload.payment_terms,
+      payment_date: action.payload.payment_date,
+      recorded_by: action.payload.recorded_by,
+      reference_number: action.payload.reference_number,
+      notes: action.payload.notes,
+    });
+    await ensureSalesInvoiceWhenOrderFullyPaid(supabase, orderId);
+    await markAdminRecordRead(
+      supabase,
+      "order",
+      orderId,
+      adminReadPayload(action.payload.recorded_by),
+    );
+
+    remainingAmount = roundCurrency(remainingAmount - amount);
+  }
+}
+
+async function loadCustomerOrderPaymentBalances(
+  adminClient: SupabaseAdminClient,
+  customerId: string,
+  orderIds: string[],
+) {
+  const uniqueOrderIds = [...new Set(orderIds)];
+  const { data: orders, error } = await adminClient
+    .from("order")
+    .select("id, customer_id, payment_status")
+    .in("id", uniqueOrderIds);
+
+  if (error) {
+    throw new Error("Unable to verify selected customer orders.");
+  }
+
+  const orderById = new Map(
+    ((orders ?? []) as Array<{
+      id?: unknown;
+      customer_id?: unknown;
+      payment_status?: unknown;
+    }>).flatMap((order) => {
+      return typeof order.id === "string"
+        ? [[order.id, order]]
+        : [];
+    }),
+  );
+
+  return Promise.all(uniqueOrderIds.map(async (orderId) => {
+    const order = orderById.get(orderId);
+
+    if (!order || order.customer_id !== customerId) {
+      throw new Error("One or more selected orders do not belong to this customer.");
+    }
+
+    if (order.payment_status === "paid") {
+      throw new Error("Paid orders cannot receive payments.");
+    }
+
+    const { data: balance, error: balanceError } = await adminClient.rpc(
+      "compute_payment_balance",
+      { target_order_id: orderId },
+    );
+
+    if (balanceError) {
+      throw new Error("Unable to verify selected order balances.");
+    }
+
+    const numericBalance = Number(balance ?? 0);
+
+    return {
+      orderId,
+      balance: Number.isFinite(numericBalance)
+        ? roundCurrency(Math.max(numericBalance, 0))
+        : 0,
+    };
+  }));
+}
+
 async function executeAdminAgentPaymentDistribution(
   supabase: SupabaseServerClient,
   action: Extract<AdminAction, { type: "record-admin-agent-payment-distribution" }>,
@@ -3651,6 +3898,8 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Agent account created.";
     case "promote-customer-to-agent":
       return "Customer promoted to agent.";
+    case "revoke-customer-agent-promotion":
+      return "Customer promotion revoked.";
     case "update-agent":
       return "Agent updated.";
     case "create-order":
@@ -3695,6 +3944,8 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Customer payments distributed.";
     case "apply-customer-payment":
       return "Customer payment distributed.";
+    case "apply-customer-orders-payment":
+      return "Payment distributed to selected orders.";
     case "create-customer-registration-link":
       return "Registration link created and sent to selected agents.";
     case "save-invoice":
