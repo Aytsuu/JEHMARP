@@ -16,17 +16,24 @@ jobs:
     name: Smoke test production
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    environment: production
 
     env:
       PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
     steps:
-      - name: Require production base URL
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve production base URL
         shell: bash
         run: |
           set -euo pipefail
-          : "${PRODUCTION_BASE_URL:?PRODUCTION_BASE_URL secret is required}"
-          echo "PRODUCTION_BASE_URL=${PRODUCTION_BASE_URL%/}" >> "$GITHUB_ENV"
+          PRODUCTION_BASE_URL="$(bash .github/scripts/resolve-production-base-url.sh)"
+          echo "Using production base URL: ${PRODUCTION_BASE_URL}"
+          echo "PRODUCTION_BASE_URL=${PRODUCTION_BASE_URL}" >> "$GITHUB_ENV"
 
       - name: Check public pages
         shell: bash
