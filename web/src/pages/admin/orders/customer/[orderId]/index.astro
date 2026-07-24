@@ -91,7 +91,9 @@ if (!order) {
   return Astro.redirect("/admin/orders", 302);
 }
 
-type CustomerOrderItem = NonNullable<typeof order>["customer_order_item"][number];
+type CustomerOrderItem = NonNullable<
+  typeof order
+>["customer_order_item"][number];
 
 await markAdminOrderReadIfUnread(Astro, orderId, adminRoute.userId);
 
@@ -102,10 +104,10 @@ const hiddenInlineValidationErrors = new Set([
 ]);
 const feedback =
   rawFeedback.status === "Order marked as read." ||
-    rawFeedback.status === "Commission updated." ||
-    rawFeedback.status === "Order notes saved." ||
-    rawFeedback.status === "Order status updated." ||
-    (rawFeedback.error && hiddenInlineValidationErrors.has(rawFeedback.error))
+  rawFeedback.status === "Commission updated." ||
+  rawFeedback.status === "Order notes saved." ||
+  rawFeedback.status === "Order status updated." ||
+  (rawFeedback.error && hiddenInlineValidationErrors.has(rawFeedback.error))
     ? {
         ...rawFeedback,
         status:
@@ -116,7 +118,8 @@ const feedback =
             ? undefined
             : rawFeedback.status,
         error:
-          rawFeedback.error && hiddenInlineValidationErrors.has(rawFeedback.error)
+          rawFeedback.error &&
+          hiddenInlineValidationErrors.has(rawFeedback.error)
             ? undefined
             : rawFeedback.error,
       }
@@ -153,9 +156,7 @@ const paymentOrderTotal = order.customer_order_item.reduce((total, item) => {
   return total + item.final_quantity * item.unit_price;
 }, 0);
 const isAgentLinkedOrder = Boolean(
-  order.agent_id ||
-  order.parent_order_id ||
-  totalCommission > 0,
+  order.agent_id || order.parent_order_id || totalCommission > 0,
 );
 const commissionAdjustedOrderTotal = orderReceivableTotal(
   order,
@@ -167,20 +168,33 @@ const paymentFormOrderTotal = isAgentLinkedOrder
   : paymentOrderTotal;
 const paymentFormBalance = Math.max(paymentFormOrderTotal - paidTotal, 0);
 const canCreatePaymentRecord = paymentFormBalance > 0;
-const receivable = isAgentLinkedOrder ? commissionAdjustedOrderTotal : paymentOrderTotal;
+const receivable = isAgentLinkedOrder
+  ? commissionAdjustedOrderTotal
+  : paymentOrderTotal;
 const showOrigOrderTotal =
   isAgentLinkedOrder && commissionAdjustedOrderTotal < paymentOrderTotal;
 const balanceDue = paymentFormBalance;
 const canEditInvoiceQuantities = hasSalesInvoice;
 const distributionConversionAgentId = orderDistributionConversionAgentId(order);
 const distributionConversionBlockReason =
-  getCustomerOrderDistributionConversionBlockReason(order, distributionConversionAgentId);
+  getCustomerOrderDistributionConversionBlockReason(
+    order,
+    distributionConversionAgentId,
+  );
 const distributionConversionBlockMessage =
-  customerOrderDistributionConversionBlockMessage(distributionConversionBlockReason);
+  customerOrderDistributionConversionBlockMessage(
+    distributionConversionBlockReason,
+  );
 const canConvertToDistributionOrder =
-  canConvertPromotedCustomerOrderToDistribution(order, distributionConversionAgentId);
+  canConvertPromotedCustomerOrderToDistribution(
+    order,
+    distributionConversionAgentId,
+  );
 const showDistributionConversionPrompt =
-  shouldShowCustomerOrderDistributionConversionCard(order, distributionConversionAgentId);
+  shouldShowCustomerOrderDistributionConversionCard(
+    order,
+    distributionConversionAgentId,
+  );
 const paymentDateDefault = manilaDateInputValue();
 const paymentTimeDefault = manilaTimeInputValue();
 const availableOrderDetailTabs = orderDetailTabIds;
@@ -213,14 +227,11 @@ const salesInvoicePdfFileName = invoice
   : null;
 const commissionProjectionTrigger = Boolean(
   order.agent_id ||
-    order.parent_order_id ||
-    order.customer?.promoted_to_agent_id,
+  order.parent_order_id ||
+  order.customer?.promoted_to_agent_id,
 );
 
-function projectedItemCommission(
-  item: CustomerOrderItem,
-  quantity: number,
-) {
+function projectedItemCommission(item: CustomerOrderItem, quantity: number) {
   if (item.agent_commission_amount > 0) {
     return Math.max(item.agent_commission_amount, 0);
   }
@@ -288,7 +299,10 @@ const customerViewHref = order.customer?.id
 const customerAddress = order.customer?.address ?? "No address on file";
 const customerPhone = order.customer?.phone_number ?? "No contact number";
 const customerEmail = order.customer?.email ?? "No email address";
-const orderedByAgent = order.parent_order_id && !order.converted_at ? order.parent_order?.agent ?? null : null;
+const orderedByAgent =
+  order.parent_order_id && !order.converted_at
+    ? (order.parent_order?.agent ?? null)
+    : null;
 const orderedByAgentDisplayName =
   orderedByAgent?.display_name ?? "Agent details unavailable";
 const orderedByAgentPhone = orderedByAgent?.contact ?? "No contact number";
@@ -352,16 +366,17 @@ const backLabel = backHref.startsWith("/admin/customers/")
   : backHref.startsWith("/admin/orders/agent/")
     ? "Back to distribution order"
     : "Back to orders";
-const parentAgentOrder = order.parent_order_id && !order.converted_at
-  ? await loadAdminAgentOrder(order.parent_order_id)
-  : null;
+const parentAgentOrder =
+  order.parent_order_id && !order.converted_at
+    ? await loadAdminAgentOrder(order.parent_order_id)
+    : null;
 const orderNavigationSource = parentAgentOrder
   ? parentAgentOrder.customer_order.filter(isAdminOrderDetailNavOrder)
   : order.parent_order_id
     ? dashboardData.orders.filter(
         (entry) =>
-          entry.parent_order_id === order.parent_order_id
-          && isAdminOrderDetailNavOrder(entry),
+          entry.parent_order_id === order.parent_order_id &&
+          isAdminOrderDetailNavOrder(entry),
       )
     : dashboardData.orders.filter(isAdminOrderDetailNavOrder);
 const orderNavigationEntries = buildOrderDetailNavEntries({
@@ -387,7 +402,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
   >
     <aside class="order-detail-sidebar">
       <div class="order-sidebar-header">
-        <p class="order-detail-eyebrow">Order / Order Details</p>
+        <p class="order-detail-eyebrow">Orders / Order Details</p>
 
         <div class="order-summary-top">
           <div class="order-summary-top__main">
@@ -397,11 +412,9 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               <OrderDetailNav
                 currentCode={orderCode}
                 entries={orderNavigationEntries}
-                menuLabel={
-                  parentAgentOrder
-                    ? "Other customer orders in this distribution order"
-                    : "Other orders"
-                }
+                menuLabel={parentAgentOrder
+                  ? "Other customer orders in this distribution order"
+                  : "Other orders"}
               />
               <p>{formatOrderSource(order.source)}</p>
             </div>
@@ -448,7 +461,11 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                 <div class="order-information__item">
                   <dt>Commission</dt>
                   <dd>
-                    <form method="post" class="order-commission-form" data-astro-reload>
+                    <form
+                      method="post"
+                      class="order-commission-form"
+                      data-astro-reload
+                    >
                       <input
                         type="hidden"
                         name="action"
@@ -482,7 +499,9 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                 }
               </dd>
             </div>
-            <div class="order-information__item order-information__item--balance-due">
+            <div
+              class="order-information__item order-information__item--balance-due"
+            >
               <dt>Balance due</dt>
               <dd>{formatCurrency(balanceDue)}</dd>
             </div>
@@ -503,25 +522,25 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                 customers status, ready for distribution to the agent's
                 customers.
               </p>
-              {
-                canConvertToDistributionOrder ? (
-                  <form method="post" data-astro-reload>
-                    <input
-                      type="hidden"
-                      name="action"
-                      value="convert-customer-order-to-agent-distribution"
-                    />
-                    <input type="hidden" name="orderId" value={order.id} />
-                    <input type="hidden" name="returnTo" value={backHref} />
-                    <button type="submit">Proceed Conversion</button>
-                  </form>
-                ) : (
-                  <div class="order-conversion-card__blocked">
-                    <p>{distributionConversionBlockMessage}</p>
-                    <button type="button" disabled>Proceed Conversion</button>
-                  </div>
-                )
-              }
+              {canConvertToDistributionOrder ? (
+                <form method="post" data-astro-reload>
+                  <input
+                    type="hidden"
+                    name="action"
+                    value="convert-customer-order-to-agent-distribution"
+                  />
+                  <input type="hidden" name="orderId" value={order.id} />
+                  <input type="hidden" name="returnTo" value={backHref} />
+                  <button type="submit">Proceed Conversion</button>
+                </form>
+              ) : (
+                <div class="order-conversion-card__blocked">
+                  <p>{distributionConversionBlockMessage}</p>
+                  <button type="button" disabled>
+                    Proceed Conversion
+                  </button>
+                </div>
+              )}
             </section>
           )
         }
@@ -548,7 +567,10 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               </div>
               {
                 customerViewHref ? (
-                  <a href={customerViewHref} class="order-party-card__view-details-link">
+                  <a
+                    href={customerViewHref}
+                    class="order-party-card__view-details-link"
+                  >
                     View details
                   </a>
                 ) : null
@@ -653,27 +675,26 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                       { "is-placeholder": !orderedByAgent?.contact },
                     ]}
                   >
-                    <span class="order-party-card__meta-icon" aria-hidden="true">
+                    <span
+                      class="order-party-card__meta-icon"
+                      aria-hidden="true"
+                    >
                       <svg viewBox="0 0 24 24">
-                        <path
-                          d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z"
-                        ></path>
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z" />
                       </svg>
                     </span>
-                    {
-                      orderedByAgent?.contact ? (
-                        <a
-                          class="order-party-card__meta-link"
-                          href={`tel:${orderedByAgent.contact}`}
-                        >
-                          {orderedByAgentPhone}
-                        </a>
-                      ) : (
-                        <span class="order-party-card__meta-text">
-                          {orderedByAgentPhone}
-                        </span>
-                      )
-                    }
+                    {orderedByAgent?.contact ? (
+                      <a
+                        class="order-party-card__meta-link"
+                        href={`tel:${orderedByAgent.contact}`}
+                      >
+                        {orderedByAgentPhone}
+                      </a>
+                    ) : (
+                      <span class="order-party-card__meta-text">
+                        {orderedByAgentPhone}
+                      </span>
+                    )}
                   </li>
                   <li
                     class:list={[
@@ -681,28 +702,27 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                       { "is-placeholder": !orderedByAgent?.email },
                     ]}
                   >
-                    <span class="order-party-card__meta-icon" aria-hidden="true">
+                    <span
+                      class="order-party-card__meta-icon"
+                      aria-hidden="true"
+                    >
                       <svg viewBox="0 0 24 24">
-                        <path
-                          d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
-                        ></path>
-                        <path d="m22 6-10 7L2 6"></path>
+                        <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+                        <path d="m22 6-10 7L2 6" />
                       </svg>
                     </span>
-                    {
-                      orderedByAgent?.email ? (
-                        <a
-                          class="order-party-card__meta-link"
-                          href={`mailto:${orderedByAgent.email}`}
-                        >
-                          {orderedByAgentEmail}
-                        </a>
-                      ) : (
-                        <span class="order-party-card__meta-text">
-                          {orderedByAgentEmail}
-                        </span>
-                      )
-                    }
+                    {orderedByAgent?.email ? (
+                      <a
+                        class="order-party-card__meta-link"
+                        href={`mailto:${orderedByAgent.email}`}
+                      >
+                        {orderedByAgentEmail}
+                      </a>
+                    ) : (
+                      <span class="order-party-card__meta-text">
+                        {orderedByAgentEmail}
+                      </span>
+                    )}
                   </li>
                 </ul>
               </article>
@@ -891,7 +911,10 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                         <form
                           method="post"
                           class="order-product-quantity-form"
-                          {...quantityValidationDataset(item, item.partial_quantity)}
+                          {...quantityValidationDataset(
+                            item,
+                            item.partial_quantity,
+                          )}
                         >
                           <input
                             type="hidden"
@@ -1232,7 +1255,10 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                         <form
                           method="post"
                           class="pdf-preview-quantity-form"
-                          {...quantityValidationDataset(item, item.final_quantity)}
+                          {...quantityValidationDataset(
+                            item,
+                            item.final_quantity,
+                          )}
                         >
                           <input
                             type="hidden"
@@ -1413,7 +1439,11 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
             >
               <input type="hidden" name="action" value="record-payment" />
               <input type="hidden" name="orderId" value={order.id} />
-              <input type="hidden" name="returnTo" value={paymentRecordReturnPath} />
+              <input
+                type="hidden"
+                name="returnTo"
+                value={paymentRecordReturnPath}
+              />
               {
                 (hasPayments || isResellerCustomer) && (
                   <input
