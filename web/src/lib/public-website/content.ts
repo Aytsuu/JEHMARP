@@ -30,6 +30,8 @@ export type PublicFeaturedProduct = {
   name: string;
   description: string | null;
   image_path: string | null;
+  category?: string | null;
+  category_name?: string | null;
 };
 
 type SectionLike = {
@@ -84,7 +86,7 @@ export async function getFeaturedPublicProducts(
   const supabase = createSupabasePublicClient();
   const { data, error } = await supabase
     .from("product")
-    .select("id, name, description, image_path")
+    .select("id, name, description, image_path, category")
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(limit);
