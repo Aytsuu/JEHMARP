@@ -13,6 +13,9 @@ describe("admin-content-preview", () => {
     expect(toAdminContentPreviewHref("/shop")).toBe(
       `${ADMIN_CONTENT_PREVIEW_ROOT}/shop`,
     );
+    expect(toAdminContentPreviewHref("/track")).toBe(
+      `${ADMIN_CONTENT_PREVIEW_ROOT}/track`,
+    );
     expect(toAdminContentPreviewHref("/login")).toBe("/admin/login");
   });
 
@@ -26,6 +29,9 @@ describe("admin-content-preview", () => {
   it("detects valid admin preview paths", () => {
     expect(isAdminContentPreviewPath(ADMIN_CONTENT_PREVIEW_ROOT)).toBe(true);
     expect(isAdminContentPreviewPath(`${ADMIN_CONTENT_PREVIEW_ROOT}/shop`)).toBe(
+      true,
+    );
+    expect(isAdminContentPreviewPath(`${ADMIN_CONTENT_PREVIEW_ROOT}/track`)).toBe(
       true,
     );
     expect(isAdminContentPreviewPath("/admin/settings")).toBe(false);

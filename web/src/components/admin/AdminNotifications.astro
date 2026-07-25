@@ -1,15 +1,16 @@
 ---
-import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
-import { buildAdminNotifications } from "@/lib/admin-dashboard/notifications";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import type { AdminNotificationsPageData } from "@/lib/admin-dashboard/notifications";
 import AdminNotificationCard from "./AdminNotificationCard.astro";
 
 type Props = {
-  data: AdminDashboardData;
+  data: AdminNotificationsPageData;
+  paginationQuery: string;
 };
 
-const { data } = Astro.props;
-const notifications = buildAdminNotifications(data);
-const unreadCount = notifications.filter((notification) => notification.isUnread).length;
+const { data, paginationQuery } = Astro.props;
+const { notifications, pagination, unreadCount } = data;
+const skeletonItems = Array.from({ length: 3 });
 ---
 
 <section
@@ -17,41 +18,96 @@ const unreadCount = notifications.filter((notification) => notification.isUnread
   class="admin-notifications"
   aria-labelledby="admin-notifications-title"
 >
-  <div class="admin-notifications__toolbar">
-    <p class="admin-notifications__summary">
+  <form
+    method="get"
+    action="/admin/notifications"
+    data-notifications-pagination-form
+    data-current-filter-query={paginationQuery}
+    hidden
+    aria-hidden="true"
+  ></form>
+
+  <div data-interactive-table data-server-pagination="true" class="admin-notifications__feed">
+    <div class="admin-notifications__toolbar">
+      <p class="admin-notifications__summary">
+        {
+          unreadCount > 0 ? (
+            <>
+              <span class="admin-notifications__summary-count">{unreadCount}</span>
+              unread notification{unreadCount === 1 ? "" : "s"}
+            </>
+          ) : (
+            "All caught up"
+          )
+        }
+      </p>
+
       {
-        unreadCount > 0 ? (
-          <>
-            <span class="admin-notifications__summary-count">{unreadCount}</span>
-            unread notification{unreadCount === 1 ? "" : "s"}
-          </>
-        ) : (
-          "All caught up"
+        unreadCount > 0 && (
+          <form method="post" class="admin-notifications__form">
+            <input type="hidden" name="action" value="mark-all-admin-notifications-read" />
+            <button type="submit" class="notification-action notification-action--secondary notification-action--compact">
+              <svg viewBox="0 0 24 24" aria-hidden="true"
+                ><polyline points="20 6 9 17 4 12"></polyline></svg
+              >
+              <span>Mark all as read</span>
+            </button>
+          </form>
         )
       }
-    </p>
+    </div>
 
-    {
-      unreadCount > 0 && (
-        <form method="post" class="admin-notifications__form">
-          <input type="hidden" name="action" value="mark-all-admin-notifications-read" />
-          <button type="submit" class="notification-action notification-action--secondary notification-action--compact">
-            <svg viewBox="0 0 24 24" aria-hidden="true"
-              ><polyline points="20 6 9 17 4 12"></polyline></svg
-            >
-            <span>Mark all as read</span>
-          </button>
-        </form>
-      )
-    }
+    <div data-notifications-list-shell class="admin-notifications__list">
+      {notifications.map((notif) => <AdminNotificationCard notification={notif} />)}
+    </div>
+
+    <DashboardTablePagination pagination={pagination} />
   </div>
 
-  <div class="admin-notifications__list" data-notifications-list>
-    {notifications.map((notif) => <AdminNotificationCard notification={notif} />)}
-  </div>
+  <template data-notifications-pagination-skeleton>
+    <div class="admin-notifications__list" aria-busy="true" aria-live="polite">
+      {
+        skeletonItems.map(() => (
+          <article class="admin-notifications__skeleton-card">
+            <span class="table-skeleton-block table-skeleton-block--short"></span>
+            <span class="table-skeleton-block"></span>
+            <span class="table-skeleton-block table-skeleton-block--wide"></span>
+          </article>
+        ))
+      }
+    </div>
+  </template>
 </section>
 
+<script>
+  import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
+
+  function initAdminNotificationsPagination() {
+    initDashboardFragmentTable({
+      cacheKey: "admin-notifications-pagination-cache-v1",
+      fragmentPath: "/admin/notifications-fragment",
+      pagePath: "/admin/notifications",
+      formSelector: "[data-notifications-pagination-form]",
+      tableShellSelector: "[data-notifications-list-shell]",
+      skeletonTemplateSelector: "[data-notifications-pagination-skeleton]",
+      filterKeys: [],
+      historyStateKey: "notificationsPaginationQuery",
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", initAdminNotificationsPagination);
+  document.addEventListener("astro:after-swap", initAdminNotificationsPagination);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    initAdminNotificationsPagination();
+  }
+</script>
+
 <style>
+  .admin-notifications__feed {
+    display: grid;
+    gap: 0;
+  }
+
   .admin-notifications__toolbar {
     display: flex;
     align-items: center;
@@ -141,5 +197,25 @@ const unreadCount = notifications.filter((notification) => notification.isUnread
     display: flex;
     flex-direction: column;
     gap: 0.85rem;
+  }
+
+  .admin-notifications__skeleton-card {
+    display: grid;
+    gap: 0.55rem;
+    padding: 1rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .admin-notifications :global(.dashboard-interactive-table__footer) {
+    border-top: 1px solid #e5e7eb;
+    background: transparent;
+    min-height: 0;
+  }
+
+  .admin-notifications :global(.dashboard-interactive-table__footer .table-pagination) {
+    margin-top: 0;
+    padding: 0.75rem 0 0;
   }
 </style>

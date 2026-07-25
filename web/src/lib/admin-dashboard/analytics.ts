@@ -20,6 +20,7 @@ import type {
 
 export type AnalyticsSummary = {
   grossSales: number;
+  netIncome: number;
   totalPaidAmount: number;
   outstandingBalance: number;
   pendingOrderPayments: number;
@@ -198,6 +199,10 @@ export function buildAdminAnalytics(
     summary: {
       grossSales: roundCurrency(completedPaidOrders.reduce(
         (total, order) => total + orderTotal(order, "final_quantity"),
+        0,
+      )),
+      netIncome: roundCurrency(completedPaidOrders.reduce(
+        (total, order) => total + orderReceivableTotal(order, "final_quantity"),
         0,
       )),
       totalPaidAmount: roundCurrency(data.orders.reduce((total, order) => total + orderPaymentTotal(order), 0)),

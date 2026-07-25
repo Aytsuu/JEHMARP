@@ -1,0 +1,391 @@
+---
+import {
+  formatTrackingCurrency,
+  formatTrackingLookupDate,
+  formatTrackingOrderStatus,
+  lookupCustomerOrdersByTrackingNumber,
+} from "@/lib/public-website/customer-tracking";
+
+type Props = {
+  submittedTrackingNumber: string;
+  lookupError?: string | null;
+  rateLimitMessage?: string | null;
+  lookupResult?: Awaited<ReturnType<typeof lookupCustomerOrdersByTrackingNumber>> | null;
+  formAction?: string;
+  inputId?: string;
+};
+
+const {
+  submittedTrackingNumber,
+  lookupError = null,
+  rateLimitMessage = null,
+  lookupResult = null,
+  formAction = "/track",
+  inputId = "tracking-number",
+} = Astro.props;
+---
+
+<section class="track-page" aria-labelledby="track-page-title">
+  <div class="track-page__intro">
+    <p class="track-page__eyebrow">Order tracking</p>
+    <h1 id="track-page-title">Track your orders</h1>
+    <p>Enter your customer tracking number</p>
+  </div>
+
+  <form class="track-page__form" method="get" action={formAction}>
+    <label for={inputId}>Tracking number</label>
+    <div class="track-page__form-row">
+      <input
+        id={inputId}
+        name="number"
+        value={submittedTrackingNumber}
+        placeholder="JHM-ABCD2345"
+        autocomplete="off"
+        spellcheck="false"
+        autocapitalize="characters"
+        required
+      />
+      <button type="submit">Track orders</button>
+    </div>
+  </form>
+
+  {
+    (lookupError || rateLimitMessage) && (
+      <div class="track-page__alert track-page__alert--error" role="alert">
+        {lookupError ?? rateLimitMessage}
+      </div>
+    )
+  }
+
+  {
+    lookupResult && (
+      <section
+        class="track-page__results"
+        aria-labelledby="track-results-title"
+      >
+        <div class="track-page__results-header">
+          <h2 id="track-results-title">
+            Orders for {lookupResult.trackingNumber}
+          </h2>
+          <p>
+            {lookupResult.orders.length === 0
+              ? "No orders were found for this tracking number yet."
+              : `${lookupResult.orders.length} order${lookupResult.orders.length === 1 ? "" : "s"} found.`}
+          </p>
+          {lookupResult.orders.length > 0 && (
+            <p class="track-page__total-due">
+              Total amount due:{" "}
+              <strong>{formatTrackingCurrency(lookupResult.totalAmountDue)}</strong>
+            </p>
+          )}
+        </div>
+
+        {lookupResult.orders.map((order) => (
+          <article class="track-page__order-card">
+            <header class="track-page__order-card-header">
+              <div>
+                <h3>Order {order.id.slice(0, 8).toUpperCase()}</h3>
+                <p>Submitted {formatTrackingLookupDate(order.createdAt)}</p>
+              </div>
+              <div class="track-page__status-group">
+                <span class="track-page__status-pill">
+                  {formatTrackingOrderStatus(order.orderStatus)}
+                </span>
+                <span class="track-page__status-pill track-page__status-pill--muted">
+                  {formatTrackingOrderStatus(order.paymentStatus)}
+                </span>
+              </div>
+            </header>
+
+            <dl class="track-page__amounts">
+              <div>
+                <dt>Order total</dt>
+                <dd>{formatTrackingCurrency(order.orderTotal)}</dd>
+              </div>
+              <div>
+                <dt>Amount due</dt>
+                <dd class:list={[
+                  "track-page__amount-due",
+                  { "track-page__amount-due--paid": order.amountDue <= 0 },
+                ]}>
+                  {order.amountDue <= 0
+                    ? "Paid in full"
+                    : formatTrackingCurrency(order.amountDue)}
+                </dd>
+              </div>
+            </dl>
+
+            {order.items.length > 0 && (
+              <ul class="track-page__items">
+                {order.items.map((item) => (
+                  <li>
+                    <strong>{item.productName}</strong>
+                    <span>
+                      {item.quantity} {item.unitLabel}
+                    </span>
+                    {item.addDetails && <p>{item.addDetails}</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+        ))}
+      </section>
+    )
+  }
+
+  {
+    submittedTrackingNumber.trim() &&
+      !lookupResult &&
+      !lookupError &&
+      !rateLimitMessage && (
+        <div class="track-page__alert track-page__alert--error" role="alert">
+          We could not find any customer record for that tracking number.
+        </div>
+      )
+  }
+</section>
+
+<style>
+  .track-page {
+    display: grid;
+    gap: 1.25rem;
+    max-width: 48rem;
+    margin: 0 auto;
+  }
+
+  .track-page__eyebrow {
+    margin: 0 0 0.35rem;
+    color: #991b1b;
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
+  .track-page h1 {
+    margin: 0;
+    font-size: clamp(2rem, 4vw, 2.75rem);
+    letter-spacing: 0;
+  }
+
+  .track-page__intro p:last-child {
+    margin: 0.5rem 0 0;
+    color: #4b5563;
+  }
+
+  .track-page__form,
+  .track-page__alert,
+  .track-page__results,
+  .track-page__order-card {
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: #fff;
+  }
+
+  .track-page__form {
+    display: grid;
+    gap: 0.5rem;
+    padding: 1rem;
+  }
+
+  .track-page__form label {
+    font-size: 0.82rem;
+    font-weight: 800;
+    color: #374151;
+  }
+
+  .track-page__form-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.75rem;
+  }
+
+  .track-page__form input,
+  .track-page__form button {
+    font: inherit;
+  }
+
+  .track-page__form input {
+    width: 100%;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+  }
+
+  .track-page__form button {
+    border: 0;
+    border-radius: 0.375rem;
+    background: #991b1b;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 800;
+    padding: 0.75rem 1rem;
+    white-space: nowrap;
+  }
+
+  .track-page__alert {
+    padding: 0.75rem 1rem;
+    font-weight: 700;
+  }
+
+  .track-page__alert--error {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b;
+  }
+
+  .track-page__results {
+    display: grid;
+    gap: 1rem;
+    padding: 1rem;
+  }
+
+  .track-page__results-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    letter-spacing: 0;
+  }
+
+  .track-page__results-header p {
+    margin: 0.35rem 0 0;
+    color: #4b5563;
+  }
+
+  .track-page__total-due {
+    margin-top: 0.75rem !important;
+    color: #111827 !important;
+    font-size: 1rem;
+  }
+
+  .track-page__total-due strong {
+    color: #991b1b;
+  }
+
+  .track-page__order-card {
+    padding: 1rem;
+  }
+
+  .track-page__order-card-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .track-page__order-card-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    letter-spacing: 0;
+  }
+
+  .track-page__order-card-header p {
+    margin: 0.25rem 0 0;
+    color: #6b7280;
+    font-size: 0.9rem;
+  }
+
+  .track-page__status-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    justify-content: flex-end;
+  }
+
+  .track-page__status-pill {
+    border-radius: 999px;
+    background: #fef2f2;
+    color: #991b1b;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 0.25rem 0.6rem;
+    text-transform: capitalize;
+  }
+
+  .track-page__status-pill--muted {
+    background: #f3f4f6;
+    color: #374151;
+  }
+
+  .track-page__amounts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 1rem 0 0;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .track-page__amounts div {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .track-page__amounts dt {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .track-page__amounts dd {
+    margin: 0;
+    color: #111827;
+    font-size: 1rem;
+    font-weight: 800;
+  }
+
+  .track-page__amount-due {
+    color: #991b1b;
+  }
+
+  .track-page__amount-due--paid {
+    color: #166534;
+  }
+
+  .track-page__items {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .track-page__items li {
+    display: grid;
+    gap: 0.15rem;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 0.75rem;
+  }
+
+  .track-page__items li:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .track-page__items span {
+    color: #4b5563;
+    font-size: 0.9rem;
+  }
+
+  .track-page__items p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.85rem;
+  }
+
+  @media (max-width: 640px) {
+    .track-page__form-row,
+    .track-page__order-card-header,
+    .track-page__amounts {
+      grid-template-columns: 1fr;
+      flex-direction: column;
+    }
+
+    .track-page__status-group {
+      justify-content: flex-start;
+    }
+  }
+</style>

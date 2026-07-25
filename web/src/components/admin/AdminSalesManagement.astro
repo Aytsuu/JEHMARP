@@ -67,7 +67,8 @@ const skeletonRows = Array.from({ length: 6 });
               <th scope="col">Sale Date</th>
               <th scope="col">Customer</th>
               <th scope="col">Source</th>
-              <th scope="col">Amount</th>
+              <th scope="col">Gross Amount</th>
+              <th scope="col">Net Amount</th>
               <th scope="col">Payments</th>
               <DashboardTableActionsHeader />
             </tr>
@@ -75,7 +76,7 @@ const skeletonRows = Array.from({ length: 6 });
           <tbody>
             {data.salesRows.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={8}
+                colspan={9}
                 message="No completed sales match the selected filters."
               />
             ) : data.salesRows.map((sale, index) => {
@@ -91,6 +92,7 @@ const skeletonRows = Array.from({ length: 6 });
                   <td class="dashboard-table__cell--truncate">{sale.customer_label || "Guest"}</td>
                   <td>{sale.source_label}</td>
                   <td>{formatCurrency(sale.order_total)}</td>
+                  <td>{formatCurrency(sale.net_total)}</td>
                   <td>{formatSalePaymentSummary(sale.payment_count)}</td>
                   <td class="dashboard-table__actions-column">
                     <TableActionMenu
@@ -121,7 +123,8 @@ const skeletonRows = Array.from({ length: 6 });
             <th scope="col">Sale Date</th>
             <th scope="col">Customer</th>
             <th scope="col">Source</th>
-            <th scope="col">Amount</th>
+            <th scope="col">Gross Amount</th>
+            <th scope="col">Net Amount</th>
             <th scope="col">Payments</th>
             <DashboardTableActionsHeader />
           </tr>
@@ -134,6 +137,7 @@ const skeletonRows = Array.from({ length: 6 });
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>

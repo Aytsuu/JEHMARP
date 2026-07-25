@@ -1,4 +1,9 @@
 import type { AdminDashboardData } from "./data";
+import {
+  buildAdminPagination,
+  type AdminPaginatedResult,
+  type AdminPaginationParams,
+} from "./pagination";
 import { fullName } from "./view";
 import { buildUnpaidOrderCheckNotifications } from "./unpaid-order-checks";
 
@@ -147,6 +152,40 @@ export function buildAdminNotifications(
       isUnread: false,
     },
   ];
+}
+
+export function paginateAdminNotifications(
+  notifications: AdminNotification[],
+  pagination: AdminPaginationParams,
+): AdminPaginatedResult<AdminNotification> {
+  const builtPagination = buildAdminPagination(notifications.length, pagination);
+  const start = (builtPagination.page - 1) * builtPagination.pageSize;
+
+  return {
+    records: notifications.slice(start, start + builtPagination.pageSize),
+    pagination: builtPagination,
+  };
+}
+
+export type AdminNotificationsPageData = {
+  notifications: AdminNotification[];
+  pagination: AdminPaginatedResult<AdminNotification>["pagination"];
+  unreadCount: number;
+};
+
+export function buildAdminNotificationsPageData(
+  data: AdminNotificationSource,
+  pagination: AdminPaginationParams,
+  now = new Date(),
+): AdminNotificationsPageData {
+  const allNotifications = buildAdminNotifications(data, now);
+  const paginatedNotifications = paginateAdminNotifications(allNotifications, pagination);
+
+  return {
+    notifications: paginatedNotifications.records,
+    pagination: paginatedNotifications.pagination,
+    unreadCount: allNotifications.filter((notification) => notification.isUnread).length,
+  };
 }
 
 export function getAdminUnreadNotificationIds(

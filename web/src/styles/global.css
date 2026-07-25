@@ -1776,6 +1776,7 @@
   }
 
   .dashboard-main--loading .dashboard-main__content {
+    visibility: hidden;
     pointer-events: none;
   }
 

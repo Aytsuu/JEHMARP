@@ -62,10 +62,9 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         animation: none;
       }
 
-      ::view-transition-old(dashboard-main),
-      ::view-transition-new(dashboard-main) {
-        animation-duration: 0.16s;
-        animation-timing-function: ease-out;
+      ::view-transition-old(dashboard-main-content),
+      ::view-transition-new(dashboard-main-content) {
+        animation: none;
       }
 
       @media (max-width: 47.99rem) {
@@ -154,7 +153,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
             <div
               class="dashboard-main__content"
               transition:name={dashboardPageTransitionName}
-              transition:animate="fade"
+              transition:animate="none"
             >
               <slot />
             </div>

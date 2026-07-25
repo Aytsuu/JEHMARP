@@ -1,6 +1,5 @@
 ---
 import AdminNotifications from "@/components/admin/AdminNotifications.astro";
-import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { buildAdminNotificationsPageData } from "@/lib/admin-dashboard/notifications";
 import {
@@ -8,6 +7,7 @@ import {
   serializeAdminPagination,
 } from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { setDashboardFragmentResponseHeaders } from "@/lib/dashboard/fragment-response";
 
 export const prerender = false;
 
@@ -17,19 +17,15 @@ if (!adminRoute.ready) {
   return adminRoute.response;
 }
 
+setDashboardFragmentResponseHeaders(Astro);
+
 const pagination = parseAdminPagination(Astro.url);
 const paginationQuery = serializeAdminPagination(pagination);
 const data = await loadAdminDashboardData();
 const notificationsData = buildAdminNotificationsPageData(data, pagination);
 ---
 
-<AdminNotificationsPageLayout
-  title="Admin Notifications - JEHMARP"
-  description="System alerts and pending workflow indicators."
-  heading="Notifications"
-  intro="Review live actionable alerts regarding orders, inquiries, reseller signups, and unpaid order follow-ups."
-  dashboardData={data}
-  scrollOnParent={true}
->
-  <AdminNotifications data={notificationsData} paginationQuery={paginationQuery} />
-</AdminNotificationsPageLayout>
+<AdminNotifications
+  data={notificationsData}
+  paginationQuery={paginationQuery}
+/>

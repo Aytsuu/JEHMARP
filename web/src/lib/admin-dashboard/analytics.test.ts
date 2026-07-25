@@ -10,6 +10,7 @@ describe("buildAdminAnalytics", () => {
 
     expect(analytics.summary).toEqual({
       grossSales: 120,
+      netIncome: 70,
       totalPaidAmount: 310,
       outstandingBalance: 20,
       pendingOrderPayments: 20,

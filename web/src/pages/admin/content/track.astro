@@ -1,7 +1,10 @@
 ---
+import AdminContentPageLayout from "@/components/admin/AdminContentPageLayout.astro";
+import AdminContentPreviewFrame from "@/components/admin/AdminContentPreviewFrame.astro";
 import PageShell from "@/components/PageShell.astro";
 import PublicTrackPageContent from "@/components/public-website/PublicTrackPageContent.astro";
-import Layout from "@/layouts/Layout.astro";
+import { loadAdminContentPreviewPage } from "@/lib/admin-dashboard/content-preview-page";
+import { ADMIN_CONTENT_PREVIEW_ROOT } from "@/lib/public-website/admin-content-preview";
 import {
   lookupCustomerOrdersByTrackingNumber,
   normalizeCustomerTrackingNumber,
@@ -10,6 +13,13 @@ import { getClientIp } from "@/lib/security/client-ip";
 
 export const prerender = false;
 
+const preview = await loadAdminContentPreviewPage(Astro);
+
+if (!preview.ready) {
+  return preview.response;
+}
+
+const trackPath = `${ADMIN_CONTENT_PREVIEW_ROOT}/track`;
 const submittedTrackingNumber = Astro.url.searchParams.get("number") ?? "";
 const lookupError = Astro.url.searchParams.get("error");
 let lookupResult = null as Awaited<
@@ -38,16 +48,22 @@ if (submittedTrackingNumber.trim()) {
 }
 ---
 
-<Layout
-  title="Track Orders - JEHMARP"
-  description="Track your JEHMARP orders with your customer tracking number."
+<AdminContentPageLayout
+  title="Track Orders Preview - JEHMARP"
+  description="Admin track orders page preview."
+  feedback={preview.feedback}
+  dashboardData={preview.dashboardData}
 >
-  <PageShell title="Track Orders">
-    <PublicTrackPageContent
-      submittedTrackingNumber={submittedTrackingNumber}
-      lookupError={lookupError}
-      rateLimitMessage={rateLimitMessage}
-      lookupResult={lookupResult}
-    />
-  </PageShell>
-</Layout>
+  <AdminContentPreviewFrame activePath="/track">
+    <PageShell title="Track Orders">
+      <PublicTrackPageContent
+        submittedTrackingNumber={submittedTrackingNumber}
+        lookupError={lookupError}
+        rateLimitMessage={rateLimitMessage}
+        lookupResult={lookupResult}
+        formAction={trackPath}
+        inputId="admin-tracking-number"
+      />
+    </PageShell>
+  </AdminContentPreviewFrame>
+</AdminContentPageLayout>
