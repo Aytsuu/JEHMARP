@@ -433,9 +433,9 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
     : [];
 
   return (
-    <div className="admin-charts-root flex flex-col gap-6">
+    <div className="admin-charts-root flex flex-col gap-[0.85rem]">
       <>
-        <div className="order-1 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)]">
+        <div className="order-1 grid grid-cols-1 gap-[0.85rem] xl:grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)]">
           <div className="rounded-xl border border-gray-300 bg-white p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -766,7 +766,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
           )}
         </div>
 
-        <div className="order-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="order-4 grid grid-cols-1 gap-[0.85rem] lg:grid-cols-2">
           <div className="rounded-xl border border-gray-300 bg-white p-6">
             <h3 className="mb-1 text-lg font-bold text-gray-900">Top Products</h3>
             <p className="mb-6 text-sm text-gray-500">

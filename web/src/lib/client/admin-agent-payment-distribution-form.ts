@@ -38,7 +38,7 @@ export function initAdminAgentPaymentDistributionForms() {
 }
 
 function initAdminAgentPaymentDistributionForm(form: HTMLFormElement) {
-  const section = form.closest<HTMLElement>("[data-admin-agent-payment-distribution-section]")
+  const section = document.querySelector<HTMLElement>("[data-agent-order-detail-page]")
     ?? document;
   const amountInput = form.querySelector<HTMLInputElement>('input[name="amount"]');
   const selectedOrderInputContainer = form.querySelector<HTMLElement>(

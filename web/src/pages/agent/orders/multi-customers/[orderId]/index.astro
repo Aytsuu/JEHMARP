@@ -844,7 +844,6 @@ const customerCount = agentOrder.customer_order.length;
   }
 
   .customer-orders-table-toolbar__add-customer:disabled {
-    cursor: not-allowed;
     opacity: 0.55;
   }
 
@@ -959,7 +958,10 @@ const customerCount = agentOrder.customer_order.length;
     cursor: pointer;
   }
 
-  .agent-payment-bulk-panel :disabled,
+  .agent-payment-bulk-panel button:disabled {
+    opacity: 0.55;
+  }
+
   .agent-order-customer-orders-table input:disabled {
     cursor: not-allowed;
     opacity: 0.55;

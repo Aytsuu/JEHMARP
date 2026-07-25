@@ -118,8 +118,8 @@ const unreadCount = notifications.filter((notification) => notification.isUnread
     color: #4b5563;
   }
 
-  .notification-action--secondary:hover,
-  .notification-action--secondary:focus-visible {
+  .notification-action--secondary:hover:not(:disabled),
+  .notification-action--secondary:focus-visible:not(:disabled) {
     background-color: #e5e7eb;
     border-color: #d1d5db;
     color: #374151;

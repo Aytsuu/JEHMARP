@@ -297,6 +297,11 @@ export type AdminAction =
       amount: number;
     }
   | {
+      type: "update-agent-order-total-commission";
+      agentOrderId: string;
+      amount: number;
+    }
+  | {
       type: "update-agent-order-commission";
       agentOrderItemId: string;
       payload: {
@@ -308,6 +313,12 @@ export type AdminAction =
   | {
       type: "update-agent-order-item-quantity";
       agentOrderItemId: string;
+      quantity: number;
+    }
+  | {
+      type: "add-agent-order-item";
+      agentOrderId: string;
+      productId: string;
       quantity: number;
     }
   | {
@@ -756,6 +767,14 @@ export async function executeAdminAction(
     case "update-order-total-commission":
       await executeOrderTotalCommissionUpdate(supabase, action.orderId, action.amount, adminUserId);
       return;
+    case "update-agent-order-total-commission":
+      await executeAgentOrderTotalCommissionUpdate(
+        supabase,
+        action.agentOrderId,
+        action.amount,
+        adminUserId,
+      );
+      return;
     case "update-agent-order-commission":
       await assertAgentOrderItemCommissionEditable(supabase, action.agentOrderItemId);
       await executeTableUpdate(supabase, "order_item", action.agentOrderItemId, action.payload);
@@ -772,6 +791,14 @@ export async function executeAdminAction(
 
       return;
     }
+    case "add-agent-order-item":
+      await executeAgentOrderItemAdd(
+        supabase,
+        action.agentOrderId,
+        action.productId,
+        action.quantity,
+      );
+      return;
     case "approve-agent-order":
       await executeAgentOrderApproval(supabase, action);
       return;
@@ -1177,6 +1204,12 @@ function parseAdminActionFormDataOrThrow(
         orderId: uuidSchema.parse(requiredString(formData, "orderId")),
         amount: nonNegativeNumber(formData, "amount"),
       });
+    case "update-agent-order-total-commission":
+      return success({
+        type: "update-agent-order-total-commission",
+        agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
+        amount: nonNegativeNumber(formData, "amount"),
+      });
     case "update-agent-order-commission":
       return success({
         type: "update-agent-order-commission",
@@ -1191,6 +1224,13 @@ function parseAdminActionFormDataOrThrow(
       return success({
         type: "update-agent-order-item-quantity",
         agentOrderItemId: uuidSchema.parse(requiredString(formData, "agentOrderItemId")),
+        quantity: positiveNumber(formData, "quantity"),
+      });
+    case "add-agent-order-item":
+      return success({
+        type: "add-agent-order-item",
+        agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
+        productId: uuidSchema.parse(requiredString(formData, "productId")),
         quantity: positiveNumber(formData, "quantity"),
       });
     case "approve-agent-order":
@@ -2350,6 +2390,61 @@ async function executeAgentDistributionOrderCreate(
   };
 }
 
+async function executeAgentOrderTotalCommissionUpdate(
+  supabase: SupabaseServerClient,
+  agentOrderId: string,
+  amount: number,
+  adminUserId: string,
+) {
+  await assertAgentOrderCommissionEditable(supabase, agentOrderId);
+
+  const { data: orderItems, error: orderItemsError } = await supabase
+    .from("order_item")
+    .select("id, final_quantity, partial_quantity, unit_price")
+    .eq("order_id", agentOrderId);
+
+  if (orderItemsError) {
+    throw new Error("Unable to load agent order items for commission update.");
+  }
+
+  const normalizedItems = (orderItems ?? []).flatMap((item) => {
+    const id = typeof item.id === "string" ? item.id : null;
+    const quantity = Number(item.final_quantity ?? item.partial_quantity ?? 0);
+    const unitPrice = Number(item.unit_price ?? 0);
+
+    if (!id || !Number.isFinite(quantity) || !Number.isFinite(unitPrice)) {
+      return [];
+    }
+
+    return [{
+      id,
+      lineTotal: Math.max(roundCurrency(quantity * unitPrice), 0),
+    }];
+  });
+
+  if (normalizedItems.length === 0) {
+    throw new Error("Agent order has no items for commission update.");
+  }
+
+  const allocatedCommissions = allocateTotalCommission(normalizedItems, amount);
+  const now = new Date().toISOString();
+  const updateResults = await Promise.all(allocatedCommissions.map((item) => (
+    supabase
+      .from("order_item")
+      .update({
+        agent_commission_amount: item.amount,
+        agent_commission_updated_by: adminUserId,
+        agent_commission_updated_at: now,
+        updated_at: now,
+      })
+      .eq("id", item.id)
+  )));
+
+  if (updateResults.some((result) => result.error)) {
+    throw new Error("Unable to update agent order commission.");
+  }
+}
+
 async function executeOrderTotalCommissionUpdate(
   supabase: SupabaseServerClient,
   orderId: string,
@@ -3246,6 +3341,83 @@ async function assertOrderItemCommissionPayable(
   }
 }
 
+async function assertAgentOrderCommissionEditable(
+  supabase: SupabaseServerClient,
+  agentOrderId: string,
+) {
+  const { data: customerOrders, error: customerOrdersError } = await supabase
+    .from("order")
+    .select("id, payment_status")
+    .in("order_kind", ["customer", "personal"])
+    .eq("parent_order_id", agentOrderId)
+    .is("converted_at", null);
+
+  if (customerOrdersError) {
+    throw new Error("Unable to verify agent order payments before updating commission.");
+  }
+
+  const linkedCustomerOrders = customerOrders ?? [];
+  const isFullyPaid = linkedCustomerOrders.length > 0 &&
+    linkedCustomerOrders.every((order) => order.payment_status === "paid");
+
+  if (isFullyPaid) {
+    throw new Error("Agent order commission cannot be edited after all customer orders are fully paid.");
+  }
+}
+
+async function executeAgentOrderItemAdd(
+  supabase: SupabaseServerClient,
+  agentOrderId: string,
+  productId: string,
+  quantity: number,
+) {
+  await assertAgentOrderCommissionEditable(supabase, agentOrderId);
+
+  const { data: agentOrder, error: agentOrderError } = await supabase
+    .from("order")
+    .select("id")
+    .eq("id", agentOrderId)
+    .eq("order_kind", "distribution")
+    .maybeSingle();
+
+  if (agentOrderError) {
+    throw new Error("Unable to verify agent distribution order before adding a product.");
+  }
+
+  if (!agentOrder?.id) {
+    throw new Error("Agent distribution order was not found.");
+  }
+
+  const { data: existingItem, error: existingItemError } = await supabase
+    .from("order_item")
+    .select("id")
+    .eq("order_id", agentOrderId)
+    .eq("product_id", productId)
+    .limit(1)
+    .maybeSingle();
+
+  if (existingItemError) {
+    throw new Error("Unable to verify agent order products before adding.");
+  }
+
+  if (existingItem?.id) {
+    throw new Error("This product is already on the agent order.");
+  }
+
+  const { error } = await supabase.from("order_item").insert({
+    order_id: agentOrderId,
+    order_kind: "distribution",
+    product_id: productId,
+    partial_quantity: quantity,
+    final_quantity: quantity,
+    add_details: null,
+  });
+
+  if (error) {
+    throw new Error(error.message || "Unable to add product to agent order.");
+  }
+}
+
 async function assertAgentOrderItemCommissionEditable(
   supabase: SupabaseServerClient,
   agentOrderItemId: string,
@@ -3264,24 +3436,7 @@ async function assertAgentOrderItemCommissionEditable(
     throw new Error("Agent order item was not found.");
   }
 
-  const { data: customerOrders, error: customerOrdersError } = await supabase
-    .from("order")
-    .select("id, payment_status")
-    .in("order_kind", ["customer", "personal"])
-    .eq("parent_order_id", agentOrderItem.order_id)
-    .is("converted_at", null);
-
-  if (customerOrdersError) {
-    throw new Error("Unable to verify agent order payments before updating commission.");
-  }
-
-  const linkedCustomerOrders = customerOrders ?? [];
-  const isFullyPaid = linkedCustomerOrders.length > 0 &&
-    linkedCustomerOrders.every((order) => order.payment_status === "paid");
-
-  if (isFullyPaid) {
-    throw new Error("Agent order commission cannot be edited after all customer orders are fully paid.");
-  }
+  await assertAgentOrderCommissionEditable(supabase, agentOrderItem.order_id);
 }
 
 function roundCurrency(value: number) {
@@ -3918,12 +4073,16 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Customer order converted to agent distribution order.";
     case "update-order-total-commission":
       return "Commission updated.";
+    case "update-agent-order-total-commission":
+      return "Commission updated.";
     case "update-commission":
       return "Commission updated.";
     case "update-agent-order-commission":
       return "Commission updated.";
     case "update-agent-order-item-quantity":
       return "Product quantity updated.";
+    case "add-agent-order-item":
+      return "Product added to agent order.";
     case "approve-agent-order":
       return "Agent order approved.";
     case "attach-agent-order-customer":
