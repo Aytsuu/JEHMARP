@@ -16,7 +16,7 @@ type Props = {
 };
 
 const { title, description, navLabel, sidebarUnreadBadges = {} } = Astro.props;
-const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pathname);
+const dashboardPageTransitionName = getDashboardPageTransitionName();
 ---
 
 <!doctype html>

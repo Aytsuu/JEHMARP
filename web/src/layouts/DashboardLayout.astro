@@ -21,7 +21,7 @@ type Props = {
 const { title, description, navLabel, sidebarUnreadBadges = {} } = Astro.props;
 const isAgentDashboard = navLabel === "Agent operations";
 const isAgentMobilePrimary = isAgentDashboard && isAgentMobilePrimaryRoute(Astro.url.pathname);
-const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pathname);
+const dashboardPageTransitionName = getDashboardPageTransitionName();
 ---
 
 <!doctype html>

@@ -50,10 +50,6 @@ function isPaymentEligibleOrderCheckbox(checkbox: HTMLInputElement) {
   return checkbox.dataset.orderPaymentEligible === "true";
 }
 
-function getPaymentEligibleOrderCheckboxes(section: HTMLElement) {
-  return getOrderCheckboxes(section).filter(isPaymentEligibleOrderCheckbox);
-}
-
 function getSelectedOrderCheckboxes(section: HTMLElement) {
   return getOrderCheckboxes(section).filter((checkbox) => checkbox.checked);
 }
@@ -267,7 +263,7 @@ function initCustomerRecordFragmentTables(section: HTMLElement) {
   }
 }
 
-function resetCustomerRecordOrdersBulkPdf(section: HTMLElement) {
+function resetCustomerRecordOrdersBulkPdf() {
   initOrderBulkPdf({
     sectionSelector: "[data-customer-record-page]",
     menuTriggerSelector: "#customer-record-document-menu [data-table-action-menu-trigger]",
@@ -275,7 +271,7 @@ function resetCustomerRecordOrdersBulkPdf(section: HTMLElement) {
 }
 
 function refreshCustomerRecordOrdersTableState(section: HTMLElement) {
-  resetCustomerRecordOrdersBulkPdf(section);
+  resetCustomerRecordOrdersBulkPdf();
   refreshCustomerRecordPaymentSelection(section);
 }
 
@@ -300,6 +296,6 @@ export function initCustomerRecordPage() {
     });
   }
 
-  resetCustomerRecordOrdersBulkPdf(section);
+  resetCustomerRecordOrdersBulkPdf();
   refreshCustomerRecordPaymentSelection(section);
 }

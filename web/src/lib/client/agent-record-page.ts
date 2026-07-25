@@ -129,7 +129,7 @@ function initAgentRecordFragmentTables(section: HTMLElement) {
   }
 }
 
-function resetAgentRecordOrdersBulkPdf(section: HTMLElement) {
+function resetAgentRecordOrdersBulkPdf() {
   initOrderBulkPdf({
     sectionSelector: "[data-agent-record-page]",
     menuTriggerSelector: "#agent-record-document-menu [data-table-action-menu-trigger]",
@@ -149,13 +149,13 @@ export function initAgentRecordPage() {
     section.dataset.agentOrdersBulkPdfInitialized = "true";
 
     document.addEventListener("agent-record:table-updated", () => {
-      resetAgentRecordOrdersBulkPdf(section);
+      resetAgentRecordOrdersBulkPdf();
     });
 
     document.addEventListener("dashboard:interactive-table-updated", () => {
-      resetAgentRecordOrdersBulkPdf(section);
+      resetAgentRecordOrdersBulkPdf();
     });
   }
 
-  resetAgentRecordOrdersBulkPdf(section);
+  resetAgentRecordOrdersBulkPdf();
 }
