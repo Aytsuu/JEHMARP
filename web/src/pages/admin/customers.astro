@@ -1,10 +1,7 @@
 ---
 import AdminCustomerManagement from "@/components/admin/AdminCustomerManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
-import {
-  formatAdminActionFeedback,
-  handleAdminDashboardAction,
-} from "@/lib/admin-dashboard/actions";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import {
   loadAdminCustomerManagementData,
   loadAdminDashboardData,
@@ -25,10 +22,6 @@ const adminRoute = await requireAdminRoute(Astro);
 
 if (!adminRoute.ready) {
   return adminRoute.response;
-}
-
-if (Astro.request.method === "POST") {
-  return handleAdminDashboardAction(Astro, adminRoute.userId, "/admin/customers");
 }
 
 const customerFilters = parseAdminCustomerFilters(Astro.url);

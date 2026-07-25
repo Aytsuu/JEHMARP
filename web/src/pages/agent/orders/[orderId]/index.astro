@@ -5,10 +5,7 @@ import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNum
 import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
-import {
-  formatAgentActionFeedback,
-  handleAgentDashboardAction,
-} from "@/lib/agent-dashboard/actions";
+import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
 import {
   loadAgentDashboardData,
   loadAgentOrder,
@@ -50,16 +47,6 @@ if (!orderId) {
 }
 
 const requestedOrderDetailTab = Astro.url.searchParams.get("tab");
-
-if (Astro.request.method === "POST") {
-  const returnPath =
-    requestedOrderDetailTab &&
-    orderDetailTabIds.includes(requestedOrderDetailTab as OrderDetailTabId)
-      ? `/agent/orders/${orderId}?tab=${encodeURIComponent(requestedOrderDetailTab)}`
-      : `/agent/orders/${orderId}`;
-
-  return handleAgentDashboardAction(Astro, agentRoute.userId, returnPath);
-}
 
 const [data, order] = await Promise.all([
   loadAgentDashboardData(Astro, agentRoute.userId),

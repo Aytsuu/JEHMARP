@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildAdminNotifications,
+  buildAdminNotificationsPageData,
   getAdminUnreadNotificationIds,
   getUnreadAdminInquiryIds,
   getUnreadAdminOrderIds,
   getUnreadAdminResellerApplicationIds,
+  paginateAdminNotifications,
 } from "./notifications";
 
 describe("admin notifications", () => {
@@ -253,5 +255,57 @@ describe("admin notifications", () => {
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.id).toBe("system-welcome");
     expect(getAdminUnreadNotificationIds(data)).toEqual([]);
+  });
+
+  it("paginates notifications using the shared admin pagination defaults", () => {
+    const notifications = Array.from({ length: 12 }, (_, index) => ({
+      id: `notification-${index + 1}`,
+      type: "Order Review",
+      title: `Notification ${index + 1}`,
+      message: "Pending review",
+      date: `2026-07-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`,
+      link: "/admin/orders",
+      severity: "warning" as const,
+      isUnread: index % 2 === 0,
+    }));
+
+    const pageOne = paginateAdminNotifications(notifications, { page: 1, pageSize: 10 });
+    const pageTwo = paginateAdminNotifications(notifications, { page: 2, pageSize: 10 });
+
+    expect(pageOne.records).toHaveLength(10);
+    expect(pageOne.records[0]?.id).toBe("notification-1");
+    expect(pageOne.pagination).toEqual({
+      page: 1,
+      pageSize: 10,
+      totalRows: 12,
+      totalPages: 2,
+      fromRow: 1,
+      toRow: 10,
+    });
+    expect(pageTwo.records).toHaveLength(2);
+    expect(pageTwo.records[0]?.id).toBe("notification-11");
+  });
+
+  it("builds paginated page data while keeping the full unread count", () => {
+    const data = {
+      resellerApplications: [],
+      orders: Array.from({ length: 12 }, (_, index) => ({
+        id: `order-${index + 1}`,
+        order_status: "pending",
+        source: "guest_shop",
+        admin_read_at: null,
+        created_at: `2026-07-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`,
+        customer: null,
+      })),
+      contactInquiries: [],
+      customers: [],
+      readAdminNotificationIds: [],
+    } as unknown as Parameters<typeof buildAdminNotificationsPageData>[0];
+
+    const pageData = buildAdminNotificationsPageData(data, { page: 2, pageSize: 10 });
+
+    expect(pageData.notifications).toHaveLength(2);
+    expect(pageData.pagination.page).toBe(2);
+    expect(pageData.unreadCount).toBe(12);
   });
 });

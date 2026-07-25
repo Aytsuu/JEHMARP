@@ -2,10 +2,7 @@
 import AdminAgentRecordContent from "@/components/admin/AdminAgentRecordContent.astro";
 import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
-import {
-  formatAdminActionFeedback,
-  handleAdminDashboardAction,
-} from "@/lib/admin-dashboard/actions";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import {
   agentRecordCommissionTotal,
   agentRecordOrderCounts,
@@ -59,14 +56,6 @@ const { agentId } = Astro.params;
 
 if (!agentId) {
   return Astro.redirect("/admin/agents", 302);
-}
-
-if (Astro.request.method === "POST") {
-  return handleAdminDashboardAction(
-    Astro,
-    adminRoute.userId,
-    `/admin/agents/${agentId}`,
-  );
 }
 
 const [dashboardData, detailData] = await Promise.all([

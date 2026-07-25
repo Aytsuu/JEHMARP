@@ -1,11 +1,12 @@
-import {
-  shouldHandleDashboardNavClick,
-} from "@/lib/client/dashboard-nav";
 import { isAgentMobileRoute } from "@/lib/client/agent-mobile-route";
-
-const SKELETON_DELAY_MS = 200;
+import {
+  isDashboardShellRoute,
+  isSameDashboardLocation,
+} from "@/lib/client/dashboard-shell-route";
+import { shouldHandleDashboardNavClick } from "@/lib/client/dashboard-nav";
 
 let skeletonTimer: number | undefined;
+let pendingRouteTransition: ViewTransition | null = null;
 
 function getRouteSkeleton() {
   return document.querySelector<HTMLElement>("[data-dashboard-route-skeleton]");
@@ -44,14 +45,30 @@ function hideRouteSkeleton() {
   document.body.classList.remove("dashboard-route-loading");
 }
 
-function scheduleRouteSkeleton() {
+function beginRouteLoading() {
   if (isAgentMobileRoute()) return;
+  showRouteSkeleton();
+}
 
-  hideRouteSkeleton();
-  skeletonTimer = window.setTimeout(() => {
-    skeletonTimer = undefined;
-    showRouteSkeleton();
-  }, SKELETON_DELAY_MS);
+function completeRouteLoading() {
+  if (pendingRouteTransition) {
+    const transition = pendingRouteTransition;
+    pendingRouteTransition = null;
+    void transition.finished.finally(() => {
+      requestAnimationFrame(hideRouteSkeleton);
+    });
+    return;
+  }
+
+  requestAnimationFrame(hideRouteSkeleton);
+}
+
+function shouldShowRouteSkeleton(from: URL, to: URL) {
+  if (isAgentMobileRoute(from.pathname)) return false;
+  if (!isDashboardShellRoute(from.pathname)) return false;
+  if (!isDashboardShellRoute(to.pathname)) return false;
+  if (isSameDashboardLocation(from, to)) return false;
+  return true;
 }
 
 function isPrimaryNavigationClick(event: MouseEvent) {
@@ -80,10 +97,27 @@ export function initDashboardRouteLoading() {
     const link = target.closest<HTMLAnchorElement>("[data-dashboard-nav-link]");
     if (!link || !shouldHandleDashboardNavClick(link)) return;
 
-    scheduleRouteSkeleton();
+    beginRouteLoading();
   });
 
-  document.addEventListener("astro:after-swap", hideRouteSkeleton);
-  document.addEventListener("astro:page-load", hideRouteSkeleton);
+  document.addEventListener("astro:before-preparation", (event) => {
+    const transitionEvent = event as Event & {
+      from?: URL;
+      to?: URL;
+    };
+    if (!transitionEvent.from || !transitionEvent.to) return;
+    if (!shouldShowRouteSkeleton(transitionEvent.from, transitionEvent.to)) return;
+
+    beginRouteLoading();
+  });
+
+  document.addEventListener("astro:before-swap", (event) => {
+    const transitionEvent = event as Event & {
+      viewTransition?: ViewTransition;
+    };
+    pendingRouteTransition = transitionEvent.viewTransition ?? null;
+  });
+
+  document.addEventListener("astro:after-swap", completeRouteLoading);
   window.addEventListener("pageshow", hideRouteSkeleton);
 }

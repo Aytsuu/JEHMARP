@@ -4,6 +4,7 @@ const ADMIN_PREVIEW_PUBLIC_PATHS = new Set([
   "/",
   "/our-story",
   "/shop",
+  "/track",
   "/business",
   "/contact",
 ]);

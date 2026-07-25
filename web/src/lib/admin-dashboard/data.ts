@@ -552,6 +552,7 @@ export type AdminSalesTableRow = {
   payment_status: AdminOrder["payment_status"];
   invoice_number: string | null;
   order_total: number;
+  net_total: number;
   paid_total: number;
   balance: number;
   payment_count: number;
@@ -1277,6 +1278,7 @@ async function loadPaginatedAdminSalesRows(
       release_date: row.release_date ?? null,
       invoice_number: row.invoice_number ?? null,
       order_total: Number(row.order_total ?? 0),
+      net_total: Number(row.net_total ?? 0),
       paid_total: Number(row.paid_total ?? 0),
       balance: Number(row.balance ?? 0),
       payment_count: Number(row.payment_count ?? 0),

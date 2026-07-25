@@ -5,7 +5,6 @@ import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import {
   formatAdminActionFeedback,
-  handleAdminDashboardAction,
   markAdminOrderReadIfUnread,
 } from "@/lib/admin-dashboard/actions";
 import {
@@ -68,19 +67,6 @@ const orderDetailTabIds = [
   "notes",
 ] as const;
 const requestedOrderDetailTab = Astro.url.searchParams.get("tab");
-
-if (Astro.request.method === "POST") {
-  return handleAdminDashboardAction(
-    Astro,
-    adminRoute.userId,
-    requestedOrderDetailTab &&
-      orderDetailTabIds.includes(
-        requestedOrderDetailTab as (typeof orderDetailTabIds)[number],
-      )
-      ? `/admin/orders/customer/${orderId}?tab=${encodeURIComponent(requestedOrderDetailTab)}`
-      : `/admin/orders/customer/${orderId}`,
-  );
-}
 
 const [dashboardData, order] = await Promise.all([
   loadAdminDashboardData(),

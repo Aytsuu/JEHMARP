@@ -1,7 +1,9 @@
 ---
 import AdminCharts from "@/components/admin/AdminCharts";
+import DashboardMetricTrend from "@/components/dashboard/DashboardMetricTrend.astro";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
+import { formatSignedMetricTrendDiff } from "@/lib/dashboard/metric-trend";
 import { formatCurrency } from "@/lib/admin-dashboard/view";
 
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
@@ -13,18 +15,30 @@ type Props = {
 const { data } = Astro.props;
 const analytics = buildAdminAnalytics(data);
 const pendingCustomerBalances = analytics.pendingCustomerBalances;
+const receivableTrend = analytics.summary.pendingOrderPaymentsTrend;
+const receivableTrendDiffLabel = formatSignedMetricTrendDiff(
+  receivableTrend.difference,
+  formatCurrency,
+);
 const numberFormatter = new Intl.NumberFormat("en-PH");
 ---
 
 <section class="admin-summary-grid" aria-label="Dashboard summary">
   <article class="admin-summary-card admin-summary-card--brand">
-    <h2>Gross Sales</h2>
-    <p>{formatCurrency(analytics.summary.grossSales)}</p>
+    <h2>Net Income</h2>
+    <p>{formatCurrency(analytics.summary.netIncome)}</p>
     <a href="/admin/sales">Review sales</a>
   </article>
   <article class="admin-summary-card" data-summary-card="pendingOrderPayments">
-    <h2>Receivables</h2>
-    <p>{formatCurrency(analytics.summary.pendingOrderPayments)}</p>
+    <h2>Receivable</h2>
+    <p class="admin-summary-card__value-with-trend">
+      {formatCurrency(analytics.summary.pendingOrderPayments)}
+      <DashboardMetricTrend
+        diff={receivableTrend.difference}
+        formattedDiff={receivableTrendDiffLabel}
+        tooltip={receivableTrend.tooltip}
+      />
+    </p>
     <button
       type="button"
       class="admin-summary-card__link"
@@ -54,7 +68,7 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
 
 <DashboardModal
   id="pending-payments-modal"
-  title="Receivables"
+  title="Receivable"
   description={`${formatCurrency(analytics.summary.pendingOrderPayments)} total unpaid balance`}
 >
   {
