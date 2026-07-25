@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAdminAnalytics } from "./analytics";
+import { buildAdminAnalytics, buildMetricTrend } from "./analytics";
 
 import type { AdminDashboardData, AdminOrder, AdminOrderItem } from "./data";
 
@@ -14,6 +14,12 @@ describe("buildAdminAnalytics", () => {
       totalPaidAmount: 310,
       outstandingBalance: 20,
       pendingOrderPayments: 20,
+      pendingOrderPaymentsTrend: {
+        previousValue: 0,
+        difference: 20,
+        direction: "up",
+        tooltip: "+₱20.00 compared to the previous 30 days. Current receivable: ₱20.00; 30 days ago: ₱0.00. Based on processing orders with unpaid balance.",
+      },
       orderCount: 3,
       newResellerApplications: 1,
       newContactInquiries: 1,
@@ -328,6 +334,52 @@ describe("buildAdminAnalytics", () => {
         ],
       },
     ]);
+  });
+
+  it("compares receivable totals against the balance 30 days ago", () => {
+    const data = createAnalyticsData();
+    const receivableOrder = order({
+      id: "receivable-order",
+      agentId: "agent-id",
+      status: "processing",
+      paymentStatus: "partial",
+      createdAt: "2026-06-01T10:00:00.000Z",
+      updatedAt: "2026-07-04T10:00:00.000Z",
+      paymentAmounts: [40, 70],
+      items: [
+        item("product-pork", "Pork Belly", "pork", 2, 100, 20, false),
+      ],
+    });
+    receivableOrder.customer_order_status_history = [
+      {
+        id: "history-processing",
+        from_status: "pending",
+        to_status: "processing",
+        changed_at: "2026-06-02T10:00:00.000Z",
+        notes: null,
+      },
+    ];
+    receivableOrder.payment = receivableOrder.payment.map((payment, index) => ({
+      ...payment,
+      created_at: index === 0 ? "2026-05-20T10:00:00.000Z" : "2026-07-01T10:00:00.000Z",
+    }));
+    data.orders = [receivableOrder];
+
+    const analytics = buildAdminAnalytics(data, new Date("2026-07-04T12:00:00.000Z"));
+
+    expect(analytics.summary.pendingOrderPayments).toBe(70);
+    expect(analytics.summary.pendingOrderPaymentsTrend).toEqual({
+      previousValue: 140,
+      difference: -70,
+      direction: "down",
+      tooltip: "-₱70.00 compared to the previous 30 days. Current receivable: ₱70.00; 30 days ago: ₱140.00. Based on processing orders with unpaid balance.",
+    });
+    expect(buildMetricTrend(120, 120)).toEqual({
+      previousValue: 120,
+      difference: 0,
+      direction: "flat",
+      tooltip: "",
+    });
   });
 
   it("does not attribute direct customer orders to the customer's assigned agent in commission analytics", () => {

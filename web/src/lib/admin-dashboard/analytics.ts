@@ -6,7 +6,9 @@ import {
   orderReceivableTotal,
   orderTotal,
   formatDate,
+  formatCurrency,
 } from "./view";
+import { formatSignedMetricTrendDiff } from "@/lib/dashboard/metric-trend";
 import { formatOrderCode } from "@/lib/order-detail-nav";
 
 import type {
@@ -18,12 +20,20 @@ import type {
   AdminResellerApplication,
 } from "./data";
 
+export type DashboardMetricTrend = {
+  previousValue: number;
+  difference: number;
+  direction: "up" | "down" | "flat";
+  tooltip: string;
+};
+
 export type AnalyticsSummary = {
   grossSales: number;
   netIncome: number;
   totalPaidAmount: number;
   outstandingBalance: number;
   pendingOrderPayments: number;
+  pendingOrderPaymentsTrend: DashboardMetricTrend;
   orderCount: number;
   newResellerApplications: number;
   newContactInquiries: number;
@@ -186,6 +196,92 @@ function isProcessingReceivable(order: AdminOrder): boolean {
   return order.order_status === "processing" && orderBalance(order) > 0;
 }
 
+function subtractDays(date: Date, days: number): Date {
+  return new Date(date.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
+function orderStatusAt(
+  order: AdminOrder,
+  at: Date,
+): AdminOrder["order_status"] | null {
+  const atTime = at.getTime();
+
+  if (new Date(order.created_at).getTime() > atTime) {
+    return null;
+  }
+
+  const latestHistory = order.customer_order_status_history
+    .filter((entry) => new Date(entry.changed_at).getTime() <= atTime)
+    .sort(
+      (left, right) =>
+        new Date(right.changed_at).getTime() - new Date(left.changed_at).getTime(),
+    )[0];
+
+  if (latestHistory) {
+    return latestHistory.to_status;
+  }
+
+  if (new Date(order.updated_at).getTime() <= atTime) {
+    return order.order_status;
+  }
+
+  return "pending";
+}
+
+function orderPaymentTotalAt(order: AdminOrder, at: Date): number {
+  const atTime = at.getTime();
+
+  return roundCurrency(
+    order.payment
+      .filter((payment) => new Date(payment.created_at).getTime() <= atTime)
+      .reduce((total, payment) => total + payment.amount, 0),
+  );
+}
+
+function processingReceivableAt(orders: AdminOrder[], at: Date): number {
+  return roundCurrency(
+    orders
+      .filter((order) => orderStatusAt(order, at) === "processing")
+      .reduce((total, order) => {
+        const balance = Math.max(
+          roundCurrency(
+            orderReceivableTotal(order, "final_quantity") - orderPaymentTotalAt(order, at),
+          ),
+          0,
+        );
+
+        return total + balance;
+      }, 0),
+  );
+}
+
+export function buildMetricTrend(
+  currentValue: number,
+  previousValue: number,
+): DashboardMetricTrend {
+  const difference = roundCurrency(currentValue - previousValue);
+
+  return {
+    previousValue,
+    difference,
+    direction: difference > 0 ? "up" : difference < 0 ? "down" : "flat",
+    tooltip: "",
+  };
+}
+
+function buildReceivablePaymentsTrend(
+  currentValue: number,
+  previousValue: number,
+): DashboardMetricTrend {
+  const trend = buildMetricTrend(currentValue, previousValue);
+  const diffLabel = formatSignedMetricTrendDiff(trend.difference, formatCurrency);
+
+  return {
+    ...trend,
+    tooltip: `${diffLabel} compared to the previous 30 days. Current receivable: ${formatCurrency(currentValue)}; 30 days ago: ${formatCurrency(previousValue)}. Based on processing orders with unpaid balance.`,
+  };
+}
+
 export function buildAdminAnalytics(
   data: AdminDashboardData,
   now = new Date(),
@@ -194,6 +290,13 @@ export function buildAdminAnalytics(
   const agentOrders = data.orders.filter((order) => getAnalyticsAgentId(order) !== null);
   const currentMonth = monthIdentifier(now);
   const currentDay = dayIdentifier(now);
+  const pendingOrderPayments = roundCurrency(data.orders
+    .filter(isProcessingReceivable)
+    .reduce((total, order) => total + orderBalance(order), 0));
+  const pendingOrderPaymentsPrevious = processingReceivableAt(
+    data.orders,
+    subtractDays(now, 30),
+  );
 
   return {
     summary: {
@@ -209,9 +312,11 @@ export function buildAdminAnalytics(
       outstandingBalance: roundCurrency(data.orders
         .filter(isOutstandingBalanceOrder)
         .reduce((total, order) => total + orderBalance(order), 0)),
-      pendingOrderPayments: roundCurrency(data.orders
-        .filter(isProcessingReceivable)
-        .reduce((total, order) => total + orderBalance(order), 0)),
+      pendingOrderPayments,
+      pendingOrderPaymentsTrend: buildReceivablePaymentsTrend(
+        pendingOrderPayments,
+        pendingOrderPaymentsPrevious,
+      ),
       orderCount: data.orders.length,
       newResellerApplications: data.resellerApplications.filter(
         (application) => application.application_status === "submitted",
