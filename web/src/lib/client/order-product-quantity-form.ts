@@ -9,8 +9,12 @@ export function initOrderProductQuantityForms(root: ParentNode = document) {
     .forEach((form) => {
       if (form.dataset[initializedFlag] === "true") return;
 
-      const input = form.querySelector<HTMLInputElement>('input[name="quantity"]');
-      const submitButton = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+      const input = form.querySelector<HTMLInputElement>(
+        "[data-order-product-quantity-input], input[name='quantity']",
+      );
+      const submitButton = form.querySelector<HTMLButtonElement>(
+        "[data-order-product-quantity-save], button[type='submit']",
+      );
 
       if (!input || !submitButton) return;
 

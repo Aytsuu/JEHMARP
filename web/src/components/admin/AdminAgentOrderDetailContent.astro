@@ -1,0 +1,1097 @@
+---
+import ActionMenu from "@/components/ActionMenu.astro";
+import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
+import DashboardModal from "@/components/dashboard/DashboardModal.astro";
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Sheet from "@/components/ui/Sheet.astro";
+import ViewButton from "@/components/ViewButton.astro";
+import type { AdminAgentOrder, AdminOrder } from "@/lib/admin-dashboard/data";
+import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
+import { getAdminOrderStatusFilters, orderSources, paymentStatuses } from "@/lib/admin-dashboard/order-filters";
+import type { AdminPagination } from "@/lib/admin-dashboard/pagination";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
+import {
+  defaultProductCommissionAmount,
+  formatCurrency,
+  formatDate,
+  formatAgentCode,
+  fullName,
+  orderPaymentTotal,
+  orderReceivableTotal,
+  productAgentCommissionLabel,
+} from "@/lib/admin-dashboard/view";
+import {
+  formatAgentOrderDistributionStatus,
+  getAgentOrderProductDistribution,
+  minimumAgentOrderItemQuantity,
+} from "@/lib/agent-order-distribution";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { formatOrderCode } from "@/lib/order-detail-nav";
+
+type PendingPaymentConfirmation = {
+  payment: NonNullable<AdminOrder["agent_received_payment"]>[number];
+  customerName: string;
+  orderId: string;
+  orderCode: string;
+  dateRequested: string;
+};
+
+type AttachCustomerCustomer = {
+  id: string;
+  label: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email: string;
+  address: string;
+  balance: number;
+  creditLimit: number;
+  creditExceeded: boolean;
+  paymentNotice: "unpaid" | "partial" | null;
+};
+
+type CustomerOrderCounts = {
+  pending: number;
+  unpaid: number;
+  partial: number;
+  paid: number;
+  total: number;
+};
+
+type Props = {
+  agentOrder: AdminAgentOrder;
+  agentOrderReturnTo: string;
+  agentDetailsHref: string | null;
+  agentName: string;
+  agentId: string | null;
+  agentContact: string;
+  agentEmail: string;
+  agentAddress: string;
+  isPendingAgentOrderApproval: boolean;
+  totalPaid: number;
+  totalCommission: number;
+  totalReceivable: number;
+  grossTotal: number;
+  balanceDue: number;
+  isCommissionLocked: boolean;
+  isQuantityEditable: boolean;
+  canAttachCustomer: boolean;
+  pendingPaymentConfirmations: PendingPaymentConfirmation[];
+  pendingPaymentConfirmationTotal: number;
+  customerOrderCounts: CustomerOrderCounts;
+  customerOrderRows: AdminOrder[];
+  ordersPagination: AdminPagination;
+  orderFilters: AdminOrderFilters;
+  attachCustomerCustomers: AttachCustomerCustomer[];
+  attachCustomerProducts: Array<{
+    id: string;
+    name: string;
+    unitLabel: string;
+    defaultPrice: number;
+    remainingQuantity?: number | null;
+  }>;
+  todayDate: string;
+  todayTime: string;
+  pageBasePath: string;
+};
+
+const {
+  agentOrder,
+  agentOrderReturnTo,
+  agentDetailsHref,
+  agentName,
+  agentId,
+  agentContact,
+  agentEmail,
+  agentAddress,
+  isPendingAgentOrderApproval,
+  totalPaid,
+  totalCommission,
+  totalReceivable,
+  grossTotal,
+  balanceDue,
+  isCommissionLocked,
+  isQuantityEditable,
+  canAttachCustomer,
+  pendingPaymentConfirmations,
+  pendingPaymentConfirmationTotal,
+  customerOrderCounts,
+  customerOrderRows,
+  ordersPagination,
+  orderFilters,
+  attachCustomerCustomers,
+  attachCustomerProducts,
+  todayDate,
+  todayTime,
+  pageBasePath,
+} = Astro.props;
+
+const orderStatuses = getAdminOrderStatusFilters();
+const paymentConfirmationModalId = "agent-order-payment-confirmation-modal";
+const productsModalId = "agent-order-products-modal";
+const productCount = agentOrder.agent_order_item.length;
+const pendingConfirmationCount = pendingPaymentConfirmations.length;
+
+function formatAmountValue(value: number) {
+  return new Intl.NumberFormat("en-PH", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function getPendingAgentReceivedPayments(order: AdminOrder) {
+  return (order.agent_received_payment ?? []).filter(
+    (payment) => payment.status === "pending_admin_confirmation",
+  );
+}
+
+function getRemainingPaymentBalance(order: AdminOrder) {
+  const invoice = order.invoice[0];
+  const orderAmount = orderReceivableTotal(
+    order,
+    invoice ? "final_quantity" : "partial_quantity",
+  );
+  const orderPaid = orderPaymentTotal(order);
+  const pendingAgentPaymentTotal = getPendingAgentReceivedPayments(order).reduce(
+    (sum, payment) => sum + payment.amount,
+    0,
+  );
+
+  return Math.max(orderAmount - orderPaid - pendingAgentPaymentTotal, 0);
+}
+
+const existingProductIds = new Set(
+  agentOrder.agent_order_item.map((item) => item.product_id),
+);
+const addableProducts = attachCustomerProducts.filter(
+  (product) => !existingProductIds.has(product.id),
+);
+const canAddProducts = isQuantityEditable && addableProducts.length > 0;
+
+const commissionBreakdown = agentOrder.agent_order_item.map((item) => {
+  const unitPrice = item.product?.default_price ?? 0;
+  const defaultCommission = defaultProductCommissionAmount({
+    product: item.product,
+    quantity: item.quantity,
+    unitPrice,
+  });
+
+  return {
+    id: item.id,
+    productName: item.product?.name ?? "Missing product",
+    quantity: item.quantity,
+    unitLabel: item.product?.unit_label ?? "unit",
+    calculationLabel: item.product
+      ? `${productAgentCommissionLabel(item.product)} × ${item.quantity}`
+      : "No commission rule",
+    defaultCommission,
+  };
+});
+
+const defaultTotalCommission = commissionBreakdown.reduce(
+  (sum, item) => sum + item.defaultCommission,
+  0,
+);
+---
+
+<div
+  class="agent-order-detail-page"
+  data-agent-order-detail-page
+  data-dashboard-record-page
+  data-admin-agent-payment-distribution-section
+>
+  {
+    !isPendingAgentOrderApproval && (
+      <section class="agent-order-detail-stats" aria-label="Distribution order overview">
+        <article class="agent-order-detail-stat">
+          <h2 class="agent-order-detail-stat__title">Agent Information</h2>
+          <dl class="agent-order-detail-stat__list">
+            <div class="agent-order-detail-stat__item">
+              <dt>Name</dt>
+              <dd>
+                {
+                  agentDetailsHref ? (
+                    <a href={agentDetailsHref}>{agentName}</a>
+                  ) : (
+                    agentName
+                  )
+                }
+              </dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Agent ID</dt>
+              <dd>{agentId ? formatAgentCode(agentId) : "—"}</dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Contact</dt>
+              <dd>
+                {
+                  agentContact !== "No contact number" ? (
+                    <a href={`tel:${agentContact}`}>{agentContact}</a>
+                  ) : (
+                    agentContact
+                  )
+                }
+              </dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Email</dt>
+              <dd>
+                {
+                  agentEmail !== "No email address" ? (
+                    <a href={`mailto:${agentEmail}`}>{agentEmail}</a>
+                  ) : (
+                    agentEmail
+                  )
+                }
+              </dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Address</dt>
+              <dd>{agentAddress}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="agent-order-detail-stat">
+          <h2 class="agent-order-detail-stat__title">Summary</h2>
+          <dl class="agent-order-detail-stat__list">
+            <div class="agent-order-detail-stat__item">
+              <dt>Paid</dt>
+              <dd>{formatCurrency(totalPaid)}</dd>
+            </div>
+            <div class="agent-order-detail-stat__item agent-order-detail-stat__item--commission">
+              <dt>Commission</dt>
+              <dd class="agent-order-detail-stat__commission-value">
+                <span class="agent-order-detail-stat__commission-amount">
+                  {formatCurrency(totalCommission)}
+                </span>
+                {
+                  !isCommissionLocked && (
+                    <button
+                      type="button"
+                      class="agent-order-detail-stat__commission-edit table-cell-trigger"
+                      data-open-cell-popover
+                      data-popover-title="Edit commission"
+                      aria-label="Edit commission"
+                    >
+                      <span class="sr-only">Edit commission</span>
+                    </button>
+                  )
+                }
+                {
+                  !isCommissionLocked && (
+                    <div class="hidden-popover-form-holder">
+                      <div class="agent-order-commission-popover">
+                        <p class="agent-order-commission-popover__intro">
+                          Update the total commission. The amount is distributed across
+                          products based on each line total.
+                        </p>
+                        <div class="agent-order-commission-popover__breakdown">
+                          {
+                            commissionBreakdown.map((item) => (
+                              <div class="agent-order-commission-popover__breakdown-item">
+                                <span class="agent-order-commission-popover__product">
+                                  {item.productName}
+                                </span>
+                                <span class="agent-order-commission-popover__calculation">
+                                  {item.calculationLabel}
+                                </span>
+                                <span class="agent-order-commission-popover__default">
+                                  Default {formatCurrency(item.defaultCommission)}
+                                </span>
+                              </div>
+                            ))
+                          }
+                        </div>
+                        <form
+                          method="post"
+                          class="agent-order-commission-popover__total-form"
+                          data-astro-reload
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="update-agent-order-total-commission"
+                          />
+                          <input
+                            type="hidden"
+                            name="agentOrderId"
+                            value={agentOrder.id}
+                          />
+                          <label class="agent-order-commission-popover__total-label" for="agent-order-commission-total">
+                            Total commission
+                          </label>
+                          <input
+                            id="agent-order-commission-total"
+                            type="number"
+                            name="amount"
+                            min="0"
+                            step="0.01"
+                            value={totalCommission.toFixed(2)}
+                            required
+                          />
+                          <button type="submit">Save</button>
+                          <p class="agent-order-commission-popover__default-total">
+                            Default total {formatCurrency(defaultTotalCommission)}
+                          </p>
+                        </form>
+                      </div>
+                    </div>
+                  )
+                }
+              </dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Receivable</dt>
+              <dd>{formatCurrency(totalReceivable)}</dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Gross Total</dt>
+              <dd>{formatCurrency(grossTotal)}</dd>
+            </div>
+          </dl>
+          <div class="agent-order-detail-stat__footer">
+            <span>Balance due</span>
+            <strong>{formatCurrency(balanceDue)}</strong>
+          </div>
+        </article>
+
+        <article class="agent-order-detail-stat">
+          <h2 class="agent-order-detail-stat__title">Customer Orders</h2>
+          <dl class="agent-order-detail-stat__list">
+            <div class="agent-order-detail-stat__item">
+              <dt>Pending</dt>
+              <dd>{customerOrderCounts.pending}</dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Unpaid</dt>
+              <dd>{customerOrderCounts.unpaid}</dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Partial</dt>
+              <dd>{customerOrderCounts.partial}</dd>
+            </div>
+            <div class="agent-order-detail-stat__item">
+              <dt>Paid</dt>
+              <dd>{customerOrderCounts.paid}</dd>
+            </div>
+          </dl>
+          <div class="agent-order-detail-stat__footer">
+            <span>Total</span>
+            <strong>{customerOrderCounts.total}</strong>
+          </div>
+        </article>
+      </section>
+    )
+  }
+
+  {
+    isPendingAgentOrderApproval ? (
+      <section class="agent-order-approval-panel" aria-labelledby="agent-order-approval-heading">
+        <div class="agent-order-approval-panel__content">
+          <span class="agent-order-approval-panel__eyebrow">Admin approval required</span>
+          <h2 id="agent-order-approval-heading">Pending Order</h2>
+          <p>
+            This agent submitted an order for admin approval. Approve it before managing products,
+            customer distribution, payment confirmations, or summary totals.
+          </p>
+        </div>
+        <form method="post" class="agent-order-approval-panel__action">
+          <input type="hidden" name="action" value="approve-agent-order" />
+          <input type="hidden" name="agentOrderId" value={agentOrder.id} />
+          <button type="submit">Approve Order</button>
+        </form>
+      </section>
+    ) : (
+      <section
+        class="agent-order-detail-customers"
+        id="agent-order-customers"
+        aria-label="Customer orders"
+      >
+        <div
+          data-interactive-table
+          data-server-pagination="true"
+          class="dashboard-interactive-table customer-record-table agent-order-customer-table"
+        >
+          <div class="table-filters order-management-toolbar">
+            <form
+              method="get"
+              action={pageBasePath}
+              class="order-filter-form"
+              aria-label="Filter customer orders"
+              data-agent-order-customers-filter-form
+            >
+              <div class="order-filter-form__field order-filter-form__field--search">
+                <input
+                  name="search"
+                  type="search"
+                  value={orderFilters.search ?? ""}
+                  placeholder="Search order ID, customer, source, or status..."
+                  autocomplete="off"
+                  aria-label="Search customer orders"
+                  data-agent-order-customers-search
+                />
+              </div>
+              <div class="order-filter-form__field">
+                <select name="source" aria-label="Filter by source">
+                  <option value="">All sources</option>
+                  {orderSources.map((source) => (
+                    <option value={source} selected={orderFilters.source === source}>
+                      {formatOrderSource(source)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div class="order-filter-form__field">
+                <select name="orderStatus" aria-label="Filter by order status">
+                  <option value="">All order statuses</option>
+                  {orderStatuses.map((status) => (
+                    <option value={status} selected={orderFilters.orderStatus === status}>
+                      {autoCapitalize(status)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div class="order-filter-form__field">
+                <select name="paymentStatus" aria-label="Filter by payment status">
+                  <option value="">All payment statuses</option>
+                  {paymentStatuses.map((status) => (
+                    <option value={status} selected={orderFilters.paymentStatus === status}>
+                      {autoCapitalize(status)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </form>
+
+            <div class="order-management-toolbar__actions">
+              <button
+                type="button"
+                class="order-management-toolbar__outline-button"
+                data-open-dashboard-modal={paymentConfirmationModalId}
+                disabled={pendingConfirmationCount === 0}
+              >
+                Payment Confirmation ({pendingConfirmationCount})
+              </button>
+              <button
+                type="button"
+                class="order-management-toolbar__outline-button"
+                data-open-dashboard-modal={productsModalId}
+                disabled={productCount === 0}
+              >
+                Product ({productCount})
+              </button>
+              {
+                agentOrder.customer_order.length > 0 && (
+                  <ActionMenu
+                    id="agent-order-customers-document-menu"
+                    menuLabel="Document options for selected customer orders"
+                    triggerLabel="Document"
+                    triggerClass="order-management-toolbar__document-menu"
+                    disabled
+                    items={[
+                      {
+                        label: "Sales Invoice",
+                        icon: "external-pdf",
+                        dataAction: "bulk-sales-invoice-pdf",
+                      },
+                      {
+                        label: "Order Slip",
+                        icon: "external-pdf",
+                        dataAction: "bulk-order-slip-pdf",
+                      },
+                    ]}
+                  />
+                )
+              }
+              <button
+                type="button"
+                class="btn-table-manage"
+                data-open-create-sheet
+                data-sheet-target="#agent-order-attach-customer-sheet"
+                disabled={!canAttachCustomer}
+                title={canAttachCustomer
+                  ? undefined
+                  : "Completed and paid agent orders cannot accept new customers."}
+              >
+                Add Customer
+              </button>
+              <button
+                type="button"
+                class="btn-table-manage"
+                data-agent-order-add-payment
+                data-open-create-sheet
+                data-sheet-target="#agent-order-payment-sheet"
+                disabled
+              >
+                Add Payment
+              </button>
+            </div>
+          </div>
+
+          <div class="dashboard-interactive-table__surface">
+            <DashboardTableBoard>
+              <table class="dashboard-table agent-order-customer-orders-table">
+                <thead>
+                  <tr>
+                    <DashboardTableNumberHeader />
+                    <th scope="col" class="dashboard-table__select-column">
+                      <label class="dashboard-table__select-all">
+                        <span class="sr-only">Select all customer orders</span>
+                        <input type="checkbox" data-order-select-all />
+                      </label>
+                    </th>
+                    <th scope="col">Date Created</th>
+                    <th scope="col">Customer</th>
+                    <th scope="col">Source</th>
+                    <th scope="col">Order Status</th>
+                    <th scope="col">Payment Status</th>
+                    <th scope="col">Total amount</th>
+                    <DashboardTableActionsHeader />
+                  </tr>
+                </thead>
+                <tbody>
+                  {
+                    customerOrderRows.length === 0 ? (
+                      <DashboardTableEmptyState
+                        colspan={9}
+                        message="No customer orders match the selected filters."
+                      />
+                    ) : (
+                      customerOrderRows.map((order, index) => {
+                        const invoice = order.invoice[0];
+                        const orderAmount = orderReceivableTotal(
+                          order,
+                          invoice ? "final_quantity" : "partial_quantity",
+                        );
+                        const orderPaid = orderPaymentTotal(order);
+                        const isPendingOrder = order.order_status === "pending";
+                        const remainingPaymentBalance = getRemainingPaymentBalance(order);
+                        const customerName = order.customer
+                          ? fullName(order.customer)
+                          : "Guest";
+                        const isPaymentEligible = remainingPaymentBalance > 0;
+
+                        return (
+                          <tr>
+                            <td class="dashboard-table__number-column">
+                              {dashboardTableRowNumber(ordersPagination, index)}
+                            </td>
+                            <td class="dashboard-table__select-column">
+                              <label class="dashboard-table__row-select">
+                                <span class="sr-only">Select order for {customerName}</span>
+                                <input
+                                  type="checkbox"
+                                  value={order.id}
+                                  data-order-row-checkbox
+                                  data-order-row-type="customer"
+                                  data-payment-order-checkbox
+                                  data-payment-order-balance={remainingPaymentBalance}
+                                  data-order-code={formatOrderCode(order.id)}
+                                  data-order-date={formatDate(order.created_at)}
+                                  data-order-balance={formatCurrency(remainingPaymentBalance)}
+                                  data-order-balance-value={remainingPaymentBalance}
+                                  data-order-payment-eligible={isPaymentEligible}
+                                />
+                              </label>
+                            </td>
+                            <td>{formatDate(order.created_at)}</td>
+                            <td>{customerName}</td>
+                            <td>{formatOrderSource(order.source)}</td>
+                            <td>
+                              <StatusBadge
+                                kind="order"
+                                status={order.order_status}
+                                label={autoCapitalize(order.order_status)}
+                              />
+                            </td>
+                            <td>
+                              <StatusBadge
+                                kind="payment"
+                                status={order.payment_status}
+                                label={autoCapitalize(order.payment_status)}
+                              />
+                            </td>
+                            <td>
+                              <span class="amount-ratio">
+                                <span class="amount-ratio__paid">
+                                  {formatCurrency(orderPaid)}
+                                </span>
+                                <span class="amount-ratio__total">
+                                  /{formatAmountValue(orderAmount)}
+                                </span>
+                              </span>
+                              {
+                                isPendingOrder && (
+                                  <span class="pending-acceptance-note">
+                                    Awaiting acceptance
+                                  </span>
+                                )
+                              }
+                            </td>
+                            <td class="dashboard-table__actions-column">
+                              {
+                                isPendingOrder ? (
+                                  <form
+                                    method="post"
+                                    class="order-table-action-form"
+                                    data-astro-reload
+                                  >
+                                    <input type="hidden" name="action" value="update-order-status" />
+                                    <input type="hidden" name="orderId" value={order.id} />
+                                    <input type="hidden" name="orderStatus" value="processing" />
+                                    <button type="submit" class="btn-table-manage">
+                                      Accept order
+                                    </button>
+                                  </form>
+                                ) : (
+                                  <ViewButton
+                                    href={`/admin/orders/customer/${order.id}?returnTo=${agentOrderReturnTo}`}
+                                  />
+                                )
+                              }
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )
+                  }
+                </tbody>
+              </table>
+            </DashboardTableBoard>
+          </div>
+
+          <DashboardTablePagination pagination={ordersPagination} />
+        </div>
+      </section>
+    )
+  }
+
+  <DashboardModal
+    id={paymentConfirmationModalId}
+    title="Payment confirmations"
+    description="Review agent-submitted payments awaiting admin confirmation."
+  >
+    {
+      pendingPaymentConfirmations.length === 0 ? (
+        <p class="agent-order-modal-empty">No payment confirmations are pending.</p>
+      ) : (
+        <div class="agent-order-payment-confirmation-modal">
+          <table class="dashboard-table agent-order-payment-confirmation-table">
+            <thead>
+              <tr>
+                <th scope="col">Customer</th>
+                <th scope="col">Order ID</th>
+                <th scope="col">Date requested</th>
+                <th scope="col">Amount</th>
+                <th scope="col" class="dashboard-table__actions-column">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                pendingPaymentConfirmations.map(({ payment, customerName, orderCode, dateRequested }) => (
+                  <tr>
+                    <td>{customerName}</td>
+                    <td>{orderCode}</td>
+                    <td>{formatDate(dateRequested)}</td>
+                    <td>{formatCurrency(payment.amount)}</td>
+                    <td class="dashboard-table__actions-column">
+                      <form method="post" class="order-table-action-form">
+                        <input type="hidden" name="action" value="confirm-agent-payment" />
+                        <input type="hidden" name="agentPaymentId" value={payment.id} />
+                        <button type="submit" class="btn-table-manage">Confirm</button>
+                      </form>
+                    </td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+
+          <form method="post" class="agent-order-payment-confirmation-modal__confirm-all">
+            <input type="hidden" name="action" value="confirm-agent-payments" />
+            {
+              pendingPaymentConfirmations.map(({ payment }) => (
+                <input type="hidden" name="agentPaymentId" value={payment.id} />
+              ))
+            }
+            <button type="submit" class="btn-table-manage">
+              Confirm all ({formatCurrency(pendingPaymentConfirmationTotal)})
+            </button>
+          </form>
+        </div>
+      )
+    }
+  </DashboardModal>
+
+  <DashboardModal
+    id={productsModalId}
+    title="Products"
+    description="Review and update ordered quantities for this distribution order."
+  >
+    <div class="agent-order-products-modal" data-order-products-list>
+      {
+        canAddProducts ? (
+            <form
+              method="post"
+              class="agent-order-products-modal__add-row"
+              data-order-product-add-form
+              data-order-product-add-row
+              hidden
+              data-astro-reload
+            >
+              <input type="hidden" name="action" value="add-agent-order-item" />
+              <input type="hidden" name="agentOrderId" value={agentOrder.id} />
+              <div class="agent-order-products-modal__add-fields">
+                <label class="sr-only" for="agent-order-add-product-select">
+                  Product
+                </label>
+                <select
+                  id="agent-order-add-product-select"
+                  name="productId"
+                  class="agent-order-products-modal__add-select"
+                  data-order-product-add-select
+                  required
+                >
+                  <option value="">Select product</option>
+                  {
+                    addableProducts.map((product) => (
+                      <option value={product.id} data-unit-label={product.unitLabel}>
+                        {product.name} - {formatCurrency(product.defaultPrice)} /{" "}
+                        {product.unitLabel}
+                      </option>
+                    ))
+                  }
+                </select>
+                <label class="sr-only" for="agent-order-add-product-quantity">
+                  Quantity
+                </label>
+                <div class="agent-order-products-modal__quantity-input">
+                  <input
+                    id="agent-order-add-product-quantity"
+                    type="number"
+                    name="quantity"
+                    class="agent-order-products-modal__add-quantity"
+                    min="0.001"
+                    step="0.001"
+                    value="1"
+                    required
+                    data-order-product-add-quantity
+                  />
+                  <span
+                    class="agent-order-products-modal__quantity-unit"
+                    data-order-product-add-unit
+                    aria-hidden="true"
+                  >
+                    {addableProducts[0]?.unitLabel ?? "unit"}
+                  </span>
+                </div>
+              </div>
+              <div class="agent-order-products-modal__add-actions">
+                <button
+                  type="submit"
+                  class="agent-order-products-modal__icon-button agent-order-products-modal__icon-button--confirm"
+                  aria-label="Save product"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.25"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  class="agent-order-products-modal__icon-button agent-order-products-modal__icon-button--cancel"
+                  data-order-product-add-cancel
+                  aria-label="Cancel"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.25"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </form>
+        ) : null
+      }
+
+      {
+        agentOrder.agent_order_item.length === 0 ? (
+          <p class="agent-order-modal-empty" data-order-product-empty>
+            No products have been added to this order yet.
+          </p>
+        ) : null
+      }
+
+      {
+        agentOrder.agent_order_item.length > 0 ? (
+          <ul class="agent-order-products-modal__list">
+            {
+              agentOrder.agent_order_item.map((item) => {
+                const unitPrice = item.product?.default_price ?? 0;
+                const lineTotal = item.quantity * unitPrice;
+                const unitLabel = item.product?.unit_label ?? "unit";
+                const distribution = getAgentOrderProductDistribution(
+                  agentOrder,
+                  item.product_id,
+                );
+                const minQuantity = minimumAgentOrderItemQuantity(
+                  distribution.approvedDistributedQuantity,
+                );
+
+                return (
+                  <li class="agent-order-products-modal__item">
+                    <div class="agent-order-products-modal__item-row">
+                      <div class="agent-order-products-modal__item-copy">
+                        <h3 class="agent-order-products-modal__item-name">
+                          {item.product?.name ?? "Missing product"}
+                        </h3>
+                        <p class="agent-order-products-modal__item-price">
+                          <span>Price per unit</span>
+                          <span>{formatCurrency(unitPrice)}</span>
+                        </p>
+                      </div>
+                      <div class="agent-order-products-modal__item-actions">
+                        <strong
+                          class="agent-order-products-modal__item-total"
+                          data-order-product-line-total
+                          data-unit-price={unitPrice}
+                        >
+                          {formatCurrency(lineTotal)}
+                        </strong>
+                        {
+                          isQuantityEditable ? (
+                            <form
+                              method="post"
+                              class="agent-order-products-modal__quantity-form"
+                              data-order-product-quantity-form
+                            >
+                              <input
+                                type="hidden"
+                                name="action"
+                                value="update-agent-order-item-quantity"
+                              />
+                              <input
+                                type="hidden"
+                                name="agentOrderItemId"
+                                value={item.id}
+                              />
+                              <label class="sr-only" for={`product-modal-qty-${item.id}`}>
+                                Quantity for {item.product?.name ?? "item"}
+                              </label>
+                              <div class="agent-order-products-modal__quantity-input">
+                                <input
+                                  id={`product-modal-qty-${item.id}`}
+                                  type="number"
+                                  name="quantity"
+                                  min={minQuantity}
+                                  step="0.001"
+                                  value={item.quantity}
+                                  required
+                                  data-order-product-quantity-input
+                                  data-initial-quantity={item.quantity}
+                                />
+                                <span
+                                  class="agent-order-products-modal__quantity-unit"
+                                  aria-hidden="true"
+                                >
+                                  {unitLabel}
+                                </span>
+                              </div>
+                              <button
+                                type="submit"
+                                data-order-product-quantity-save
+                                disabled
+                              >
+                                Save
+                              </button>
+                            </form>
+                          ) : (
+                            <span class="agent-order-products-modal__quantity-value">
+                              {item.quantity} {unitLabel}
+                            </span>
+                          )
+                        }
+                      </div>
+                    </div>
+                    <p class="agent-order-products-modal__meta">
+                      {formatAgentOrderDistributionStatus({
+                        remainingQuantity: distribution.remainingQuantity,
+                        unitLabel,
+                      })}
+                    </p>
+                  </li>
+                );
+              })
+            }
+          </ul>
+        ) : null
+      }
+
+      {
+        canAddProducts ? (
+          <footer class="agent-order-products-modal__footer">
+            <button
+              type="button"
+              class="agent-order-products-modal__add-trigger"
+              data-order-product-add-trigger
+            >
+              Add Product
+            </button>
+          </footer>
+        ) : null
+      }
+    </div>
+  </DashboardModal>
+
+  <AgentOrderAttachCustomerSheet
+    agentOrderId={agentOrder.id}
+    customers={attachCustomerCustomers}
+    products={attachCustomerProducts}
+    mode="admin"
+    canAttachCustomer={canAttachCustomer}
+  />
+
+  <Sheet id="agent-order-payment-sheet" width="42rem">
+    <div slot="header" class="order-create-sheet__header-copy">
+      <h3 class="drawer-sheet__title">Distribute payment</h3>
+      <p class="order-create-sheet__header-description">
+        Payment will be applied to the selected orders in order date sequence.
+      </p>
+    </div>
+    <form
+      id="agent-order-payment-form"
+      method="post"
+      class="order-create-form customer-payment-form"
+      data-admin-agent-payment-distribution-form
+      data-astro-reload
+    >
+      <input type="hidden" name="action" value="record-admin-agent-payment-distribution" />
+      <input type="hidden" name="agentOrderId" value={agentOrder.id} />
+      <div data-selected-payment-order-inputs hidden></div>
+
+      <article
+        class="customer-payment-sheet__orders-card"
+        data-customer-payment-orders-card
+      >
+        <button
+          type="button"
+          class="customer-payment-sheet__orders-toggle"
+          data-customer-payment-orders-toggle
+          aria-expanded="true"
+          aria-controls="agent-payment-selected-orders-panel"
+        >
+          <span
+            class="customer-payment-sheet__orders-title"
+            data-customer-payment-orders-title
+          >
+            Selected Orders (0)
+          </span>
+          <svg
+            class="customer-payment-sheet__orders-chevron"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+        <div
+          id="agent-payment-selected-orders-panel"
+          class="customer-payment-sheet__orders-panel"
+          data-customer-payment-orders-panel
+        >
+          <div
+            class="customer-payment-sheet__selected"
+            data-customer-payment-selected-orders
+          ></div>
+        </div>
+      </article>
+
+      <div class="order-create-form__payment-fields">
+        <label class="field-row">
+          <span>Amount received</span>
+          <input
+            name="amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            required
+            data-customer-payment-amount
+          />
+        </label>
+        <div class="order-create-form__field-pair">
+          <label class="field-row">
+            <span>Payment method</span>
+            <select name="paymentMethod" required>
+              <option value="Cash" selected>Cash</option>
+              <option value="Check">Check</option>
+            </select>
+          </label>
+          <label class="field-row">
+            <span>Payment terms</span>
+            <select name="paymentTerms" required>
+              <option value="Cash on Delivery (COD)" selected>
+                Cash on Delivery (COD)
+              </option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Gcash">Gcash</option>
+            </select>
+          </label>
+        </div>
+        <div class="order-create-form__field-pair">
+          <label class="field-row">
+            <span>Payment date</span>
+            <input name="paymentDate" type="date" value={todayDate} required />
+          </label>
+          <label class="field-row">
+            <span>Payment time</span>
+            <input name="paymentTime" type="time" value={todayTime} required />
+          </label>
+        </div>
+        <label class="field-row">
+          <span>Reference</span>
+          <input name="referenceNumber" />
+        </label>
+        <label class="field-row">
+          <span>Payment notes</span>
+          <textarea name="notes" rows="2"></textarea>
+        </label>
+      </div>
+    </form>
+    <div slot="footer" class="order-create-sheet__footer">
+      <div class="customer-payment-sheet__footer-total" aria-live="polite">
+        <span>Total amount</span>
+        <strong data-customer-payment-total-value>{formatCurrency(0)}</strong>
+      </div>
+      <button type="submit" form="agent-order-payment-form">
+        Distribute payment
+      </button>
+    </div>
+  </Sheet>
+</div>

@@ -106,8 +106,8 @@ const notifications = buildAgentNotifications(data);
     transition: color 0.2s ease, background-color 0.2s ease;
   }
 
-  .agent-notifications__icon-btn:hover,
-  .agent-notifications__icon-btn:focus-visible {
+  .agent-notifications__icon-btn:hover:not(:disabled),
+  .agent-notifications__icon-btn:focus-visible:not(:disabled) {
     background: rgba(17, 24, 39, 0.06);
     color: #111827;
     outline: none;

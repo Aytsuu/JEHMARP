@@ -740,6 +740,17 @@
     --dashboard-sidebar-transition: 0.18s cubic-bezier(0.33, 1, 0.68, 1);
   }
 
+  .dashboard-frame button:disabled,
+  .dashboard-frame button:disabled:hover,
+  .dashboard-frame button:disabled:active,
+  .dashboard-frame button:disabled:focus-visible,
+  .admin-content-dashboard-frame button:disabled,
+  .admin-content-dashboard-frame button:disabled:hover,
+  .admin-content-dashboard-frame button:disabled:active,
+  .admin-content-dashboard-frame button:disabled:focus-visible {
+    cursor: pointer;
+  }
+
   .dashboard-sidebar-shell {
     position: relative;
     min-width: 0;
@@ -1176,7 +1187,7 @@
     color: rgba(62, 66, 70, 0.66) !important;
   }
 
-  .dashboard-sidebar__logout-form button:hover {
+  .dashboard-sidebar__logout-form button:hover:not(:disabled) {
     background-color: #f3f4f6 !important;
     color: var(--color-brand-red) !important;
     transform: none !important;
@@ -1447,6 +1458,41 @@
     justify-content: flex-end;
     gap: 0.75rem;
     white-space: nowrap;
+  }
+
+  .order-management-toolbar__outline-button {
+    min-height: 2.35rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.375rem;
+    background-color: transparent;
+    color: var(--color-brand-muted-black);
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: normal;
+    text-transform: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+
+  .order-management-toolbar__outline-button:hover:not(:disabled) {
+    background-color: #f3f4f6;
+    color: #111827;
+  }
+
+  .order-management-toolbar__outline-button:focus-visible {
+    outline: 2px solid var(--color-brand-red);
+    outline-offset: 2px;
+  }
+
+  .order-management-toolbar__outline-button:disabled,
+  .order-management-toolbar__outline-button:disabled:hover,
+  .order-management-toolbar__outline-button:disabled:active {
+    opacity: 0.5;
+    background-color: transparent;
+    color: var(--color-brand-muted-black);
+    border-color: #d1d5db;
   }
 
   .product-management-toolbar__limit,
@@ -1818,9 +1864,9 @@
   }
 
   .admin-notifications-page[data-admin-notifications-page-scroll-parent="true"] .admin-notifications-page__inner {
-    flex: none;
+    flex: 1 0 auto;
     height: auto;
-    min-height: 0;
+    min-height: 100%;
     overflow: visible;
   }
 
@@ -2001,8 +2047,14 @@
     @apply border border-gray-300 px-3 py-2 no-underline;
   }
 
+  .admin-shell:has(.admin-summary-grid) {
+    --dashboard-card-gap: 0.85rem;
+    gap: var(--dashboard-card-gap);
+  }
+
   .admin-summary-grid {
-    @apply grid gap-4;
+    @apply grid;
+    gap: var(--dashboard-card-gap, 0.85rem);
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   }
 
@@ -2013,7 +2065,7 @@
 
   .admin-charts-shell__placeholder {
     display: grid;
-    gap: 1.5rem;
+    gap: var(--dashboard-card-gap, 0.85rem);
     min-height: 28rem;
   }
 
@@ -2039,6 +2091,7 @@
     z-index: 1;
     min-width: 0;
     max-width: 100%;
+    gap: var(--dashboard-card-gap, 0.85rem);
   }
 
   .admin-recent-activity-card {
@@ -2517,8 +2570,8 @@
     color: #374151;
   }
 
-  .alert-dialog__button--secondary:hover,
-  .alert-dialog__button--secondary:focus-visible {
+  .alert-dialog__button--secondary:hover:not(:disabled),
+  .alert-dialog__button--secondary:focus-visible:not(:disabled) {
     background: #e5e7eb;
     border-color: #d1d5db;
     outline: none;
@@ -2530,8 +2583,8 @@
     color: #ffffff;
   }
 
-  .alert-dialog__button--primary:hover,
-  .alert-dialog__button--primary:focus-visible {
+  .alert-dialog__button--primary:hover:not(:disabled),
+  .alert-dialog__button--primary:focus-visible:not(:disabled) {
     background: #8f1d1d;
     border-color: #8f1d1d;
     outline: none;
@@ -2543,8 +2596,8 @@
     color: #ffffff;
   }
 
-  .alert-dialog__button--danger:hover,
-  .alert-dialog__button--danger:focus-visible {
+  .alert-dialog__button--danger:hover:not(:disabled),
+  .alert-dialog__button--danger:focus-visible:not(:disabled) {
     background: #8f1d1d;
     border-color: #8f1d1d;
     outline: none;
@@ -2898,9 +2951,7 @@
   .dashboard-interactive-table.customer-record-table {
     --customer-record-table-row-height: 3rem;
     --customer-record-table-visible-rows: 10;
-    --customer-record-table-fixed-height: calc(
-      var(--customer-record-table-row-height) * (var(--customer-record-table-visible-rows) + 1)
-    );
+    --customer-record-table-fixed-height: calc(var(--customer-record-table-row-height) * (var(--customer-record-table-visible-rows) + 1));
     gap: 1.25rem;
     row-gap: 1.25rem;
     height: auto;
@@ -2908,8 +2959,8 @@
     grid-template-rows: auto auto auto;
   }
 
-  .dashboard-interactive-table.customer-record-table > .table-filters,
-  .dashboard-interactive-table.customer-record-table > .order-management-toolbar {
+  .dashboard-interactive-table.customer-record-table>.table-filters,
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar {
     margin-bottom: 0;
     padding: 0;
     border-bottom: 0;
@@ -2929,29 +2980,45 @@
   .dashboard-interactive-table.customer-record-table .dashboard-table-board {
     height: 100%;
     min-height: 0;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 
-  .dashboard-interactive-table.customer-record-table .dashboard-table-board > table,
-  .dashboard-interactive-table.customer-record-table .dashboard-table-board > .dashboard-table {
-    height: 100%;
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board>table,
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board>.dashboard-table {
+    height: auto;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
-    flex: 1 1 auto;
+    display: table;
+    flex: none;
   }
 
   .dashboard-interactive-table.customer-record-table .dashboard-table-board thead {
-    flex-shrink: 0;
+    display: table-header-group;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
   }
 
   .dashboard-interactive-table.customer-record-table .dashboard-table-board tbody {
-    flex: 1 1 auto;
-    min-height: 0;
+    display: table-row-group;
+    overflow: visible;
     max-height: none;
-    overflow-x: hidden;
-    overflow-y: auto;
+    flex: none;
+    width: auto;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board tbody tr {
+    display: table-row;
+    width: auto;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board tbody tr.empty-row {
+    display: table-row;
+    width: auto;
+    min-width: 0;
   }
 
   .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__footer {
@@ -2967,6 +3034,687 @@
 
   .dashboard-interactive-table.customer-record-table .order-management-toolbar__document-menu {
     min-height: 2.35rem;
+  }
+
+  .dashboard-interactive-table.agent-order-customer-table {
+    --customer-record-table-row-height: 3rem;
+    --customer-record-table-visible-rows: 10;
+    --customer-record-table-fixed-height: calc(var(--customer-record-table-row-height) * (var(--customer-record-table-visible-rows) + 1));
+  }
+
+  .agent-order-detail-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+
+  .agent-order-detail-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .agent-order-detail-stat {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    padding: 1rem 1.1rem;
+  }
+
+  .agent-order-detail-stat__title {
+    margin: 0 0 0.85rem;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .agent-order-detail-stat__list {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0;
+  }
+
+  .agent-order-detail-stat__item {
+    display: grid;
+    grid-template-columns: minmax(6rem, 7.5rem) minmax(0, 1fr);
+    gap: 0.75rem;
+    align-items: baseline;
+  }
+
+  .agent-order-detail-stat__item dt {
+    margin: 0;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.86rem;
+    font-weight: 500;
+  }
+
+  .agent-order-detail-stat__item dd {
+    margin: 0;
+    color: #111827;
+    font-size: 0.95rem;
+    font-weight: 600;
+    min-width: 0;
+  }
+
+  .agent-order-detail-stat__item dd a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .agent-order-detail-stat__item dd a:hover {
+    color: var(--color-brand-red);
+  }
+
+  .agent-order-detail-stat__item--commission dd {
+    min-width: 0;
+  }
+
+  .agent-order-detail-stat__commission-value {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-width: 0;
+  }
+
+  .agent-order-detail-stat__commission-amount {
+    color: #111827;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .agent-order-detail-stat__commission-edit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+  }
+
+  .agent-order-detail-stat__commission-edit::after {
+    position: static;
+    transform: none;
+    opacity: 0.65;
+  }
+
+  .agent-order-detail-stat__commission-edit:hover:not(:disabled),
+  .agent-order-detail-stat__commission-edit:focus-visible:not(:disabled) {
+    background-color: #f3f4f6;
+  }
+
+  .agent-order-detail-stat__footer {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 0.65rem;
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(17, 24, 39, 0.1);
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.86rem;
+    font-weight: 500;
+  }
+
+  .agent-order-detail-stat__footer strong {
+    color: #111827;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .agent-order-detail-customers {
+    min-width: 0;
+  }
+
+  .agent-order-approval-panel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 1.5rem;
+    border: 1px solid #fde68a;
+    border-radius: 0.85rem;
+    background: #fffbeb;
+    padding: 1.25rem;
+    color: #78350f;
+  }
+
+  .agent-order-approval-panel__content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .agent-order-approval-panel__eyebrow {
+    color: #92400e;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .agent-order-approval-panel h2 {
+    margin: 0;
+    color: #111827;
+    font-size: 1.15rem;
+    line-height: 1.2;
+  }
+
+  .agent-order-approval-panel p {
+    margin: 0;
+    max-width: 42rem;
+    color: #78350f;
+    font-size: 0.93rem;
+    line-height: 1.5;
+  }
+
+  .agent-order-approval-panel__action {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .agent-order-approval-panel__action button {
+    min-height: 2.5rem;
+    border: none;
+    border-radius: 0.55rem;
+    background: #991b1b;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    padding: 0 1rem;
+  }
+
+  .agent-order-customer-orders-table .amount-ratio {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0;
+    white-space: nowrap;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .agent-order-customer-orders-table .amount-ratio__total {
+    font-size: 0.82em;
+    font-weight: 500;
+    color: #9ca3af;
+  }
+
+  .pending-acceptance-note {
+    display: block;
+    margin-top: 0.2rem;
+    color: #b45309;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+
+  .agent-order-modal-empty {
+    margin: 0;
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.92rem;
+  }
+
+  .agent-order-payment-confirmation-modal {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .agent-order-payment-confirmation-modal__confirm-all {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .agent-order-products-modal {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  .agent-order-products-modal__add-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.2rem;
+    margin: 0;
+    padding: 0.4rem 0.85rem;
+    border: 1px solid rgba(17, 24, 39, 0.16);
+    border-radius: 0.45rem;
+    background: #ffffff;
+    color: #111827;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.84rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .agent-order-products-modal__add-trigger:hover {
+    background: #f9fafb;
+  }
+
+  .agent-order-products-modal__add-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.1);
+  }
+
+  .agent-order-products-modal__add-row[hidden] {
+    display: none;
+  }
+
+  .agent-order-products-modal__add-fields {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .agent-order-products-modal__add-select {
+    min-width: 0;
+    flex: 1 1 auto;
+    min-height: 2.2rem;
+    border: 1px solid rgba(17, 24, 39, 0.16);
+    border-radius: 0.45rem;
+    padding: 0.35rem 0.65rem;
+    background: #ffffff;
+    font: inherit;
+    color: #111827;
+  }
+
+  .agent-order-products-modal__add-quantity {
+    width: 4.75rem;
+    min-width: 0;
+    min-height: 2.2rem;
+    border: 0;
+    border-radius: 0;
+    padding: 0.35rem 0.55rem;
+    background: transparent;
+    font: inherit;
+    color: #111827;
+    -moz-appearance: textfield;
+  }
+
+  .agent-order-products-modal__add-quantity::-webkit-outer-spin-button,
+  .agent-order-products-modal__add-quantity::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .agent-order-products-modal__add-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .agent-order-products-modal__icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid rgba(17, 24, 39, 0.16);
+    border-radius: 0.45rem;
+    background: #ffffff;
+    cursor: pointer;
+  }
+
+  .agent-order-products-modal__icon-button--confirm {
+    color: #166534;
+    border-color: rgba(22, 101, 52, 0.22);
+    background: #f0fdf4;
+  }
+
+  .agent-order-products-modal__icon-button--confirm:hover {
+    background: #dcfce7;
+  }
+
+  .agent-order-products-modal__icon-button--cancel {
+    color: #991b1b;
+    border-color: rgba(153, 27, 27, 0.22);
+    background: #fef2f2;
+  }
+
+  .agent-order-products-modal__icon-button--cancel:hover {
+    background: #fee2e2;
+  }
+
+  .agent-order-products-modal__list {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-width: 0;
+  }
+
+  .agent-order-products-modal__item {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(17, 24, 39, 0.1);
+  }
+
+  .agent-order-products-modal__item:first-child {
+    padding-top: 0;
+  }
+
+  .agent-order-products-modal__item:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .agent-order-products-modal__item-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-width: 0;
+  }
+
+  .agent-order-products-modal__item-copy {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .agent-order-products-modal__item-name {
+    margin: 0;
+    min-width: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #111827;
+  }
+
+  .agent-order-products-modal__item-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .agent-order-products-modal__item-total {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+  }
+
+  .agent-order-products-modal__item-price {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    margin: 0;
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.82rem;
+    line-height: 1.2;
+  }
+
+  .agent-order-products-modal__item-price span:first-child {
+    color: rgba(17, 24, 39, 0.58);
+    font-weight: 500;
+  }
+
+  .agent-order-products-modal__item-price span:last-child {
+    color: #111827;
+    font-weight: 600;
+  }
+
+  .agent-order-products-modal__quantity-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  .agent-order-products-modal__quantity-input {
+    display: inline-flex;
+    align-items: stretch;
+    min-height: 2.2rem;
+    border: 1px solid rgba(17, 24, 39, 0.16);
+    border-radius: 0.45rem;
+    background: #ffffff;
+    overflow: hidden;
+  }
+
+  .agent-order-products-modal__quantity-input input[type="number"] {
+    width: 4.75rem;
+    min-width: 0;
+    min-height: 2.2rem;
+    border: 0;
+    border-radius: 0;
+    padding: 0.35rem 0.55rem;
+    background: transparent;
+    font: inherit;
+    color: #111827;
+    -moz-appearance: textfield;
+  }
+
+  .agent-order-products-modal__quantity-input input[type="number"]::-webkit-outer-spin-button,
+  .agent-order-products-modal__quantity-input input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .agent-order-products-modal__quantity-unit {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0 0.65rem;
+    border-left: 1px solid rgba(17, 24, 39, 0.12);
+    background: #f9fafb;
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .agent-order-products-modal__quantity-form button {
+    min-height: 2.2rem;
+    border: none;
+    border-radius: 0.45rem;
+    background: #991b1b;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0 0.75rem;
+  }
+
+  .agent-order-products-modal__quantity-form button:disabled {
+    opacity: 0.45;
+  }
+
+  .agent-order-products-modal__quantity-value {
+    color: #111827;
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+
+  .agent-order-products-modal__footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(17, 24, 39, 0.1);
+  }
+
+  .agent-order-products-modal__footer--inline-add {
+    min-width: 0;
+  }
+
+  .agent-order-products-modal__footer--inline-add .agent-order-products-modal__add-row--inline {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    border-bottom: 0;
+  }
+
+  .agent-order-products-modal__footer--inline-add .agent-order-products-modal__add-row--inline[hidden] {
+    display: none;
+  }
+
+  .agent-order-products-modal__meta {
+    margin: 0;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+
+  .agent-order-products-modal__item-actions .order-product-remove-form__button {
+    min-height: 2.2rem;
+    border: 1px solid rgba(153, 27, 27, 0.22);
+    border-radius: 0.45rem;
+    background: #ffffff;
+    color: #991b1b;
+    padding: 0 0.75rem;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .agent-order-products-modal__item-actions .order-product-remove-form__button:hover {
+    background: #fef2f2;
+  }
+
+  .order-products-panel__header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .order-products-panel__header-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .agent-order-commission-popover {
+    display: grid;
+    gap: 0.85rem;
+    min-width: 18rem;
+  }
+
+  .agent-order-commission-popover__intro {
+    margin: 0;
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.84rem;
+    line-height: 1.45;
+  }
+
+  .agent-order-commission-popover__breakdown {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.75rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.65rem;
+    background: #f9fafb;
+  }
+
+  .agent-order-commission-popover__breakdown-item {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .agent-order-commission-popover__product {
+    color: #111827;
+    font-size: 0.86rem;
+    font-weight: 600;
+  }
+
+  .agent-order-commission-popover__calculation,
+  .agent-order-commission-popover__default,
+  .agent-order-commission-popover__default-total {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+
+  .agent-order-commission-popover__total-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.45rem 0.65rem;
+    align-items: center;
+  }
+
+  .agent-order-commission-popover__total-label {
+    grid-column: 1 / -1;
+    color: #111827;
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .agent-order-commission-popover__total-form input[type="number"] {
+    width: 100%;
+    min-height: 2.2rem;
+    border: 1px solid rgba(17, 24, 39, 0.16);
+    border-radius: 0.45rem;
+    padding: 0.35rem 0.5rem;
+    font: inherit;
+  }
+
+  .agent-order-commission-popover__total-form button {
+    min-height: 2.2rem;
+    border: none;
+    border-radius: 0.45rem;
+    background: #991b1b;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0 0.75rem;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .agent-order-commission-popover__default-total {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  @media (max-width: 960px) {
+    .agent-order-detail-stats {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 720px) {
+    .agent-order-approval-panel {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .sr-only {
@@ -6848,7 +7596,7 @@
     transition: background-color 0.2s ease;
   }
 
-  .drawer-sheet__body form button[type="submit"]:hover {
+  .drawer-sheet__body form button[type="submit"]:hover:not(:disabled) {
     background-color: #551313;
   }
 
@@ -7095,7 +7843,7 @@
     }
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__orders-card {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__orders-card {
     border: 1px solid #e5e7eb;
     border-radius: 0.75rem;
     background: #ffffff;
@@ -7103,7 +7851,7 @@
     overflow: hidden;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__orders-toggle {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__orders-toggle {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -7119,13 +7867,13 @@
     cursor: pointer;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__orders-toggle:focus-visible {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__orders-toggle:focus-visible {
     outline: 2px solid rgba(102, 24, 24, 0.35);
     outline-offset: 2px;
     border-radius: 0.375rem;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__orders-title {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__orders-title {
     margin: 0;
     font-size: 0.92rem;
     font-weight: 500;
@@ -7134,7 +7882,7 @@
     letter-spacing: normal;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__orders-chevron {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__orders-chevron {
     width: 1rem;
     height: 1rem;
     flex-shrink: 0;
@@ -7147,73 +7895,73 @@
     transition: transform 0.2s ease;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__orders-card.is-collapsed .customer-payment-sheet__orders-chevron {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__orders-card.is-collapsed .customer-payment-sheet__orders-chevron {
     transform: rotate(-90deg);
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__orders-panel {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__orders-panel {
     max-height: 14rem;
     margin-top: 0.85rem;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__orders-card.is-collapsed .customer-payment-sheet__orders-panel {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__orders-card.is-collapsed .customer-payment-sheet__orders-panel {
     display: none;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__empty {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__empty {
     margin: 0;
     color: #6b7280;
     font-size: 0.9rem;
     line-height: 1.5;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__selected {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__selected {
     display: grid;
     gap: 0;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__order-row {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__order-row {
     padding: 0.7rem 0;
     border-bottom: 1px solid #e5e7eb;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__order-row:first-child {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__order-row:first-child {
     padding-top: 0;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__order-row:last-child {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__order-row:last-child {
     padding-bottom: 0;
     border-bottom: 0;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__order-top {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__order-top {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
     gap: 1rem;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__order-code {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__order-code {
     font-weight: 600;
     color: #111827;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__order-amount {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__order-amount {
     font-weight: 600;
     color: #111827;
     white-space: nowrap;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__order-date {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__order-date {
     display: block;
     margin-top: 0.2rem;
     font-size: 0.75rem;
     color: #9ca3af;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__footer-total {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__footer-total {
     display: flex;
     min-width: 10rem;
     flex-direction: column;
@@ -7222,7 +7970,7 @@
     margin-right: auto;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__footer-total span {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__footer-total span {
     color: #6b7280;
     font-size: 0.72rem;
     font-weight: 800;
@@ -7230,7 +7978,7 @@
     text-transform: uppercase;
   }
 
-  #customer-record-payment-sheet .customer-payment-sheet__footer-total strong {
+  :is(#customer-record-payment-sheet, #agent-order-payment-sheet) .customer-payment-sheet__footer-total strong {
     color: #111827;
     font-size: 1.1rem;
     letter-spacing: 0;
@@ -7427,7 +8175,7 @@
     letter-spacing: normal;
   }
 
-  .order-item-accordion__remove:hover {
+  .order-item-accordion__remove:hover:not(:disabled) {
     background: transparent;
     color: var(--color-brand-red);
   }
@@ -7586,8 +8334,14 @@
     transition: background-color 0.2s ease;
   }
 
-  .btn-table-manage:hover {
+  .btn-table-manage:hover:not(:disabled) {
     background-color: #551313;
+  }
+
+  .btn-table-manage:disabled,
+  .btn-table-manage:disabled:hover,
+  .btn-table-manage:disabled:active {
+    background-color: var(--color-brand-red);
   }
 
   .btn-table-manage--muted {
@@ -7600,9 +8354,16 @@
     color: var(--color-brand-muted-black);
   }
 
-  .btn-table-manage--ghost:hover {
+  .btn-table-manage--ghost:hover:not(:disabled) {
     background-color: #f3f4f6;
     color: #111827;
+  }
+
+  .btn-table-manage--ghost:disabled,
+  .btn-table-manage--ghost:disabled:hover,
+  .btn-table-manage--ghost:disabled:active {
+    background-color: transparent;
+    color: var(--color-brand-muted-black);
   }
 
   .table-action-menu {
@@ -7640,14 +8401,14 @@
     text-transform: none;
   }
 
-  .table-action-menu__trigger:hover,
-  .table-action-menu__trigger[aria-expanded="true"] {
+  .table-action-menu__trigger:hover:not(:disabled),
+  .table-action-menu__trigger[aria-expanded="true"]:not(:disabled) {
     background: rgba(17, 24, 39, 0.08);
     color: var(--color-brand-red);
   }
 
-  .table-action-menu__trigger--button:hover,
-  .table-action-menu__trigger--button[aria-expanded="true"] {
+  .table-action-menu__trigger--button:hover:not(:disabled),
+  .table-action-menu__trigger--button[aria-expanded="true"]:not(:disabled) {
     background-color: #f3f4f6;
     color: #111827;
   }
@@ -7658,10 +8419,22 @@
   }
 
   .table-action-menu__trigger:disabled,
-  .table-action-menu__trigger--button:disabled {
+  .table-action-menu__trigger--button:disabled,
+  .table-action-menu__trigger:disabled:hover,
+  .table-action-menu__trigger:disabled:active,
+  .table-action-menu__trigger--button:disabled:hover,
+  .table-action-menu__trigger--button:disabled:active {
     opacity: 0.55;
-    cursor: not-allowed;
-    pointer-events: none;
+    background: transparent;
+    color: var(--color-brand-muted-black);
+  }
+
+  .table-action-menu__trigger--button:disabled,
+  .table-action-menu__trigger--button:disabled:hover,
+  .table-action-menu__trigger--button:disabled:active {
+    background-color: transparent;
+    border-color: #d1d5db;
+    color: var(--color-brand-muted-black);
   }
 
   .table-action-menu__trigger svg {
@@ -7701,8 +8474,8 @@
     transition: background-color 0.15s ease, opacity 0.15s ease;
   }
 
-  .table-action-menu__item:hover,
-  .table-action-menu__item:focus-visible {
+  .table-action-menu__item:hover:not(:disabled):not([aria-disabled="true"]),
+  .table-action-menu__item:focus-visible:not(:disabled):not([aria-disabled="true"]) {
     background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
     opacity: 0.82;
@@ -7712,7 +8485,6 @@
   .table-action-menu__item:disabled,
   .table-action-menu__item[aria-disabled="true"] {
     opacity: 0.45;
-    cursor: not-allowed;
     pointer-events: none;
   }
 
@@ -8203,13 +8975,13 @@
     vertical-align: middle;
   }
 
-  .dashboard-interactive-table .dashboard-table th.dashboard-table__number-column + .dashboard-table__select-column,
-  .dashboard-interactive-table .dashboard-table td.dashboard-table__number-column + .dashboard-table__select-column {
+  .dashboard-interactive-table .dashboard-table th.dashboard-table__number-column+.dashboard-table__select-column,
+  .dashboard-interactive-table .dashboard-table td.dashboard-table__number-column+.dashboard-table__select-column {
     padding-left: 0.35rem;
   }
 
-  .agent-customers-table th.dashboard-table__number-column + .dashboard-table__select-column,
-  .agent-customers-table td.dashboard-table__number-column + .dashboard-table__select-column {
+  .agent-customers-table th.dashboard-table__number-column+.dashboard-table__select-column,
+  .agent-customers-table td.dashboard-table__number-column+.dashboard-table__select-column {
     padding-left: 0.35rem;
   }
 
@@ -8228,15 +9000,15 @@
     vertical-align: middle;
   }
 
-  .dashboard-table td.dashboard-table__actions-column > .order-table-action-form,
-  .dashboard-table td.dashboard-table__actions-column > .table-action-menu,
-  .dashboard-table td.dashboard-table__actions-column > .btn-table-manage,
-  .dashboard-table td.dashboard-table__actions-column > a,
-  .dashboard-table td.dashboard-table__actions-column > button,
-  .table-wrap table td.dashboard-table__actions-column > .order-table-action-form,
-  .table-wrap table td.dashboard-table__actions-column > .btn-table-manage,
-  .table-wrap table td.dashboard-table__actions-column > a,
-  .table-wrap table td.dashboard-table__actions-column > button {
+  .dashboard-table td.dashboard-table__actions-column>.order-table-action-form,
+  .dashboard-table td.dashboard-table__actions-column>.table-action-menu,
+  .dashboard-table td.dashboard-table__actions-column>.btn-table-manage,
+  .dashboard-table td.dashboard-table__actions-column>a,
+  .dashboard-table td.dashboard-table__actions-column>button,
+  .table-wrap table td.dashboard-table__actions-column>.order-table-action-form,
+  .table-wrap table td.dashboard-table__actions-column>.btn-table-manage,
+  .table-wrap table td.dashboard-table__actions-column>a,
+  .table-wrap table td.dashboard-table__actions-column>button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -8247,16 +9019,15 @@
     white-space: nowrap;
   }
 
-  .dashboard-table td.dashboard-table__actions-column > .order-table-action-form + :is(a, button, .table-action-menu, .btn-table-manage),
-  .dashboard-table td.dashboard-table__actions-column > :is(a, button, .btn-table-manage) + :is(a, button, .table-action-menu, .btn-table-manage, .order-table-action-form),
-  .table-wrap table td.dashboard-table__actions-column > :is(a, button, .btn-table-manage) + :is(a, button, .btn-table-manage) {
+  .dashboard-table td.dashboard-table__actions-column>.order-table-action-form+ :is(a, button, .table-action-menu, .btn-table-manage),
+  .dashboard-table td.dashboard-table__actions-column> :is(a, button, .btn-table-manage)+ :is(a, button, .table-action-menu, .btn-table-manage, .order-table-action-form),
+  .table-wrap table td.dashboard-table__actions-column> :is(a, button, .btn-table-manage)+ :is(a, button, .btn-table-manage) {
     margin-left: 0.5rem;
   }
 
   .dashboard-table td.dashboard-table__actions-column--wide,
   .dashboard-table th.dashboard-table__actions-column--wide,
-  .dashboard-table:has(> thead > tr > .dashboard-table__actions-column--wide)
-    td.dashboard-table__actions-column {
+  .dashboard-table:has(> thead > tr > .dashboard-table__actions-column--wide) td.dashboard-table__actions-column {
     width: 9.5rem;
     min-width: 9.5rem;
     max-width: 9.5rem;
@@ -8357,13 +9128,13 @@
     max-width: 100%;
   }
 
-  .dashboard-table td:not(.dashboard-table__actions-column) > :not(.table-action-menu):not(.hidden-popover-form-holder):not(.dashboard-table__delivery-status) {
+  .dashboard-table td:not(.dashboard-table__actions-column)> :not(.table-action-menu):not(.hidden-popover-form-holder):not(.dashboard-table__delivery-status) {
     max-width: 100%;
   }
 
-  .dashboard-table td:not(.dashboard-table__actions-column) > span:not(.status-badge):not(.order-status-cell):not(.order-customer-cell),
-  .dashboard-table td:not(.dashboard-table__actions-column) > a:not(.table-action-menu__item),
-  .dashboard-table td:not(.dashboard-table__actions-column) > button:not(.table-action-menu__trigger):not(.dashboard-table__product-button):not(.table-cell-trigger) {
+  .dashboard-table td:not(.dashboard-table__actions-column)>span:not(.status-badge):not(.order-status-cell):not(.order-customer-cell),
+  .dashboard-table td:not(.dashboard-table__actions-column)>a:not(.table-action-menu__item),
+  .dashboard-table td:not(.dashboard-table__actions-column)>button:not(.table-action-menu__trigger):not(.dashboard-table__product-button):not(.table-cell-trigger) {
     display: block;
     min-width: 0;
     max-width: 100%;
@@ -8400,7 +9171,7 @@
     overflow: hidden;
   }
 
-  .dashboard-table td > .order-status-cell {
+  .dashboard-table td>.order-status-cell {
     display: flex;
     align-items: center;
     gap: 0.4rem;
@@ -8436,7 +9207,7 @@
     overflow: visible;
   }
 
-  .dashboard-table td > .order-customer-cell {
+  .dashboard-table td>.order-customer-cell {
     display: flex;
     align-items: center;
     gap: 0.45rem;
@@ -8446,14 +9217,14 @@
     white-space: nowrap;
   }
 
-  .dashboard-table td > .order-customer-cell > .order-customer-cell__name {
+  .dashboard-table td>.order-customer-cell>.order-customer-cell__name {
     flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .dashboard-table td > .order-customer-cell > .order-customer-count {
+  .dashboard-table td>.order-customer-cell>.order-customer-count {
     flex: 0 0 auto;
   }
 
@@ -8461,27 +9232,27 @@
   .dashboard-table td>.status-badge,
   .dashboard-table td>.table-action-menu,
   .dashboard-table td>.dashboard-table__delivery-status,
-  .dashboard-table td.dashboard-table__actions-column > a,
-  .dashboard-table td.dashboard-table__actions-column > button,
-  .dashboard-table td.dashboard-table__actions-column > form {
+  .dashboard-table td.dashboard-table__actions-column>a,
+  .dashboard-table td.dashboard-table__actions-column>button,
+  .dashboard-table td.dashboard-table__actions-column>form {
     display: inline-flex;
     white-space: nowrap;
   }
 
   .dashboard-table__cell--truncate,
-  .dashboard-table__cell--truncate > button,
-  .dashboard-table__cell--truncate > div > span {
+  .dashboard-table__cell--truncate>button,
+  .dashboard-table__cell--truncate>div>span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .dashboard-table__cell--truncate > .order-customer-cell {
+  .dashboard-table__cell--truncate>.order-customer-cell {
     overflow: hidden;
     white-space: nowrap;
   }
 
-  .dashboard-table__cell--truncate > span:not(.order-customer-cell) {
+  .dashboard-table__cell--truncate>span:not(.order-customer-cell) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -8508,7 +9279,7 @@
   }
 
   .dashboard-table td.dashboard-table__badge-column .status-badge,
-  .dashboard-table td.dashboard-table__badge-only-cell > .status-badge {
+  .dashboard-table td.dashboard-table__badge-only-cell>.status-badge {
     width: 100%;
     max-width: none;
     overflow: visible;
@@ -8916,7 +9687,6 @@
 
   .table-pagination button:disabled {
     opacity: 0.4;
-    cursor: not-allowed;
   }
 
   .document-preview--pdf-like.document-preview-body {

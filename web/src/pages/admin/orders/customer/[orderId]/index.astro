@@ -316,6 +316,13 @@ const addableProducts = dashboardData.products.filter(
 const orderProductEditLockReason = hasSalesInvoice
   ? "Order products are locked after a sales invoice has been created."
   : null;
+const canAddOrderProducts = canEditOrderProducts && addableProducts.length > 0;
+
+function customerProductUnitPrice(product: (typeof dashboardData.products)[number]) {
+  return order?.customer?.is_reseller
+    ? product.reseller_price
+    : product.default_price;
+}
 
 const timelineItems = [
   ...order.payment.map((payment) => ({
@@ -865,176 +872,291 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
           role="tabpanel"
           hidden={!isOrderDetailTabActive("products")}
         >
-          <div class="order-products-panel">
+          <div class="order-products-panel" data-order-products-panel>
             <div class="order-products-panel__header">
-              <div>
+              <div class="order-products-panel__header-copy">
                 <h3 class="order-products-panel__title">Order Products</h3>
                 <p class="order-products-panel__copy">
                   Finalize products and order slip quantities before opening or
                   printing the order slip.
                 </p>
               </div>
+              <div class="order-products-panel__header-actions">
+                {
+                  orderProductEditLockReason ? (
+                    <p class="order-products-panel__lock">
+                      {orderProductEditLockReason}
+                    </p>
+                  ) : null
+                }
+              </div>
+            </div>
+
+            <div
+              class="agent-order-products-modal"
+              data-order-products-list
+              data-order-product-add-inline
+            >
               {
-                orderProductEditLockReason ? (
-                  <p class="order-products-panel__lock">
-                    {orderProductEditLockReason}
+                order.customer_order_item.length === 0 ? (
+                  <p class="agent-order-modal-empty" data-order-product-empty>
+                    No products have been added to this order yet.
                   </p>
                 ) : null
               }
-            </div>
 
-            <div class="order-products-table" role="table">
-              <div class="order-products-table__head" role="row">
-                <span class="order-products-table__number" role="columnheader" aria-hidden="true"></span>
-                <span role="columnheader">Product</span>
-                <span role="columnheader">Order Qty</span>
-                <span role="columnheader">Unit Price</span>
-                <span role="columnheader">Subtotal</span>
-                <span role="columnheader">Details</span>
-                <span class="order-products-table__actions" role="columnheader" aria-hidden="true"></span>
-              </div>
               {
-                order.customer_order_item.map((item, index) => {
-                  const itemSubtotal = item.partial_quantity * item.unit_price;
-                  const canRemoveOrderProduct =
-                    canEditOrderProducts &&
-                    order.customer_order_item.length > 1;
+                order.customer_order_item.length > 0 ? (
+                  <ul class="agent-order-products-modal__list">
+                    {
+                      order.customer_order_item.map((item) => {
+                        const itemSubtotal = item.partial_quantity * item.unit_price;
+                        const unitLabel = item.product?.unit_label ?? "unit";
+                        const canRemoveOrderProduct =
+                          canEditOrderProducts &&
+                          order.customer_order_item.length > 1;
 
-                  return (
-                    <div class="order-products-table__row" role="row">
-                      <span class="order-products-table__number" role="cell">{index + 1}</span>
-                      <span role="cell">
-                        <strong>
-                          {item.product?.name ?? "Missing product"}
-                        </strong>
-                        <small>{item.product?.unit_label ?? "unit"}</small>
-                      </span>
-                      <span role="cell">
-                        <form
-                          method="post"
-                          class="order-product-quantity-form"
-                          {...quantityValidationDataset(
-                            item,
-                            item.partial_quantity,
-                          )}
+                        return (
+                          <li class="agent-order-products-modal__item">
+                            <div class="agent-order-products-modal__item-row">
+                              <div class="agent-order-products-modal__item-copy">
+                                <h3 class="agent-order-products-modal__item-name">
+                                  {item.product?.name ?? "Missing product"}
+                                </h3>
+                                <p class="agent-order-products-modal__item-price">
+                                  <span>Price per unit</span>
+                                  <span>{formatCurrency(item.unit_price)}</span>
+                                </p>
+                              </div>
+                              <div class="agent-order-products-modal__item-actions">
+                                <strong
+                                  class="agent-order-products-modal__item-total"
+                                  data-order-product-line-total
+                                  data-unit-price={item.unit_price}
+                                >
+                                  {formatCurrency(itemSubtotal)}
+                                </strong>
+                                {
+                                  canEditOrderProducts ? (
+                                    <form
+                                      method="post"
+                                      class="agent-order-products-modal__quantity-form"
+                                      {...quantityValidationDataset(
+                                        item,
+                                        item.partial_quantity,
+                                      )}
+                                    >
+                                      <input
+                                        type="hidden"
+                                        name="action"
+                                        value="update-order-item-quantity"
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="orderItemId"
+                                        value={item.id}
+                                      />
+                                      <label
+                                        class="sr-only"
+                                        for={`customer-order-product-qty-${item.id}`}
+                                      >
+                                        Quantity for {item.product?.name ?? "item"}
+                                      </label>
+                                      <div class="agent-order-products-modal__quantity-input">
+                                        <input
+                                          id={`customer-order-product-qty-${item.id}`}
+                                          type="number"
+                                          name="quantity"
+                                          min="0.001"
+                                          step="0.001"
+                                          value={item.partial_quantity}
+                                          required
+                                          data-order-product-quantity-input
+                                          data-initial-quantity={item.partial_quantity}
+                                        />
+                                        <span
+                                          class="agent-order-products-modal__quantity-unit"
+                                          aria-hidden="true"
+                                        >
+                                          {unitLabel}
+                                        </span>
+                                      </div>
+                                      <button
+                                        type="submit"
+                                        data-order-product-quantity-save
+                                        disabled
+                                      >
+                                        Save
+                                      </button>
+                                    </form>
+                                  ) : (
+                                    <span class="agent-order-products-modal__quantity-value">
+                                      {item.partial_quantity} {unitLabel}
+                                    </span>
+                                  )
+                                }
+                                {
+                                  canRemoveOrderProduct ? (
+                                    <form
+                                      method="post"
+                                      class="order-product-remove-form"
+                                    >
+                                      <input
+                                        type="hidden"
+                                        name="action"
+                                        value="remove-order-item"
+                                      />
+                                      <input
+                                        type="hidden"
+                                        name="orderItemId"
+                                        value={item.id}
+                                      />
+                                      <button
+                                        type="submit"
+                                        class="order-product-remove-form__button"
+                                      >
+                                        Remove
+                                      </button>
+                                    </form>
+                                  ) : null
+                                }
+                              </div>
+                            </div>
+                            {
+                              item.add_details ? (
+                                <p class="agent-order-products-modal__meta">
+                                  {item.add_details}
+                                </p>
+                              ) : null
+                            }
+                          </li>
+                        );
+                      })
+                    }
+                  </ul>
+                ) : null
+              }
+
+              {
+                canAddOrderProducts ? (
+                  <footer
+                    class="agent-order-products-modal__footer agent-order-products-modal__footer--inline-add"
+                    data-order-product-add-footer
+                  >
+                    <button
+                      type="button"
+                      class="agent-order-products-modal__add-trigger"
+                      data-order-product-add-trigger
+                    >
+                      Add Product
+                    </button>
+                    <form
+                      method="post"
+                      class="agent-order-products-modal__add-row agent-order-products-modal__add-row--inline"
+                      data-order-product-add-form
+                      hidden
+                      data-astro-reload
+                    >
+                      <input type="hidden" name="action" value="add-order-item" />
+                      <input type="hidden" name="orderId" value={order.id} />
+                      <div class="agent-order-products-modal__add-fields">
+                        <label class="sr-only" for="customer-order-add-product-select">
+                          Product
+                        </label>
+                        <select
+                          id="customer-order-add-product-select"
+                          name="productId"
+                          class="agent-order-products-modal__add-select"
+                          data-order-product-add-select
+                          required
                         >
+                          <option value="">Select product</option>
+                          {
+                            addableProducts.map((product) => (
+                              <option
+                                value={product.id}
+                                data-unit-label={product.unit_label}
+                              >
+                                {product.name} -{" "}
+                                {formatCurrency(customerProductUnitPrice(product))} /{" "}
+                                {product.unit_label}
+                              </option>
+                            ))
+                          }
+                        </select>
+                        <label class="sr-only" for="customer-order-add-product-quantity">
+                          Quantity
+                        </label>
+                        <div class="agent-order-products-modal__quantity-input">
                           <input
-                            type="hidden"
-                            name="action"
-                            value="update-order-item-quantity"
-                          />
-                          <input
-                            type="hidden"
-                            name="orderItemId"
-                            value={item.id}
-                          />
-                          <input
+                            id="customer-order-add-product-quantity"
                             type="number"
                             name="quantity"
+                            class="agent-order-products-modal__add-quantity"
                             min="0.001"
                             step="0.001"
-                            value={item.partial_quantity}
-                            disabled={!canEditOrderProducts}
+                            value="1"
                             required
+                            data-order-product-add-quantity
                           />
-                          <button
-                            type="submit"
-                            disabled={!canEditOrderProducts}
+                          <span
+                            class="agent-order-products-modal__quantity-unit"
+                            data-order-product-add-unit
+                            aria-hidden="true"
                           >
-                            Save
-                          </button>
-                        </form>
-                      </span>
-                      <span role="cell">{formatCurrency(item.unit_price)}</span>
-                      <span role="cell">{formatCurrency(itemSubtotal)}</span>
-                      <span role="cell">{item.add_details ?? "None"}</span>
-                      <span class="order-products-table__actions" role="cell">
-                        <form method="post" class="order-product-remove-form">
-                          <input
-                            type="hidden"
-                            name="action"
-                            value="remove-order-item"
-                          />
-                          <input
-                            type="hidden"
-                            name="orderItemId"
-                            value={item.id}
-                          />
-                          <button
-                            type="submit"
-                            class="order-product-remove-form__button"
-                            disabled={!canRemoveOrderProduct}
+                            {addableProducts[0]?.unit_label ?? "unit"}
+                          </span>
+                        </div>
+                      </div>
+                      <div class="agent-order-products-modal__add-actions">
+                        <button
+                          type="submit"
+                          class="agent-order-products-modal__icon-button agent-order-products-modal__icon-button--confirm"
+                          aria-label="Save product"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.25"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
                           >
-                            Remove
-                          </button>
-                        </form>
-                      </span>
-                    </div>
-                  );
-                })
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="agent-order-products-modal__icon-button agent-order-products-modal__icon-button--cancel"
+                          data-order-product-add-cancel
+                          aria-label="Cancel"
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.25"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            aria-hidden="true"
+                          >
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      </div>
+                    </form>
+                  </footer>
+                ) : null
               }
             </div>
-
-            <form method="post" class="order-product-add-form">
-              <input type="hidden" name="action" value="add-order-item" />
-              <input type="hidden" name="orderId" value={order.id} />
-              <label>
-                <span>Product</span>
-                <select
-                  name="productId"
-                  disabled={!canEditOrderProducts ||
-                    addableProducts.length === 0}
-                  required
-                >
-                  <option value="">Select product</option>
-                  {
-                    addableProducts.map((product) => (
-                      <option value={product.id}>
-                        {product.name} -{" "}
-                        {formatCurrency(
-                          order.customer?.is_reseller
-                            ? product.reseller_price
-                            : product.default_price,
-                        )}{" "}
-                        / {product.unit_label}
-                      </option>
-                    ))
-                  }
-                </select>
-              </label>
-              <label>
-                <span>Quantity</span>
-                <input
-                  type="number"
-                  name="quantity"
-                  min="0.001"
-                  step="0.001"
-                  disabled={!canEditOrderProducts ||
-                    addableProducts.length === 0}
-                  required
-                />
-              </label>
-              <label>
-                <span>Details</span>
-                <input
-                  type="text"
-                  name="addDetails"
-                  disabled={!canEditOrderProducts ||
-                    addableProducts.length === 0}
-                />
-              </label>
-              <button
-                type="submit"
-                class="primary-panel-button primary-panel-button--compact"
-                disabled={!canEditOrderProducts || addableProducts.length === 0}
-              >
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 5v14"></path>
-                  <path d="M5 12h14"></path>
-                </svg>
-                <span>Add Product</span>
-              </button>
-            </form>
           </div>
         </section>
 
@@ -2479,8 +2601,8 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     cursor: pointer;
   }
 
-  .order-commission-form button:hover,
-  .order-commission-form button:focus-visible {
+  .order-commission-form button:hover:not(:disabled),
+  .order-commission-form button:focus-visible:not(:disabled) {
     background: #374151;
     outline: none;
   }
@@ -2541,7 +2663,6 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
   .order-conversion-card button:disabled {
     background: #cbd5e1;
     color: #475569;
-    cursor: not-allowed;
   }
 
   .order-conversion-card button:not(:disabled):hover,
@@ -2566,8 +2687,8 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     cursor: pointer;
   }
 
-  .order-accept-form__button:hover,
-  .order-accept-form__button:focus-visible {
+  .order-accept-form__button:hover:not(:disabled),
+  .order-accept-form__button:focus-visible:not(:disabled) {
     background: #991b1b;
     outline: none;
   }
@@ -2770,7 +2891,10 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     margin: 0;
     font-size: 1.5rem;
     line-height: 1.15;
+    font-weight: 700;
     color: #111827;
+    text-transform: none;
+    letter-spacing: normal;
   }
 
   .order-title-copy p {
@@ -2807,7 +2931,6 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
 
   .primary-panel-button:disabled {
     opacity: 0.55;
-    cursor: not-allowed;
   }
 
   .primary-panel-button--compact {
@@ -3093,12 +3216,11 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
 
   .order-products-panel__lock {
     max-width: 22rem;
-    margin-top: 0;
+    margin: 0;
     color: #991b1b;
     text-align: right;
   }
 
-  .order-products-table,
   .order-timeline-table {
     display: grid;
     overflow: hidden;
@@ -3107,26 +3229,12 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     background: #ffffff;
   }
 
-  .order-products-table__head,
-  .order-products-table__row,
   .order-timeline-table__head,
   .order-timeline-table__row {
     display: grid;
     align-items: center;
     gap: 1rem;
     padding: 0.85rem 1rem;
-  }
-
-  .order-products-table__head,
-  .order-products-table__row {
-    grid-template-columns:
-      2.25rem
-      minmax(10rem, 1.4fr)
-      minmax(11rem, 1.1fr)
-      minmax(7rem, 0.7fr)
-      minmax(7rem, 0.7fr)
-      minmax(8rem, 1fr)
-      max-content;
   }
 
   .order-timeline-table__head,
@@ -3138,7 +3246,6 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
       minmax(11rem, 0.8fr);
   }
 
-  .order-products-table__number,
   .order-timeline-table__number {
     color: #6b7280;
     font-size: 0.82rem;
@@ -3147,12 +3254,6 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     text-align: right;
   }
 
-  .order-products-table__actions {
-    justify-self: end;
-    white-space: nowrap;
-  }
-
-  .order-products-table__head,
   .order-timeline-table__head {
     background: #f8fafc;
     color: rgba(17, 24, 39, 0.58);
@@ -3162,98 +3263,15 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     letter-spacing: 0.05em;
   }
 
-  .order-products-table__row,
   .order-timeline-table__row {
     border-top: 1px solid rgba(17, 24, 39, 0.08);
     color: #111827;
     font-size: 0.9rem;
   }
 
-  .order-products-table__row strong,
   .order-timeline-table__row strong {
     display: block;
     font-size: 0.92rem;
-  }
-
-  .order-products-table__row small {
-    display: block;
-    margin-top: 0.2rem;
-    color: rgba(17, 24, 39, 0.55);
-  }
-
-  .order-product-quantity-form {
-    display: grid;
-    grid-template-columns: minmax(5.5rem, 1fr) auto;
-    gap: 0.4rem;
-  }
-
-  .order-product-quantity-form input,
-  .order-product-add-form input,
-  .order-product-add-form select {
-    min-height: 2.35rem;
-    width: 100%;
-    border: 1px solid rgba(17, 24, 39, 0.14);
-    border-radius: 0.5rem;
-    background: #ffffff;
-    padding: 0.45rem 0.65rem;
-    font: inherit;
-  }
-
-  .order-product-quantity-form button,
-  .order-product-remove-form__button {
-    min-height: 2.35rem;
-    border: 1px solid rgba(17, 24, 39, 0.12);
-    border-radius: 0.5rem;
-    background: #111827;
-    color: #ffffff;
-    padding: 0.45rem 0.65rem;
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .order-product-remove-form__button {
-    width: 100%;
-    background: #ffffff;
-    color: #991b1b;
-    border-color: rgba(153, 27, 27, 0.22);
-  }
-
-  .order-product-quantity-form button:disabled,
-  .order-product-remove-form__button:disabled,
-  .order-product-add-form :disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-  }
-
-  .order-product-add-form {
-    display: grid;
-    grid-template-columns:
-      minmax(12rem, 1.4fr)
-      minmax(7rem, 0.6fr)
-      minmax(10rem, 1fr)
-      auto;
-    align-items: end;
-    gap: 0.75rem;
-    padding: 1rem;
-    border: 1px solid rgba(17, 24, 39, 0.08);
-    border-radius: 0.75rem;
-    background: #ffffff;
-  }
-
-  .order-product-add-form label {
-    display: grid;
-    gap: 0.4rem;
-    margin: 0;
-  }
-
-  .order-product-add-form label span {
-    color: rgba(17, 24, 39, 0.58);
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
   }
 
   .panel-header,
@@ -3535,12 +3553,12 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     flex-shrink: 0;
   }
 
-  .order-notes-toolbar__button:hover,
-  .order-notes-toolbar__button.is-active {
+  .order-notes-toolbar__button:hover:not(:disabled):not(.is-active) {
     background: rgba(17, 24, 39, 0.06);
   }
 
   .order-notes-toolbar__button.is-active {
+    background: rgba(17, 24, 39, 0.06);
     color: #7f1d1d;
   }
 
@@ -4051,28 +4069,22 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
       display: grid;
     }
 
+    .order-products-panel__header-actions {
+      justify-content: flex-start;
+    }
+
     .order-products-panel__lock {
       max-width: none;
       text-align: left;
     }
 
-    .order-products-table,
     .order-timeline-table {
       overflow-x: auto;
-    }
-
-    .order-products-table__head,
-    .order-products-table__row {
-      min-width: 60rem;
     }
 
     .order-timeline-table__head,
     .order-timeline-table__row {
       min-width: 44rem;
-    }
-
-    .order-product-add-form {
-      grid-template-columns: 1fr;
     }
   }
 </style>

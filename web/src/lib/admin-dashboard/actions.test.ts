@@ -969,6 +969,24 @@ describe("parseAdminActionFormData", () => {
     });
   });
 
+  it("parses total agent order commission updates from the summary card", () => {
+    const formData = new FormData();
+    formData.set("action", "update-agent-order-total-commission");
+    formData.set("agentOrderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+    formData.set("amount", "60");
+
+    const result = parseAdminActionFormData(formData, adminUserId);
+
+    expect(result).toEqual({
+      success: true,
+      action: {
+        type: "update-agent-order-total-commission",
+        agentOrderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+        amount: 60,
+      },
+    });
+  });
+
   it("parses agent order commission updates as a single amount", () => {
     const formData = new FormData();
     formData.set("action", "update-agent-order-commission");
@@ -989,6 +1007,24 @@ describe("parseAdminActionFormData", () => {
         },
       });
     }
+  });
+
+  it("parses agent order product additions", () => {
+    const formData = new FormData();
+    formData.set("action", "add-agent-order-item");
+    formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
+    formData.set("productId", "4f65578f-3f1f-4216-9fc2-013ef06661d1");
+    formData.set("quantity", "2.5");
+
+    expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
+      success: true,
+      action: {
+        type: "add-agent-order-item",
+        agentOrderId: "11111111-1111-4111-8111-111111111111",
+        productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+        quantity: 2.5,
+      },
+    });
   });
 
   it("parses agent order approval actions", () => {
@@ -1595,6 +1631,205 @@ describe("executeAdminAction", () => {
       updated_at: expect.any(String),
     });
     expect(itemUpdateEq).toHaveBeenNthCalledWith(2, "id", secondItemId);
+  });
+
+  it("updates an agent order total commission across its order items", async () => {
+    const agentOrderId = "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb";
+    const firstItemId = "11111111-1111-4111-8111-111111111111";
+    const secondItemId = "22222222-2222-4222-8222-222222222222";
+    const customerOrderIs = vi.fn(() => Promise.resolve({
+      data: [
+        { id: "customer-order-1", payment_status: "partial" },
+      ],
+      error: null,
+    }));
+    const customerOrderEq = vi.fn(() => ({ is: customerOrderIs }));
+    const customerOrderIn = vi.fn(() => ({ eq: customerOrderEq }));
+    const customerOrderSelect = vi.fn(() => ({ in: customerOrderIn }));
+    const itemsEq = vi.fn(() => Promise.resolve({
+      data: [
+        {
+          id: firstItemId,
+          final_quantity: 3,
+          partial_quantity: 3,
+          unit_price: 300,
+        },
+        {
+          id: secondItemId,
+          final_quantity: 1,
+          partial_quantity: 1,
+          unit_price: 100,
+        },
+      ],
+      error: null,
+    }));
+    const itemSelect = vi.fn(() => ({ eq: itemsEq }));
+    const itemUpdateEq = vi.fn(() => Promise.resolve({ error: null }));
+    const itemUpdate = vi.fn(() => ({ eq: itemUpdateEq }));
+    const from = vi.fn((table: string) => {
+      if (table === "order_item") {
+        return {
+          select: itemSelect,
+          update: itemUpdate,
+        };
+      }
+
+      if (table === "order") {
+        return { select: customerOrderSelect };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from } as never, {
+      type: "update-agent-order-total-commission",
+      agentOrderId,
+      amount: 60,
+    }, adminUserId);
+
+    expect(customerOrderSelect).toHaveBeenCalledWith("id, payment_status");
+    expect(customerOrderEq).toHaveBeenCalledWith("parent_order_id", agentOrderId);
+    expect(itemSelect).toHaveBeenCalledWith("id, final_quantity, partial_quantity, unit_price");
+    expect(itemsEq).toHaveBeenCalledWith("order_id", agentOrderId);
+    expect(itemUpdate).toHaveBeenNthCalledWith(1, {
+      agent_commission_amount: 54,
+      agent_commission_updated_by: adminUserId,
+      agent_commission_updated_at: expect.any(String),
+      updated_at: expect.any(String),
+    });
+    expect(itemUpdateEq).toHaveBeenNthCalledWith(1, "id", firstItemId);
+    expect(itemUpdate).toHaveBeenNthCalledWith(2, {
+      agent_commission_amount: 6,
+      agent_commission_updated_by: adminUserId,
+      agent_commission_updated_at: expect.any(String),
+      updated_at: expect.any(String),
+    });
+    expect(itemUpdateEq).toHaveBeenNthCalledWith(2, "id", secondItemId);
+  });
+
+  it("adds a product to an agent distribution order when payments are still editable", async () => {
+    const agentOrderId = "11111111-1111-4111-8111-111111111111";
+    const productId = "4f65578f-3f1f-4216-9fc2-013ef06661d1";
+    const customerOrderIs = vi.fn(() => Promise.resolve({
+      data: [{ id: "customer-order-1", payment_status: "partial" }],
+      error: null,
+    }));
+    const customerOrderEq = vi.fn(() => ({ is: customerOrderIs }));
+    const customerOrderIn = vi.fn(() => ({ eq: customerOrderEq }));
+    const agentOrderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { id: agentOrderId },
+      error: null,
+    }));
+    const agentOrderKindEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
+    const agentOrderIdEq = vi.fn(() => ({ eq: agentOrderKindEq }));
+    const existingItemMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
+    const existingItemLimit = vi.fn(() => ({ maybeSingle: existingItemMaybeSingle }));
+    const existingItemProductEq = vi.fn(() => ({ limit: existingItemLimit }));
+    const existingItemOrderEq = vi.fn(() => ({ eq: existingItemProductEq }));
+    const existingItemSelect = vi.fn(() => ({ eq: existingItemOrderEq }));
+    const insert = vi.fn(() => Promise.resolve({ error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "order") {
+        return {
+          select: (columns: string) => {
+            if (columns === "id, payment_status") {
+              return { in: customerOrderIn };
+            }
+
+            return { eq: agentOrderIdEq };
+          },
+        };
+      }
+
+      if (table === "order_item") {
+        return {
+          select: existingItemSelect,
+          insert,
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await executeAdminAction({ from } as never, {
+      type: "add-agent-order-item",
+      agentOrderId,
+      productId,
+      quantity: 2.5,
+    }, adminUserId);
+
+    expect(agentOrderIdEq).toHaveBeenCalledWith("id", agentOrderId);
+    expect(agentOrderKindEq).toHaveBeenCalledWith("order_kind", "distribution");
+    expect(existingItemOrderEq).toHaveBeenCalledWith("order_id", agentOrderId);
+    expect(existingItemProductEq).toHaveBeenCalledWith("product_id", productId);
+    expect(insert).toHaveBeenCalledWith({
+      order_id: agentOrderId,
+      order_kind: "distribution",
+      product_id: productId,
+      partial_quantity: 2.5,
+      final_quantity: 2.5,
+      add_details: null,
+    });
+  });
+
+  it("rejects adding a duplicate product to an agent distribution order", async () => {
+    const agentOrderId = "11111111-1111-4111-8111-111111111111";
+    const productId = "4f65578f-3f1f-4216-9fc2-013ef06661d1";
+    const customerOrderIs = vi.fn(() => Promise.resolve({
+      data: [{ id: "customer-order-1", payment_status: "partial" }],
+      error: null,
+    }));
+    const customerOrderEq = vi.fn(() => ({ is: customerOrderIs }));
+    const customerOrderIn = vi.fn(() => ({ eq: customerOrderEq }));
+    const agentOrderMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { id: agentOrderId },
+      error: null,
+    }));
+    const agentOrderKindEq = vi.fn(() => ({ maybeSingle: agentOrderMaybeSingle }));
+    const agentOrderIdEq = vi.fn(() => ({ eq: agentOrderKindEq }));
+    const existingItemMaybeSingle = vi.fn(() => Promise.resolve({
+      data: { id: "existing-item-id" },
+      error: null,
+    }));
+    const existingItemLimit = vi.fn(() => ({ maybeSingle: existingItemMaybeSingle }));
+    const existingItemProductEq = vi.fn(() => ({ limit: existingItemLimit }));
+    const existingItemOrderEq = vi.fn(() => ({ eq: existingItemProductEq }));
+    const existingItemSelect = vi.fn(() => ({ eq: existingItemOrderEq }));
+    const insert = vi.fn(() => Promise.resolve({ error: null }));
+    const from = vi.fn((table: string) => {
+      if (table === "order") {
+        return {
+          select: (columns: string) => {
+            if (columns === "id, payment_status") {
+              return { in: customerOrderIn };
+            }
+
+            return { eq: agentOrderIdEq };
+          },
+        };
+      }
+
+      if (table === "order_item") {
+        return {
+          select: existingItemSelect,
+          insert,
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+
+    await expect(executeAdminAction({ from } as never, {
+      type: "add-agent-order-item",
+      agentOrderId,
+      productId,
+      quantity: 2.5,
+    }, adminUserId)).rejects.toThrow("This product is already on the agent order.");
+
+    expect(insert).not.toHaveBeenCalled();
   });
 
   it("promotes a customer to an agent, attaches existing orders, and marks the customer promoted", async () => {

@@ -539,8 +539,8 @@ const skeletonRows = Array.from({ length: 6 });
     cursor: pointer;
   }
 
-  .agent-record-table__conversion-form button:hover,
-  .agent-record-table__conversion-form button:focus-visible {
+  .agent-record-table__conversion-form button:hover:not(:disabled),
+  .agent-record-table__conversion-form button:focus-visible:not(:disabled) {
     background: #111827;
   }
 
