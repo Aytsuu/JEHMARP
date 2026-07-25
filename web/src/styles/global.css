@@ -3178,6 +3178,12 @@
     white-space: nowrap;
   }
 
+  .customer-credit-cell .status-badge {
+    flex: 0 0 auto;
+    width: max-content;
+    max-width: none;
+  }
+
   .order-customer-count {
     position: relative;
     display: inline-flex;
@@ -8311,11 +8317,51 @@
     white-space: nowrap;
   }
 
+  .dashboard-table .table-cell-trigger[data-open-cell-popover]:has(> .status-badge:only-child),
+  .dashboard-table .table-cell-trigger[data-open-cell-popover]:has(.customer-credit-cell) {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
+    box-sizing: border-box;
+  }
+
+  .dashboard-table td:has(> .table-cell-trigger[data-open-cell-popover] > .status-badge:only-child) {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .dashboard-table .table-cell-trigger[data-open-cell-popover]:has(> .status-badge:only-child) .status-badge {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .dashboard-table .table-cell-trigger[data-open-cell-popover] .customer-credit-cell .status-badge {
+    width: max-content;
+    max-width: none;
+    flex: 0 0 auto;
+  }
+
+  .dashboard-table .table-cell-trigger[data-open-cell-popover] .customer-credit-cell {
+    min-width: 0;
+    flex: 1 1 auto;
+    max-width: 100%;
+  }
+
   .dashboard-table td:not(.dashboard-table__actions-column) > :not(.table-action-menu):not(.hidden-popover-form-holder):not(.dashboard-table__delivery-status) {
     max-width: 100%;
   }
 
-  .dashboard-table td:not(.dashboard-table__actions-column) > span:not(.status-badge):not(.order-status-cell),
+  .dashboard-table td:not(.dashboard-table__actions-column) > span:not(.status-badge):not(.order-status-cell):not(.order-customer-cell),
   .dashboard-table td:not(.dashboard-table__actions-column) > a:not(.table-action-menu__item),
   .dashboard-table td:not(.dashboard-table__actions-column) > button:not(.table-action-menu__trigger):not(.dashboard-table__product-button):not(.table-cell-trigger) {
     display: block;
@@ -8333,25 +8379,55 @@
 
   .dashboard-table th.dashboard-table__badge-column,
   .dashboard-table td.dashboard-table__badge-column,
-  .dashboard-table td:has(.status-badge),
-  .dashboard-table td:has(.order-status-cell) {
+  .dashboard-table td.dashboard-table__badge-only-cell {
     width: auto;
     min-width: max-content;
     max-width: none;
     overflow: visible;
   }
 
-  .dashboard-table td:has(.status-badge) .table-cell-trigger,
-  .dashboard-table td:has(.order-status-cell) .table-cell-trigger,
-  .dashboard-table td.dashboard-table__badge-column .table-cell-trigger {
+  .dashboard-table td.dashboard-table__badge-column .table-cell-trigger,
+  .dashboard-table td.dashboard-table__badge-only-cell .table-cell-trigger {
     width: 100%;
     max-width: none;
     overflow: visible;
     text-overflow: clip;
   }
 
-  .order-status-cell {
+  .dashboard-table td:has(> .order-status-cell) {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .dashboard-table td > .order-status-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .dashboard-table .order-status-cell .status-badge {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .dashboard-table .order-status-cell .order-pending-customer-badge {
+    flex: 0 0 auto;
+  }
+
+  .order-status-cell {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    width: auto;
     max-width: none;
   }
 
@@ -8360,7 +8436,27 @@
     overflow: visible;
   }
 
-  .dashboard-table td>.order-customer-cell,
+  .dashboard-table td > .order-customer-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    white-space: nowrap;
+  }
+
+  .dashboard-table td > .order-customer-cell > .order-customer-cell__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .dashboard-table td > .order-customer-cell > .order-customer-count {
+    flex: 0 0 auto;
+  }
+
   .dashboard-table td>.customer-credit-cell,
   .dashboard-table td>.status-badge,
   .dashboard-table td>.table-action-menu,
@@ -8373,9 +8469,19 @@
   }
 
   .dashboard-table__cell--truncate,
-  .dashboard-table__cell--truncate>span,
-  .dashboard-table__cell--truncate>button,
-  .dashboard-table__cell--truncate>div>span {
+  .dashboard-table__cell--truncate > button,
+  .dashboard-table__cell--truncate > div > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dashboard-table__cell--truncate > .order-customer-cell {
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .dashboard-table__cell--truncate > span:not(.order-customer-cell) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -8401,9 +8507,8 @@
     white-space: nowrap;
   }
 
-  .dashboard-table .status-badge,
-  .dashboard-table td:has(.status-badge) .status-badge,
-  .dashboard-table td.dashboard-table__badge-column .status-badge {
+  .dashboard-table td.dashboard-table__badge-column .status-badge,
+  .dashboard-table td.dashboard-table__badge-only-cell > .status-badge {
     width: 100%;
     max-width: none;
     overflow: visible;

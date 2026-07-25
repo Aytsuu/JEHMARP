@@ -321,6 +321,35 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
         );
       }
 
+      function isBadgeOnlyTableCell(cell: HTMLElement) {
+        if (cell.querySelector(".customer-credit-cell, .order-status-cell")) {
+          return false;
+        }
+
+        if (cell.querySelector(".table-cell-trigger[data-open-cell-popover]")) {
+          return false;
+        }
+
+        if (cell.classList.contains("dashboard-table__badge-column")) {
+          return true;
+        }
+
+        const meaningfulChildren = [...cell.children].filter(
+          (child) => !child.classList.contains("hidden-popover-form-holder"),
+        );
+
+        if (meaningfulChildren.length !== 1) {
+          return false;
+        }
+
+        const content = meaningfulChildren[0];
+        if (content.classList.contains("status-badge")) {
+          return true;
+        }
+
+        return false;
+      }
+
       function isBadgeTableColumn(
         bodyRows: HTMLTableRowElement[],
         columnIndex: number,
@@ -329,11 +358,24 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
           const cell = row.children[columnIndex] as HTMLElement | undefined;
           if (!cell) return false;
 
-          return Boolean(
-            cell.classList.contains("dashboard-table__badge-column")
-              || cell.querySelector(".status-badge, .order-status-cell"),
-          );
+          return isBadgeOnlyTableCell(cell);
         });
+      }
+
+      function markBadgeOnlyTableCells(board: HTMLElement) {
+        const table = board.querySelector("table");
+        const tbody = table?.querySelector("tbody");
+        if (!tbody) return;
+
+        for (const row of tbody.rows) {
+          for (const cell of row.cells) {
+            if (isBadgeOnlyTableCell(cell)) {
+              cell.classList.add("dashboard-table__badge-only-cell");
+            } else {
+              cell.classList.remove("dashboard-table__badge-only-cell");
+            }
+          }
+        }
       }
 
       function shouldSyncTableColumnWidth(
@@ -376,6 +418,8 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
         const thead = table?.querySelector("thead");
         const tbody = table?.querySelector("tbody");
         if (!table || !thead || !tbody) return;
+
+        markBadgeOnlyTableCells(board);
 
         table.querySelectorAll<HTMLTableCellElement>("th, td").forEach((cell) => {
           cell.style.removeProperty("width");
