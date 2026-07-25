@@ -1,0 +1,614 @@
+---
+import ActionMenu from "@/components/ActionMenu.astro";
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import TableActionMenu from "@/components/TableActionMenu.astro";
+import ViewButton from "@/components/ViewButton.astro";
+import type { AdminOrder } from "@/lib/admin-dashboard/data";
+import type {
+  CustomerInvoiceRow,
+  CustomerPaymentRow,
+  CustomerRecordTab,
+  CustomerSalesRow,
+} from "@/lib/admin-dashboard/customer-record";
+import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
+import { getAdminOrderStatusFilters, orderSources, paymentStatuses } from "@/lib/admin-dashboard/order-filters";
+import type { AdminPagination } from "@/lib/admin-dashboard/pagination";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
+import {
+  formatCurrency,
+  formatDate,
+  formatSalePaymentSummary,
+  orderBalance,
+} from "@/lib/admin-dashboard/view";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { formatOrderCode } from "@/lib/order-detail-nav";
+
+type Props = {
+  tab: CustomerRecordTab;
+  customerBasePath: string;
+  customerReturnTo: string;
+  orderFilters: AdminOrderFilters;
+  orderRows: AdminOrder[];
+  ordersPagination: AdminPagination;
+  salesRows: CustomerSalesRow[];
+  salesPagination: AdminPagination;
+  invoiceRows: CustomerInvoiceRow[];
+  invoicesPagination: AdminPagination;
+  paymentRows: CustomerPaymentRow[];
+  paymentsPagination: AdminPagination;
+  showOrdersToolbarActions?: boolean;
+};
+
+const {
+  tab,
+  customerBasePath,
+  customerReturnTo,
+  orderFilters,
+  orderRows,
+  ordersPagination,
+  salesRows,
+  salesPagination,
+  invoiceRows,
+  invoicesPagination,
+  paymentRows,
+  paymentsPagination,
+  showOrdersToolbarActions = false,
+} = Astro.props;
+
+const orderStatuses = getAdminOrderStatusFilters();
+const skeletonRows = Array.from({ length: 6 });
+---
+
+{
+  tab === "orders" && (
+    <>
+      <div
+        data-interactive-table
+        data-server-pagination="true"
+        class="dashboard-interactive-table customer-record-table"
+      >
+        <div class="table-filters order-management-toolbar">
+          <form
+            method="get"
+            action={customerBasePath}
+            class="order-filter-form"
+            aria-label="Filter customer orders"
+            data-customer-record-orders-filter-form
+          >
+            <input type="hidden" name="tab" value="orders" />
+            <div class="order-filter-form__field order-filter-form__field--search">
+              <input
+                name="search"
+                type="search"
+                value={orderFilters.search ?? ""}
+                placeholder="Search order ID, source, or status..."
+                autocomplete="off"
+                aria-label="Search orders"
+                data-customer-record-orders-search
+              />
+            </div>
+            <div class="order-filter-form__field">
+              <select name="source" aria-label="Filter by source">
+                <option value="">All sources</option>
+                {orderSources.map((source) => (
+                  <option value={source} selected={orderFilters.source === source}>
+                    {formatOrderSource(source)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="order-filter-form__field">
+              <select name="orderStatus" aria-label="Filter by order status">
+                <option value="">All order statuses</option>
+                {orderStatuses.map((status) => (
+                  <option value={status} selected={orderFilters.orderStatus === status}>
+                    {autoCapitalize(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="order-filter-form__field">
+              <select name="paymentStatus" aria-label="Filter by payment status">
+                <option value="">All payment statuses</option>
+                {paymentStatuses.map((status) => (
+                  <option value={status} selected={orderFilters.paymentStatus === status}>
+                    {autoCapitalize(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </form>
+          {
+            showOrdersToolbarActions && (
+              <div class="order-management-toolbar__actions">
+                <ActionMenu
+                  id="customer-record-document-menu"
+                  menuLabel="Document options for selected orders"
+                  triggerLabel="Document"
+                  triggerClass="order-management-toolbar__document-menu"
+                  disabled
+                  items={[
+                    {
+                      label: "Sales Invoice",
+                      icon: "external-pdf",
+                      dataAction: "bulk-sales-invoice-pdf",
+                    },
+                    {
+                      label: "Order Slip",
+                      icon: "external-pdf",
+                      dataAction: "bulk-order-slip-pdf",
+                    },
+                  ]}
+                />
+                <button
+                  type="button"
+                  class="btn-table-manage"
+                  data-customer-add-payment
+                  data-open-create-sheet
+                  data-sheet-target="#customer-record-payment-sheet"
+                  disabled
+                >
+                  Add Payment
+                </button>
+              </div>
+            )
+          }
+        </div>
+
+        <div data-customer-record-orders-table-shell class="dashboard-interactive-table__surface">
+          <DashboardTableBoard>
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <DashboardTableNumberHeader />
+                  <th scope="col" class="dashboard-table__select-column">
+                    <label class="dashboard-table__select-all">
+                      <span class="sr-only">Select all orders on this page</span>
+                      <input type="checkbox" data-order-select-all />
+                    </label>
+                  </th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Order ID</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Order Status</th>
+                  <th scope="col">Payment Status</th>
+                  <th scope="col">Balance</th>
+                  <DashboardTableActionsHeader />
+                </tr>
+              </thead>
+              <tbody>
+                {orderRows.length === 0 ? (
+                  <DashboardTableEmptyState colspan={9} message="No orders match the selected filters." />
+                ) : orderRows.map((order, index) => {
+                  const balance = orderBalance(order);
+                  const isPaid = order.payment_status === "paid";
+                  return (
+                    <tr>
+                      <td class="dashboard-table__number-column">{dashboardTableRowNumber(ordersPagination, index)}</td>
+                      <td class="dashboard-table__select-column">
+                        <label class="dashboard-table__row-select">
+                          <span class="sr-only">Select order {formatOrderCode(order.id)}</span>
+                          <input
+                            type="checkbox"
+                            value={order.id}
+                            data-order-row-checkbox
+                            data-order-row-type="customer"
+                            data-order-code={formatOrderCode(order.id)}
+                            data-order-date={formatDate(order.created_at)}
+                            data-order-balance={formatCurrency(balance)}
+                            data-order-balance-value={balance}
+                            data-order-payment-eligible={!isPaid}
+                          />
+                        </label>
+                      </td>
+                      <td>{formatDate(order.created_at)}</td>
+                      <td>{formatOrderCode(order.id)}</td>
+                      <td>{formatOrderSource(order.source)}</td>
+                      <td>
+                        <StatusBadge kind="order" status={order.order_status} label={autoCapitalize(order.order_status)} />
+                      </td>
+                      <td>
+                        <StatusBadge kind="payment" status={order.payment_status} label={autoCapitalize(order.payment_status)} />
+                      </td>
+                      <td>{formatCurrency(balance)}</td>
+                      <td class="dashboard-table__actions-column">
+                        <ViewButton href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`} data-astro-prefetch="false" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </DashboardTableBoard>
+        </div>
+
+        <DashboardTablePagination pagination={ordersPagination} />
+      </div>
+
+      <template data-customer-record-orders-filter-skeleton>
+        <DashboardTableBoard aria-busy="true" aria-live="polite">
+          <table class="product-table-skeleton dashboard-table">
+            <caption class="sr-only">Loading filtered customer orders</caption>
+            <thead>
+              <tr>
+                <DashboardTableNumberHeader />
+                <th scope="col" class="dashboard-table__select-column">
+                  <span class="table-skeleton-block table-skeleton-block--short"></span>
+                </th>
+                <th scope="col">Date</th>
+                <th scope="col">Order ID</th>
+                <th scope="col">Source</th>
+                <th scope="col">Order Status</th>
+                <th scope="col">Payment Status</th>
+                <th scope="col">Balance</th>
+                <DashboardTableActionsHeader />
+              </tr>
+            </thead>
+            <tbody>
+              {skeletonRows.map(() => (
+                <tr>
+                  <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DashboardTableBoard>
+      </template>
+    </>
+  )
+}
+
+{
+  tab === "sales" && (
+    <>
+      <div
+        data-interactive-table
+        data-server-pagination="true"
+        class="dashboard-interactive-table customer-record-table"
+      >
+        <div class="table-filters order-management-toolbar">
+          <form
+            method="get"
+            action={customerBasePath}
+            class="order-filter-form"
+            aria-label="Filter customer sales"
+            data-customer-record-sales-filter-form
+          >
+            <input type="hidden" name="tab" value="sales" />
+            <div class="order-filter-form__field order-filter-form__field--search">
+              <input
+                name="search"
+                type="search"
+                value={orderFilters.search ?? ""}
+                placeholder="Search sale, invoice, or source..."
+                autocomplete="off"
+                aria-label="Search sales"
+                data-customer-record-sales-search
+              />
+            </div>
+            <div class="order-filter-form__field">
+              <select name="source" aria-label="Filter by source">
+                <option value="">All sources</option>
+                {orderSources.map((source) => (
+                  <option value={source} selected={orderFilters.source === source}>
+                    {formatOrderSource(source)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div data-customer-record-sales-table-shell class="dashboard-interactive-table__surface">
+          <DashboardTableBoard>
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <DashboardTableNumberHeader />
+                  <th scope="col">Order Date</th>
+                  <th scope="col">Sale Date</th>
+                  <th scope="col">Order ID</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Amount</th>
+                  <th scope="col">Payments</th>
+                  <DashboardTableActionsHeader />
+                </tr>
+              </thead>
+              <tbody>
+                {salesRows.length === 0 ? (
+                  <DashboardTableEmptyState colspan={8} message="No sales match the selected filters." />
+                ) : salesRows.map((sale, index) => (
+                  <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(salesPagination, index)}</td>
+                    <td>{formatDate(sale.created_at)}</td>
+                    <td>{formatDate(sale.sale_date)}</td>
+                    <td>{formatOrderCode(sale.id)}</td>
+                    <td>{sale.source_label}</td>
+                    <td>{formatCurrency(sale.order_total)}</td>
+                    <td>{formatSalePaymentSummary(sale.payment_count)}</td>
+                    <td class="dashboard-table__actions-column">
+                      <TableActionMenu
+                        menuLabel={`Open actions for sale ${formatOrderCode(sale.id)}`}
+                        pdfHref={sale.invoice_number ? `/admin/orders/customer/${sale.id}/sales-invoice.pdf` : undefined}
+                        detailsHref={sale.href}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DashboardTableBoard>
+        </div>
+
+        <DashboardTablePagination pagination={salesPagination} />
+      </div>
+
+      <template data-customer-record-sales-filter-skeleton>
+        <DashboardTableBoard aria-busy="true" aria-live="polite">
+          <table class="product-table-skeleton dashboard-table">
+            <caption class="sr-only">Loading filtered customer sales</caption>
+            <thead>
+              <tr>
+                <DashboardTableNumberHeader />
+                <th scope="col">Order Date</th>
+                <th scope="col">Sale Date</th>
+                <th scope="col">Order ID</th>
+                <th scope="col">Source</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Payments</th>
+                <DashboardTableActionsHeader />
+              </tr>
+            </thead>
+            <tbody>
+              {skeletonRows.map(() => (
+                <tr>
+                  <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DashboardTableBoard>
+      </template>
+    </>
+  )
+}
+
+{
+  tab === "invoices" && (
+    <>
+      <div
+        data-interactive-table
+        data-server-pagination="true"
+        class="dashboard-interactive-table customer-record-table"
+      >
+        <div class="table-filters order-management-toolbar">
+          <form
+            method="get"
+            action={customerBasePath}
+            class="order-filter-form"
+            aria-label="Filter customer invoices"
+            data-customer-record-invoices-filter-form
+          >
+            <input type="hidden" name="tab" value="invoices" />
+            <div class="order-filter-form__field order-filter-form__field--search">
+              <input
+                name="search"
+                type="search"
+                value={orderFilters.search ?? ""}
+                placeholder="Search invoice number or order ID..."
+                autocomplete="off"
+                aria-label="Search invoices"
+                data-customer-record-invoices-search
+              />
+            </div>
+          </form>
+        </div>
+
+        <div data-customer-record-invoices-table-shell class="dashboard-interactive-table__surface">
+          <DashboardTableBoard>
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <DashboardTableNumberHeader />
+                  <th scope="col">Date Created</th>
+                  <th scope="col">Invoice Number</th>
+                  <th scope="col">Order ID</th>
+                  <th scope="col">Invoice Total</th>
+                  <th scope="col">Paid</th>
+                  <th scope="col">Balance</th>
+                  <DashboardTableActionsHeader />
+                </tr>
+              </thead>
+              <tbody>
+                {invoiceRows.length === 0 ? (
+                  <DashboardTableEmptyState colspan={8} message="No invoices match the selected filters." />
+                ) : invoiceRows.map((invoice, index) => (
+                  <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(invoicesPagination, index)}</td>
+                    <td>{formatDate(invoice.invoice_created_at)}</td>
+                    <td>{invoice.invoice_number}</td>
+                    <td>{formatOrderCode(invoice.order_id)}</td>
+                    <td>{formatCurrency(invoice.invoice_total)}</td>
+                    <td>{formatCurrency(invoice.paid_total)}</td>
+                    <td>{formatCurrency(invoice.balance)}</td>
+                    <td class="dashboard-table__actions-column">
+                      <TableActionMenu
+                        menuLabel={`Open actions for invoice ${invoice.invoice_number}`}
+                        pdfHref={`/admin/orders/customer/${invoice.order_id}/sales-invoice.pdf`}
+                        detailsHref={invoice.href}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DashboardTableBoard>
+        </div>
+
+        <DashboardTablePagination pagination={invoicesPagination} />
+      </div>
+
+      <template data-customer-record-invoices-filter-skeleton>
+        <DashboardTableBoard aria-busy="true" aria-live="polite">
+          <table class="product-table-skeleton dashboard-table">
+            <caption class="sr-only">Loading filtered customer invoices</caption>
+            <thead>
+              <tr>
+                <DashboardTableNumberHeader />
+                <th scope="col">Date Created</th>
+                <th scope="col">Invoice Number</th>
+                <th scope="col">Order ID</th>
+                <th scope="col">Invoice Total</th>
+                <th scope="col">Paid</th>
+                <th scope="col">Balance</th>
+                <DashboardTableActionsHeader />
+              </tr>
+            </thead>
+            <tbody>
+              {skeletonRows.map(() => (
+                <tr>
+                  <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DashboardTableBoard>
+      </template>
+    </>
+  )
+}
+
+{
+  tab === "payments" && (
+    <>
+      <div
+        data-interactive-table
+        data-server-pagination="true"
+        class="dashboard-interactive-table customer-record-table"
+      >
+        <div class="table-filters order-management-toolbar">
+          <form
+            method="get"
+            action={customerBasePath}
+            class="order-filter-form"
+            aria-label="Filter customer payment records"
+            data-customer-record-payments-filter-form
+          >
+            <input type="hidden" name="tab" value="payments" />
+            <div class="order-filter-form__field order-filter-form__field--search">
+              <input
+                name="search"
+                type="search"
+                value={orderFilters.search ?? ""}
+                placeholder="Search order ID, method, or reference..."
+                autocomplete="off"
+                aria-label="Search payment records"
+                data-customer-record-payments-search
+              />
+            </div>
+          </form>
+        </div>
+
+        <div data-customer-record-payments-table-shell class="dashboard-interactive-table__surface">
+          <DashboardTableBoard>
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <DashboardTableNumberHeader />
+                  <th scope="col">Payment Date</th>
+                  <th scope="col">Order ID</th>
+                  <th scope="col">Method</th>
+                  <th scope="col">Terms</th>
+                  <th scope="col">Amount</th>
+                  <th scope="col">Reference</th>
+                  <DashboardTableActionsHeader />
+                </tr>
+              </thead>
+              <tbody>
+                {paymentRows.length === 0 ? (
+                  <DashboardTableEmptyState colspan={8} message="No payment records match the selected filters." />
+                ) : paymentRows.map((payment, index) => (
+                  <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(paymentsPagination, index)}</td>
+                    <td>{formatDate(payment.payment_date)}</td>
+                    <td>{formatOrderCode(payment.order_id)}</td>
+                    <td>{autoCapitalize(payment.payment_method)}</td>
+                    <td>{autoCapitalize(payment.payment_terms)}</td>
+                    <td>{formatCurrency(payment.amount)}</td>
+                    <td>{payment.reference_number ?? "—"}</td>
+                    <td class="dashboard-table__actions-column">
+                      <ViewButton href={payment.href} label={`View payment for order ${formatOrderCode(payment.order_id)}`} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DashboardTableBoard>
+        </div>
+
+        <DashboardTablePagination pagination={paymentsPagination} />
+      </div>
+
+      <template data-customer-record-payments-filter-skeleton>
+        <DashboardTableBoard aria-busy="true" aria-live="polite">
+          <table class="product-table-skeleton dashboard-table">
+            <caption class="sr-only">Loading filtered customer payment records</caption>
+            <thead>
+              <tr>
+                <DashboardTableNumberHeader />
+                <th scope="col">Payment Date</th>
+                <th scope="col">Order ID</th>
+                <th scope="col">Method</th>
+                <th scope="col">Terms</th>
+                <th scope="col">Amount</th>
+                <th scope="col">Reference</th>
+                <DashboardTableActionsHeader />
+              </tr>
+            </thead>
+            <tbody>
+              {skeletonRows.map(() => (
+                <tr>
+                  <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DashboardTableBoard>
+      </template>
+    </>
+  )
+}

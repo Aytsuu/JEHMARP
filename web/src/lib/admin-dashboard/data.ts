@@ -345,6 +345,7 @@ export type AdminAgent = {
   status: "active" | "inactive" | "suspended";
   email: string | null;
   contact: string | null;
+  address: string;
   created_at: string;
   updated_at: string;
 };

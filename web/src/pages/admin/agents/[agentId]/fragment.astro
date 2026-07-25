@@ -1,0 +1,163 @@
+---
+import AdminAgentRecordTabTable from "@/components/admin/AdminAgentRecordTabTable.astro";
+import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordTabTable.astro";
+import {
+  buildAgentAssignedCustomerRows,
+  buildAgentPreviousOrderRows,
+  buildAgentRecordOrderRows,
+  filterAgentAssignedCustomerRows,
+  filterAgentPreviousOrderRows,
+  filterAgentRecordOrderRows,
+  isAgentCustomerLikeTab,
+  paginateAgentRecords,
+  parseAgentRecordFilters,
+  parseAgentRecordTab,
+} from "@/lib/admin-dashboard/agent-record";
+import type { CustomerRecordTab } from "@/lib/admin-dashboard/customer-record";
+import {
+  buildCustomerInvoiceRows,
+  buildCustomerPaymentRows,
+  buildCustomerSalesRows,
+  filterCustomerInvoiceRows,
+  filterCustomerPaymentRows,
+  filterCustomerSalesRows,
+} from "@/lib/admin-dashboard/customer-record";
+import { loadAdminAgentDetailsData } from "@/lib/admin-dashboard/data";
+import { parseAdminPagination } from "@/lib/admin-dashboard/pagination";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import {
+  canConvertPromotedCustomerOrderToDistribution,
+  getCustomerOrderDistributionConversionBlockReason,
+  orderBalance,
+  orderTotal,
+} from "@/lib/admin-dashboard/view";
+import { setDashboardFragmentResponseHeaders } from "@/lib/dashboard/fragment-response";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+setDashboardFragmentResponseHeaders(Astro);
+
+const { agentId } = Astro.params;
+
+if (!agentId) {
+  return new Response("Agent not found.", { status: 404 });
+}
+
+const detailData = await loadAdminAgentDetailsData(agentId);
+
+if (!detailData) {
+  return new Response("Agent not found.", { status: 404 });
+}
+
+const agent = detailData.agent;
+const activeTab = parseAgentRecordTab(Astro.url.searchParams.get("tab"));
+const orderFilters = parseAgentRecordFilters(Astro.url);
+const pagination = parseAdminPagination(Astro.url);
+const agentReturnTo = encodeURIComponent(`/admin/agents/${agent.id}`);
+const agentBasePath = `/admin/agents/${agent.id}`;
+const customerOrders = detailData.customerOrders;
+
+const filteredOrders = filterAgentRecordOrderRows(
+  buildAgentRecordOrderRows(customerOrders, detailData.agentOrders, agentReturnTo),
+  orderFilters,
+);
+const paginatedOrders = paginateAgentRecords(
+  filteredOrders,
+  pagination.page,
+  pagination.pageSize,
+);
+const salesRows = filterCustomerSalesRows(
+  buildCustomerSalesRows(customerOrders, agentReturnTo),
+  orderFilters,
+);
+const paginatedSales = paginateAgentRecords(
+  salesRows,
+  pagination.page,
+  pagination.pageSize,
+);
+const invoiceRows = filterCustomerInvoiceRows(
+  buildCustomerInvoiceRows(customerOrders, agentReturnTo),
+  orderFilters.search,
+);
+const paginatedInvoices = paginateAgentRecords(
+  invoiceRows,
+  pagination.page,
+  pagination.pageSize,
+);
+const paymentRows = filterCustomerPaymentRows(
+  buildCustomerPaymentRows(customerOrders, agentReturnTo),
+  orderFilters.search,
+);
+const paginatedPayments = paginateAgentRecords(
+  paymentRows,
+  pagination.page,
+  pagination.pageSize,
+);
+const assignedCustomerRows = filterAgentAssignedCustomerRows(
+  buildAgentAssignedCustomerRows(detailData.assignedCustomers, agentReturnTo),
+  orderFilters.search,
+);
+const paginatedAssignedCustomers = paginateAgentRecords(
+  assignedCustomerRows,
+  pagination.page,
+  pagination.pageSize,
+);
+const previousOrderRows = filterAgentPreviousOrderRows(
+  buildAgentPreviousOrderRows(
+    detailData.previousCustomerOrders,
+    agentReturnTo,
+    {
+      getBlockReason: (order) => getCustomerOrderDistributionConversionBlockReason(order, agent.id),
+      canConvert: (order) => canConvertPromotedCustomerOrderToDistribution(order, agent.id),
+      getBalance: (order) => orderBalance(order),
+      getTotalAmount: (order) => orderTotal(order, "final_quantity"),
+    },
+  ),
+  orderFilters.search,
+);
+const paginatedPreviousOrders = paginateAgentRecords(
+  previousOrderRows,
+  pagination.page,
+  pagination.pageSize,
+);
+
+const agentTabTableProps = {
+  tab: activeTab,
+  agentBasePath,
+  agentReturnTo,
+  orderFilters,
+  orderRows: paginatedOrders.records,
+  ordersPagination: paginatedOrders.pagination,
+  assignedCustomerRows: paginatedAssignedCustomers.records,
+  assignedCustomersPagination: paginatedAssignedCustomers.pagination,
+  previousOrderRows: paginatedPreviousOrders.records,
+  previousOrdersPagination: paginatedPreviousOrders.pagination,
+};
+---
+
+{
+  isAgentCustomerLikeTab(activeTab) ? (
+    <AdminCustomerRecordTabTable
+      tab={activeTab as CustomerRecordTab}
+      customerBasePath={agentBasePath}
+      customerReturnTo={agentReturnTo}
+      orderFilters={orderFilters}
+      orderRows={[]}
+      ordersPagination={paginatedOrders.pagination}
+      salesRows={paginatedSales.records}
+      salesPagination={paginatedSales.pagination}
+      invoiceRows={paginatedInvoices.records}
+      invoicesPagination={paginatedInvoices.pagination}
+      paymentRows={paginatedPayments.records}
+      paymentsPagination={paginatedPayments.pagination}
+    />
+  ) : (
+    <AdminAgentRecordTabTable {...agentTabTableProps} />
+  )
+}

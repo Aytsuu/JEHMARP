@@ -147,8 +147,12 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
   }
 </DashboardModal>
 
-<section aria-label="Analytics Visualization">
-  <AdminCharts client:only="react" analytics={analytics} />
+<section aria-label="Analytics Visualization" class="admin-charts-shell">
+  <div class="admin-charts-shell__placeholder" aria-hidden="true">
+    <div class="admin-charts-shell__panel"></div>
+    <div class="admin-charts-shell__panel admin-charts-shell__panel--compact"></div>
+  </div>
+  <AdminCharts client:idle analytics={analytics} />
 </section>
 
 <script>

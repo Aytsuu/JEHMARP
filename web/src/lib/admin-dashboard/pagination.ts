@@ -108,6 +108,17 @@ export function buildAdminPagination(
   };
 }
 
+export function dashboardTableRowNumber(
+  pagination: Pick<AdminPagination, "fromRow"> | null | undefined,
+  index: number,
+) {
+  if (!pagination || pagination.fromRow <= 0) {
+    return index + 1;
+  }
+
+  return pagination.fromRow + index;
+}
+
 function positiveInteger(value: string | null) {
   if (!value) return undefined;
 

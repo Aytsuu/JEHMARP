@@ -1,0 +1,1435 @@
+---
+import AdminAgentRecordTabTable from "@/components/admin/AdminAgentRecordTabTable.astro";
+import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordTabTable.astro";
+import DashboardModal from "@/components/dashboard/DashboardModal.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import type { AdminAgent, AdminCustomer } from "@/lib/admin-dashboard/data";
+import {
+  agentAccountLabel,
+  type AgentAssignedCustomerRow,
+  formatKgSoldTrendDiff,
+  type AgentPerformanceQuickStats,
+  type AgentPreviousOrderRow,
+  type AgentRecordFilters,
+  type AgentRecordOrderRow,
+  type AgentRecordTab,
+} from "@/lib/admin-dashboard/agent-record";
+import type {
+  CustomerInvoiceRow,
+  CustomerPaymentRow,
+  CustomerReceivableSegment,
+  CustomerSalesRow,
+} from "@/lib/admin-dashboard/customer-record";
+import type { AdminPagination } from "@/lib/admin-dashboard/pagination";
+import {
+  formatCompactCurrency,
+  formatCurrency,
+  formatDate,
+  selected,
+} from "@/lib/admin-dashboard/view";
+type Props = {
+  agent: AdminAgent;
+  linkedCustomer: AdminCustomer | null;
+  activeTab: AgentRecordTab;
+  filterQuery: string;
+  orderFilters: AgentRecordFilters;
+  orderRows: AgentRecordOrderRow[];
+  ordersPagination: AdminPagination;
+  salesRows: CustomerSalesRow[];
+  salesPagination: AdminPagination;
+  invoiceRows: CustomerInvoiceRow[];
+  invoicesPagination: AdminPagination;
+  paymentRows: CustomerPaymentRow[];
+  paymentsPagination: AdminPagination;
+  assignedCustomerRows: AgentAssignedCustomerRow[];
+  assignedCustomersPagination: AdminPagination;
+  previousOrderRows: AgentPreviousOrderRow[];
+  previousOrdersPagination: AdminPagination;
+  orderCounts: {
+    total: number;
+    pending: number;
+    processing: number;
+    closed: number;
+  };
+  processingReceivableTotal: number;
+  estimatedInvoiceTotal: number;
+  receivableSegments: CustomerReceivableSegment[];
+  assignedCustomersCount: number;
+  commissionEarned: number;
+  paymentsSubmitted: number;
+  performanceQuickStats: AgentPerformanceQuickStats;
+  agentReturnTo: string;
+  showPreviousOrdersTab: boolean;
+};
+
+const {
+  agent,
+  linkedCustomer,
+  activeTab,
+  filterQuery,
+  orderFilters,
+  orderRows,
+  ordersPagination,
+  salesRows,
+  salesPagination,
+  invoiceRows,
+  invoicesPagination,
+  paymentRows,
+  paymentsPagination,
+  assignedCustomerRows,
+  assignedCustomersPagination,
+  previousOrderRows,
+  previousOrdersPagination,
+  orderCounts,
+  processingReceivableTotal,
+  estimatedInvoiceTotal,
+  receivableSegments,
+  assignedCustomersCount,
+  commissionEarned,
+  paymentsSubmitted,
+  performanceQuickStats,
+  agentReturnTo,
+  showPreviousOrdersTab,
+} = Astro.props;
+
+const agentBasePath = `/admin/agents/${agent.id}`;
+const receivableBarTotal = receivableSegments.reduce(
+  (total, segment) => total + segment.receivable,
+  0,
+);
+const commissionModalId = `agent-${agent.id}-commission-modal`;
+const hasCommissionEntries = performanceQuickStats.commissionEntries.length > 0;
+const maxCommissionPreviewEntries = 2;
+const commissionPreviewEntries = performanceQuickStats.commissionEntries.slice(
+  0,
+  maxCommissionPreviewEntries,
+);
+const hiddenCommissionCount = Math.max(
+  performanceQuickStats.commissionEntries.length - maxCommissionPreviewEntries,
+  0,
+);
+const kgSoldTrend = performanceQuickStats.kgSoldTrend;
+const kgSoldTrendDirection = kgSoldTrend.diff > 0
+  ? "up"
+  : kgSoldTrend.diff < 0
+    ? "down"
+    : "flat";
+
+function tabHref(tab: AgentRecordTab) {
+  const params = new URLSearchParams(filterQuery);
+  params.set("tab", tab);
+  params.delete("page");
+  return `${agentBasePath}?${params.toString()}`;
+}
+
+const customerTabTableProps = {
+  customerBasePath: agentBasePath,
+  customerReturnTo: agentReturnTo,
+  orderFilters,
+  orderRows: [],
+  ordersPagination,
+  salesRows,
+  salesPagination,
+  invoiceRows,
+  invoicesPagination,
+  paymentRows,
+  paymentsPagination,
+};
+---
+
+<div
+  class="customer-record-page"
+  data-agent-record-page
+  data-agent-id={agent.id}
+>
+  {
+    agent.promoted_from_customer_at && (
+      <section class="customer-record-banner" aria-label="Agent promotion status">
+        <p class="customer-record-banner__copy">
+          This agent was promoted from a customer record.
+          {
+            linkedCustomer && (
+              <>
+                {" "}
+                <a class="customer-record-banner__action" href={`/admin/customers/${linkedCustomer.id}?returnTo=${agentReturnTo}`}>
+                  View customer record
+                </a>
+              </>
+            )
+          }
+          {" "}Completed customer orders remain unchanged; eligible unpaid orders can be converted into agent distribution orders in the Previous orders tab.
+        </p>
+      </section>
+    )
+  }
+
+  <div class="customer-record-cards">
+    <article class="customer-record-card">
+      <h2 class="customer-record-card__title">Contact information</h2>
+      <dl class="customer-record-card__list customer-record-card__list--contact">
+        <div class="customer-record-card__field">
+          <dt class="customer-record-card__contact-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 5h18v14H3z"></path>
+              <path d="M7 9h4"></path>
+              <path d="M7 13h6"></path>
+              <path d="M16 9h1"></path>
+            </svg>
+            <span class="sr-only">Employee ID</span>
+          </dt>
+          <dd>{agent.employee_id ?? "No employee ID"}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt class="customer-record-card__contact-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"></path>
+              <path d="m22 6-10 7L2 6"></path>
+            </svg>
+            <span class="sr-only">Email</span>
+          </dt>
+          <dd>{agent.email ?? "No email"}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt class="customer-record-card__contact-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z"></path>
+            </svg>
+            <span class="sr-only">Contact</span>
+          </dt>
+          <dd>{agent.contact ?? "No contact"}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt class="customer-record-card__contact-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 21s-7-4.35-7-10a7 7 0 1 1 14 0c0 5.65-7 10-7 10Z"></path>
+              <circle cx="12" cy="11" r="2.5"></circle>
+            </svg>
+            <span class="sr-only">Address</span>
+          </dt>
+          <dd>{agent.address || "No address"}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt class="customer-record-card__contact-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span class="sr-only">Joined</span>
+          </dt>
+          <dd>Joined {formatDate(agent.created_at)}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="customer-record-card customer-record-card--status">
+      <div class="customer-record-card__header">
+        <h2 class="customer-record-card__title">Status</h2>
+        <button
+          type="button"
+          class="customer-record-card__edit-trigger table-cell-trigger"
+          data-open-cell-popover
+          data-popover-title={`Edit status: ${agent.display_name}`}
+          aria-label={`Edit status for ${agent.display_name}`}
+        >
+          <span class="sr-only">Edit status</span>
+        </button>
+        <div class="hidden-popover-form-holder">
+          <form method="post" class="admin-table-form" data-astro-reload>
+            <input type="hidden" name="action" value="update-agent" />
+            <input type="hidden" name="agentId" value={agent.id} />
+            <input type="hidden" name="employeeId" value={agent.employee_id ?? ""} />
+            <input type="hidden" name="firstName" value={agent.first_name} />
+            <input type="hidden" name="lastName" value={agent.last_name} />
+            <input type="hidden" name="contact" value={agent.contact ?? ""} />
+            <input type="hidden" name="email" value={agent.email ?? ""} />
+            <label>
+              <span>Status</span>
+              <select name="status">
+                <option value="active" selected={selected(agent.status, "active")}>Active</option>
+                <option value="inactive" selected={selected(agent.status, "inactive")}>Inactive</option>
+                <option value="suspended" selected={selected(agent.status, "suspended")}>Suspended</option>
+              </select>
+            </label>
+            <button type="submit">Save changes</button>
+          </form>
+        </div>
+      </div>
+      <dl class="customer-record-card__list customer-record-card__list--status customer-record-card__list--sentence-case">
+        <div class="customer-record-card__field">
+          <dt>Account</dt>
+          <dd>
+            <StatusBadge
+              kind="agent"
+              status={agent.status === "active" ? "active" : "inactive"}
+              label={agentAccountLabel(agent.status)}
+            />
+          </dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Members</dt>
+          <dd>{assignedCustomersCount}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Performance</dt>
+          <dd>—</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Commission</dt>
+          <dd>{formatCompactCurrency(commissionEarned)}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Payments submitted</dt>
+          <dd>{formatCompactCurrency(paymentsSubmitted)}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="customer-record-card">
+      <h2 class="customer-record-card__title">Agent orders</h2>
+      <dl class="customer-record-card__list customer-record-card__list--stats customer-record-card__list--sentence-case">
+        <div class="customer-record-card__field">
+          <dt>Total</dt><dd>{orderCounts.total}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Pending</dt><dd>{orderCounts.pending}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Processing</dt><dd>{orderCounts.processing}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Closed</dt><dd>{orderCounts.closed}</dd>
+        </div>
+      </dl>
+    </article>
+  </div>
+
+  <section class="customer-record-receivables" aria-label="Receivable summary">
+    <div class="customer-record-receivables__totals">
+      <div class="customer-record-receivables__total">
+        <div class="customer-record-receivables__summary-line">
+          <span class="customer-record-receivables__label">Total receivable amount:</span>
+          <strong class="customer-record-receivables__value">
+            {formatCurrency(processingReceivableTotal)}
+          </strong>
+        </div>
+        <p class="customer-record-receivables__hint">Processing orders only</p>
+      </div>
+      <div class="customer-record-receivables__total">
+        <div class="customer-record-receivables__summary-line">
+          <span class="customer-record-receivables__label">Total estimated invoice value:</span>
+          <strong class="customer-record-receivables__value">
+            {formatCurrency(estimatedInvoiceTotal)}
+          </strong>
+        </div>
+        <p class="customer-record-receivables__hint">Pending, processing, and closed orders</p>
+      </div>
+    </div>
+
+    <div class="customer-record-receivables__bar" aria-hidden="true">
+      {
+        receivableSegments.map((segment) => {
+          const width =
+            receivableBarTotal > 0
+              ? (segment.receivable / receivableBarTotal) * 100
+              : 0;
+          return (
+            <span
+              class="customer-record-receivables__segment"
+              style={`width: ${width}%; background-color: ${segment.color};`}
+            />
+          );
+        })
+      }
+    </div>
+
+    <ul class="customer-record-receivables__legend">
+      {
+        receivableSegments.map((segment) => (
+          <li>
+            <span
+              class="customer-record-receivables__dot"
+              style={`background-color: ${segment.color};`}
+            />
+            <span class="customer-record-receivables__legend-label">{segment.label}</span>
+            <span class="customer-record-receivables__legend-meta">
+              {segment.invoiceCount} invoice
+              {segment.invoiceCount === 1 ? "" : "s"}
+            </span>
+            <strong class="customer-record-receivables__legend-value">
+              {formatCurrency(segment.receivable)}
+            </strong>
+          </li>
+        ))
+      }
+    </ul>
+
+    <div class="agent-record-quick-stats" aria-label="Agent performance quick stats">
+      <article class="agent-record-quick-stats__card">
+        <h3 class="agent-record-quick-stats__title">Kg sold</h3>
+        <p class="agent-record-quick-stats__value">
+          {performanceQuickStats.kgSold.toLocaleString("en-PH", {
+            maximumFractionDigits: 1,
+          })}
+          <span class="agent-record-quick-stats__unit">kg</span>
+          <span
+            class:list={[
+              "agent-record-quick-stats__trend",
+              "agent-record-quick-stats__tooltip-trigger",
+              `agent-record-quick-stats__trend--${kgSoldTrendDirection}`,
+            ]}
+            tabindex="0"
+            data-tooltip={kgSoldTrend.tooltip}
+            aria-label={kgSoldTrend.tooltip}
+          >
+            {
+              kgSoldTrendDirection === "up" && (
+                <svg
+                  class="agent-record-quick-stats__trend-icon"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.25"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                  <polyline points="16 7 22 7 22 13" />
+                </svg>
+              )
+            }
+            {
+              kgSoldTrendDirection === "down" && (
+                <svg
+                  class="agent-record-quick-stats__trend-icon"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.25"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="22 17 13.5 8.5 8.5 13.5 2 7" />
+                  <polyline points="16 17 22 17 22 11" />
+                </svg>
+              )
+            }
+            {formatKgSoldTrendDiff(kgSoldTrend.diff)}
+          </span>
+        </p>
+        <p class="agent-record-quick-stats__hint">Across closed orders</p>
+      </article>
+
+      <article class="agent-record-quick-stats__card">
+        <h3 class="agent-record-quick-stats__title">Most sold category</h3>
+        {
+          performanceQuickStats.topCategory ? (
+            <>
+              <p class="agent-record-quick-stats__value agent-record-quick-stats__value--text">
+                {performanceQuickStats.topCategory.label}
+              </p>
+              <p class="agent-record-quick-stats__hint">
+                {performanceQuickStats.topCategory.quantity.toLocaleString("en-PH", {
+                  maximumFractionDigits: 1,
+                })}
+                {" "}
+                kg sold
+              </p>
+            </>
+          ) : (
+            <p class="agent-record-quick-stats__empty">No closed sales yet</p>
+          )
+        }
+      </article>
+
+      <div class="agent-record-quick-stats__row" data-agent-commission-preview-row>
+        <article class="agent-record-quick-stats__card" data-agent-remittance-card>
+          <h3 class="agent-record-quick-stats__title">
+            <span>Remittance performance</span>
+            {
+              performanceQuickStats.remittance.performanceLabel && (
+                <span
+                  class="agent-record-quick-stats__title-badge agent-record-quick-stats__tooltip-trigger agent-record-quick-stats__tooltip-trigger--below"
+                  tabindex="0"
+                  data-tooltip={performanceQuickStats.remittance.performanceTooltip}
+                  aria-label={performanceQuickStats.remittance.performanceTooltip}
+                >
+                  ({performanceQuickStats.remittance.performanceLabel})
+                </span>
+              )
+            }
+          </h3>
+          <dl class="agent-record-quick-stats__metrics">
+            <div>
+              <dt>Submissions</dt>
+              <dd>{performanceQuickStats.remittance.submissionCount}</dd>
+            </div>
+            <div>
+              <dt>Confirmed</dt>
+              <dd>
+                {performanceQuickStats.remittance.confirmedCount}
+                {
+                  performanceQuickStats.remittance.submissionCount > 0 && (
+                    <span class="agent-record-quick-stats__meta">
+                      ({performanceQuickStats.remittance.confirmationRate}%)
+                    </span>
+                  )
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Avg. days to remit</dt>
+              <dd>
+                {
+                  performanceQuickStats.remittance.averageDaysToRemit === null
+                    ? "—"
+                    : `${performanceQuickStats.remittance.averageDaysToRemit} days`
+                }
+              </dd>
+            </div>
+            <div>
+              <dt>Last 30 days</dt>
+              <dd>{performanceQuickStats.remittance.recentSubmissions30Days}</dd>
+            </div>
+            <div>
+              <dt>Pending review</dt>
+              <dd>{performanceQuickStats.remittance.pendingCount}</dd>
+            </div>
+            <div>
+              <dt>Total remitted</dt>
+              <dd>{formatCompactCurrency(performanceQuickStats.remittance.totalRemitted)}</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article
+          class="agent-record-quick-stats__card agent-record-quick-stats__card--paired"
+          data-agent-commission-card
+        >
+          <div class="agent-record-quick-stats__card-header" data-agent-commission-header>
+            <div>
+              <h3 class="agent-record-quick-stats__title">Commission tracking</h3>
+              <p class="agent-record-quick-stats__hint">
+                Closed and fully paid orders only
+              </p>
+            </div>
+            <p class="agent-record-quick-stats__value agent-record-quick-stats__value--compact">
+              {formatCompactCurrency(performanceQuickStats.commissionEarnedTotal)}
+            </p>
+          </div>
+
+          <div class="agent-record-quick-stats__commission-preview">
+            {
+              hasCommissionEntries ? (
+                <ul
+                  class="agent-record-quick-stats__commission-list"
+                  data-agent-commission-preview-list
+                >
+                  {
+                    commissionPreviewEntries.map((entry) => (
+                      <li data-agent-commission-entry>
+                        <a href={entry.href} class="agent-record-quick-stats__commission-link">
+                          <span class="agent-record-quick-stats__commission-date">
+                            {formatDate(entry.earned_at)}
+                          </span>
+                          <span class="agent-record-quick-stats__commission-order">
+                            {entry.order_label}
+                          </span>
+                          <strong class="agent-record-quick-stats__commission-amount">
+                            {formatCurrency(entry.amount)}
+                          </strong>
+                        </a>
+                      </li>
+                    ))
+                  }
+                </ul>
+              ) : (
+                <p class="agent-record-quick-stats__empty">No earned commission yet</p>
+              )
+            }
+          </div>
+
+          <div class="agent-record-quick-stats__commission-footer" data-agent-commission-footer>
+            {
+              hiddenCommissionCount > 0 && (
+                <p class="agent-record-quick-stats__truncation">
+                  +{hiddenCommissionCount} more earned commission
+                  {hiddenCommissionCount === 1 ? "" : "s"}
+                </p>
+              )
+            }
+            {
+              hasCommissionEntries && (
+                <button
+                  type="button"
+                  class="agent-record-quick-stats__view-all"
+                  data-open-dashboard-modal={commissionModalId}
+                  aria-haspopup="dialog"
+                  aria-controls={commissionModalId}
+                >
+                  View all
+                </button>
+              )
+            }
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <DashboardModal
+    id={commissionModalId}
+    title="Commission tracking"
+    description={`${formatCurrency(performanceQuickStats.commissionEarnedTotal)} total earned commission`}
+  >
+    {
+      performanceQuickStats.commissionEntries.length > 0 ? (
+        <ul class="agent-commission-modal-list">
+          {
+            performanceQuickStats.commissionEntries.map((entry) => (
+              <li class="agent-commission-modal-item">
+                <div class="agent-commission-modal-item__header">
+                  <span class="agent-commission-modal-item__date">
+                    {formatDate(entry.earned_at)}
+                  </span>
+                  <strong class="agent-commission-modal-item__amount">
+                    {formatCurrency(entry.amount)}
+                  </strong>
+                </div>
+                <p class="agent-commission-modal-item__order">{entry.order_label}</p>
+                <div class="agent-commission-modal-item__actions">
+                  <a class="agent-commission-modal-item__link" href={entry.href}>
+                    View order details
+                  </a>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      ) : (
+        <p class="dashboard-modal__empty">No earned commission yet</p>
+      )
+    }
+  </DashboardModal>
+
+  <div class="customer-record-tabs">
+    <nav class="customer-record-tabs__nav" aria-label="Agent record sections">
+      <a href={tabHref("orders")} class:list={["customer-record-tabs__link", activeTab === "orders" && "is-active"]}>
+        Orders
+      </a>
+      <a href={tabHref("sales")} class:list={["customer-record-tabs__link", activeTab === "sales" && "is-active"]}>
+        Sales
+      </a>
+      <a href={tabHref("invoices")} class:list={["customer-record-tabs__link", activeTab === "invoices" && "is-active"]}>
+        Invoices
+      </a>
+      <a href={tabHref("payments")} class:list={["customer-record-tabs__link", activeTab === "payments" && "is-active"]}>
+        Payment records
+      </a>
+      <a href={tabHref("customers")} class:list={["customer-record-tabs__link", activeTab === "customers" && "is-active"]}>
+        Customers
+      </a>
+      {
+        showPreviousOrdersTab && (
+          <a href={tabHref("previous-orders")} class:list={["customer-record-tabs__link", activeTab === "previous-orders" && "is-active"]}>
+            Previous orders
+          </a>
+        )
+      }
+    </nav>
+
+    {
+      activeTab === "orders" && (
+        <section class="customer-record-tab-panel" aria-label="Agent orders">
+          <AdminAgentRecordTabTable
+            tab="orders"
+            agentBasePath={agentBasePath}
+            agentReturnTo={agentReturnTo}
+            orderFilters={orderFilters}
+            orderRows={orderRows}
+            ordersPagination={ordersPagination}
+            assignedCustomerRows={assignedCustomerRows}
+            assignedCustomersPagination={assignedCustomersPagination}
+            previousOrderRows={previousOrderRows}
+            previousOrdersPagination={previousOrdersPagination}
+          />
+        </section>
+      )
+    }
+
+    {
+      (activeTab === "sales" || activeTab === "invoices" || activeTab === "payments") && (
+        <section class="customer-record-tab-panel" aria-label={`Agent ${activeTab}`}>
+          <AdminCustomerRecordTabTable tab={activeTab} {...customerTabTableProps} />
+        </section>
+      )
+    }
+
+    {
+      (activeTab === "customers" || activeTab === "previous-orders") && (
+        <section class="customer-record-tab-panel" aria-label={`Agent ${activeTab}`}>
+          <AdminAgentRecordTabTable
+            tab={activeTab}
+            agentBasePath={agentBasePath}
+            agentReturnTo={agentReturnTo}
+            orderFilters={orderFilters}
+            orderRows={orderRows}
+            ordersPagination={ordersPagination}
+            assignedCustomerRows={assignedCustomerRows}
+            assignedCustomersPagination={assignedCustomersPagination}
+            previousOrderRows={previousOrderRows}
+            previousOrdersPagination={previousOrdersPagination}
+          />
+        </section>
+      )
+    }
+  </div>
+</div>
+
+<script>
+  import { initAgentRecordPage } from "@/lib/client/agent-record-page";
+
+  document.addEventListener("DOMContentLoaded", initAgentRecordPage);
+  document.addEventListener("astro:after-swap", initAgentRecordPage);
+
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    initAgentRecordPage();
+  }
+</script>
+
+<style>
+  .customer-record-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .customer-record-banner {
+    margin: 0;
+    color: #374151;
+  }
+
+  .customer-record-banner__copy {
+    margin: 0;
+    line-height: 1.55;
+    font-size: 0.92rem;
+  }
+
+  .customer-record-banner__action {
+    display: inline;
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--color-brand-red);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-transform: none;
+    cursor: pointer;
+  }
+
+  .customer-record-banner__action:hover,
+  .customer-record-banner__action:focus-visible {
+    color: #551313;
+    outline: none;
+  }
+
+  .customer-record-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .customer-record-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    padding: 1rem 1.1rem;
+  }
+
+  .customer-record-card__title {
+    margin: 0 0 0.85rem;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .customer-record-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .customer-record-card--status .customer-record-card__title {
+    margin-bottom: 0;
+  }
+
+  .customer-record-card__edit-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    padding: 0;
+    margin: -0.1rem -0.1rem 0 0;
+    border-radius: 0.375rem;
+  }
+
+  .customer-record-card__edit-trigger::after {
+    position: static;
+    transform: none;
+    opacity: 0.65;
+  }
+
+  .customer-record-card__edit-trigger:hover,
+  .customer-record-card__edit-trigger:focus-visible {
+    background-color: #f3f4f6;
+  }
+
+  .customer-record-card__list {
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
+    flex: 1;
+  }
+
+  .customer-record-card__list--stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+  }
+
+  .customer-record-card__field {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .customer-record-card__list--status {
+    flex: 0 0 auto;
+    align-content: start;
+    gap: 0.35rem;
+  }
+
+  .customer-record-card__list--status .customer-record-card__field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    align-self: stretch;
+    width: 100%;
+  }
+
+  .customer-record-card__list--status dt {
+    flex: 0 1 auto;
+    max-width: 10.5rem;
+  }
+
+  .customer-record-card__list--status dd {
+    flex: 0 0 auto;
+    text-align: right;
+  }
+
+  .customer-record-card__list--contact {
+    flex: 0 0 auto;
+    align-content: start;
+    gap: 0.35rem;
+  }
+
+  .customer-record-card__list--contact .customer-record-card__field {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: center;
+    align-self: start;
+  }
+
+  .customer-record-card__list--contact dd {
+    margin: 0;
+    line-height: 1.35;
+  }
+
+  .customer-record-card__contact-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0;
+    color: rgba(17, 24, 39, 0.5);
+  }
+
+  .customer-record-card__contact-icon svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .customer-record-card__list dt {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+  }
+
+  .customer-record-card__list--sentence-case dt {
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    color: #6b7280;
+  }
+
+  .customer-record-card__list--contact dt {
+    font-size: inherit;
+    font-weight: inherit;
+    text-transform: none;
+    letter-spacing: normal;
+    color: inherit;
+  }
+
+  .customer-record-card__list dd {
+    margin: 0;
+    color: #111827;
+    font-weight: 500;
+    line-height: 1.45;
+    min-width: 0;
+  }
+
+  .customer-record-receivables {
+    display: grid;
+    gap: 0.85rem;
+    padding: 1.5rem 1.1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .customer-record-receivables__totals {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .customer-record-receivables__total {
+    flex: 0 0 auto;
+  }
+
+  .customer-record-receivables__summary-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .customer-record-receivables__label {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #374151;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .customer-record-receivables__value {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+  }
+
+  .customer-record-receivables__hint {
+    margin: 0.2rem 0 0;
+    font-size: 0.82rem;
+    color: #6b7280;
+  }
+
+  .customer-record-receivables__bar {
+    display: flex;
+    width: 100%;
+    min-height: 0.85rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: #f3f4f6;
+  }
+
+  .customer-record-receivables__segment {
+    display: block;
+    min-width: 0;
+  }
+
+  .customer-record-receivables__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .customer-record-receivables__legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.86rem;
+    color: #374151;
+  }
+
+  .customer-record-receivables__dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+
+  .customer-record-receivables__legend-label {
+    font-weight: 600;
+  }
+
+  .customer-record-receivables__legend-meta {
+    color: #6b7280;
+  }
+
+  .customer-record-receivables__legend-value {
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .agent-record-quick-stats {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 0.35rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f3f4f6;
+  }
+
+  .agent-record-quick-stats__card {
+    display: grid;
+    gap: 0.45rem;
+    padding: 0.95rem 1rem;
+    border: 1px solid #eef0f3;
+    border-radius: 0.7rem;
+  }
+
+  .agent-record-quick-stats__row {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-column: 1 / -1;
+    align-items: start;
+  }
+
+  .agent-record-quick-stats__card--paired {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .agent-record-quick-stats__card--paired:not(.is-height-synced) {
+    max-height: 16rem;
+  }
+
+  .agent-record-quick-stats__commission-preview {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .agent-record-quick-stats__commission-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    margin-top: auto;
+  }
+
+  .agent-record-quick-stats__truncation {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    margin-right: auto;
+    font-size: 0.78rem;
+    color: #6b7280;
+  }
+
+  .agent-record-quick-stats__card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .agent-record-quick-stats__title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: #374151;
+  }
+
+  .agent-record-quick-stats__title-badge {
+    display: inline-flex;
+    padding: 0.12rem 0.45rem;
+    border-radius: 9999px;
+    background: #fff7ed;
+    color: #9a3412;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .agent-record-quick-stats__value {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.45rem;
+    margin: 0;
+    font-size: 1.55rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: #111827;
+  }
+
+  .agent-record-quick-stats__value--text {
+    font-size: 1.2rem;
+  }
+
+  .agent-record-quick-stats__value--compact {
+    font-size: 1.15rem;
+    white-space: nowrap;
+  }
+
+  .agent-record-quick-stats__unit {
+    margin-left: 0.2rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .agent-record-quick-stats__trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.82rem;
+    font-weight: 600;
+    line-height: 1;
+  }
+
+  .agent-record-quick-stats__trend--up {
+    color: #15803d;
+  }
+
+  .agent-record-quick-stats__trend--down {
+    color: #b91c1c;
+  }
+
+  .agent-record-quick-stats__trend--flat {
+    color: #6b7280;
+  }
+
+  .agent-record-quick-stats__trend-icon {
+    width: 0.95rem;
+    height: 0.95rem;
+    flex: 0 0 auto;
+  }
+
+  .agent-record-quick-stats__tooltip-trigger {
+    position: relative;
+    cursor: help;
+  }
+
+  .agent-record-quick-stats__tooltip-trigger::after {
+    position: absolute;
+    bottom: calc(100% + 0.5rem);
+    left: 50%;
+    z-index: 20;
+    width: max-content;
+    max-width: 16rem;
+    transform: translateX(-50%);
+    border-radius: 0.375rem;
+    background-color: #111827;
+    color: #ffffff;
+    content: attr(data-tooltip);
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.35;
+    opacity: 0;
+    padding: 0.45rem 0.6rem;
+    pointer-events: none;
+    text-align: left;
+    transition: opacity 0.12s ease;
+    white-space: normal;
+  }
+
+  .agent-record-quick-stats__tooltip-trigger::before {
+    position: absolute;
+    bottom: calc(100% + 0.25rem);
+    left: 50%;
+    z-index: 21;
+    width: 0.5rem;
+    height: 0.5rem;
+    transform: translateX(-50%) rotate(45deg);
+    background-color: #111827;
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+  }
+
+  .agent-record-quick-stats__tooltip-trigger--below::after {
+    bottom: auto;
+    top: calc(100% + 0.5rem);
+  }
+
+  .agent-record-quick-stats__tooltip-trigger--below::before {
+    bottom: auto;
+    top: calc(100% + 0.25rem);
+  }
+
+  .agent-record-quick-stats__tooltip-trigger:hover::after,
+  .agent-record-quick-stats__tooltip-trigger:hover::before,
+  .agent-record-quick-stats__tooltip-trigger:focus-visible::after,
+  .agent-record-quick-stats__tooltip-trigger:focus-visible::before {
+    opacity: 1;
+  }
+
+  .agent-record-quick-stats__hint {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #6b7280;
+  }
+
+  .agent-record-quick-stats__empty {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #6b7280;
+  }
+
+  .agent-record-quick-stats__metrics {
+    display: grid;
+    gap: 0.55rem 0.85rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 0;
+  }
+
+  .agent-record-quick-stats__metrics div {
+    display: grid;
+    gap: 0.1rem;
+  }
+
+  .agent-record-quick-stats__metrics dt {
+    margin: 0;
+    font-size: 0.76rem;
+    font-weight: 500;
+    color: #6b7280;
+  }
+
+  .agent-record-quick-stats__metrics dd {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .agent-record-quick-stats__meta {
+    margin-left: 0.2rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #6b7280;
+  }
+
+  .agent-record-quick-stats__commission-list {
+    display: grid;
+    gap: 0.45rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow: hidden;
+  }
+
+  .agent-record-quick-stats__commission-link {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, auto) minmax(0, 1fr) auto;
+    gap: 0.65rem;
+    align-items: center;
+    padding: 0.55rem 0.65rem;
+    border-radius: 0.55rem;
+    background: #ffffff;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .agent-record-quick-stats__commission-link:hover {
+    background: #f3f4f6;
+  }
+
+  .agent-record-quick-stats__commission-date,
+  .agent-record-quick-stats__commission-order {
+    font-size: 0.84rem;
+    color: #374151;
+  }
+
+  .agent-record-quick-stats__commission-order {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agent-record-quick-stats__commission-amount {
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+  }
+
+  .agent-record-quick-stats__view-all {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-brand-red);
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    cursor: pointer;
+  }
+
+  .agent-record-quick-stats__view-all:hover,
+  .agent-record-quick-stats__view-all:focus-visible {
+    text-decoration: underline;
+    color: #551313;
+  }
+
+  .agent-commission-modal-list {
+    display: grid;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent-commission-modal-item {
+    padding: 0.65rem 0 0.35rem;
+    border-top: 1px solid #eef0f3;
+  }
+
+  .agent-commission-modal-item:first-child {
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .agent-commission-modal-item__header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .agent-commission-modal-item__date,
+  .agent-commission-modal-item__order {
+    margin: 0;
+    font-size: 0.88rem;
+    color: #374151;
+  }
+
+  .agent-commission-modal-item__order {
+    margin-top: 0.2rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .agent-commission-modal-item__amount {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+  }
+
+  .agent-commission-modal-item__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.35rem;
+  }
+
+  .agent-commission-modal-item__link {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-brand-red);
+    text-decoration: none;
+  }
+
+  .agent-commission-modal-item__link:hover,
+  .agent-commission-modal-item__link:focus-visible {
+    text-decoration: underline;
+    color: #551313;
+  }
+
+  @media (max-width: 900px) {
+    .agent-record-quick-stats {
+      grid-template-columns: 1fr;
+    }
+
+    .agent-record-quick-stats__row {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .customer-record-tabs__nav {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .customer-record-tabs__link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.7rem 0.95rem;
+    border-bottom: 2px solid transparent;
+    color: #6b7280;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .customer-record-tabs__link.is-active {
+    color: #111827;
+    border-bottom-color: var(--color-brand-red);
+  }
+
+  .customer-record-tab-panel {
+    padding-top: 0;
+  }
+
+  @media (max-width: 960px) {
+    .customer-record-cards {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

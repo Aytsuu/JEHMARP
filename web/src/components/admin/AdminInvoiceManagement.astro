@@ -1,11 +1,14 @@
 ---
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import TableActionMenu from "@/components/TableActionMenu.astro";
 import type { AdminInvoiceManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminInvoiceFilters } from "@/lib/admin-dashboard/invoice-filters";
 import { invoiceBalanceStatuses } from "@/lib/admin-dashboard/invoice-filters";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import { formatCurrency, formatDate } from "@/lib/admin-dashboard/view";
 
 type Props = {
@@ -63,27 +66,29 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
         <table class="dashboard-table">
           <thead>
             <tr>
+              <DashboardTableNumberHeader />
               <th scope="col">Date Created</th>
               <th scope="col">Invoice Number</th>
               <th scope="col">Customer</th>
               <th scope="col">Invoice Total</th>
               <th scope="col">Paid</th>
               <th scope="col">Balance</th>
-              <th scope="col">Action</th>
+              <DashboardTableActionsHeader />
             </tr>
           </thead>
           <tbody>
             {data.invoiceRows.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={7}
+                colspan={8}
                 message="No invoices match the selected filters."
               />
-            ) : data.invoiceRows.map((invoice) => {
+            ) : data.invoiceRows.map((invoice, index) => {
               const salesInvoicePdfHref = `/admin/orders/customer/${invoice.order_id}/sales-invoice.pdf`;
               const orderDetailsHref = `/admin/orders/customer/${invoice.order_id}`;
 
               return (
                 <tr data-status={invoice.payment_status}>
+                  <td class="dashboard-table__number-column">{dashboardTableRowNumber(data.pagination, index)}</td>
                   <td>{formatDate(invoice.invoice_created_at)}</td>
                   <td class="dashboard-table__cell--truncate">
                     {invoice.invoice_number}
@@ -94,7 +99,7 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
                   <td>{formatCurrency(invoice.invoice_total)}</td>
                   <td>{formatCurrency(invoice.paid_total)}</td>
                   <td>{formatCurrency(invoice.balance)}</td>
-                  <td>
+                  <td class="dashboard-table__actions-column">
                     <TableActionMenu
                       menuLabel={`Open actions for ${invoice.invoice_number}`}
                       pdfHref={salesInvoicePdfHref}
@@ -118,18 +123,20 @@ function formatBalanceStatus(status: (typeof invoiceBalanceStatuses)[number]) {
         <caption class="sr-only">Loading filtered invoices</caption>
         <thead>
           <tr>
+            <DashboardTableNumberHeader />
             <th scope="col">Date Created</th>
             <th scope="col">Invoice Number</th>
             <th scope="col">Customer</th>
             <th scope="col">Invoice Total</th>
             <th scope="col">Paid</th>
             <th scope="col">Balance</th>
-            <th scope="col">Action</th>
+            <DashboardTableActionsHeader />
           </tr>
         </thead>
         <tbody>
           {skeletonRows.map(() => (
             <tr>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>

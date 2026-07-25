@@ -1,6 +1,9 @@
 ---
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import {
   escapeTextareaValue,
   formatDate,
@@ -42,17 +45,19 @@ const sectionsByPage = data.pages.map((page) => ({
               <caption>Sections for {page.title}</caption>
               <thead>
                 <tr>
+                  <DashboardTableNumberHeader />
                   <th scope="col">Date Created</th>
                   <th scope="col">Type</th>
                   <th scope="col">Order</th>
                   <th scope="col">Status</th>
                   <th scope="col">Content</th>
-                  <th scope="col">Action</th>
+                  <DashboardTableActionsHeader wide />
                 </tr>
               </thead>
               <tbody>
-                {sections.map((section) => (
+                {sections.map((section, index) => (
                   <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
                     <td>{formatDate(section.created_at)}</td>
                     <td>{section.type}</td>
                     <td>{section.sort_order}</td>
@@ -63,7 +68,7 @@ const sectionsByPage = data.pages.map((page) => ({
                         <pre>{JSON.stringify(section.content, null, 2)}</pre>
                       </details>
                     </td>
-                    <td>
+                    <td class="dashboard-table__actions-column">
                       <button type="button" class="btn-table-manage" data-open-sheet>Manage</button>
                       <div class="hidden-form-holder" style="display: none;">
                         <form method="post" class="admin-table-form">

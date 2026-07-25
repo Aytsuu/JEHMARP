@@ -4,8 +4,10 @@ import ActionMenu from "@/components/ActionMenu.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminOrderManagementData } from "@/lib/admin-dashboard/data";
 import ViewButton from "@/components/ViewButton.astro";
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
@@ -16,6 +18,8 @@ import {
   formatDate,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
+import { formatOrderCode } from "@/lib/order-detail-nav";
 
 type Props = {
   data: AdminOrderManagementData;
@@ -559,6 +563,7 @@ function pendingCustomerOrderLabel(count: number) {
         <table class="dashboard-table">
           <thead>
             <tr>
+              <DashboardTableNumberHeader />
               <th scope="col" class="dashboard-table__select-column">
                 <label class="dashboard-table__select-all">
                   <span class="sr-only">Select all orders on this page</span>
@@ -566,24 +571,26 @@ function pendingCustomerOrderLabel(count: number) {
                 </label>
               </th>
               <th scope="col">Date Created</th>
+              <th scope="col">Order ID</th>
               <th scope="col">Customer</th>
               <th scope="col">Source</th>
               <th scope="col">Order Status</th>
               <th scope="col">Payment Status</th>
               <th scope="col">Order Total</th>
               <th scope="col">Remaining Receivable</th>
-              <th scope="col">Action</th>
+              <DashboardTableActionsHeader />
             </tr>
           </thead>
           <tbody>
             {orderRows.length === 0 ? (
               <DashboardTableEmptyState
-                colspan={9}
+                colspan={11}
                 message="No orders match the selected filters."
               />
-            ) : orderRows.map((order) => {
+            ) : orderRows.map((order, index) => {
               return (
                 <tr data-status={order.status}>
+                  <td class="dashboard-table__number-column">{dashboardTableRowNumber(data.pagination, index)}</td>
                   <td class="dashboard-table__select-column">
                     <label class="dashboard-table__row-select">
                       <span class="sr-only">Select order for {order.customer_label}</span>
@@ -596,6 +603,7 @@ function pendingCustomerOrderLabel(count: number) {
                     </label>
                   </td>
                   <td>{formatDate(order.created_at)}</td>
+                  <td>{formatOrderCode(order.id)}</td>
                   <td class="dashboard-table__cell--truncate">
                     <span class="order-customer-cell">
                       <span class="order-customer-cell__name">{order.customer_label}</span>
@@ -639,7 +647,7 @@ function pendingCustomerOrderLabel(count: number) {
                   </td>
                   <td>{formatCurrency(order.total_amount)}</td>
                   <td>{formatCurrency(order.remaining_receivable)}</td>
-                  <td>
+                  <td class="dashboard-table__actions-column">
                     {
                       isPendingCustomerOrderRow(order) ? (
                         <form
@@ -677,31 +685,35 @@ function pendingCustomerOrderLabel(count: number) {
         <caption class="sr-only">Loading filtered orders</caption>
         <thead>
           <tr>
+            <DashboardTableNumberHeader />
             <th scope="col" class="dashboard-table__select-column">
               <span class="table-skeleton-block table-skeleton-block--short"></span>
             </th>
             <th scope="col">Date Created</th>
+            <th scope="col">Order ID</th>
             <th scope="col">Customer</th>
             <th scope="col">Source</th>
             <th scope="col">Order Status</th>
             <th scope="col">Payment Status</th>
             <th scope="col">Order Total</th>
             <th scope="col">Remaining Receivable</th>
-            <th scope="col">Action</th>
+            <DashboardTableActionsHeader />
           </tr>
         </thead>
         <tbody>
           {skeletonRows.map(() => (
             <tr>
+              <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td class="dashboard-table__select-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
+              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
             </tr>
           ))}
         </tbody>
@@ -1292,32 +1304,6 @@ function pendingCustomerOrderLabel(count: number) {
 
   .order-management-toolbar__document-menu {
     min-height: 2.35rem;
-  }
-
-  .dashboard-table__select-column {
-    width: 2.75rem;
-    min-width: 2.75rem;
-    max-width: 2.75rem;
-    padding-left: 0.75rem;
-    padding-right: 0.5rem;
-    text-align: center;
-    vertical-align: middle;
-  }
-
-  .dashboard-table__select-all,
-  .dashboard-table__row-select {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0;
-  }
-
-  .dashboard-table__select-column input[type="checkbox"] {
-    width: 1rem;
-    height: 1rem;
-    margin: 0;
-    accent-color: var(--color-brand-red);
-    cursor: pointer;
   }
 
   .order-status-cell {

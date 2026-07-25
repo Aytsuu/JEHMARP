@@ -1,0 +1,97 @@
+---
+import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordTabTable.astro";
+import {
+  buildCustomerInvoiceRows,
+  buildCustomerPaymentRows,
+  buildCustomerSalesRows,
+  filterCustomerInvoiceRows,
+  filterCustomerOrders,
+  filterCustomerPaymentRows,
+  filterCustomerSalesRows,
+  paginateCustomerRecords,
+  parseCustomerRecordTab,
+} from "@/lib/admin-dashboard/customer-record";
+import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { parseAdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
+import { parseAdminPagination } from "@/lib/admin-dashboard/pagination";
+import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { setDashboardFragmentResponseHeaders } from "@/lib/dashboard/fragment-response";
+
+export const prerender = false;
+
+const adminRoute = await requireAdminRoute(Astro);
+
+if (!adminRoute.ready) {
+  return adminRoute.response;
+}
+
+setDashboardFragmentResponseHeaders(Astro);
+
+const { customerId } = Astro.params;
+
+if (!customerId) {
+  return new Response("Customer not found.", { status: 404 });
+}
+
+const data = await loadAdminDashboardData();
+const customer = data.customers.find((entry) => entry.id === customerId);
+
+if (!customer) {
+  return new Response("Customer not found.", { status: 404 });
+}
+
+const activeTab = parseCustomerRecordTab(Astro.url.searchParams.get("tab"));
+const orderFilters = parseAdminOrderFilters(Astro.url);
+const pagination = parseAdminPagination(Astro.url);
+const customerOrders = data.orders.filter((order) => order.customer_id === customerId);
+const customerReturnTo = encodeURIComponent(`/admin/customers/${customer.id}`);
+const customerBasePath = `/admin/customers/${customer.id}`;
+const filteredOrders = filterCustomerOrders(customerOrders, orderFilters);
+const paginatedOrders = paginateCustomerRecords(
+  filteredOrders,
+  pagination.page,
+  pagination.pageSize,
+);
+const salesRows = filterCustomerSalesRows(
+  buildCustomerSalesRows(customerOrders, customerReturnTo),
+  orderFilters,
+);
+const paginatedSales = paginateCustomerRecords(
+  salesRows,
+  pagination.page,
+  pagination.pageSize,
+);
+const invoiceRows = filterCustomerInvoiceRows(
+  buildCustomerInvoiceRows(customerOrders, customerReturnTo),
+  orderFilters.search,
+);
+const paginatedInvoices = paginateCustomerRecords(
+  invoiceRows,
+  pagination.page,
+  pagination.pageSize,
+);
+const paymentRows = filterCustomerPaymentRows(
+  buildCustomerPaymentRows(customerOrders, customerReturnTo),
+  orderFilters.search,
+);
+const paginatedPayments = paginateCustomerRecords(
+  paymentRows,
+  pagination.page,
+  pagination.pageSize,
+);
+---
+
+<AdminCustomerRecordTabTable
+  tab={activeTab}
+  customerBasePath={customerBasePath}
+  customerReturnTo={customerReturnTo}
+  orderFilters={orderFilters}
+  orderRows={paginatedOrders.records}
+  ordersPagination={paginatedOrders.pagination}
+  salesRows={paginatedSales.records}
+  salesPagination={paginatedSales.pagination}
+  invoiceRows={paginatedInvoices.records}
+  invoicesPagination={paginatedInvoices.pagination}
+  paymentRows={paginatedPayments.records}
+  paymentsPagination={paginatedPayments.pagination}
+/>

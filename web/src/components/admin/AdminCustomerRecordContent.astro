@@ -1,0 +1,1151 @@
+---
+import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordTabTable.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import AlertDialog from "@/components/ui/AlertDialog.astro";
+import Sheet from "@/components/ui/Sheet.astro";
+import type {
+  AdminAgent,
+  AdminCustomer,
+  AdminOrder,
+} from "@/lib/admin-dashboard/data";
+import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
+import type { AdminPagination } from "@/lib/admin-dashboard/pagination";
+import type {
+  CustomerInvoiceRow,
+  CustomerPaymentRow,
+  CustomerReceivableSegment,
+  CustomerRecordTab,
+  CustomerSalesRow,
+} from "@/lib/admin-dashboard/customer-record";
+import {
+  formatCompactCurrency,
+  formatCurrency,
+  fullName,
+  selected,
+} from "@/lib/admin-dashboard/view";
+
+type Props = {
+  customer: AdminCustomer;
+  agents: AdminAgent[];
+  assignedAgent: AdminAgent | null;
+  linkedAgent: AdminAgent | undefined;
+  isPromotedCustomer: boolean;
+  activeTab: CustomerRecordTab;
+  tabQueryBase: string;
+  filterQuery: string;
+  orderFilters: AdminOrderFilters;
+  orderRows: AdminOrder[];
+  ordersPagination: AdminPagination;
+  salesRows: CustomerSalesRow[];
+  salesPagination: AdminPagination;
+  invoiceRows: CustomerInvoiceRow[];
+  invoicesPagination: AdminPagination;
+  paymentRows: CustomerPaymentRow[];
+  paymentsPagination: AdminPagination;
+  orderCounts: {
+    total: number;
+    pending: number;
+    processing: number;
+    closed: number;
+  };
+  outstandingCreditBalance: number;
+  processingReceivableTotal: number;
+  estimatedInvoiceTotal: number;
+  receivableSegments: CustomerReceivableSegment[];
+  customerReturnTo: string;
+  customerEmail: string;
+  hasCustomerEmail: boolean;
+  today: string;
+  todayTime: string;
+};
+
+const {
+  customer,
+  agents,
+  assignedAgent,
+  linkedAgent,
+  isPromotedCustomer,
+  activeTab,
+  filterQuery,
+  orderFilters,
+  orderRows,
+  ordersPagination,
+  salesRows,
+  salesPagination,
+  invoiceRows,
+  invoicesPagination,
+  paymentRows,
+  paymentsPagination,
+  orderCounts,
+  outstandingCreditBalance,
+  processingReceivableTotal,
+  estimatedInvoiceTotal,
+  receivableSegments,
+  customerReturnTo,
+  customerEmail,
+  hasCustomerEmail,
+  today,
+  todayTime,
+} = Astro.props;
+
+const customerName = fullName(customer);
+const activeAgents = agents.filter((agent) => agent.status === "active");
+const receivableBarTotal = receivableSegments.reduce(
+  (total, segment) => total + segment.receivable,
+  0,
+);
+const customerBasePath = `/admin/customers/${customer.id}`;
+
+function tabHref(tab: CustomerRecordTab) {
+  const params = new URLSearchParams(filterQuery);
+  params.set("tab", tab);
+  params.delete("page");
+  return `${customerBasePath}?${params.toString()}`;
+}
+---
+
+<div
+  class="customer-record-page"
+  data-customer-record-page
+  data-customer-id={customer.id}
+>
+  <section
+    class="customer-record-banner"
+    aria-label="Customer promotion status"
+  >
+    {
+      isPromotedCustomer && linkedAgent ? (
+        <p class="customer-record-banner__copy">
+          This customer was promoted to an agent. If that was accidental, you
+          can cancel the promotion.{" "}
+          <button
+            type="button"
+            class="customer-record-banner__action"
+            data-open-alert-dialog="revoke-customer-promotion-dialog"
+            data-alert-dialog-form="revoke-customer-promotion-form"
+          >
+            Not an Agent
+          </button>
+        </p>
+      ) : (
+        <p class="customer-record-banner__copy">
+          This customer can be promoted to an agent.{" "}
+          <button
+            type="button"
+            class="customer-record-banner__action"
+            data-open-create-sheet
+            data-sheet-target="#promote-customer-agent-sheet"
+          >
+            Promote Customer
+          </button>
+        </p>
+      )
+    }
+  </section>
+
+  <div class="customer-record-cards">
+    <article class="customer-record-card">
+      <h2 class="customer-record-card__title">Contact information</h2>
+      <dl
+        class="customer-record-card__list customer-record-card__list--contact"
+      >
+        <div class="customer-record-card__field">
+          <dt class="customer-record-card__contact-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+              ></path>
+              <path d="m22 6-10 7L2 6"></path>
+            </svg>
+            <span class="sr-only">Email</span>
+          </dt>
+          <dd>{customer.email ?? "No email"}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt class="customer-record-card__contact-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z"
+              ></path>
+            </svg>
+            <span class="sr-only">Number</span>
+          </dt>
+          <dd>{customer.phone_number}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt class="customer-record-card__contact-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 21s-7-4.35-7-10a7 7 0 1 1 14 0c0 5.65-7 10-7 10Z"
+              ></path>
+              <circle cx="12" cy="11" r="2.5"></circle>
+            </svg>
+            <span class="sr-only">Address</span>
+          </dt>
+          <dd>{customer.address}</dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="customer-record-card customer-record-card--status">
+      <div class="customer-record-card__header">
+        <h2 class="customer-record-card__title">Status</h2>
+        <button
+          type="button"
+          class="customer-record-card__edit-trigger table-cell-trigger"
+          data-open-cell-popover
+          data-popover-title={`Edit status: ${customerName}`}
+          aria-label={`Edit status for ${customerName}`}
+        >
+          <span class="sr-only">Edit status</span>
+        </button>
+        <div class="hidden-popover-form-holder">
+          <form method="post" class="admin-table-form" data-astro-reload>
+            <input type="hidden" name="action" value="save-customer" />
+            <input type="hidden" name="customerId" value={customer.id} />
+            <input type="hidden" name="firstName" value={customer.first_name} />
+            <input type="hidden" name="lastName" value={customer.last_name} />
+            <input
+              type="hidden"
+              name="phoneNumber"
+              value={customer.phone_number}
+            />
+            <input type="hidden" name="email" value={customer.email ?? ""} />
+            <input type="hidden" name="address" value={customer.address} />
+            <label class="checkbox-row">
+              <input
+                name="isReseller"
+                type="checkbox"
+                checked={customer.is_reseller || undefined}
+              />
+              <span>Reseller customer</span>
+            </label>
+            <label>
+              <span>Assigned agent</span>
+              <select name="assignedAgentId">
+                <option value="" selected={!customer.assigned_agent_id}
+                  >None</option
+                >
+                {
+                  activeAgents.map((agent) => (
+                    <option
+                      value={agent.id}
+                      selected={selected(customer.assigned_agent_id, agent.id)}
+                    >
+                      {agent.display_name}
+                    </option>
+                  ))
+                }
+              </select>
+            </label>
+            <p class="cell-popover__readonly-value">
+              Outstanding balance: {
+                formatCompactCurrency(outstandingCreditBalance)
+              }
+            </p>
+            <label>
+              <span>Credit limit</span>
+              <input
+                name="creditLimit"
+                type="number"
+                min="0"
+                step="1"
+                value={customer.credit_limit}
+                required
+              />
+            </label>
+            <button type="submit">Save changes</button>
+          </form>
+        </div>
+      </div>
+      <dl class="customer-record-card__list customer-record-card__list--status customer-record-card__list--sentence-case">
+        <div class="customer-record-card__field">
+          <dt>Customer type</dt>
+          <dd>
+            <StatusBadge
+              kind="customer-type"
+              status={customer.is_reseller ? "reseller" : "retail"}
+              label={customer.is_reseller ? "Reseller" : "Retail"}
+            />
+          </dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Assigned agent</dt>
+          <dd>
+            {
+              assignedAgent ? (
+                <a
+                  class="customer-record-card__link"
+                  href={`/admin/agents/${assignedAgent.id}?returnTo=${customerReturnTo}`}
+                >
+                  {assignedAgent.display_name}
+                </a>
+              ) : (
+                "None"
+              )
+            }
+          </dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Credit limit</dt>
+          <dd>
+            <span class="customer-record-card__credit">
+              {formatCompactCurrency(outstandingCreditBalance)} / {
+                formatCompactCurrency(customer.credit_limit)
+              }
+              {
+                customer.credit_limit_exceeded && (
+                  <StatusBadge
+                    kind="payment"
+                    status="unpaid"
+                    label="Exceeded"
+                  />
+                )
+              }
+            </span>
+          </dd>
+        </div>
+      </dl>
+    </article>
+
+    <article class="customer-record-card">
+      <h2 class="customer-record-card__title">Orders</h2>
+      <dl class="customer-record-card__list customer-record-card__list--stats customer-record-card__list--sentence-case">
+        <div class="customer-record-card__field">
+          <dt>Total</dt><dd>{orderCounts.total}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Pending</dt><dd>{orderCounts.pending}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Processing</dt><dd>{orderCounts.processing}</dd>
+        </div>
+        <div class="customer-record-card__field">
+          <dt>Closed</dt><dd>{orderCounts.closed}</dd>
+        </div>
+      </dl>
+    </article>
+  </div>
+
+  <section class="customer-record-receivables" aria-label="Receivable summary">
+    <div class="customer-record-receivables__totals">
+      <div class="customer-record-receivables__total">
+        <div class="customer-record-receivables__summary-line">
+          <span class="customer-record-receivables__label"
+            >Total receivable amount:</span
+          >
+          <strong class="customer-record-receivables__value">
+            {formatCurrency(processingReceivableTotal)}
+          </strong>
+        </div>
+        <p class="customer-record-receivables__hint">Processing orders only</p>
+      </div>
+      <div class="customer-record-receivables__total">
+        <div class="customer-record-receivables__summary-line">
+          <span class="customer-record-receivables__label"
+            >Total estimated invoice value:</span
+          >
+          <strong class="customer-record-receivables__value">
+            {formatCurrency(estimatedInvoiceTotal)}
+          </strong>
+        </div>
+        <p class="customer-record-receivables__hint">
+          Pending, processing, and closed orders
+        </p>
+      </div>
+    </div>
+
+    <div class="customer-record-receivables__bar" aria-hidden="true">
+      {
+        receivableSegments.map((segment) => {
+          const width =
+            receivableBarTotal > 0
+              ? (segment.receivable / receivableBarTotal) * 100
+              : 0;
+          return (
+            <span
+              class="customer-record-receivables__segment"
+              style={`width: ${width}%; background-color: ${segment.color};`}
+            />
+          );
+        })
+      }
+    </div>
+
+    <ul class="customer-record-receivables__legend">
+      {
+        receivableSegments.map((segment) => (
+          <li>
+            <span
+              class="customer-record-receivables__dot"
+              style={`background-color: ${segment.color};`}
+            />
+            <span class="customer-record-receivables__legend-label">
+              {segment.label}
+            </span>
+            <span class="customer-record-receivables__legend-meta">
+              {segment.invoiceCount} invoice
+              {segment.invoiceCount === 1 ? "" : "s"}
+            </span>
+            <strong class="customer-record-receivables__legend-value">
+              {formatCurrency(segment.receivable)}
+            </strong>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <div class="customer-record-tabs">
+    <nav
+      class="customer-record-tabs__nav"
+      aria-label="Customer record sections"
+    >
+      <a
+        href={tabHref("orders")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "orders" && "is-active",
+        ]}
+      >
+        Orders
+      </a>
+      <a
+        href={tabHref("sales")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "sales" && "is-active",
+        ]}
+      >
+        Sales
+      </a>
+      <a
+        href={tabHref("invoices")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "invoices" && "is-active",
+        ]}
+      >
+        Invoices
+      </a>
+      <a
+        href={tabHref("payments")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "payments" && "is-active",
+        ]}
+      >
+        Payment records
+      </a>
+    </nav>
+
+    {
+      activeTab === "orders" && (
+        <section class="customer-record-tab-panel" aria-label="Customer orders">
+          <AdminCustomerRecordTabTable
+            tab="orders"
+            customerBasePath={customerBasePath}
+            customerReturnTo={customerReturnTo}
+            orderFilters={orderFilters}
+            orderRows={orderRows}
+            ordersPagination={ordersPagination}
+            salesRows={salesRows}
+            salesPagination={salesPagination}
+            invoiceRows={invoiceRows}
+            invoicesPagination={invoicesPagination}
+            paymentRows={paymentRows}
+            paymentsPagination={paymentsPagination}
+            showOrdersToolbarActions
+          />
+        </section>
+      )
+    }
+
+    {
+      activeTab === "sales" && (
+        <section class="customer-record-tab-panel" aria-label="Customer sales">
+          <AdminCustomerRecordTabTable
+            tab="sales"
+            customerBasePath={customerBasePath}
+            customerReturnTo={customerReturnTo}
+            orderFilters={orderFilters}
+            orderRows={orderRows}
+            ordersPagination={ordersPagination}
+            salesRows={salesRows}
+            salesPagination={salesPagination}
+            invoiceRows={invoiceRows}
+            invoicesPagination={invoicesPagination}
+            paymentRows={paymentRows}
+            paymentsPagination={paymentsPagination}
+          />
+        </section>
+      )
+    }
+
+    {
+      activeTab === "invoices" && (
+        <section
+          class="customer-record-tab-panel"
+          aria-label="Customer invoices"
+        >
+          <AdminCustomerRecordTabTable
+            tab="invoices"
+            customerBasePath={customerBasePath}
+            customerReturnTo={customerReturnTo}
+            orderFilters={orderFilters}
+            orderRows={orderRows}
+            ordersPagination={ordersPagination}
+            salesRows={salesRows}
+            salesPagination={salesPagination}
+            invoiceRows={invoiceRows}
+            invoicesPagination={invoicesPagination}
+            paymentRows={paymentRows}
+            paymentsPagination={paymentsPagination}
+          />
+        </section>
+      )
+    }
+
+    {
+      activeTab === "payments" && (
+        <section
+          class="customer-record-tab-panel"
+          aria-label="Customer payment records"
+        >
+          <AdminCustomerRecordTabTable
+            tab="payments"
+            customerBasePath={customerBasePath}
+            customerReturnTo={customerReturnTo}
+            orderFilters={orderFilters}
+            orderRows={orderRows}
+            ordersPagination={ordersPagination}
+            salesRows={salesRows}
+            salesPagination={salesPagination}
+            invoiceRows={invoiceRows}
+            invoicesPagination={invoicesPagination}
+            paymentRows={paymentRows}
+            paymentsPagination={paymentsPagination}
+          />
+        </section>
+      )
+    }
+  </div>
+
+  <Sheet id="customer-record-payment-sheet" width="42rem">
+    <div slot="header" class="order-create-sheet__header-copy">
+      <h3 class="drawer-sheet__title">Distribute payment</h3>
+      <p class="order-create-sheet__header-description">
+        Payment will be applied to the selected orders in order date sequence.
+      </p>
+    </div>
+    <form
+      id="customer-record-payment-form"
+      method="post"
+      class="order-create-form customer-payment-form"
+      data-customer-payment-form
+      data-astro-reload
+    >
+      <input
+        type="hidden"
+        name="action"
+        value="apply-customer-orders-payment"
+      />
+      <input type="hidden" name="customerId" value={customer.id} />
+      <div data-customer-payment-order-ids></div>
+
+      <article
+        class="customer-payment-sheet__orders-card"
+        data-customer-payment-orders-card
+      >
+        <button
+          type="button"
+          class="customer-payment-sheet__orders-toggle"
+          data-customer-payment-orders-toggle
+          aria-expanded="true"
+          aria-controls="customer-payment-selected-orders-panel"
+        >
+          <span
+            class="customer-payment-sheet__orders-title"
+            data-customer-payment-orders-title
+          >
+            Selected Orders (0)
+          </span>
+          <svg
+            class="customer-payment-sheet__orders-chevron"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+        <div
+          id="customer-payment-selected-orders-panel"
+          class="customer-payment-sheet__orders-panel"
+          data-customer-payment-orders-panel
+        >
+          <div
+            class="customer-payment-sheet__selected"
+            data-customer-payment-selected-orders
+          >
+          </div>
+        </div>
+      </article>
+
+      <div class="order-create-form__payment-fields">
+        <label class="field-row">
+          <span>Amount received</span>
+          <input
+            name="amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            required
+            data-customer-payment-amount
+          />
+        </label>
+        <div class="order-create-form__field-pair">
+          <label class="field-row">
+            <span>Payment method</span>
+            <select name="paymentMethod" required>
+              <option value="Cash" selected>Cash</option>
+              <option value="Check">Check</option>
+            </select>
+          </label>
+          <label class="field-row">
+            <span>Payment terms</span>
+            <select name="paymentTerms" required>
+              <option value="Cash on Delivery (COD)" selected>
+                Cash on Delivery (COD)
+              </option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Gcash">Gcash</option>
+            </select>
+          </label>
+        </div>
+        <div class="order-create-form__field-pair">
+          <label class="field-row">
+            <span>Payment date</span>
+            <input name="paymentDate" type="date" value={today} required />
+          </label>
+          <label class="field-row">
+            <span>Payment time</span>
+            <input name="paymentTime" type="time" value={todayTime} required />
+          </label>
+        </div>
+        <label class="field-row">
+          <span>Reference</span>
+          <input name="referenceNumber" />
+        </label>
+        <label class="field-row">
+          <span>Payment notes</span>
+          <textarea name="notes" rows="2"></textarea>
+        </label>
+      </div>
+    </form>
+    <div slot="footer" class="order-create-sheet__footer">
+      <div class="customer-payment-sheet__footer-total" aria-live="polite">
+        <span>Total amount</span>
+        <strong data-customer-payment-total-value>{formatCurrency(0)}</strong>
+      </div>
+      <button type="submit" form="customer-record-payment-form">
+        Distribute payment
+      </button>
+    </div>
+  </Sheet>
+
+  {
+    !isPromotedCustomer && (
+      <Sheet id="promote-customer-agent-sheet" width="32rem">
+        <div slot="header">
+          <h3 class="drawer-sheet__title">Promote to agent</h3>
+          <p>
+            Create an agent login for {customerName}. Profile details come from
+            this customer record.
+          </p>
+        </div>
+        <form
+          id="promote-customer-agent-form"
+          method="post"
+          class="admin-form promote-agent-form"
+          data-astro-reload
+        >
+          <input
+            type="hidden"
+            name="action"
+            value="promote-customer-to-agent"
+          />
+          <input type="hidden" name="customerId" value={customer.id} />
+          {hasCustomerEmail && (
+            <input type="hidden" name="existingEmail" value={customerEmail} />
+          )}
+          <div class="admin-form-grid promote-agent-form__grid">
+            {hasCustomerEmail ? (
+              <label class="field-row field-row--full">
+                <span>Email</span>
+                <input
+                  type="email"
+                  value={customerEmail}
+                  readonly
+                  aria-readonly="true"
+                />
+              </label>
+            ) : (
+              <label class="field-row field-row--full">
+                <span>Email</span>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  autocomplete="email"
+                />
+              </label>
+            )}
+            <label class="field-row field-row--full">
+              <span>Employee ID</span>
+              <input
+                name="employeeId"
+                type="text"
+                autocomplete="off"
+                placeholder="Optional"
+              />
+            </label>
+            <label class="field-row field-row--full">
+              <span>Temporary password</span>
+              <input
+                name="password"
+                type="password"
+                minlength="8"
+                required
+                autocomplete="new-password"
+              />
+            </label>
+          </div>
+        </form>
+        <div slot="footer">
+          <button
+            type="button"
+            data-open-alert-dialog="promote-customer-confirm-dialog"
+            data-alert-dialog-form="promote-customer-agent-form"
+          >
+            Promote to agent
+          </button>
+        </div>
+      </Sheet>
+    )
+  }
+
+  <form
+    id="revoke-customer-promotion-form"
+    method="post"
+    hidden
+    data-astro-reload
+  >
+    <input
+      type="hidden"
+      name="action"
+      value="revoke-customer-agent-promotion"
+    />
+    <input type="hidden" name="customerId" value={customer.id} />
+  </form>
+
+  <AlertDialog
+    id="promote-customer-confirm-dialog"
+    title="Promote customer to agent?"
+    description={`This will create an agent account for ${customerName}, copy profile details, and link active processing orders.`}
+    confirmLabel="Promote customer"
+  />
+
+  <AlertDialog
+    id="revoke-customer-promotion-dialog"
+    title="Cancel agent promotion?"
+    description={`This will deactivate the linked agent account for ${customerName} and restore the customer record. Active processing orders will be detached from the agent.`}
+    confirmLabel="Not an agent"
+    variant="danger"
+  />
+</div>
+
+<script>
+  import { initCustomerRecordPage } from "@/lib/client/customer-record-page";
+
+  document.addEventListener("DOMContentLoaded", initCustomerRecordPage);
+  document.addEventListener("astro:after-swap", initCustomerRecordPage);
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    initCustomerRecordPage();
+  }
+</script>
+
+<style>
+  .customer-record-page {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .customer-record-banner {
+    margin: 0;
+    color: #374151;
+  }
+
+  .customer-record-banner__copy {
+    margin: 0;
+    line-height: 1.55;
+    font-size: 0.92rem;
+  }
+
+  .customer-record-banner__action {
+    display: inline;
+    border: none;
+    background: none;
+    padding: 0;
+    color: var(--color-brand-red);
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-transform: none;
+    cursor: pointer;
+  }
+
+  .customer-record-banner__action:hover,
+  .customer-record-banner__action:focus-visible {
+    color: #551313;
+    outline: none;
+  }
+
+  .customer-record-cards {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .customer-record-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+    padding: 1rem 1.1rem;
+  }
+
+  .customer-record-card__title {
+    margin: 0 0 0.85rem;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .customer-record-card__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .customer-record-card--status .customer-record-card__title {
+    margin-bottom: 0;
+  }
+
+  .customer-record-card__edit-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
+    padding: 0;
+    margin: -0.1rem -0.1rem 0 0;
+    border-radius: 0.375rem;
+  }
+
+  .customer-record-card__edit-trigger::after {
+    position: static;
+    transform: none;
+    opacity: 0.65;
+  }
+
+  .customer-record-card__edit-trigger:hover,
+  .customer-record-card__edit-trigger:focus-visible {
+    background-color: #f3f4f6;
+  }
+
+  .customer-record-card__list {
+    display: grid;
+    gap: 0.85rem;
+    margin: 0;
+    flex: 1;
+  }
+
+  .customer-record-card__list--stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+  }
+
+  .customer-record-card__field {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .customer-record-card__list--status {
+    flex: 0 0 auto;
+    align-content: start;
+    gap: 0.35rem;
+  }
+
+  .customer-record-card__list--status .customer-record-card__field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    align-self: stretch;
+    width: 100%;
+  }
+
+  .customer-record-card__list--status dt {
+    flex: 0 1 auto;
+    max-width: 10.5rem;
+  }
+
+  .customer-record-card__list--status dd {
+    flex: 0 0 auto;
+    text-align: right;
+  }
+
+  .customer-record-card__list--contact {
+    flex: 0 0 auto;
+    align-content: start;
+    gap: 0.35rem;
+  }
+
+  .customer-record-card__list--contact .customer-record-card__field {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.45rem;
+    align-items: center;
+    align-self: start;
+  }
+
+  .customer-record-card__list--contact dd {
+    margin: 0;
+    line-height: 1.35;
+  }
+
+  .customer-record-card__contact-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0;
+    color: rgba(17, 24, 39, 0.5);
+  }
+
+  .customer-record-card__contact-icon svg {
+    width: 0.9rem;
+    height: 0.9rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .customer-record-card__list dt {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6b7280;
+  }
+
+  .customer-record-card__list--sentence-case dt {
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    color: #6b7280;
+  }
+
+  .customer-record-card__list--contact dt {
+    font-size: inherit;
+    font-weight: inherit;
+    text-transform: none;
+    letter-spacing: normal;
+    color: inherit;
+  }
+
+  .customer-record-card__list dd {
+    margin: 0;
+    color: #111827;
+    font-weight: 500;
+    line-height: 1.45;
+    min-width: 0;
+  }
+
+  .customer-record-card__credit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+  }
+
+  .customer-record-card__link {
+    color: var(--color-brand-red);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-transform: none;
+  }
+
+  .customer-record-card__link:hover,
+  .customer-record-card__link:focus-visible {
+    color: #551313;
+    outline: none;
+  }
+
+  .customer-record-receivables {
+    display: grid;
+    gap: 0.85rem;
+    padding: 1.5rem 1.1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .customer-record-receivables__totals {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2rem;
+    flex-wrap: wrap;
+  }
+
+  .customer-record-receivables__total {
+    flex: 0 0 auto;
+  }
+
+  .customer-record-receivables__summary-line {
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+  }
+
+  .customer-record-receivables__label {
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: #374151;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .customer-record-receivables__value {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #111827;
+    white-space: nowrap;
+  }
+
+  .customer-record-receivables__hint {
+    margin: 0.2rem 0 0;
+    font-size: 0.82rem;
+    color: #6b7280;
+  }
+
+  .customer-record-receivables__bar {
+    display: flex;
+    width: 100%;
+    min-height: 0.85rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: #f3f4f6;
+  }
+
+  .customer-record-receivables__segment {
+    display: block;
+    min-width: 0;
+  }
+
+  .customer-record-receivables__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .customer-record-receivables__legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.86rem;
+    font-weight: 500;
+    color: #374151;
+  }
+
+  .customer-record-receivables__legend-label {
+    font-weight: 500;
+    color: #111827;
+  }
+
+  .customer-record-receivables__legend-value {
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .customer-record-receivables__legend-meta {
+    font-weight: 500;
+    color: #6b7280;
+  }
+
+  .customer-record-receivables__dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+
+  .customer-record-tabs__nav {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .customer-record-tabs__link {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.7rem 0.95rem;
+    border-bottom: 2px solid transparent;
+    color: #6b7280;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .customer-record-tabs__link.is-active {
+    color: #111827;
+    border-bottom-color: var(--color-brand-red);
+  }
+
+  @media (max-width: 960px) {
+    .customer-record-cards {
+      grid-template-columns: 1fr;
+    }
+
+    .customer-record-receivables__totals {
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .customer-record-card__list--status .customer-record-card__field {
+      gap: 0.75rem;
+    }
+
+    .customer-record-card__list--status dd {
+      text-align: right;
+    }
+  }
+</style>

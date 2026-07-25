@@ -671,6 +671,7 @@ describe("parseAdminActionFormData", () => {
     formData.set("lastName", " Agent ");
     formData.set("email", "  Agent@Example.Test ");
     formData.set("contact", " 09171234567 ");
+    formData.set("address", " 123 Main St, Quezon City ");
     formData.set("password", "password123");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
@@ -684,6 +685,7 @@ describe("parseAdminActionFormData", () => {
           display_name: "New Agent",
           email: "agent@example.test",
           contact: "09171234567",
+          address: "123 Main St, Quezon City",
           password: "password123",
           status: "active",
         },
@@ -698,6 +700,7 @@ describe("parseAdminActionFormData", () => {
     formData.set("lastName", "Agent");
     formData.set("email", " ");
     formData.set("contact", "09171234567");
+    formData.set("address", "123 Main St, Quezon City");
     formData.set("password", " ");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
@@ -711,6 +714,7 @@ describe("parseAdminActionFormData", () => {
           display_name: "New Agent",
           email: null,
           contact: "09171234567",
+          address: "123 Main St, Quezon City",
           password: null,
           status: "active",
         },
@@ -725,6 +729,7 @@ describe("parseAdminActionFormData", () => {
     formData.set("lastName", "Agent");
     formData.set("email", "agent@example.test");
     formData.set("contact", "   ");
+    formData.set("address", "123 Main St, Quezon City");
     formData.set("password", "password123");
 
     expect(parseAdminActionFormData(formData, adminUserId).success).toBe(false);
@@ -737,6 +742,7 @@ describe("parseAdminActionFormData", () => {
     formData.set("lastName", "Agent");
     formData.set("email", "agent@example.test");
     formData.set("contact", "0917-123-4567");
+    formData.set("address", "123 Main St, Quezon City");
     formData.set("password", "password123");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
@@ -752,6 +758,7 @@ describe("parseAdminActionFormData", () => {
     formData.set("lastName", "Agent");
     formData.set("email", "agent@example.test");
     formData.set("contact", "0917123456");
+    formData.set("address", "123 Main St, Quezon City");
     formData.set("password", "password123");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
@@ -767,12 +774,26 @@ describe("parseAdminActionFormData", () => {
     formData.set("lastName", "Agent");
     formData.set("email", "not-an-email");
     formData.set("contact", "letters");
+    formData.set("address", "123 Main St, Quezon City");
     formData.set("password", "short");
 
     expect(parseAdminActionFormData(formData, adminUserId)).toEqual({
       success: false,
       errors: ["Enter a valid email address."],
     });
+  });
+
+  it("rejects create-agent actions without an address", () => {
+    const formData = new FormData();
+    formData.set("action", "create-agent");
+    formData.set("firstName", "New");
+    formData.set("lastName", "Agent");
+    formData.set("email", "agent@example.test");
+    formData.set("contact", "09171234567");
+    formData.set("address", "   ");
+    formData.set("password", "password123");
+
+    expect(parseAdminActionFormData(formData, adminUserId).success).toBe(false);
   });
 
   it("parses promote-customer-to-agent actions with account credentials", () => {

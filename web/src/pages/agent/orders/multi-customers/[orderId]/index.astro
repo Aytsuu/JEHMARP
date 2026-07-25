@@ -3,9 +3,12 @@ import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astr
 import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
 import AgentOrderDistributionSummaryCard from "@/components/agent/AgentOrderDistributionSummaryCard.astro";
 import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import ViewButton from "@/components/ViewButton.astro";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import {
   formatAgentActionFeedback,
   handleAgentDashboardAction,
@@ -345,6 +348,7 @@ const customerCount = agentOrder.customer_order.length;
                   <table class="agent-customers-table agent-order-products-table">
                     <thead>
                       <tr>
+                        <DashboardTableNumberHeader />
                         <th scope="col">Product</th>
                         <th scope="col">Quantity</th>
                         <th scope="col">Details</th>
@@ -353,7 +357,7 @@ const customerCount = agentOrder.customer_order.length;
                       </tr>
                     </thead>
                     <tbody>
-                      {agentOrder.agent_order_item.map((item) => {
+                      {agentOrder.agent_order_item.map((item, index) => {
                         const unitPrice = item.product?.default_price ?? 0;
                         const distribution = getAgentOrderProductDistribution(
                           agentOrder,
@@ -362,6 +366,7 @@ const customerCount = agentOrder.customer_order.length;
 
                         return (
                           <tr>
+                            <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
                             <td>
                               {item.product?.name ?? "Missing product"}
                               <span class="agent-order-products-table__meta">
@@ -616,7 +621,10 @@ const customerCount = agentOrder.customer_order.length;
                   <table class="agent-customers-table agent-order-customer-orders-table">
                     <thead>
                       <tr>
-                        <th scope="col">Select</th>
+                        <DashboardTableNumberHeader />
+                        <th scope="col" class="dashboard-table__select-column">
+                          <span class="sr-only">Select</span>
+                        </th>
                         <th scope="col">Date Created</th>
                         <th scope="col">Customer</th>
                         <th scope="col">Source</th>
@@ -624,11 +632,11 @@ const customerCount = agentOrder.customer_order.length;
                         <th scope="col">Payment Status</th>
                         <th scope="col">Order calculation</th>
                         <th scope="col">Agent received</th>
-                        <th scope="col">Action</th>
+                        <DashboardTableActionsHeader />
                       </tr>
                     </thead>
                     <tbody>
-                      {agentOrder.customer_order.map((order) => {
+                      {agentOrder.customer_order.map((order, index) => {
                         const quantityKey = orderQuantityKey(order);
                         const grossTotal = orderTotal(order, quantityKey);
                         const orderCommission = orderExpectedCommission(order);
@@ -644,7 +652,8 @@ const customerCount = agentOrder.customer_order.length;
 
                         return (
                           <tr>
-                            <td>
+                            <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
+                            <td class="dashboard-table__select-column">
                               <input
                                 type="checkbox"
                                 value={order.id}
@@ -689,7 +698,7 @@ const customerCount = agentOrder.customer_order.length;
                                 <span>Pending admin confirmation</span>
                               </span>
                             </td>
-                            <td>
+                            <td class="dashboard-table__actions-column">
                               <ViewButton href={`/agent/orders/${order.id}`} />
                             </td>
                           </tr>
