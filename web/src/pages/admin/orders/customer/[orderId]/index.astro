@@ -885,15 +885,16 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
 
             <div class="order-products-table" role="table">
               <div class="order-products-table__head" role="row">
+                <span class="order-products-table__number" role="columnheader" aria-hidden="true"></span>
                 <span role="columnheader">Product</span>
                 <span role="columnheader">Order Qty</span>
                 <span role="columnheader">Unit Price</span>
                 <span role="columnheader">Subtotal</span>
                 <span role="columnheader">Details</span>
-                <span role="columnheader">Action</span>
+                <span class="order-products-table__actions" role="columnheader" aria-hidden="true"></span>
               </div>
               {
-                order.customer_order_item.map((item) => {
+                order.customer_order_item.map((item, index) => {
                   const itemSubtotal = item.partial_quantity * item.unit_price;
                   const canRemoveOrderProduct =
                     canEditOrderProducts &&
@@ -901,6 +902,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
 
                   return (
                     <div class="order-products-table__row" role="row">
+                      <span class="order-products-table__number" role="cell">{index + 1}</span>
                       <span role="cell">
                         <strong>
                           {item.product?.name ?? "Missing product"}
@@ -946,7 +948,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                       <span role="cell">{formatCurrency(item.unit_price)}</span>
                       <span role="cell">{formatCurrency(itemSubtotal)}</span>
                       <span role="cell">{item.add_details ?? "None"}</span>
-                      <span role="cell">
+                      <span class="order-products-table__actions" role="cell">
                         <form method="post" class="order-product-remove-form">
                           <input
                             type="hidden"
@@ -1641,13 +1643,15 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
             </div>
             <div class="order-timeline-table" role="table">
               <div class="order-timeline-table__head" role="row">
+                <span class="order-timeline-table__number" role="columnheader" aria-hidden="true"></span>
                 <span role="columnheader">Event</span>
                 <span role="columnheader">Details</span>
                 <span role="columnheader">Date</span>
               </div>
               {
-                timelineItems.map((item) => (
+                timelineItems.map((item, index) => (
                   <div class="order-timeline-table__row" role="row">
+                    <span class="order-timeline-table__number" role="cell">{index + 1}</span>
                     <span role="cell">
                       <strong>{item.title}</strong>
                     </span>
@@ -3116,20 +3120,36 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
   .order-products-table__head,
   .order-products-table__row {
     grid-template-columns:
+      2.25rem
       minmax(10rem, 1.4fr)
       minmax(11rem, 1.1fr)
       minmax(7rem, 0.7fr)
       minmax(7rem, 0.7fr)
       minmax(8rem, 1fr)
-      minmax(6rem, 0.6fr);
+      max-content;
   }
 
   .order-timeline-table__head,
   .order-timeline-table__row {
     grid-template-columns:
+      2.25rem
       minmax(10rem, 1fr)
       minmax(12rem, 1.3fr)
       minmax(11rem, 0.8fr);
+  }
+
+  .order-products-table__number,
+  .order-timeline-table__number {
+    color: #6b7280;
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .order-products-table__actions {
+    justify-self: end;
+    white-space: nowrap;
   }
 
   .order-products-table__head,
@@ -4043,12 +4063,12 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
 
     .order-products-table__head,
     .order-products-table__row {
-      min-width: 58rem;
+      min-width: 60rem;
     }
 
     .order-timeline-table__head,
     .order-timeline-table__row {
-      min-width: 42rem;
+      min-width: 44rem;
     }
 
     .order-product-add-form {

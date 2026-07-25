@@ -1,0 +1,560 @@
+---
+import ActionMenu from "@/components/ActionMenu.astro";
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
+import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import ViewButton from "@/components/ViewButton.astro";
+import type {
+  AgentAssignedCustomerRow,
+  AgentPreviousOrderRow,
+  AgentRecordFilters,
+  AgentRecordOrderRow,
+  AgentRecordTab,
+} from "@/lib/admin-dashboard/agent-record";
+import { getAdminOrderStatusFilters, orderSources, paymentStatuses } from "@/lib/admin-dashboard/order-filters";
+import { dashboardTableRowNumber, type AdminPagination } from "@/lib/admin-dashboard/pagination";
+import { formatCurrency, formatDate } from "@/lib/admin-dashboard/view";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+import { formatOrderCode } from "@/lib/order-detail-nav";
+
+type Props = {
+  tab: AgentRecordTab;
+  agentBasePath: string;
+  agentReturnTo: string;
+  orderFilters: AgentRecordFilters;
+  orderRows: AgentRecordOrderRow[];
+  ordersPagination: AdminPagination;
+  assignedCustomerRows: AgentAssignedCustomerRow[];
+  assignedCustomersPagination: AdminPagination;
+  previousOrderRows: AgentPreviousOrderRow[];
+  previousOrdersPagination: AdminPagination;
+};
+
+const {
+  tab,
+  agentBasePath,
+  agentReturnTo,
+  orderFilters,
+  orderRows,
+  ordersPagination,
+  assignedCustomerRows,
+  assignedCustomersPagination,
+  previousOrderRows,
+  previousOrdersPagination,
+} = Astro.props;
+
+const orderStatuses = getAdminOrderStatusFilters();
+const skeletonRows = Array.from({ length: 6 });
+---
+
+{
+  tab === "orders" && (
+    <>
+      <div
+        data-interactive-table
+        data-server-pagination="true"
+        class="dashboard-interactive-table customer-record-table"
+      >
+        <div class="table-filters order-management-toolbar">
+          <form
+            method="get"
+            action={agentBasePath}
+            class="order-filter-form"
+            aria-label="Filter agent orders"
+            data-agent-record-orders-filter-form
+          >
+            <input type="hidden" name="tab" value="orders" />
+            <div class="order-filter-form__field order-filter-form__field--search">
+              <input
+                name="search"
+                type="search"
+                value={orderFilters.search ?? ""}
+                placeholder="Search order ID, type, or status..."
+                autocomplete="off"
+                aria-label="Search orders"
+                data-agent-record-orders-search
+              />
+            </div>
+            <div class="order-filter-form__field">
+              <select name="orderType" aria-label="Filter by order type">
+                <option value="">All types</option>
+                <option value="customer" selected={orderFilters.orderType === "customer"}>Customer</option>
+                <option value="agent" selected={orderFilters.orderType === "agent"}>Agent</option>
+              </select>
+            </div>
+            <div class="order-filter-form__field">
+              <select name="source" aria-label="Filter by source">
+                <option value="">All sources</option>
+                {orderSources.map((source) => (
+                  <option value={source} selected={orderFilters.source === source}>
+                    {formatOrderSource(source)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="order-filter-form__field">
+              <select name="orderStatus" aria-label="Filter by order status">
+                <option value="">All order statuses</option>
+                {orderStatuses.map((status) => (
+                  <option value={status} selected={orderFilters.orderStatus === status}>
+                    {autoCapitalize(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div class="order-filter-form__field">
+              <select name="paymentStatus" aria-label="Filter by payment status">
+                <option value="">All payment statuses</option>
+                {paymentStatuses.map((status) => (
+                  <option value={status} selected={orderFilters.paymentStatus === status}>
+                    {autoCapitalize(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </form>
+          <div class="order-management-toolbar__actions">
+            <ActionMenu
+              id="agent-record-document-menu"
+              menuLabel="Document options for selected orders"
+              triggerLabel="Document"
+              triggerClass="order-management-toolbar__document-menu"
+              disabled
+              items={[
+                {
+                  label: "Sales Invoice",
+                  icon: "external-pdf",
+                  dataAction: "bulk-sales-invoice-pdf",
+                },
+                {
+                  label: "Order Slip",
+                  icon: "external-pdf",
+                  dataAction: "bulk-order-slip-pdf",
+                },
+              ]}
+            />
+          </div>
+        </div>
+
+        <div data-agent-record-orders-table-shell class="dashboard-interactive-table__surface">
+          <DashboardTableBoard>
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <DashboardTableNumberHeader />
+                  <th scope="col" class="dashboard-table__select-column">
+                    <label class="dashboard-table__select-all">
+                      <span class="sr-only">Select all orders on this page</span>
+                      <input type="checkbox" data-order-select-all />
+                    </label>
+                  </th>
+                  <th scope="col">Date</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">Order ID</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Order Status</th>
+                  <th scope="col">Payment Status</th>
+                  <th scope="col">Amount</th>
+                  <DashboardTableActionsHeader />
+                </tr>
+              </thead>
+              <tbody>
+                {orderRows.length === 0 ? (
+                  <DashboardTableEmptyState colspan={10} message="No orders match the selected filters." />
+                ) : orderRows.map((order, index) => (
+                  <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(ordersPagination, index)}</td>
+                    <td class="dashboard-table__select-column">
+                      <label class="dashboard-table__row-select">
+                        <span class="sr-only">Select {order.order_type_label.toLowerCase()} order {formatOrderCode(order.id)}</span>
+                        <input
+                          type="checkbox"
+                          value={order.id}
+                          data-order-row-checkbox
+                          data-order-row-type={order.order_type}
+                        />
+                      </label>
+                    </td>
+                    <td>{formatDate(order.created_at)}</td>
+                    <td>{order.order_type_label}</td>
+                    <td>{formatOrderCode(order.id)}</td>
+                    <td>{order.source_label}</td>
+                    <td>
+                      <StatusBadge kind="order" status={order.order_status} label={autoCapitalize(order.order_status)} />
+                    </td>
+                    <td>
+                      <StatusBadge kind="payment" status={order.payment_status} label={autoCapitalize(order.payment_status)} />
+                    </td>
+                    <td>{formatCurrency(order.amount)}</td>
+                    <td class="dashboard-table__actions-column">
+                      <ViewButton href={order.href} label={`View ${order.order_type_label.toLowerCase()} order ${formatOrderCode(order.id)}`} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DashboardTableBoard>
+        </div>
+
+        <DashboardTablePagination pagination={ordersPagination} />
+      </div>
+
+      <template data-agent-record-orders-filter-skeleton>
+        <DashboardTableBoard aria-busy="true" aria-live="polite">
+          <table class="product-table-skeleton dashboard-table">
+            <caption class="sr-only">Loading filtered orders</caption>
+            <thead>
+              <tr>
+                <DashboardTableNumberHeader />
+                <th scope="col" class="dashboard-table__select-column">
+                  <span class="table-skeleton-block table-skeleton-block--short"></span>
+                </th>
+                <th scope="col">Date</th>
+                <th scope="col">Type</th>
+                <th scope="col">Order ID</th>
+                <th scope="col">Source</th>
+                <th scope="col">Order Status</th>
+                <th scope="col">Payment Status</th>
+                <th scope="col">Amount</th>
+                <DashboardTableActionsHeader />
+              </tr>
+            </thead>
+            <tbody>
+              {skeletonRows.map(() => (
+                <tr>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DashboardTableBoard>
+      </template>
+    </>
+  )
+}
+
+{
+  tab === "customers" && (
+    <>
+      <div
+        data-interactive-table
+        data-server-pagination="true"
+        class="dashboard-interactive-table customer-record-table"
+      >
+        <div class="table-filters order-management-toolbar">
+          <form
+            method="get"
+            action={agentBasePath}
+            class="order-filter-form"
+            aria-label="Filter assigned customers"
+            data-agent-record-customers-filter-form
+          >
+            <input type="hidden" name="tab" value="customers" />
+            <div class="order-filter-form__field order-filter-form__field--search">
+              <input
+                name="search"
+                type="search"
+                value={orderFilters.search ?? ""}
+                placeholder="Search customer, contact, or address..."
+                autocomplete="off"
+                aria-label="Search assigned customers"
+                data-agent-record-customers-search
+              />
+            </div>
+          </form>
+        </div>
+
+        <div data-agent-record-customers-table-shell class="dashboard-interactive-table__surface">
+          <DashboardTableBoard>
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <DashboardTableNumberHeader />
+                  <th scope="col">Date Created</th>
+                  <th scope="col">Customer</th>
+                  <th scope="col">Contact</th>
+                  <th scope="col">Address</th>
+                  <DashboardTableActionsHeader />
+                </tr>
+              </thead>
+              <tbody>
+                {assignedCustomerRows.length === 0 ? (
+                  <DashboardTableEmptyState colspan={6} message="No customers are assigned to this agent yet." />
+                ) : assignedCustomerRows.map((customer, index) => (
+                  <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(assignedCustomersPagination, index)}</td>
+                    <td>{formatDate(customer.created_at)}</td>
+                    <td>
+                      {customer.name}
+                      {customer.is_reseller && (
+                        <span class="agent-record-table__reseller">(reseller)</span>
+                      )}
+                    </td>
+                    <td>
+                      {customer.phone_number}
+                      <br />
+                      {customer.email ?? "No email"}
+                    </td>
+                    <td>{customer.address}</td>
+                    <td class="dashboard-table__actions-column">
+                      <ViewButton href={customer.href} label={`View customer ${customer.name}`} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DashboardTableBoard>
+        </div>
+
+        <DashboardTablePagination pagination={assignedCustomersPagination} />
+      </div>
+
+      <template data-agent-record-customers-filter-skeleton>
+        <DashboardTableBoard aria-busy="true" aria-live="polite">
+          <table class="product-table-skeleton dashboard-table">
+            <caption class="sr-only">Loading assigned customers</caption>
+            <thead>
+              <tr>
+                <DashboardTableNumberHeader />
+                <th scope="col">Date Created</th>
+                <th scope="col">Customer</th>
+                <th scope="col">Contact</th>
+                <th scope="col">Address</th>
+                <DashboardTableActionsHeader />
+              </tr>
+            </thead>
+            <tbody>
+              {skeletonRows.map(() => (
+                <tr>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DashboardTableBoard>
+      </template>
+    </>
+  )
+}
+
+{
+  tab === "previous-orders" && (
+    <>
+      <div
+        data-interactive-table
+        data-server-pagination="true"
+        class="dashboard-interactive-table customer-record-table"
+      >
+        <div class="table-filters order-management-toolbar">
+          <form
+            method="get"
+            action={agentBasePath}
+            class="order-filter-form"
+            aria-label="Filter previous customer orders"
+            data-agent-record-previous-orders-filter-form
+          >
+            <input type="hidden" name="tab" value="previous-orders" />
+            <div class="order-filter-form__field order-filter-form__field--search">
+              <input
+                name="search"
+                type="search"
+                value={orderFilters.search ?? ""}
+                placeholder="Search order ID, source, or status..."
+                autocomplete="off"
+                aria-label="Search previous customer orders"
+                data-agent-record-previous-orders-search
+              />
+            </div>
+          </form>
+        </div>
+
+        <div data-agent-record-previous-orders-table-shell class="dashboard-interactive-table__surface">
+          <DashboardTableBoard>
+            <table class="dashboard-table">
+              <thead>
+                <tr>
+                  <DashboardTableNumberHeader />
+                  <DashboardTableActionsHeader />
+                  <th scope="col">Date Created</th>
+                  <th scope="col">Source</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Payment</th>
+                  <th scope="col">Balance</th>
+                  <th scope="col">Total Amount</th>
+                  <th scope="col">Order</th>
+                </tr>
+              </thead>
+              <tbody>
+                {previousOrderRows.length === 0 ? (
+                  <DashboardTableEmptyState colspan={9} message="No previous customer orders found for this promoted agent." />
+                ) : previousOrderRows.map((order, index) => (
+                  <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(previousOrdersPagination, index)}</td>
+                    <td class="dashboard-table__actions-column">
+                      {order.can_convert ? (
+                        <form
+                          method="post"
+                          class="agent-record-table__conversion-form"
+                          data-astro-reload
+                          onsubmit="return confirm('Convert this customer order into an agent distribution order?')"
+                        >
+                          <input
+                            type="hidden"
+                            name="action"
+                            value="convert-customer-order-to-agent-distribution"
+                          />
+                          <input type="hidden" name="orderId" value={order.id} />
+                          <input type="hidden" name="returnTo" value={agentBasePath} />
+                          <button type="submit">Convert</button>
+                        </form>
+                      ) : order.converted_parent_order_id && order.converted_at ? (
+                        <ViewButton
+                          href={order.converted_order_href ?? "#"}
+                          label={`View converted agent order ${formatOrderCode(order.converted_parent_order_id)}`}
+                        />
+                      ) : (
+                        <span class="agent-record-table__state">{order.block_reason ?? "Unavailable"}</span>
+                      )}
+                    </td>
+                    <td>{formatDate(order.created_at)}</td>
+                    <td>{order.source_label}</td>
+                    <td>{autoCapitalize(order.order_status)}</td>
+                    <td>{autoCapitalize(order.payment_status)}</td>
+                    <td>{formatCurrency(order.balance)}</td>
+                    <td>{formatCurrency(order.total_amount)}</td>
+                    <td>
+                      <ViewButton
+                        href={order.order_href}
+                        label={`View customer order ${formatOrderCode(order.id)}`}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </DashboardTableBoard>
+        </div>
+
+        <DashboardTablePagination pagination={previousOrdersPagination} />
+      </div>
+
+      <template data-agent-record-previous-orders-filter-skeleton>
+        <DashboardTableBoard aria-busy="true" aria-live="polite">
+          <table class="product-table-skeleton dashboard-table">
+            <caption class="sr-only">Loading previous customer orders</caption>
+            <thead>
+              <tr>
+                <DashboardTableNumberHeader />
+                <DashboardTableActionsHeader />
+                <th scope="col">Date Created</th>
+                <th scope="col">Source</th>
+                <th scope="col">Status</th>
+                <th scope="col">Payment</th>
+                <th scope="col">Balance</th>
+                <th scope="col">Total Amount</th>
+                <th scope="col">Order</th>
+              </tr>
+            </thead>
+            <tbody>
+              {skeletonRows.map(() => (
+                <tr>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
+                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DashboardTableBoard>
+      </template>
+    </>
+  )
+}
+
+<style>
+  .agent-record-table__reseller {
+    font-size: 0.75rem;
+    color: var(--color-brand-muted-black);
+    margin-left: 0.25rem;
+  }
+
+  .agent-record-table__indicator {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.5rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 0.25rem;
+    background: #f3f4f6;
+    color: #374151;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .agent-record-table__indicator--warning {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .agent-record-table__indicator--payment {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .agent-record-table__conversion-form {
+    margin: 0;
+  }
+
+  .agent-record-table__conversion-form button {
+    min-height: 2.25rem;
+    border: 1px solid rgba(102, 24, 24, 0.2);
+    border-radius: 0.45rem;
+    background: var(--color-brand-red);
+    color: #ffffff;
+    padding: 0.35rem 0.65rem;
+    font: inherit;
+    font-size: 0.78rem;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .agent-record-table__conversion-form button:hover,
+  .agent-record-table__conversion-form button:focus-visible {
+    background: #111827;
+  }
+
+  .agent-record-table__state {
+    display: inline-flex;
+    min-height: 1.7rem;
+    align-items: center;
+    border-radius: 0.35rem;
+    background: #f3f4f6;
+    color: #4b5563;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.72rem;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+</style>

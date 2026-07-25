@@ -1,11 +1,14 @@
 ---
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminProductManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminProductFilters } from "@/lib/admin-dashboard/product-filters";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import {
   escapeTextareaValue,
   formatCurrency,
@@ -329,6 +332,7 @@ function formatStockStatus(status: string): string {
         <table class="product-table-skeleton dashboard-table dashboard-table--products">
           <thead>
             <tr>
+              <DashboardTableNumberHeader />
               <th scope="col">Date Created</th>
               <th scope="col" class="dashboard-table__cell--product">
                 Product
@@ -337,19 +341,20 @@ function formatStockStatus(status: string): string {
               <th scope="col">Pricing</th>
               <th scope="col">Commission</th>
               <th scope="col">Status</th>
-              <th scope="col">Action</th>
+              <DashboardTableActionsHeader />
             </tr>
           </thead>
           <tbody>
             {
               data.products.length === 0 ? (
                 <DashboardTableEmptyState
-                  colspan={7}
+                  colspan={8}
                   message="No products match the selected filters."
                 />
               ) : (
-                data.products.map((product) => (
+                data.products.map((product, index) => (
                   <tr data-status={product.is_active ? "active" : "inactive"}>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(data.pagination, index)}</td>
                     <td>
                       {new Date(product.created_at).toLocaleDateString(
                         "en-US",
@@ -1013,7 +1018,7 @@ function formatStockStatus(status: string): string {
                       </div>
                     </td>
 
-                    <td></td>
+                    <td class="dashboard-table__actions-column"></td>
                   </tr>
                 ))
               )
@@ -1034,6 +1039,7 @@ function formatStockStatus(status: string): string {
         <caption class="sr-only">Loading filtered products</caption>
         <thead>
           <tr>
+            <DashboardTableNumberHeader />
             <th scope="col">Date Created</th>
             <th scope="col" class="dashboard-table__cell--product">
               Product
@@ -1042,13 +1048,16 @@ function formatStockStatus(status: string): string {
             <th scope="col">Pricing</th>
             <th scope="col">Commission</th>
             <th scope="col">Status</th>
-            <th scope="col">Action</th>
+            <DashboardTableActionsHeader />
           </tr>
         </thead>
         <tbody>
           {
             skeletonRows.map(() => (
               <tr>
+                <td>
+                  <span class="table-skeleton-block table-skeleton-block--short" />
+                </td>
                 <td>
                   <span class="table-skeleton-block" />
                 </td>

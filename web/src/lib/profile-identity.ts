@@ -70,6 +70,7 @@ export type AgentIdentityInput = {
   last_name: string;
   display_name: string;
   contact: string;
+  address?: string;
   email?: string | null;
 };
 
@@ -261,6 +262,7 @@ export function mapAgentWithProfile<
     status: row.status,
     email: email ?? identity.email,
     contact: identity.contact,
+    address: identity.address,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -513,7 +515,7 @@ export async function updateProfileIdentity(
       display_name: displayName,
       email: "email" in identity ? identity.email ?? null : identity.email,
       phone_number: "contact" in identity ? identity.contact : identity.phone_number,
-      address: "address" in identity ? identity.address : null,
+      ...("address" in identity ? { address: identity.address } : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("id", profileId);

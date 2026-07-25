@@ -40,18 +40,30 @@ function getActiveCustomerRecordTab(): CustomerRecordTab {
   return "orders";
 }
 
-function getSelectableOrderCheckboxes(section: HTMLElement) {
+function getOrderCheckboxes(section: HTMLElement) {
   return Array.from(
-    section.querySelectorAll<HTMLInputElement>("[data-order-row-checkbox]:not(:disabled)"),
+    section.querySelectorAll<HTMLInputElement>("[data-order-row-checkbox]"),
   );
 }
 
+function isPaymentEligibleOrderCheckbox(checkbox: HTMLInputElement) {
+  return checkbox.dataset.orderPaymentEligible === "true";
+}
+
+function getPaymentEligibleOrderCheckboxes(section: HTMLElement) {
+  return getOrderCheckboxes(section).filter(isPaymentEligibleOrderCheckbox);
+}
+
 function getSelectedOrderCheckboxes(section: HTMLElement) {
-  return getSelectableOrderCheckboxes(section).filter((checkbox) => checkbox.checked);
+  return getOrderCheckboxes(section).filter((checkbox) => checkbox.checked);
+}
+
+function getSelectedPaymentEligibleOrderCheckboxes(section: HTMLElement) {
+  return getSelectedOrderCheckboxes(section).filter(isPaymentEligibleOrderCheckbox);
 }
 
 function getSelectedOrderSummaries(section: HTMLElement): SelectedOrderSummary[] {
-  return getSelectedOrderCheckboxes(section).map((checkbox) => ({
+  return getSelectedPaymentEligibleOrderCheckboxes(section).map((checkbox) => ({
     id: checkbox.value,
     code: checkbox.dataset.orderCode ?? checkbox.value,
     date: checkbox.dataset.orderDate ?? "",
@@ -60,15 +72,15 @@ function getSelectedOrderSummaries(section: HTMLElement): SelectedOrderSummary[]
 }
 
 function updateCustomerRecordToolbarState(section: HTMLElement) {
-  const hasSelection = getSelectedOrderCheckboxes(section).length > 0;
+  const hasPaymentEligibleSelection = getSelectedPaymentEligibleOrderCheckboxes(section).length > 0;
 
   section.querySelectorAll<HTMLButtonElement>("[data-customer-add-payment]").forEach((button) => {
-    button.disabled = !hasSelection;
+    button.disabled = !hasPaymentEligibleSelection;
   });
 }
 
 function getSelectedOrderTotalBalance(section: HTMLElement) {
-  return getSelectedOrderCheckboxes(section).reduce((total, checkbox) => {
+  return getSelectedPaymentEligibleOrderCheckboxes(section).reduce((total, checkbox) => {
     const balance = Number(checkbox.dataset.orderBalanceValue ?? 0);
     return total + (Number.isFinite(balance) ? balance : 0);
   }, 0);
@@ -144,7 +156,7 @@ function bindCustomerPaymentSheet(section: HTMLElement) {
     if (!orderIdsHost) return;
 
     orderIdsHost.replaceChildren();
-    getSelectedOrderCheckboxes(section).forEach((checkbox) => {
+    getSelectedPaymentEligibleOrderCheckboxes(section).forEach((checkbox) => {
       const input = document.createElement("input");
       input.type = "hidden";
       input.name = "orderId";

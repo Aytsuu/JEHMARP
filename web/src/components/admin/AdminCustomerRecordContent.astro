@@ -257,7 +257,7 @@ function tabHref(tab: CustomerRecordTab) {
           </form>
         </div>
       </div>
-      <dl class="customer-record-card__list customer-record-card__list--status">
+      <dl class="customer-record-card__list customer-record-card__list--status customer-record-card__list--sentence-case">
         <div class="customer-record-card__field">
           <dt>Customer type</dt>
           <dd>
@@ -270,7 +270,20 @@ function tabHref(tab: CustomerRecordTab) {
         </div>
         <div class="customer-record-card__field">
           <dt>Assigned agent</dt>
-          <dd>{assignedAgent?.display_name ?? "None"}</dd>
+          <dd>
+            {
+              assignedAgent ? (
+                <a
+                  class="customer-record-card__link"
+                  href={`/admin/agents/${assignedAgent.id}?returnTo=${customerReturnTo}`}
+                >
+                  {assignedAgent.display_name}
+                </a>
+              ) : (
+                "None"
+              )
+            }
+          </dd>
         </div>
         <div class="customer-record-card__field">
           <dt>Credit limit</dt>
@@ -296,7 +309,7 @@ function tabHref(tab: CustomerRecordTab) {
 
     <article class="customer-record-card">
       <h2 class="customer-record-card__title">Orders</h2>
-      <dl class="customer-record-card__list customer-record-card__list--stats">
+      <dl class="customer-record-card__list customer-record-card__list--stats customer-record-card__list--sentence-case">
         <div class="customer-record-card__field">
           <dt>Total</dt><dd>{orderCounts.total}</dd>
         </div>
@@ -947,6 +960,14 @@ function tabHref(tab: CustomerRecordTab) {
     color: #6b7280;
   }
 
+  .customer-record-card__list--sentence-case dt {
+    font-size: 0.82rem;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    color: #6b7280;
+  }
+
   .customer-record-card__list--contact dt {
     font-size: inherit;
     font-weight: inherit;
@@ -968,6 +989,20 @@ function tabHref(tab: CustomerRecordTab) {
     align-items: center;
     gap: 0.45rem;
     flex-wrap: wrap;
+  }
+
+  .customer-record-card__link {
+    color: var(--color-brand-red);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-transform: none;
+  }
+
+  .customer-record-card__link:hover,
+  .customer-record-card__link:focus-visible {
+    color: #551313;
+    outline: none;
   }
 
   .customer-record-receivables {

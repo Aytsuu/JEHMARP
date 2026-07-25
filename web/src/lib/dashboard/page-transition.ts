@@ -1,3 +1,5 @@
-export function getDashboardPageTransitionName(pathname: string) {
-  return `dashboard-page-${pathname.replace(/[^a-zA-Z0-9-]/g, "-")}`;
+export const DASHBOARD_MAIN_TRANSITION_NAME = "dashboard-main-content";
+
+export function getDashboardPageTransitionName(_pathname: string) {
+  return DASHBOARD_MAIN_TRANSITION_NAME;
 }

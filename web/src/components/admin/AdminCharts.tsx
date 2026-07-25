@@ -110,6 +110,40 @@ function formatDate(value: string) {
   }).format(date);
 }
 
+function RecentActivityColGroup() {
+  return (
+    <colgroup>
+      <col className="admin-recent-activity-table__col-number" />
+      <col className="admin-recent-activity-table__col-data" span={5} />
+      <col className="admin-recent-activity-table__col-action" />
+    </colgroup>
+  );
+}
+
+function RecentActivityCell({
+  children,
+  className = "",
+  title,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  title?: string;
+}) {
+  const resolvedTitle =
+    title ?? (typeof children === "string" ? children : undefined);
+
+  return (
+    <td className={className}>
+      <span
+        className="admin-recent-activity-table__cell-text"
+        title={resolvedTitle}
+      >
+        {children}
+      </span>
+    </td>
+  );
+}
+
 function CustomTooltipContent({
   active,
   payload,
@@ -399,7 +433,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
     : [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="admin-charts-root flex flex-col gap-6">
       <>
         <div className="order-1 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)]">
           <div className="rounded-xl border border-gray-300 bg-white p-6">
@@ -833,7 +867,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
         </div>
       </>
 
-      <div className="order-2 rounded-xl border border-gray-300 bg-white p-6">
+      <div className="admin-recent-activity-card order-2 rounded-xl border border-gray-300 bg-white p-6">
         <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h3 className="mb-1 text-lg font-bold text-gray-900">Recent Activity</h3>
@@ -863,49 +897,75 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
             ))}
           </div>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap admin-recent-activity-table-wrap">
           {recentActivityTab === "customers" && (
-            <table className="min-w-full">
+            <table className="admin-recent-activity-table">
+              <RecentActivityColGroup />
               <thead>
                 <tr>
+                  <th
+                    className="dashboard-table__number-column"
+                    aria-hidden="true"
+                  />
                   <th scope="col">Name</th>
                   <th scope="col">Email</th>
                   <th scope="col">Phone</th>
                   <th scope="col">Type</th>
                   <th scope="col">Registered</th>
-                  <th scope="col">Action</th>
+                  <th
+                    className="dashboard-table__actions-column"
+                    aria-hidden="true"
+                  />
                 </tr>
               </thead>
               <tbody>
                 {analytics.recentCustomers.length > 0 ? (
-                  analytics.recentCustomers.map((customer) => (
+                  analytics.recentCustomers.map((customer, index) => (
                     <tr key={customer.id} className="hover:bg-gray-50/50">
-                      <td className="font-semibold text-gray-900">
-                        {customer.first_name} {customer.last_name}
+                      <td className="dashboard-table__number-column">
+                        {index + 1}
                       </td>
-                      <td className="text-gray-700">
+                      <RecentActivityCell
+                        className="font-semibold text-gray-900"
+                        title={`${customer.first_name} ${customer.last_name}`}
+                      >
+                        {customer.first_name} {customer.last_name}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-gray-700"
+                        title={customer.email || "No email"}
+                      >
                         {customer.email || (
                           <span className="text-gray-400">No email</span>
                         )}
-                      </td>
-                      <td className="text-gray-700">{customer.phone_number}</td>
-                      <td>
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-gray-700"
+                        title={customer.phone_number}
+                      >
+                        {customer.phone_number}
+                      </RecentActivityCell>
+                      <RecentActivityCell>
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${customer.is_reseller
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-blue-100 text-blue-800"
+                          className={`admin-recent-activity-table__badge ${customer.is_reseller
+                              ? "admin-recent-activity-table__badge--warning"
+                              : "admin-recent-activity-table__badge--info"
                             }`}
                         >
                           {customer.is_reseller ? "Reseller" : "Retail"}
                         </span>
-                      </td>
-                      <td className="text-sm text-gray-500">
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-sm text-gray-500"
+                        title={formatDate(customer.created_at)}
+                      >
                         {formatDate(customer.created_at)}
-                      </td>
-                      <td>
+                      </RecentActivityCell>
+                      <td className="dashboard-table__actions-column">
                         <a
                           href={`/admin/customers/${customer.id}`}
-                          className="text-sm font-bold text-[#661818] hover:underline"
+                          className="admin-recent-activity-table__action"
+                          title="View Profile"
                         >
                           View Profile
                         </a>
@@ -914,7 +974,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <DashboardTableEmptyStateContent message="No recent customers found" />
                     </td>
                   </tr>
@@ -924,34 +984,67 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
           )}
 
           {recentActivityTab === "orders" && (
-            <table className="min-w-full">
+            <table className="admin-recent-activity-table">
+              <RecentActivityColGroup />
               <thead>
                 <tr>
+                  <th
+                    className="dashboard-table__number-column"
+                    aria-hidden="true"
+                  />
                   <th scope="col">Customer</th>
                   <th scope="col">Order Status</th>
                   <th scope="col">Payment Status</th>
                   <th scope="col">Total</th>
                   <th scope="col">Submitted</th>
-                  <th scope="col">Action</th>
+                  <th
+                    className="dashboard-table__actions-column"
+                    aria-hidden="true"
+                  />
                 </tr>
               </thead>
               <tbody>
                 {analytics.recentOrders.length > 0 ? (
-                  analytics.recentOrders.map((order) => (
+                  analytics.recentOrders.map((order, index) => (
                     <tr key={order.id} className="hover:bg-gray-50/50">
-                      <td className="font-semibold text-gray-900">{order.customerName}</td>
-                      <td className="capitalize text-gray-700">{order.orderStatus}</td>
-                      <td className="capitalize text-gray-700">{order.paymentStatus}</td>
-                      <td className="font-semibold text-gray-900">
+                      <td className="dashboard-table__number-column">
+                        {index + 1}
+                      </td>
+                      <RecentActivityCell
+                        className="font-semibold text-gray-900"
+                        title={order.customerName}
+                      >
+                        {order.customerName}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="capitalize text-gray-700"
+                        title={order.orderStatus}
+                      >
+                        {order.orderStatus}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="capitalize text-gray-700"
+                        title={order.paymentStatus}
+                      >
+                        {order.paymentStatus}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="font-semibold text-gray-900"
+                        title={formatCurrency(order.grossSales)}
+                      >
                         {formatCurrency(order.grossSales)}
-                      </td>
-                      <td className="text-sm text-gray-500">
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-sm text-gray-500"
+                        title={formatDate(order.createdAt)}
+                      >
                         {formatDate(order.createdAt)}
-                      </td>
-                      <td>
+                      </RecentActivityCell>
+                      <td className="dashboard-table__actions-column">
                         <a
                           href={`/admin/orders/customer/${order.id}`}
-                          className="text-sm font-bold text-[#661818] hover:underline"
+                          className="admin-recent-activity-table__action"
+                          title="View Order"
                         >
                           View Order
                         </a>
@@ -960,7 +1053,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <DashboardTableEmptyStateContent message="No recent orders found" />
                     </td>
                   </tr>
@@ -970,36 +1063,69 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
           )}
 
           {recentActivityTab === "inquiries" && (
-            <table className="min-w-full">
+            <table className="admin-recent-activity-table">
+              <RecentActivityColGroup />
               <thead>
                 <tr>
+                  <th
+                    className="dashboard-table__number-column"
+                    aria-hidden="true"
+                  />
                   <th scope="col">Name</th>
                   <th scope="col">Email</th>
                   <th scope="col">Phone</th>
                   <th scope="col">Status</th>
                   <th scope="col">Received</th>
-                  <th scope="col">Action</th>
+                  <th
+                    className="dashboard-table__actions-column"
+                    aria-hidden="true"
+                  />
                 </tr>
               </thead>
               <tbody>
                 {analytics.recentInquiries.length > 0 ? (
-                  analytics.recentInquiries.map((inquiry) => (
+                  analytics.recentInquiries.map((inquiry, index) => (
                     <tr key={inquiry.id} className="hover:bg-gray-50/50">
-                      <td className="font-semibold text-gray-900">{inquiry.name}</td>
-                      <td className="text-gray-700">{inquiry.email}</td>
-                      <td className="text-gray-700">
+                      <td className="dashboard-table__number-column">
+                        {index + 1}
+                      </td>
+                      <RecentActivityCell
+                        className="font-semibold text-gray-900"
+                        title={inquiry.name}
+                      >
+                        {inquiry.name}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-gray-700"
+                        title={inquiry.email}
+                      >
+                        {inquiry.email}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-gray-700"
+                        title={inquiry.phone_number || "No phone"}
+                      >
                         {inquiry.phone_number || (
                           <span className="text-gray-400">No phone</span>
                         )}
-                      </td>
-                      <td className="capitalize text-gray-700">{inquiry.inquiry_status}</td>
-                      <td className="text-sm text-gray-500">
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="capitalize text-gray-700"
+                        title={inquiry.inquiry_status}
+                      >
+                        {inquiry.inquiry_status}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-sm text-gray-500"
+                        title={formatDate(inquiry.created_at)}
+                      >
                         {formatDate(inquiry.created_at)}
-                      </td>
-                      <td>
+                      </RecentActivityCell>
+                      <td className="dashboard-table__actions-column">
                         <a
                           href="/admin/inquiries"
-                          className="text-sm font-bold text-[#661818] hover:underline"
+                          className="admin-recent-activity-table__action"
+                          title="Review"
                         >
                           Review
                         </a>
@@ -1008,7 +1134,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <DashboardTableEmptyStateContent message="No recent inquiries found" />
                     </td>
                   </tr>
@@ -1018,34 +1144,67 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
           )}
 
           {recentActivityTab === "resellers" && (
-            <table className="min-w-full">
+            <table className="admin-recent-activity-table">
+              <RecentActivityColGroup />
               <thead>
                 <tr>
+                  <th
+                    className="dashboard-table__number-column"
+                    aria-hidden="true"
+                  />
                   <th scope="col">Name</th>
                   <th scope="col">Email</th>
                   <th scope="col">Contact</th>
                   <th scope="col">Status</th>
                   <th scope="col">Submitted</th>
-                  <th scope="col">Action</th>
+                  <th
+                    className="dashboard-table__actions-column"
+                    aria-hidden="true"
+                  />
                 </tr>
               </thead>
               <tbody>
                 {analytics.recentResellerApplications.length > 0 ? (
-                  analytics.recentResellerApplications.map((application) => (
+                  analytics.recentResellerApplications.map((application, index) => (
                     <tr key={application.id} className="hover:bg-gray-50/50">
-                      <td className="font-semibold text-gray-900">{application.name}</td>
-                      <td className="text-gray-700">{application.email}</td>
-                      <td className="text-gray-700">{application.contact_number}</td>
-                      <td className="capitalize text-gray-700">
+                      <td className="dashboard-table__number-column">
+                        {index + 1}
+                      </td>
+                      <RecentActivityCell
+                        className="font-semibold text-gray-900"
+                        title={application.name}
+                      >
+                        {application.name}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-gray-700"
+                        title={application.email}
+                      >
+                        {application.email}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-gray-700"
+                        title={application.contact_number}
+                      >
+                        {application.contact_number}
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="capitalize text-gray-700"
+                        title={application.application_status}
+                      >
                         {application.application_status}
-                      </td>
-                      <td className="text-sm text-gray-500">
+                      </RecentActivityCell>
+                      <RecentActivityCell
+                        className="text-sm text-gray-500"
+                        title={formatDate(application.created_at)}
+                      >
                         {formatDate(application.created_at)}
-                      </td>
-                      <td>
+                      </RecentActivityCell>
+                      <td className="dashboard-table__actions-column">
                         <a
                           href="/admin/reseller-applications"
-                          className="text-sm font-bold text-[#661818] hover:underline"
+                          className="admin-recent-activity-table__action"
+                          title="Review"
                         >
                           Review
                         </a>
@@ -1054,7 +1213,7 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={7}>
                       <DashboardTableEmptyStateContent message="No recent reseller applications found" />
                     </td>
                   </tr>

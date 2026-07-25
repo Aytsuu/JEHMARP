@@ -4,9 +4,12 @@ import AdminOrderAgentCard from "@/components/admin/AdminOrderAgentCard.astro";
 import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsPageLayout.astro";
 import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
 import AgentOrderDistributionSummaryCard from "@/components/agent/AgentOrderDistributionSummaryCard.astro";
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import {
   formatAdminActionFeedback,
   handleAdminDashboardAction,
@@ -303,6 +306,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
             <table class="agent-customers-table agent-order-products-table">
               <thead>
                 <tr>
+                  <DashboardTableNumberHeader />
                   <th scope="col">Product</th>
                   <th scope="col">Quantity</th>
                   <th scope="col">Details</th>
@@ -311,7 +315,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                 </tr>
               </thead>
               <tbody>
-                {agentOrder.agent_order_item.map((item) => {
+                {agentOrder.agent_order_item.map((item, index) => {
                   const unitPrice = item.product?.default_price ?? 0;
                   const defaultCommission = defaultProductCommissionAmount({
                     product: item.product,
@@ -329,6 +333,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
 
                   return (
                     <tr>
+                      <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
                       <td>
                         {item.product?.name ?? "Missing product"}
                         <span class="agent-order-products-table__meta">
@@ -678,6 +683,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
               <table class="agent-customers-table agent-order-customer-orders-table">
                 <thead>
                   <tr>
+                    <DashboardTableNumberHeader />
                     <th scope="col" class="dashboard-table__select-column">
                       <label class="dashboard-table__select-all">
                         <span class="sr-only">Select all customer orders</span>
@@ -691,11 +697,11 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                     <th scope="col">Payment Status</th>
                     <th scope="col">Total amount</th>
                     <th scope="col">Payment Confirmation</th>
-                    <th scope="col">Action</th>
+                    <DashboardTableActionsHeader wide />
                   </tr>
                 </thead>
                 <tbody>
-                  {agentOrder.customer_order.map((order) => {
+                  {agentOrder.customer_order.map((order, index) => {
                     const invoice = order.invoice[0];
                     const orderAmount = orderReceivableTotal(
                       order,
@@ -719,6 +725,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
 
                     return (
                       <tr>
+                        <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
                         <td class="dashboard-table__select-column">
                           <label class="dashboard-table__row-select">
                             <span class="sr-only">Select order for {customerName}</span>
@@ -860,7 +867,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
                             </div>
                           </div>
                         </td>
-                        <td>
+                        <td class="dashboard-table__actions-column">
                           {
                             isPendingOrder ? (
                               <form

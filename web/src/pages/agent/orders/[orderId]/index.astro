@@ -1,8 +1,10 @@
 ---
 import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
 import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import {
   formatAgentActionFeedback,
   handleAgentDashboardAction,
@@ -432,6 +434,7 @@ const timelineItems = [
                 <table class="agent-customers-table agent-order-products-table">
                   <thead>
                     <tr>
+                      <DashboardTableNumberHeader />
                       <th scope="col">Product</th>
                       <th scope="col">Quantity</th>
                       <th scope="col">Unit price</th>
@@ -442,12 +445,13 @@ const timelineItems = [
                   </thead>
                   <tbody>
                     {
-                      order.customer_order_item.map((item) => {
+                      order.customer_order_item.map((item, index) => {
                         const quantity = item[orderQuantityKey];
                         const subtotal = quantity * item.unit_price;
 
                         return (
                           <tr>
+                            <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
                             <td>
                               {item.product?.name ?? "Missing product"}
                               <span class="agent-order-products-table__meta">

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   adminPaginationRange,
   buildAdminPagination,
+  dashboardTableRowNumber,
   formatRecordCount,
   mergeAdminPaginationQuery,
   parseAdminPagination,
@@ -103,5 +104,17 @@ describe("buildAdminPagination", () => {
       fromRow: 0,
       toRow: 0,
     });
+  });
+});
+
+describe("dashboardTableRowNumber", () => {
+  it("uses pagination offset when available", () => {
+    expect(dashboardTableRowNumber({ fromRow: 11 }, 0)).toBe(11);
+    expect(dashboardTableRowNumber({ fromRow: 11 }, 4)).toBe(15);
+  });
+
+  it("falls back to one-based index when pagination is missing", () => {
+    expect(dashboardTableRowNumber(null, 0)).toBe(1);
+    expect(dashboardTableRowNumber(undefined, 2)).toBe(3);
   });
 });

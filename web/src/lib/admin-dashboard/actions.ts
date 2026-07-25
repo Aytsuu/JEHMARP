@@ -175,6 +175,7 @@ export type AdminAction =
         display_name: string;
         email: string | null;
         contact: string;
+        address: string;
         password: string | null;
         status: "active" | "inactive" | "suspended";
       };
@@ -1419,6 +1420,7 @@ async function executeAgentCreate(
       last_name: payload.last_name,
       display_name: payload.display_name,
       contact: payload.contact,
+      address: payload.address,
       email: payload.email,
       status: payload.status,
     });
@@ -2041,6 +2043,7 @@ async function executeCustomerPromotionToAgent(
       last_name: customer.last_name,
       display_name: `${customer.first_name} ${customer.last_name}`.trim(),
       contact: customer.phone_number,
+      address: customer.address,
       email: customer.email,
       status: "active",
       promoted_from_customer_id: customerId,
@@ -3779,6 +3782,7 @@ function parseAgentProfilePayload(formData: FormData) {
     first_name: firstName,
     last_name: lastName,
     display_name: `${firstName} ${lastName}`.trim(),
+    address: requiredString(formData, "address"),
   };
 }
 

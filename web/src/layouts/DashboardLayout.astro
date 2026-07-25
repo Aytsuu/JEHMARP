@@ -25,19 +25,25 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" style="font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" transition:persist />
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+      transition:persist
+    />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap"
+      transition:persist
     />
-    <ClientRouter fallback="swap" />
+    <ClientRouter fallback="animate" />
     <meta name="description" content={description} />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
@@ -257,6 +263,114 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
         );
       }
 
+      function measureContentColumnWidth(
+        headerCell: HTMLTableCellElement,
+        bodyRows: HTMLTableRowElement[],
+        columnIndex: number,
+        minimumWidth = 72,
+      ) {
+        let maxWidth = minimumWidth;
+
+        const measureCell = (cell: HTMLElement) => {
+          const style = getComputedStyle(cell);
+          const horizontalPadding =
+            parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+          const children = Array.from(cell.children) as HTMLElement[];
+
+          if (children.length === 0) {
+            maxWidth = Math.max(maxWidth, Math.ceil(cell.getBoundingClientRect().width));
+            return;
+          }
+
+          let contentWidth = 0;
+          children.forEach((child, childIndex) => {
+            contentWidth += Math.ceil(child.getBoundingClientRect().width);
+            if (childIndex > 0) {
+              contentWidth += 8;
+            }
+          });
+
+          maxWidth = Math.max(
+            maxWidth,
+            contentWidth + horizontalPadding,
+            Math.ceil(cell.scrollWidth),
+            Math.ceil(cell.getBoundingClientRect().width),
+          );
+        };
+
+        measureCell(headerCell);
+        for (const row of bodyRows) {
+          const cell = row.children[columnIndex] as HTMLElement | undefined;
+          if (cell) {
+            measureCell(cell);
+          }
+        }
+
+        return maxWidth;
+      }
+
+      const FIXED_TABLE_COLUMN_CLASSES = [
+        "dashboard-table__number-column",
+        "dashboard-table__select-column",
+        "dashboard-table__actions-column",
+      ];
+
+      function isFixedTableColumn(cell: Element) {
+        return FIXED_TABLE_COLUMN_CLASSES.some((className) =>
+          cell.classList.contains(className),
+        );
+      }
+
+      function isBadgeTableColumn(
+        bodyRows: HTMLTableRowElement[],
+        columnIndex: number,
+      ) {
+        return bodyRows.some((row) => {
+          const cell = row.children[columnIndex] as HTMLElement | undefined;
+          if (!cell) return false;
+
+          return Boolean(
+            cell.classList.contains("dashboard-table__badge-column")
+              || cell.querySelector(".status-badge, .order-status-cell"),
+          );
+        });
+      }
+
+      function shouldSyncTableColumnWidth(
+        headerCell: HTMLTableCellElement,
+        bodyRows: HTMLTableRowElement[],
+        columnIndex: number,
+      ) {
+        return isFixedTableColumn(headerCell)
+          || headerCell.classList.contains("dashboard-table__badge-column")
+          || isBadgeTableColumn(bodyRows, columnIndex);
+      }
+
+      function getSyncedTableColumnWidth(
+        headerCell: HTMLTableCellElement,
+        bodyRows: HTMLTableRowElement[],
+        columnIndex: number,
+      ) {
+        if (headerCell.classList.contains("dashboard-table__actions-column")) {
+          const measuredWidth = measureContentColumnWidth(
+            headerCell,
+            bodyRows,
+            columnIndex,
+          );
+          const cssWidth = Math.ceil(parseFloat(getComputedStyle(headerCell).width));
+          return Math.max(measuredWidth, cssWidth);
+        }
+
+        if (
+          headerCell.classList.contains("dashboard-table__badge-column")
+          || isBadgeTableColumn(bodyRows, columnIndex)
+        ) {
+          return measureContentColumnWidth(headerCell, bodyRows, columnIndex);
+        }
+
+        return Math.ceil(parseFloat(getComputedStyle(headerCell).width));
+      }
+
       function syncDashboardTableBoardColumns(board: HTMLElement) {
         const table = board.querySelector("table");
         const thead = table?.querySelector("thead");
@@ -268,10 +382,32 @@ const dashboardPageTransitionName = getDashboardPageTransitionName(Astro.url.pat
         });
 
         const headerRow = thead.querySelector("tr");
-        const tableWidth = headerRow?.getBoundingClientRect().width ?? table.scrollWidth;
+        if (!headerRow) return;
+
+        const headerCells = Array.from(headerRow.children) as HTMLTableCellElement[];
+        const bodyRows = Array.from(tbody.querySelectorAll("tr")).filter(
+          (row) => !row.classList.contains("empty-row"),
+        );
+
+        headerCells.forEach((headerCell, columnIndex) => {
+          if (!shouldSyncTableColumnWidth(headerCell, bodyRows, columnIndex)) {
+            return;
+          }
+
+          const widthPx = `${getSyncedTableColumnWidth(headerCell, bodyRows, columnIndex)}px`;
+          headerCell.style.width = widthPx;
+          for (const row of bodyRows) {
+            const cell = row.children[columnIndex] as HTMLElement | undefined;
+            if (cell) {
+              cell.style.width = widthPx;
+            }
+          }
+        });
+
+        const tableWidth = Math.ceil(headerRow.getBoundingClientRect().width);
         board.style.setProperty(
           "--dashboard-table-sync-width",
-          `${Math.ceil(tableWidth)}px`,
+          `${tableWidth}px`,
         );
       }
 

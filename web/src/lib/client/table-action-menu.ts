@@ -2,6 +2,128 @@ let activeMenu: HTMLElement | null = null;
 
 const initializedDocuments = new WeakSet<Document>();
 
+export type FloatingMenuBounds = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
+export type FloatingMenuPositionInput = {
+  triggerRect: Pick<DOMRect, "left" | "right" | "top" | "bottom">;
+  contentWidth: number;
+  contentHeight: number;
+  bounds: FloatingMenuBounds;
+  gap?: number;
+};
+
+export type FloatingMenuPosition = {
+  left: number;
+  top: number;
+};
+
+export function getFloatingMenuBounds(
+  viewportWidth = window.innerWidth,
+  viewportHeight = window.innerHeight,
+  gutter = 12,
+  root: ParentNode = document,
+): FloatingMenuBounds {
+  let left = gutter;
+  let right = viewportWidth - gutter;
+
+  const main = root.querySelector<HTMLElement>(".dashboard-main");
+  if (main) {
+    const mainRect = main.getBoundingClientRect();
+    if (mainRect.width > 0) {
+      left = Math.max(left, mainRect.left + gutter);
+      right = Math.min(right, mainRect.right - gutter);
+    }
+  }
+
+  const sidebar = root.querySelector<HTMLElement>(".dashboard-sidebar-shell");
+  if (sidebar) {
+    const sidebarRect = sidebar.getBoundingClientRect();
+    if (sidebarRect.width > 0 && sidebarRect.right > left) {
+      left = Math.max(left, sidebarRect.right + gutter);
+    }
+  }
+
+  if (right < left) {
+    right = left;
+  }
+
+  return {
+    left,
+    right,
+    top: gutter,
+    bottom: viewportHeight - gutter,
+  };
+}
+
+function getHorizontalOverflow(left: number, width: number, bounds: FloatingMenuBounds) {
+  let overflow = 0;
+
+  if (left < bounds.left) {
+    overflow += bounds.left - left;
+  }
+
+  if (left + width > bounds.right) {
+    overflow += left + width - bounds.right;
+  }
+
+  return overflow;
+}
+
+export function computeFloatingMenuPosition({
+  triggerRect,
+  contentWidth,
+  contentHeight,
+  bounds,
+  gap = 8,
+}: FloatingMenuPositionInput): FloatingMenuPosition {
+  const horizontalCandidates = [
+    triggerRect.right - contentWidth,
+    triggerRect.left,
+  ];
+
+  let left = horizontalCandidates[0];
+  let bestOverflow = getHorizontalOverflow(left, contentWidth, bounds);
+
+  for (let index = 1; index < horizontalCandidates.length; index += 1) {
+    const candidate = horizontalCandidates[index];
+    const overflow = getHorizontalOverflow(candidate, contentWidth, bounds);
+
+    if (overflow < bestOverflow) {
+      left = candidate;
+      bestOverflow = overflow;
+    }
+  }
+
+  if (left < bounds.left) {
+    left = bounds.left;
+  }
+
+  if (left + contentWidth > bounds.right) {
+    left = Math.max(bounds.left, bounds.right - contentWidth);
+  }
+
+  let top = triggerRect.bottom + gap;
+
+  if (top + contentHeight > bounds.bottom) {
+    top = triggerRect.top - contentHeight - gap;
+  }
+
+  if (top < bounds.top) {
+    top = bounds.top;
+  }
+
+  if (top + contentHeight > bounds.bottom) {
+    top = Math.max(bounds.top, bounds.bottom - contentHeight);
+  }
+
+  return { left, top };
+}
+
 function closeMenu(menu: HTMLElement | null) {
   if (!menu) return;
 
@@ -27,9 +149,8 @@ function positionMenu(menu: HTMLElement) {
   if (!trigger || !content) return;
 
   const triggerRect = trigger.getBoundingClientRect();
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const gutter = 12;
+  const bounds = getFloatingMenuBounds();
+  const gap = 8;
 
   content.hidden = false;
 
@@ -40,19 +161,13 @@ function positionMenu(menu: HTMLElement) {
       return;
     }
 
-    let left = triggerRect.right - contentRect.width;
-    let top = triggerRect.bottom + 8;
-
-    if (left < gutter) left = gutter;
-    if (left + contentRect.width > viewportWidth - gutter) {
-      left = viewportWidth - contentRect.width - gutter;
-    }
-
-    if (top + contentRect.height > viewportHeight - gutter) {
-      top = triggerRect.top - contentRect.height - 8;
-    }
-
-    if (top < gutter) top = gutter;
+    const { left, top } = computeFloatingMenuPosition({
+      triggerRect,
+      contentWidth: contentRect.width,
+      contentHeight: contentRect.height,
+      bounds,
+      gap,
+    });
 
     content.style.left = `${left}px`;
     content.style.top = `${top}px`;

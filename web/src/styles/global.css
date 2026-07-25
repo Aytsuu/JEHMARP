@@ -1730,7 +1730,6 @@
   }
 
   .dashboard-main--loading .dashboard-main__content {
-    visibility: hidden;
     pointer-events: none;
   }
 
@@ -2005,6 +2004,180 @@
   .admin-summary-grid {
     @apply grid gap-4;
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
+
+  .admin-charts-shell {
+    position: relative;
+    min-height: 28rem;
+  }
+
+  .admin-charts-shell__placeholder {
+    display: grid;
+    gap: 1.5rem;
+    min-height: 28rem;
+  }
+
+  .admin-charts-shell__panel {
+    min-height: 22rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: linear-gradient(90deg, #f3f4f6 0%, #eceff3 50%, #f3f4f6 100%);
+    background-size: 200% 100%;
+    animation: dashboard-skeleton-shimmer 1.2s ease-in-out infinite;
+  }
+
+  .admin-charts-shell__panel--compact {
+    min-height: 18rem;
+  }
+
+  .admin-charts-shell:has(.admin-charts-root) .admin-charts-shell__placeholder {
+    display: none;
+  }
+
+  .admin-charts-root {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .admin-recent-activity-card {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .table-wrap.admin-recent-activity-table-wrap {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .admin-recent-activity-table {
+    width: 100%;
+    max-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+  }
+
+  .admin-recent-activity-table__col-number {
+    width: 3.5%;
+  }
+
+  .admin-recent-activity-table__col-data {
+    width: 17.3%;
+  }
+
+  .admin-recent-activity-table__col-action {
+    width: 10%;
+  }
+
+  .admin-recent-activity-table th,
+  .admin-recent-activity-table td {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 0;
+    padding: 0.5rem 0.7rem;
+    vertical-align: middle;
+    overflow: hidden;
+    font-size: 0.9rem;
+    font-weight: 500;
+    line-height: 1.42;
+    color: #2e2e2e;
+    border-right: 1px solid #e5e7eb;
+  }
+
+  .admin-recent-activity-table thead th {
+    background: #f3f4f6;
+    border-bottom: 1px solid #e5e7eb;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-recent-activity-table tbody td {
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .admin-recent-activity-table th.dashboard-table__number-column,
+  .admin-recent-activity-table td.dashboard-table__number-column {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .admin-recent-activity-table th.dashboard-table__actions-column,
+  .admin-recent-activity-table td.dashboard-table__actions-column {
+    padding-right: 0.7rem;
+    text-align: center;
+  }
+
+  .admin-recent-activity-table__cell-text {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-recent-activity-table__badge {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: 9999px;
+    padding: 0.125rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    vertical-align: top;
+  }
+
+  .admin-recent-activity-table__badge--warning {
+    background: #fef3c7;
+    color: #92400e;
+  }
+
+  .admin-recent-activity-table__badge--info {
+    background: #dbeafe;
+    color: #1e40af;
+  }
+
+  .admin-recent-activity-table__action {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #661818;
+    text-decoration: none;
+    text-align: center;
+  }
+
+  .admin-recent-activity-table__action:hover {
+    text-decoration: underline;
+  }
+
+  @keyframes dashboard-skeleton-shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+
+    100% {
+      background-position: -100% 0;
+    }
   }
 
   .admin-summary-card {
@@ -7984,8 +8157,13 @@
     text-overflow: ellipsis;
   }
 
-  .dashboard-interactive-table .dashboard-table th:first-child,
-  .dashboard-interactive-table .dashboard-table td:first-child {
+  .dashboard-interactive-table .dashboard-table th:first-child:not(.dashboard-table__number-column),
+  .dashboard-interactive-table .dashboard-table td:first-child:not(.dashboard-table__number-column) {
+    padding-left: var(--dashboard-page-inset-x);
+  }
+
+  .dashboard-interactive-table .dashboard-table th.dashboard-table__number-column:first-child,
+  .dashboard-interactive-table .dashboard-table td.dashboard-table__number-column:first-child {
     padding-left: var(--dashboard-page-inset-x);
   }
 
@@ -7997,6 +8175,113 @@
     padding-left: 0.75rem;
     padding-right: 0.5rem;
     text-align: center;
+    vertical-align: middle;
+  }
+
+  .dashboard-table th.dashboard-table__number-column,
+  .dashboard-table td.dashboard-table__number-column,
+  .table-wrap table th.dashboard-table__number-column,
+  .table-wrap table td.dashboard-table__number-column {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    max-width: 2.75rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: visible;
+    vertical-align: middle;
+  }
+
+  .dashboard-interactive-table .dashboard-table th.dashboard-table__number-column + .dashboard-table__select-column,
+  .dashboard-interactive-table .dashboard-table td.dashboard-table__number-column + .dashboard-table__select-column {
+    padding-left: 0.35rem;
+  }
+
+  .agent-customers-table th.dashboard-table__number-column + .dashboard-table__select-column,
+  .agent-customers-table td.dashboard-table__number-column + .dashboard-table__select-column {
+    padding-left: 0.35rem;
+  }
+
+  .dashboard-table th.dashboard-table__actions-column,
+  .dashboard-table td.dashboard-table__actions-column,
+  .table-wrap table th.dashboard-table__actions-column,
+  .table-wrap table td.dashboard-table__actions-column {
+    width: 4.5rem;
+    min-width: 4.5rem;
+    max-width: 4.5rem;
+    padding-left: 0.35rem;
+    padding-right: var(--dashboard-page-inset-x, var(--dashboard-table-cell-padding-x));
+    text-align: center;
+    white-space: nowrap;
+    overflow: visible;
+    vertical-align: middle;
+  }
+
+  .dashboard-table td.dashboard-table__actions-column > .order-table-action-form,
+  .dashboard-table td.dashboard-table__actions-column > .table-action-menu,
+  .dashboard-table td.dashboard-table__actions-column > .btn-table-manage,
+  .dashboard-table td.dashboard-table__actions-column > a,
+  .dashboard-table td.dashboard-table__actions-column > button,
+  .table-wrap table td.dashboard-table__actions-column > .order-table-action-form,
+  .table-wrap table td.dashboard-table__actions-column > .btn-table-manage,
+  .table-wrap table td.dashboard-table__actions-column > a,
+  .table-wrap table td.dashboard-table__actions-column > button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    overflow: visible;
+    white-space: nowrap;
+  }
+
+  .dashboard-table td.dashboard-table__actions-column > .order-table-action-form + :is(a, button, .table-action-menu, .btn-table-manage),
+  .dashboard-table td.dashboard-table__actions-column > :is(a, button, .btn-table-manage) + :is(a, button, .table-action-menu, .btn-table-manage, .order-table-action-form),
+  .table-wrap table td.dashboard-table__actions-column > :is(a, button, .btn-table-manage) + :is(a, button, .btn-table-manage) {
+    margin-left: 0.5rem;
+  }
+
+  .dashboard-table td.dashboard-table__actions-column--wide,
+  .dashboard-table th.dashboard-table__actions-column--wide,
+  .dashboard-table:has(> thead > tr > .dashboard-table__actions-column--wide)
+    td.dashboard-table__actions-column {
+    width: 9.5rem;
+    min-width: 9.5rem;
+    max-width: 9.5rem;
+  }
+
+  .agent-customers-table th.dashboard-table__number-column,
+  .agent-customers-table td.dashboard-table__number-column {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    max-width: 2.75rem;
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.82rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  .agent-customers-table th.dashboard-table__actions-column,
+  .agent-customers-table td.dashboard-table__actions-column {
+    width: 4.5rem;
+    min-width: 4.5rem;
+    max-width: 4.5rem;
+    padding-left: 0.35rem;
+    padding-right: 0.75rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: visible;
     vertical-align: middle;
   }
 
@@ -8026,13 +8311,13 @@
     white-space: nowrap;
   }
 
-  .dashboard-table td> :not(.table-action-menu):not(.hidden-popover-form-holder):not(.dashboard-table__delivery-status) {
+  .dashboard-table td:not(.dashboard-table__actions-column) > :not(.table-action-menu):not(.hidden-popover-form-holder):not(.dashboard-table__delivery-status) {
     max-width: 100%;
   }
 
-  .dashboard-table td>span,
-  .dashboard-table td>a:not(.table-action-menu__item),
-  .dashboard-table td>button:not(.table-action-menu__trigger):not(.dashboard-table__product-button) {
+  .dashboard-table td:not(.dashboard-table__actions-column) > span:not(.status-badge):not(.order-status-cell),
+  .dashboard-table td:not(.dashboard-table__actions-column) > a:not(.table-action-menu__item),
+  .dashboard-table td:not(.dashboard-table__actions-column) > button:not(.table-action-menu__trigger):not(.dashboard-table__product-button):not(.table-cell-trigger) {
     display: block;
     min-width: 0;
     max-width: 100%;
@@ -8046,11 +8331,43 @@
     white-space: normal;
   }
 
+  .dashboard-table th.dashboard-table__badge-column,
+  .dashboard-table td.dashboard-table__badge-column,
+  .dashboard-table td:has(.status-badge),
+  .dashboard-table td:has(.order-status-cell) {
+    width: auto;
+    min-width: max-content;
+    max-width: none;
+    overflow: visible;
+  }
+
+  .dashboard-table td:has(.status-badge) .table-cell-trigger,
+  .dashboard-table td:has(.order-status-cell) .table-cell-trigger,
+  .dashboard-table td.dashboard-table__badge-column .table-cell-trigger {
+    width: 100%;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .order-status-cell {
+    width: 100%;
+    max-width: none;
+  }
+
+  .dashboard-table td:has(.order-status-cell) .order-pending-customer-badge {
+    max-width: none;
+    overflow: visible;
+  }
+
   .dashboard-table td>.order-customer-cell,
   .dashboard-table td>.customer-credit-cell,
   .dashboard-table td>.status-badge,
   .dashboard-table td>.table-action-menu,
-  .dashboard-table td>.dashboard-table__delivery-status {
+  .dashboard-table td>.dashboard-table__delivery-status,
+  .dashboard-table td.dashboard-table__actions-column > a,
+  .dashboard-table td.dashboard-table__actions-column > button,
+  .dashboard-table td.dashboard-table__actions-column > form {
     display: inline-flex;
     white-space: nowrap;
   }
@@ -8072,7 +8389,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    max-width: 100%;
+    width: max-content;
+    max-width: none;
     padding: 0.2rem 0.55rem;
     border-radius: 9999px;
     font-size: 0.75rem;
@@ -8083,9 +8401,14 @@
     white-space: nowrap;
   }
 
-  .dashboard-table .status-badge {
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .dashboard-table .status-badge,
+  .dashboard-table td:has(.status-badge) .status-badge,
+  .dashboard-table td.dashboard-table__badge-column .status-badge {
+    width: 100%;
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    box-sizing: border-box;
   }
 
   .status-badge--success {

@@ -1,0 +1,16 @@
+---
+type Props = {
+  wide?: boolean;
+};
+
+const { wide = false } = Astro.props;
+---
+
+<th
+  scope="col"
+  class:list={[
+    "dashboard-table__actions-column",
+    wide && "dashboard-table__actions-column--wide",
+  ]}
+  aria-hidden="true"
+></th>

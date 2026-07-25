@@ -1,7 +1,9 @@
 ---
 import ActionMenu from "@/components/ActionMenu.astro";
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import TableActionMenu from "@/components/TableActionMenu.astro";
@@ -16,6 +18,7 @@ import type {
 import type { AdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
 import { getAdminOrderStatusFilters, orderSources, paymentStatuses } from "@/lib/admin-dashboard/order-filters";
 import type { AdminPagination } from "@/lib/admin-dashboard/pagination";
+import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import {
   formatCurrency,
   formatDate,
@@ -162,6 +165,7 @@ const skeletonRows = Array.from({ length: 6 });
             <table class="dashboard-table">
               <thead>
                 <tr>
+                  <DashboardTableNumberHeader />
                   <th scope="col" class="dashboard-table__select-column">
                     <label class="dashboard-table__select-all">
                       <span class="sr-only">Select all orders on this page</span>
@@ -174,17 +178,18 @@ const skeletonRows = Array.from({ length: 6 });
                   <th scope="col">Order Status</th>
                   <th scope="col">Payment Status</th>
                   <th scope="col">Balance</th>
-                  <th scope="col">Action</th>
+                  <DashboardTableActionsHeader />
                 </tr>
               </thead>
               <tbody>
                 {orderRows.length === 0 ? (
-                  <DashboardTableEmptyState colspan={8} message="No orders match the selected filters." />
-                ) : orderRows.map((order) => {
+                  <DashboardTableEmptyState colspan={9} message="No orders match the selected filters." />
+                ) : orderRows.map((order, index) => {
                   const balance = orderBalance(order);
                   const isPaid = order.payment_status === "paid";
                   return (
                     <tr>
+                      <td class="dashboard-table__number-column">{dashboardTableRowNumber(ordersPagination, index)}</td>
                       <td class="dashboard-table__select-column">
                         <label class="dashboard-table__row-select">
                           <span class="sr-only">Select order {formatOrderCode(order.id)}</span>
@@ -197,7 +202,7 @@ const skeletonRows = Array.from({ length: 6 });
                             data-order-date={formatDate(order.created_at)}
                             data-order-balance={formatCurrency(balance)}
                             data-order-balance-value={balance}
-                            disabled={isPaid}
+                            data-order-payment-eligible={!isPaid}
                           />
                         </label>
                       </td>
@@ -211,7 +216,7 @@ const skeletonRows = Array.from({ length: 6 });
                         <StatusBadge kind="payment" status={order.payment_status} label={autoCapitalize(order.payment_status)} />
                       </td>
                       <td>{formatCurrency(balance)}</td>
-                      <td>
+                      <td class="dashboard-table__actions-column">
                         <ViewButton href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`} data-astro-prefetch="false" />
                       </td>
                     </tr>
@@ -231,6 +236,7 @@ const skeletonRows = Array.from({ length: 6 });
             <caption class="sr-only">Loading filtered customer orders</caption>
             <thead>
               <tr>
+                <DashboardTableNumberHeader />
                 <th scope="col" class="dashboard-table__select-column">
                   <span class="table-skeleton-block table-skeleton-block--short"></span>
                 </th>
@@ -240,12 +246,13 @@ const skeletonRows = Array.from({ length: 6 });
                 <th scope="col">Order Status</th>
                 <th scope="col">Payment Status</th>
                 <th scope="col">Balance</th>
-                <th scope="col">Action</th>
+                <DashboardTableActionsHeader />
               </tr>
             </thead>
             <tbody>
               {skeletonRows.map(() => (
                 <tr>
+                  <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
@@ -253,7 +260,7 @@ const skeletonRows = Array.from({ length: 6 });
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
-                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                 </tr>
               ))}
             </tbody>
@@ -310,27 +317,29 @@ const skeletonRows = Array.from({ length: 6 });
             <table class="dashboard-table">
               <thead>
                 <tr>
+                  <DashboardTableNumberHeader />
                   <th scope="col">Order Date</th>
                   <th scope="col">Sale Date</th>
                   <th scope="col">Order ID</th>
                   <th scope="col">Source</th>
                   <th scope="col">Amount</th>
                   <th scope="col">Payments</th>
-                  <th scope="col">Action</th>
+                  <DashboardTableActionsHeader />
                 </tr>
               </thead>
               <tbody>
                 {salesRows.length === 0 ? (
-                  <DashboardTableEmptyState colspan={7} message="No sales match the selected filters." />
-                ) : salesRows.map((sale) => (
+                  <DashboardTableEmptyState colspan={8} message="No sales match the selected filters." />
+                ) : salesRows.map((sale, index) => (
                   <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(salesPagination, index)}</td>
                     <td>{formatDate(sale.created_at)}</td>
                     <td>{formatDate(sale.sale_date)}</td>
                     <td>{formatOrderCode(sale.id)}</td>
                     <td>{sale.source_label}</td>
                     <td>{formatCurrency(sale.order_total)}</td>
                     <td>{formatSalePaymentSummary(sale.payment_count)}</td>
-                    <td>
+                    <td class="dashboard-table__actions-column">
                       <TableActionMenu
                         menuLabel={`Open actions for sale ${formatOrderCode(sale.id)}`}
                         pdfHref={sale.invoice_number ? `/admin/orders/customer/${sale.id}/sales-invoice.pdf` : undefined}
@@ -353,25 +362,27 @@ const skeletonRows = Array.from({ length: 6 });
             <caption class="sr-only">Loading filtered customer sales</caption>
             <thead>
               <tr>
+                <DashboardTableNumberHeader />
                 <th scope="col">Order Date</th>
                 <th scope="col">Sale Date</th>
                 <th scope="col">Order ID</th>
                 <th scope="col">Source</th>
                 <th scope="col">Amount</th>
                 <th scope="col">Payments</th>
-                <th scope="col">Action</th>
+                <DashboardTableActionsHeader />
               </tr>
             </thead>
             <tbody>
               {skeletonRows.map(() => (
                 <tr>
+                  <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
-                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                 </tr>
               ))}
             </tbody>
@@ -418,27 +429,29 @@ const skeletonRows = Array.from({ length: 6 });
             <table class="dashboard-table">
               <thead>
                 <tr>
+                  <DashboardTableNumberHeader />
                   <th scope="col">Date Created</th>
                   <th scope="col">Invoice Number</th>
                   <th scope="col">Order ID</th>
                   <th scope="col">Invoice Total</th>
                   <th scope="col">Paid</th>
                   <th scope="col">Balance</th>
-                  <th scope="col">Action</th>
+                  <DashboardTableActionsHeader />
                 </tr>
               </thead>
               <tbody>
                 {invoiceRows.length === 0 ? (
-                  <DashboardTableEmptyState colspan={7} message="No invoices match the selected filters." />
-                ) : invoiceRows.map((invoice) => (
+                  <DashboardTableEmptyState colspan={8} message="No invoices match the selected filters." />
+                ) : invoiceRows.map((invoice, index) => (
                   <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(invoicesPagination, index)}</td>
                     <td>{formatDate(invoice.invoice_created_at)}</td>
                     <td>{invoice.invoice_number}</td>
                     <td>{formatOrderCode(invoice.order_id)}</td>
                     <td>{formatCurrency(invoice.invoice_total)}</td>
                     <td>{formatCurrency(invoice.paid_total)}</td>
                     <td>{formatCurrency(invoice.balance)}</td>
-                    <td>
+                    <td class="dashboard-table__actions-column">
                       <TableActionMenu
                         menuLabel={`Open actions for invoice ${invoice.invoice_number}`}
                         pdfHref={`/admin/orders/customer/${invoice.order_id}/sales-invoice.pdf`}
@@ -461,25 +474,27 @@ const skeletonRows = Array.from({ length: 6 });
             <caption class="sr-only">Loading filtered customer invoices</caption>
             <thead>
               <tr>
+                <DashboardTableNumberHeader />
                 <th scope="col">Date Created</th>
                 <th scope="col">Invoice Number</th>
                 <th scope="col">Order ID</th>
                 <th scope="col">Invoice Total</th>
                 <th scope="col">Paid</th>
                 <th scope="col">Balance</th>
-                <th scope="col">Action</th>
+                <DashboardTableActionsHeader />
               </tr>
             </thead>
             <tbody>
               {skeletonRows.map(() => (
                 <tr>
+                  <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
-                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                 </tr>
               ))}
             </tbody>
@@ -526,27 +541,29 @@ const skeletonRows = Array.from({ length: 6 });
             <table class="dashboard-table">
               <thead>
                 <tr>
+                  <DashboardTableNumberHeader />
                   <th scope="col">Payment Date</th>
                   <th scope="col">Order ID</th>
                   <th scope="col">Method</th>
                   <th scope="col">Terms</th>
                   <th scope="col">Amount</th>
                   <th scope="col">Reference</th>
-                  <th scope="col">Action</th>
+                  <DashboardTableActionsHeader />
                 </tr>
               </thead>
               <tbody>
                 {paymentRows.length === 0 ? (
-                  <DashboardTableEmptyState colspan={7} message="No payment records match the selected filters." />
-                ) : paymentRows.map((payment) => (
+                  <DashboardTableEmptyState colspan={8} message="No payment records match the selected filters." />
+                ) : paymentRows.map((payment, index) => (
                   <tr>
+                    <td class="dashboard-table__number-column">{dashboardTableRowNumber(paymentsPagination, index)}</td>
                     <td>{formatDate(payment.payment_date)}</td>
                     <td>{formatOrderCode(payment.order_id)}</td>
                     <td>{autoCapitalize(payment.payment_method)}</td>
                     <td>{autoCapitalize(payment.payment_terms)}</td>
                     <td>{formatCurrency(payment.amount)}</td>
                     <td>{payment.reference_number ?? "—"}</td>
-                    <td>
+                    <td class="dashboard-table__actions-column">
                       <ViewButton href={payment.href} label={`View payment for order ${formatOrderCode(payment.order_id)}`} />
                     </td>
                   </tr>
@@ -565,25 +582,27 @@ const skeletonRows = Array.from({ length: 6 });
             <caption class="sr-only">Loading filtered customer payment records</caption>
             <thead>
               <tr>
+                <DashboardTableNumberHeader />
                 <th scope="col">Payment Date</th>
                 <th scope="col">Order ID</th>
                 <th scope="col">Method</th>
                 <th scope="col">Terms</th>
                 <th scope="col">Amount</th>
                 <th scope="col">Reference</th>
-                <th scope="col">Action</th>
+                <DashboardTableActionsHeader />
               </tr>
             </thead>
             <tbody>
               {skeletonRows.map(() => (
                 <tr>
+                  <td class="dashboard-table__number-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
-                  <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                 </tr>
               ))}
             </tbody>
