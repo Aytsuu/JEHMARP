@@ -4,7 +4,6 @@ import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsP
 import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
 import {
   formatAdminActionFeedback,
-  handleAdminDashboardAction,
   markAdminRegularCheckNotificationsReadForCustomer,
 } from "@/lib/admin-dashboard/actions";
 import {
@@ -48,14 +47,6 @@ if (!adminRoute.ready) {
 }
 
 const { customerId } = Astro.params;
-
-if (Astro.request.method === "POST") {
-  return handleAdminDashboardAction(
-    Astro,
-    adminRoute.userId,
-    `/admin/customers/${customerId}`,
-  );
-}
 
 let data = await loadAdminDashboardData();
 const customer =

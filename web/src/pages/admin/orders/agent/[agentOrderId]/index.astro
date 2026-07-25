@@ -4,10 +4,7 @@ import AdminNotificationsPageLayout from "@/components/admin/AdminNotificationsP
 import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
-import {
-  formatAdminActionFeedback,
-  handleAdminDashboardAction,
-} from "@/lib/admin-dashboard/actions";
+import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { paginateCustomerRecords } from "@/lib/admin-dashboard/customer-record";
 import {
   loadAdminAgentOrder,
@@ -61,14 +58,6 @@ const { agentOrderId } = Astro.params;
 
 if (!agentOrderId) {
   return Astro.redirect("/admin/orders", 302);
-}
-
-if (Astro.request.method === "POST") {
-  return handleAdminDashboardAction(
-    Astro,
-    adminRoute.userId,
-    `/admin/orders/agent/${agentOrderId}`,
-  );
 }
 
 const [dashboardData, agentOrder] = await Promise.all([
