@@ -1097,9 +1097,11 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
                       </RecentActivityCell>
                       <RecentActivityCell
                         className="text-gray-700"
-                        title={inquiry.email}
+                        title={inquiry.email ?? undefined}
                       >
-                        {inquiry.email}
+                        {inquiry.email ?? (
+                          <span className="text-gray-400">No email</span>
+                        )}
                       </RecentActivityCell>
                       <RecentActivityCell
                         className="text-gray-700"
