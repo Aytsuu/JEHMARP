@@ -1,6 +1,6 @@
 ---
 import AdminCharts from "@/components/admin/AdminCharts";
-import DashboardMetricTrend from "@/components/dashboard/DashboardMetricTrend.astro";
+import MetricTrend from "@/components/ui/MetricTrend.astro";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
 import { formatSignedMetricTrendDiff } from "@/lib/dashboard/metric-trend";
@@ -33,7 +33,7 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
     <h2>Receivable</h2>
     <p class="admin-summary-card__value-with-trend">
       {formatCurrency(analytics.summary.pendingOrderPayments)}
-      <DashboardMetricTrend
+      <MetricTrend
         diff={receivableTrend.difference}
         formattedDiff={receivableTrendDiffLabel}
         tooltip={receivableTrend.tooltip}

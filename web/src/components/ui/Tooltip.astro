@@ -1,0 +1,22 @@
+---
+type Props = {
+  text: string;
+  placement?: "above" | "below";
+  class?: string;
+};
+
+const { text, placement = "above", class: className } = Astro.props;
+---
+
+<span
+  class:list={[
+    "dashboard-tooltip",
+    placement === "below" && "dashboard-tooltip--below",
+    className,
+  ]}
+  tabindex="0"
+  data-tooltip={text}
+  aria-label={text}
+>
+  <slot />
+</span>

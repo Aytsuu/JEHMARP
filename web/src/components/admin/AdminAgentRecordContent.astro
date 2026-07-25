@@ -1,7 +1,7 @@
 ---
 import AdminAgentRecordTabTable from "@/components/admin/AdminAgentRecordTabTable.astro";
 import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordTabTable.astro";
-import DashboardMetricTrend from "@/components/dashboard/DashboardMetricTrend.astro";
+import MetricTrend from "@/components/ui/MetricTrend.astro";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import type { AdminAgent, AdminCustomer } from "@/lib/admin-dashboard/data";
@@ -369,7 +369,7 @@ const customerTabTableProps = {
             maximumFractionDigits: 1,
           })}
           <span class="agent-record-quick-stats__unit">kg</span>
-          <DashboardMetricTrend
+          <MetricTrend
             diff={kgSoldTrend.diff}
             formattedDiff={formatKgSoldTrendDiff(kgSoldTrend.diff)}
             tooltip={kgSoldTrend.tooltip}
@@ -406,14 +406,13 @@ const customerTabTableProps = {
             <span>Remittance performance</span>
             {
               performanceQuickStats.remittance.performanceLabel && (
-                <span
-                  class="agent-record-quick-stats__title-badge agent-record-quick-stats__tooltip-trigger agent-record-quick-stats__tooltip-trigger--below"
-                  tabindex="0"
-                  data-tooltip={performanceQuickStats.remittance.performanceTooltip}
-                  aria-label={performanceQuickStats.remittance.performanceTooltip}
+                <MetricTrend
+                  tooltip={performanceQuickStats.remittance.performanceTooltip ?? ""}
+                  placement="below"
+                  class="agent-record-quick-stats__title-badge"
                 >
                   ({performanceQuickStats.remittance.performanceLabel})
-                </span>
+                </MetricTrend>
               )
             }
           </h3>

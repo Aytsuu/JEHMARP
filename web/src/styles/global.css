@@ -2294,14 +2294,12 @@
     flex: 0 0 auto;
   }
 
-  .dashboard-metric-trend__tooltip-trigger,
-  .agent-record-quick-stats__tooltip-trigger {
+  .dashboard-tooltip {
     position: relative;
     cursor: help;
   }
 
-  .dashboard-metric-trend__tooltip-trigger::after,
-  .agent-record-quick-stats__tooltip-trigger::after {
+  .dashboard-tooltip::after {
     position: absolute;
     bottom: calc(100% + 0.5rem);
     left: 50%;
@@ -2324,8 +2322,7 @@
     white-space: normal;
   }
 
-  .dashboard-metric-trend__tooltip-trigger::before,
-  .agent-record-quick-stats__tooltip-trigger::before {
+  .dashboard-tooltip::before {
     position: absolute;
     bottom: calc(100% + 0.25rem);
     left: 50%;
@@ -2340,24 +2337,20 @@
     transition: opacity 0.12s ease;
   }
 
-  .agent-record-quick-stats__tooltip-trigger--below::after {
+  .dashboard-tooltip--below::after {
     bottom: auto;
     top: calc(100% + 0.5rem);
   }
 
-  .agent-record-quick-stats__tooltip-trigger--below::before {
+  .dashboard-tooltip--below::before {
     bottom: auto;
     top: calc(100% + 0.25rem);
   }
 
-  .dashboard-metric-trend__tooltip-trigger:hover::after,
-  .dashboard-metric-trend__tooltip-trigger:hover::before,
-  .dashboard-metric-trend__tooltip-trigger:focus-visible::after,
-  .dashboard-metric-trend__tooltip-trigger:focus-visible::before,
-  .agent-record-quick-stats__tooltip-trigger:hover::after,
-  .agent-record-quick-stats__tooltip-trigger:hover::before,
-  .agent-record-quick-stats__tooltip-trigger:focus-visible::after,
-  .agent-record-quick-stats__tooltip-trigger:focus-visible::before {
+  .dashboard-tooltip:hover::after,
+  .dashboard-tooltip:hover::before,
+  .dashboard-tooltip:focus-visible::after,
+  .dashboard-tooltip:focus-visible::before {
     opacity: 1;
   }
 

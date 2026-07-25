@@ -1,27 +1,31 @@
 ---
+import Tooltip from "@/components/ui/Tooltip.astro";
 import { getMetricTrendDirection } from "@/lib/dashboard/metric-trend";
 
 type Props = {
-  diff: number;
-  formattedDiff: string;
   tooltip: string;
+  placement?: "above" | "below";
+  class?: string;
+  diff?: number;
+  formattedDiff?: string;
 };
 
-const { diff, formattedDiff, tooltip } = Astro.props;
-const direction = getMetricTrendDirection(diff);
+const { tooltip, placement = "above", class: className, diff, formattedDiff } = Astro.props;
+const direction = diff === undefined ? null : getMetricTrendDirection(diff);
+const hasTrend = direction !== null && direction !== "flat";
+const hasSlot = Astro.slots.has("default");
 ---
 
 {
-  direction !== "flat" && (
-    <span
+  hasTrend ? (
+    <Tooltip
+      text={tooltip}
+      placement={placement}
       class:list={[
         "dashboard-metric-trend",
-        "dashboard-metric-trend__tooltip-trigger",
         `dashboard-metric-trend--${direction}`,
+        className,
       ]}
-      tabindex="0"
-      data-tooltip={tooltip}
-      aria-label={tooltip}
     >
       {
         direction === "up" && (
@@ -60,6 +64,10 @@ const direction = getMetricTrendDirection(diff);
         )
       }
       {formattedDiff}
-    </span>
-  )
+    </Tooltip>
+  ) : hasSlot ? (
+    <Tooltip text={tooltip} placement={placement} class={className}>
+      <slot />
+    </Tooltip>
+  ) : null
 }
