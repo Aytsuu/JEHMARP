@@ -2185,7 +2185,7 @@
   .admin-recent-activity-table th.dashboard-table__actions-column,
   .admin-recent-activity-table td.dashboard-table__actions-column {
     padding-right: 0.7rem;
-    text-align: center;
+    text-align: start;
   }
 
   .admin-recent-activity-table__cell-text {
@@ -2232,7 +2232,7 @@
     font-weight: 700;
     color: #661818;
     text-decoration: none;
-    text-align: center;
+    text-align: start;
   }
 
   .admin-recent-activity-table__action:hover {
@@ -9214,12 +9214,12 @@
   .dashboard-table td.dashboard-table__actions-column,
   .table-wrap table th.dashboard-table__actions-column,
   .table-wrap table td.dashboard-table__actions-column {
-    width: 4.5rem;
-    min-width: 4.5rem;
-    max-width: 4.5rem;
+    width: auto;
+    min-width: 2rem;
+    max-width: none;
     padding-left: 0.35rem;
     padding-right: var(--dashboard-page-inset-x, var(--dashboard-table-cell-padding-x));
-    text-align: center;
+    text-align: start;
     white-space: nowrap;
     overflow: visible;
     vertical-align: middle;
@@ -9236,7 +9236,7 @@
   .table-wrap table td.dashboard-table__actions-column>button {
     display: inline-flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     width: auto;
     min-width: 0;
     max-width: none;
@@ -9253,9 +9253,7 @@
   .dashboard-table td.dashboard-table__actions-column--wide,
   .dashboard-table th.dashboard-table__actions-column--wide,
   .dashboard-table:has(> thead > tr > .dashboard-table__actions-column--wide) td.dashboard-table__actions-column {
-    width: 9.5rem;
     min-width: 9.5rem;
-    max-width: 9.5rem;
   }
 
   .agent-customers-table th.dashboard-table__number-column,
@@ -9276,12 +9274,12 @@
 
   .agent-customers-table th.dashboard-table__actions-column,
   .agent-customers-table td.dashboard-table__actions-column {
-    width: 4.5rem;
-    min-width: 4.5rem;
-    max-width: 4.5rem;
+    width: auto;
+    min-width: 2rem;
+    max-width: none;
     padding-left: 0.35rem;
     padding-right: 0.75rem;
-    text-align: center;
+    text-align: start;
     white-space: nowrap;
     overflow: visible;
     vertical-align: middle;

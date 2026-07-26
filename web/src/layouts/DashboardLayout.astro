@@ -263,6 +263,78 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         );
       }
 
+      function measureActionColumnChild(child: HTMLElement) {
+        if (
+          child.matches(".order-table-action-form")
+          || (child.tagName === "FORM" && child.querySelector("button, a"))
+        ) {
+          const control = child.querySelector("button, a") as HTMLElement | null;
+          if (control) {
+            return Math.ceil(control.getBoundingClientRect().width);
+          }
+        }
+
+        return Math.ceil(child.getBoundingClientRect().width);
+      }
+
+      function measureActionColumnWidth(
+        headerCell: HTMLTableCellElement,
+        bodyRows: HTMLTableRowElement[],
+        columnIndex: number,
+        minimumWidth = 32,
+      ) {
+        let maxWidth = minimumWidth;
+
+        const measureCell = (cell: HTMLElement) => {
+          const previousMaxWidth = cell.style.maxWidth;
+          cell.style.maxWidth = "none";
+
+          try {
+            const style = getComputedStyle(cell);
+            const horizontalPadding =
+              parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+            const children = [...cell.children].filter(
+              (child) => !child.classList.contains("hidden-popover-form-holder"),
+            ) as HTMLElement[];
+
+            if (children.length === 0) {
+              maxWidth = Math.max(maxWidth, Math.ceil(cell.getBoundingClientRect().width));
+              return;
+            }
+
+            let contentWidth = 0;
+            children.forEach((child, childIndex) => {
+              contentWidth += measureActionColumnChild(child);
+              if (childIndex > 0) {
+                contentWidth += 8;
+              }
+            });
+
+            maxWidth = Math.max(
+              maxWidth,
+              contentWidth + horizontalPadding,
+              Math.ceil(cell.scrollWidth),
+            );
+          } finally {
+            if (previousMaxWidth) {
+              cell.style.maxWidth = previousMaxWidth;
+            } else {
+              cell.style.removeProperty("max-width");
+            }
+          }
+        };
+
+        measureCell(headerCell);
+        for (const row of bodyRows) {
+          const cell = row.children[columnIndex] as HTMLElement | undefined;
+          if (cell) {
+            measureCell(cell);
+          }
+        }
+
+        return maxWidth;
+      }
+
       function measureContentColumnWidth(
         headerCell: HTMLTableCellElement,
         bodyRows: HTMLTableRowElement[],
@@ -394,13 +466,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         columnIndex: number,
       ) {
         if (headerCell.classList.contains("dashboard-table__actions-column")) {
-          const measuredWidth = measureContentColumnWidth(
-            headerCell,
-            bodyRows,
-            columnIndex,
-          );
-          const cssWidth = Math.ceil(parseFloat(getComputedStyle(headerCell).width));
-          return Math.max(measuredWidth, cssWidth);
+          return measureActionColumnWidth(headerCell, bodyRows, columnIndex);
         }
 
         if (
@@ -423,6 +489,8 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
 
         table.querySelectorAll<HTMLTableCellElement>("th, td").forEach((cell) => {
           cell.style.removeProperty("width");
+          cell.style.removeProperty("min-width");
+          cell.style.removeProperty("max-width");
         });
 
         const headerRow = thead.querySelector("tr");
@@ -440,10 +508,14 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
 
           const widthPx = `${getSyncedTableColumnWidth(headerCell, bodyRows, columnIndex)}px`;
           headerCell.style.width = widthPx;
+          headerCell.style.minWidth = widthPx;
+          headerCell.style.maxWidth = "none";
           for (const row of bodyRows) {
             const cell = row.children[columnIndex] as HTMLElement | undefined;
             if (cell) {
               cell.style.width = widthPx;
+              cell.style.minWidth = widthPx;
+              cell.style.maxWidth = "none";
             }
           }
         });
