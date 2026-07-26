@@ -8,8 +8,6 @@ import { getPublicEnv } from "@/lib/env";
 import { ADMIN_CONTENT_PREVIEW_ROOT } from "@/lib/public-website/admin-content-preview";
 import {
   listOrderablePublicProducts,
-  listPublicProducts,
-  parseShopFilters,
 } from "@/lib/public-website/shop";
 
 export const prerender = false;
@@ -21,11 +19,7 @@ if (!preview.ready) {
 }
 
 const shopPath = `${ADMIN_CONTENT_PREVIEW_ROOT}/shop`;
-const filters = parseShopFilters(Astro.url);
-const [{ products, pagination }, orderableProducts] = await Promise.all([
-  listPublicProducts(Astro, filters),
-  listOrderablePublicProducts(),
-]);
+const products = await listOrderablePublicProducts();
 const orderStatus = Astro.url.searchParams.get("order");
 const orderEmailSent = Astro.url.searchParams.get("email") === "1";
 const orderMessage = Astro.url.searchParams.get("message");
@@ -41,15 +35,11 @@ const { turnstileSiteKey } = getPublicEnv();
   <AdminContentPreviewFrame activePath="/shop">
     <PageShell title="Shop">
       <PublicShopPageContent
-        filters={filters}
         products={products}
-        orderableProducts={orderableProducts}
-        pagination={pagination}
         orderStatus={orderStatus}
         orderEmailSent={orderEmailSent}
         orderMessage={orderMessage}
         turnstileSiteKey={turnstileSiteKey ?? null}
-        shopPath={shopPath}
         returnPath={shopPath}
       />
     </PageShell>

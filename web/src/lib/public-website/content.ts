@@ -2,6 +2,13 @@ import type { APIContext } from "astro";
 
 import { createSupabasePublicClient } from "@/lib/supabase/public";
 import { throwLoadError } from "@/lib/load-error";
+import {
+  buildPublicFeaturedProductsCacheKey,
+  buildPublicPageCacheKey,
+  deleteCachedJson,
+  getCachedJson,
+  setCachedJson,
+} from "@/lib/public-website/content-cache";
 
 export type PublicPageRecord = {
   id: string;
@@ -43,6 +50,18 @@ export async function getPublicPageContent(
   _context: Pick<APIContext, "cookies" | "request">,
   slug: string,
 ): Promise<PublicPageContent> {
+  const cacheKey = buildPublicPageCacheKey(slug);
+  const cached = await getCachedJson<PublicPageContent>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const content = await loadPublicPageContent(slug);
+  await setCachedJson(cacheKey, content);
+  return content;
+}
+
+async function loadPublicPageContent(slug: string): Promise<PublicPageContent> {
   const supabase = createSupabasePublicClient();
   const { data: page, error: pageError } = await supabase
     .from("page")
@@ -83,6 +102,18 @@ export async function getFeaturedPublicProducts(
   _context: Pick<APIContext, "cookies" | "request">,
   limit = 4,
 ): Promise<PublicFeaturedProduct[]> {
+  const cacheKey = buildPublicFeaturedProductsCacheKey(limit);
+  const cached = await getCachedJson<PublicFeaturedProduct[]>(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const products = await loadFeaturedPublicProducts(limit);
+  await setCachedJson(cacheKey, products);
+  return products;
+}
+
+async function loadFeaturedPublicProducts(limit: number): Promise<PublicFeaturedProduct[]> {
   const supabase = createSupabasePublicClient();
   const { data, error } = await supabase
     .from("product")
@@ -96,6 +127,28 @@ export async function getFeaturedPublicProducts(
   }
 
   return (data ?? []) as PublicFeaturedProduct[];
+}
+
+export async function invalidatePublicPageContentCacheForPage(
+  pageId: string,
+  featuredProductsLimit = 4,
+): Promise<void> {
+  const supabase = createSupabasePublicClient();
+  const { data, error } = await supabase
+    .from("page")
+    .select("slug")
+    .eq("id", pageId)
+    .maybeSingle();
+
+  if (error || !data?.slug) {
+    return;
+  }
+
+  await deleteCachedJson(buildPublicPageCacheKey(data.slug));
+
+  if (data.slug === "home") {
+    await deleteCachedJson(buildPublicFeaturedProductsCacheKey(featuredProductsLimit));
+  }
 }
 
 export function getSectionHeading(section: SectionLike): string {

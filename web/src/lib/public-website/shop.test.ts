@@ -10,9 +10,11 @@ vi.mock("@/lib/supabase/public", () => ({
 
 import {
   PRODUCT_PUBLIC_COLUMNS,
+  applyShopFilters,
   buildPagination,
   listPublicProducts,
   parseShopFilters,
+  sortPublicProducts,
 } from "./shop";
 
 beforeEach(() => {
@@ -83,6 +85,76 @@ describe("buildPagination", () => {
       previousPage: undefined,
       nextPage: undefined,
     });
+  });
+});
+
+describe("applyShopFilters", () => {
+  const products = [
+    {
+      id: "1",
+      name: "Chicken Breast",
+      category: "chicken",
+      description: null,
+      unit_label: "kg",
+      default_price: 180,
+      stock_status: "in_stock",
+      image_path: null,
+      is_active: true,
+      created_at: "2026-01-02T00:00:00.000Z",
+      updated_at: "2026-01-02T00:00:00.000Z",
+    },
+    {
+      id: "2",
+      name: "Pork Belly",
+      category: "pork",
+      description: null,
+      unit_label: "kg",
+      default_price: 320,
+      stock_status: "limited",
+      image_path: null,
+      is_active: true,
+      created_at: "2026-01-01T00:00:00.000Z",
+      updated_at: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "3",
+      name: "Brown Eggs",
+      category: "egg",
+      description: null,
+      unit_label: "tray",
+      default_price: 220,
+      stock_status: "out_of_stock",
+      image_path: null,
+      is_active: true,
+      created_at: "2026-01-03T00:00:00.000Z",
+      updated_at: "2026-01-03T00:00:00.000Z",
+    },
+  ] as const;
+
+  it("filters, sorts, and paginates products in memory", () => {
+    const result = applyShopFilters([...products], {
+      category: "pork",
+      stockStatus: "limited",
+      minPrice: 300,
+      maxPrice: 400,
+      sort: "price_desc",
+      page: 1,
+      pageSize: 12,
+    });
+
+    expect(result.products).toHaveLength(1);
+    expect(result.products[0]?.name).toBe("Pork Belly");
+    expect(result.pagination.count).toBe(1);
+  });
+
+  it("sorts products by newest first", () => {
+    const sorted = sortPublicProducts([...products], "newest");
+
+    expect(sorted.map((product) => product.name)).toEqual([
+      "Brown Eggs",
+      "Chicken Breast",
+      "Pork Belly",
+    ]);
   });
 });
 

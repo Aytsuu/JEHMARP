@@ -1,4 +1,6 @@
 ---
+import FormSubmissionFeedback from "@/components/ui/FormSubmissionFeedback.astro";
+import { CONTACT_INQUIRY_FEEDBACK_PARAMS } from "@/lib/client/form-submission-feedback-url";
 import {
   getSectionEntries,
   getSectionHeading,
@@ -49,25 +51,6 @@ function getIconTypeFromLabel(label: string) {
 }
 ---
 
-{
-  feedback?.status === "submitted" && (
-    <section class="message-block" aria-labelledby="contact-confirmation">
-      <h2 id="contact-confirmation">Inquiry submitted</h2>
-      <p>Your message was sent to the JEHMARP team.</p>
-      {feedback.reference && <p>Reference: {feedback.reference}</p>}
-    </section>
-  )
-}
-
-{
-  feedback?.status === "error" && (
-    <section class="message-block" aria-labelledby="contact-error">
-      <h2 id="contact-error">Inquiry was not submitted</h2>
-      <p>{feedback.message}</p>
-    </section>
-  )
-}
-
 <div class="business-layout">
   <div class="business-form">
     <section
@@ -82,6 +65,26 @@ function getIconTypeFromLabel(label: string) {
       >
         Inquiry Form
       </h3>
+      {
+        feedback?.status === "submitted" && (
+          <FormSubmissionFeedback
+            variant="success"
+            title="Inquiry submitted"
+            message="Your message was sent to the JEHMARP team. We will follow up using the contact details you provided."
+            clearParams={CONTACT_INQUIRY_FEEDBACK_PARAMS}
+          />
+        )
+      }
+      {
+        feedback?.status === "error" && (
+          <FormSubmissionFeedback
+            variant="error"
+            title="Inquiry was not submitted"
+            message={feedback.message}
+            clearParams={CONTACT_INQUIRY_FEEDBACK_PARAMS}
+          />
+        )
+      }
       <form class="form-grid" method="post" action="/api/contact-inquiries">
         {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
         <fieldset class="fieldset-block">

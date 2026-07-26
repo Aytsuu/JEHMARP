@@ -21,6 +21,7 @@ import {
 import {
   finalizeNewCustomerCreation,
 } from "@/lib/public-website/customer-tracking";
+import { invalidatePublicPageContentCacheForPage } from "@/lib/public-website/content";
 import {
   assertProfileEmailIsAvailable,
   assertProfilePhoneIsAvailable,
@@ -718,6 +719,7 @@ export async function executeAdminAction(
   switch (action.type) {
     case "save-page-section":
       await executeTableUpdate(supabase, "page_section", action.sectionId, action.payload);
+      await invalidatePublicPageContentCacheForPage(action.payload.page_id);
       return;
     case "save-product":
       await executeProductSave(action);

@@ -214,11 +214,10 @@ describe("getResellerApplicationFeedback", () => {
   it("parses submitted and error feedback from the business page URL", () => {
     expect(
       getResellerApplicationFeedback(
-        new URL("https://example.test/business?application=submitted&reference=abc"),
+        new URL("https://example.test/business?application=submitted"),
       ),
     ).toEqual({
       status: "submitted",
-      reference: "abc",
     });
 
     expect(

@@ -5,7 +5,9 @@ import {
   parseContactInquiryFormData,
   submitContactInquiry,
 } from "@/lib/public-website/contact-inquiries";
+import { EdgeFunctionRequestError } from "@/lib/public-website/edge-function-response";
 import { getClientIp } from "@/lib/security/client-ip";
+import { logDevelopmentFormSubmitError } from "@/lib/request-logger";
 
 export const prerender = false;
 
@@ -23,17 +25,27 @@ export const POST: APIRoute = async ({ request, redirect }) => {
   }
 
   try {
-    const inquiryId = await submitContactInquiry(parsed.data, {
+    await submitContactInquiry(parsed.data, {
       clientIp: getClientIp(request.headers),
       userAgent: request.headers.get("user-agent"),
     });
     const params = new URLSearchParams({
       inquiry: "submitted",
-      reference: inquiryId,
     });
 
     return redirect(`${returnPath}?${params.toString()}`, 303);
   } catch (error) {
+    if (error instanceof EdgeFunctionRequestError) {
+      logDevelopmentFormSubmitError({
+        enabled: import.meta.env.DEV,
+        scope: "contact-inquiry",
+        status: error.status,
+        body: error.body,
+        error,
+        url: request.url,
+      });
+    }
+
     return redirectWithError(
       redirect,
       error instanceof Error ? error.message : "The inquiry could not be submitted. Please try again.",

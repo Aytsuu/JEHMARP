@@ -1,4 +1,5 @@
 ---
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
@@ -54,7 +55,7 @@ const skeletonRows = Array.from({ length: 6 });
               <th scope="col">Supply Needs</th>
               <th scope="col">Message</th>
               <th scope="col">Status</th>
-              <th scope="col"><span class="sr-only">Email Status</span></th>
+              <DashboardTableActionsHeader />
             </tr>
           </thead>
           <tbody>
@@ -107,7 +108,7 @@ const skeletonRows = Array.from({ length: 6 });
                       </form>
                     </div>
                   </td>
-                  <td class="dashboard-table__cell--center">
+                  <td class="dashboard-table__actions-column">
                     <ResellerEmailDeliveryStatus
                       status={application.email_delivery_status}
                       error={application.email_error}
@@ -136,7 +137,7 @@ const skeletonRows = Array.from({ length: 6 });
             <th scope="col">Supply Needs</th>
             <th scope="col">Message</th>
             <th scope="col">Status</th>
-            <th scope="col">Email Status</th>
+            <DashboardTableActionsHeader />
           </tr>
         </thead>
         <tbody>
@@ -150,7 +151,7 @@ const skeletonRows = Array.from({ length: 6 });
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
               <td><span class="table-skeleton-block"></span></td>
               <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
-              <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+              <td class="dashboard-table__actions-column"><span class="table-skeleton-block table-skeleton-block--short"></span></td>
             </tr>
           ))}
         </tbody>

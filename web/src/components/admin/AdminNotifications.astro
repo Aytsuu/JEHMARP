@@ -33,8 +33,7 @@ const skeletonItems = Array.from({ length: 3 });
         {
           unreadCount > 0 ? (
             <>
-              <span class="admin-notifications__summary-count">{unreadCount}</span>
-              unread notification{unreadCount === 1 ? "" : "s"}
+              {unreadCount} unread notification{unreadCount === 1 ? "" : "s"}
             </>
           ) : (
             "All caught up"
@@ -123,21 +122,6 @@ const skeletonItems = Array.from({ length: 3 });
     font-size: 0.88rem;
     font-weight: 600;
     color: #4b5563;
-  }
-
-  .admin-notifications__summary-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 1.35rem;
-    height: 1.35rem;
-    margin-right: 0.35rem;
-    padding: 0 0.35rem;
-    border-radius: 9999px;
-    background: #fef3c7;
-    color: #92400e;
-    font-size: 0.75rem;
-    font-weight: 700;
   }
 
   .admin-notifications__form {

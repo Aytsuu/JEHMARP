@@ -9,14 +9,19 @@ const { text, placement = "above", class: className } = Astro.props;
 ---
 
 <span
-  class:list={[
-    "dashboard-tooltip",
-    placement === "below" && "dashboard-tooltip--below",
-    className,
-  ]}
+  class:list={["dashboard-tooltip", className]}
   tabindex="0"
   data-tooltip={text}
+  data-tooltip-placement={placement}
   aria-label={text}
 >
   <slot />
 </span>
+
+<script>
+  import { initDashboardTooltips } from "@/lib/client/dashboard-tooltip";
+
+  initDashboardTooltips();
+  document.addEventListener("astro:after-swap", initDashboardTooltips);
+  document.addEventListener("astro:page-load", initDashboardTooltips);
+</script>

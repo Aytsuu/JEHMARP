@@ -1,42 +1,36 @@
 ---
+import FormSubmissionFeedback from "@/components/ui/FormSubmissionFeedback.astro";
+import { GUEST_ORDER_FEEDBACK_PARAMS } from "@/lib/client/form-submission-feedback-url";
 import {
-  buildShopUrl,
-  type ProductPagination,
+  applyShopFilters,
+  SHOP_PAGE_SIZE,
   type PublicProduct,
-  type ShopFilters,
 } from "@/lib/public-website/shop";
 import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
-  filters: ShopFilters;
   products: PublicProduct[];
-  orderableProducts: PublicProduct[];
-  pagination: ProductPagination;
   orderStatus: string | null;
   orderEmailSent: boolean;
   orderMessage: string | null;
   turnstileSiteKey: string | null;
-  shopPath?: string;
   returnPath?: string;
 };
 
 const {
-  filters,
   products,
-  orderableProducts,
-  pagination,
   orderStatus,
   orderEmailSent,
   orderMessage,
   turnstileSiteKey,
-  shopPath = "/shop",
   returnPath,
 } = Astro.props;
 
 function getProductImage(name: string): string {
   const normalized = name.toLowerCase();
   if (normalized.includes("pork belly")) return "/images/pork_belly.png";
-  if (normalized.includes("chicken breast")) return "/images/chicken_breast.png";
+  if (normalized.includes("chicken breast"))
+    return "/images/chicken_breast.png";
   if (normalized.includes("short ribs") || normalized.includes("beef")) {
     return "/images/beef_short_ribs.png";
   }
@@ -48,65 +42,85 @@ function getResolvedProductImage(imagePath: string | null, name: string) {
   return resolvePublicStorageUrl(imagePath) ?? getProductImage(name);
 }
 
-const orderCatalog = orderableProducts.map((product) => ({
+const catalogProducts = products.map((product) => ({
+  ...product,
+  imageUrl: getResolvedProductImage(product.image_path, product.name),
+}));
+
+const defaultFilters = {
+  sort: "name_asc" as const,
+  page: 1,
+  pageSize: SHOP_PAGE_SIZE,
+};
+
+const { products: initialProducts, pagination } = applyShopFilters(
+  products,
+  defaultFilters,
+);
+
+const priceMax =
+  products.length > 0
+    ? Math.max(
+        1000,
+        ...products.map((product) => Number(product.default_price)),
+      )
+    : 1000;
+
+const orderCatalog = catalogProducts.map((product) => ({
   id: product.id,
   name: product.name,
   defaultPrice: product.default_price,
   unitLabel: product.unit_label,
   stockStatus: product.stock_status,
-  imageUrl: getResolvedProductImage(product.image_path, product.name),
+  imageUrl: product.imageUrl,
 }));
 
-const availableOrderProducts = orderableProducts.filter(
+const availableOrderProducts = catalogProducts.filter(
   (product) => product.stock_status !== "out_of_stock",
 );
-const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSiteKey);
+const canSubmitOrder =
+  availableOrderProducts.length > 0 && Boolean(turnstileSiteKey);
+
+const orderSuccessMessage = orderEmailSent
+  ? "Your guest order was submitted for review. We sent your customer tracking number to the email address you provided."
+  : "Your guest order was submitted for review. Our team will share your customer tracking number with you so you can follow your order status.";
+
+const orderErrorMessage =
+  orderMessage ?? "Please check the order form and try again.";
 ---
 
-<div
-  class="shop-header-banner"
-  role="img"
-  aria-label="Shop fresh local meats banner placeholder"
->
-</div>
-{
-  orderStatus === "submitted" && (
-    <section class="message-block" aria-labelledby="order-confirmation">
-      <h2 id="order-confirmation">Order submitted</h2>
-      <p>Your guest order was submitted for review.</p>
-      {orderEmailSent ? (
-        <p>We sent your customer tracking number to the email address you provided.</p>
-      ) : (
-        <p>Our team will share your customer tracking number with you so you can follow your order status.</p>
-      )}
-      <p>
-        <a href="/track">Track your order status</a> once you have your tracking number.
+<div class="shop-header-banner">
+  <img
+    src="/images/shop_banner.png"
+    alt="Fresh Local Meats Banner"
+    class="shop-header-banner__image"
+    loading="eager"
+  />
+  <div class="shop-header-banner__overlay">
+    <div class="shop-header-banner__content">
+      <h1 class="shop-header-banner__title">
+        Farm-Fresh Meats, Delivered Daily
+      </h1>
+      <p class="shop-header-banner__subtitle">
+        Premium local pork, chicken, and fresh cuts sourced directly from
+        trusted local farmers.
       </p>
-    </section>
-  )
-}
+    </div>
+  </div>
+</div>
 
-{
-  orderStatus === "error" && (
-    <section class="message-block" aria-labelledby="order-error">
-      <h2 id="order-error">Order was not submitted</h2>
-      <p>{orderMessage ?? "Please check the order form and try again."}</p>
-    </section>
-  )
-}
-
-<section class="form-section" aria-labelledby="shop-filters">
-  <h2 id="shop-filters">Filter products</h2>
-  <form class="form-grid form-grid--filters" method="get" action={shopPath}>
+<section
+  class="form-section form-section--shop-filters"
+  aria-labelledby="shop-filters"
+>
+  <form class="form-grid form-grid--filters" data-shop-filters-form>
     <div class="field-row">
       <label for="category">Category</label>
       <select id="category" name="category">
         <option value="">All categories</option>
-        <option value="pork" selected={filters.category === "pork"}>Pork</option>
-        <option value="chicken" selected={filters.category === "chicken"}
-          >Chicken</option
-        >
-        <option value="egg" selected={filters.category === "egg"}>Egg</option>
+        <option value="pork">Pork</option>
+        <option value="chicken">Chicken</option>
+        <option value="egg">Egg</option>
       </select>
     </div>
 
@@ -114,96 +128,84 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
       <label for="stockStatus">Stock status</label>
       <select id="stockStatus" name="stockStatus">
         <option value="">All stock statuses</option>
-        <option value="in_stock" selected={filters.stockStatus === "in_stock"}
-          >In stock</option
-        >
-        <option value="limited" selected={filters.stockStatus === "limited"}
-          >Limited</option
-        >
-        <option
-          value="out_of_stock"
-          selected={filters.stockStatus === "out_of_stock"}>Out of stock</option
-        >
+        <option value="in_stock">In stock</option>
+        <option value="limited">Limited</option>
+        <option value="out_of_stock">Out of stock</option>
       </select>
     </div>
 
     <div class="field-row">
       <label for="minPrice"
-        >Minimum price (PHP <span id="minPriceVal">{filters.minPrice ?? 0}</span
-        >)</label
+        >Minimum price (PHP <span id="minPriceVal">0</span>)</label
       >
       <input
         id="minPrice"
         name="minPrice"
         type="range"
         min="0"
-        max="1000"
+        max={priceMax}
         step="5"
-        value={filters.minPrice ?? 0}
+        value="0"
       />
     </div>
 
     <div class="field-row">
       <label for="maxPrice"
-        >Maximum price (PHP <span id="maxPriceVal"
-          >{filters.maxPrice ?? 1000}</span
-        >)</label
+        >Maximum price (PHP <span id="maxPriceVal">{priceMax}</span>)</label
       >
       <input
         id="maxPrice"
         name="maxPrice"
         type="range"
         min="0"
-        max="1000"
+        max={priceMax}
         step="5"
-        value={filters.maxPrice ?? 1000}
+        value={priceMax}
       />
     </div>
 
     <div class="field-row">
       <label for="sort">Sort</label>
       <select id="sort" name="sort">
-        <option value="name_asc" selected={filters.sort === "name_asc"}
-          >Name, A to Z</option
-        >
-        <option value="name_desc" selected={filters.sort === "name_desc"}
-          >Name, Z to A</option
-        >
-        <option value="price_asc" selected={filters.sort === "price_asc"}
-          >Price, low to high</option
-        >
-        <option value="price_desc" selected={filters.sort === "price_desc"}
-          >Price, high to low</option
-        >
-        <option value="newest" selected={filters.sort === "newest"}
-          >Newest</option
-        >
+        <option value="name_asc" selected>Name, A to Z</option>
+        <option value="name_desc">Name, Z to A</option>
+        <option value="price_asc">Price, low to high</option>
+        <option value="price_desc">Price, high to low</option>
+        <option value="newest">Newest</option>
       </select>
-    </div>
-
-    <div class="button-row">
-      <button type="submit">Apply filters</button>
-      <a href={shopPath} class="btn-secondary">Reset filters</a>
     </div>
   </form>
 </section>
 
-<section class="shop-products-section" aria-labelledby="product-list">
-  <p>
+<section
+  class="shop-products-section"
+  aria-labelledby="product-list"
+  data-shop-products-section
+>
+  <script
+    type="application/json"
+    data-shop-product-catalog
+    set:html={JSON.stringify(catalogProducts)}
+  />
+
+  <p data-shop-products-summary>
     Showing page {pagination.currentPage} of {pagination.totalPages}. {
       pagination.count
     } product{pagination.count === 1 ? "" : "s"} found.
   </p>
 
   {
-    products.length > 0 ? (
-      <ul class="shop-product-grid">
-        {products.map((product) => (
+    initialProducts.length > 0 ? (
+      <ul class="shop-product-grid" data-shop-product-grid>
+        {initialProducts.map((product) => (
           <li>
             <article class="product-card">
               <div class="product-card__image-container">
                 <img
-                  src={getResolvedProductImage(product.image_path, product.name)}
+                  src={getResolvedProductImage(
+                    product.image_path,
+                    product.name,
+                  )}
                   alt={product.name}
                   class="product-card__image"
                 />
@@ -242,16 +244,23 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
         ))}
       </ul>
     ) : (
-      <p>No active products match the selected filters.</p>
+      <p data-shop-products-empty hidden>
+        No active products match the selected filters.
+      </p>
     )
   }
 
-  <nav class="shop-pagination" aria-label="Product pagination">
+  <nav
+    class="shop-pagination"
+    aria-label="Product pagination"
+    data-shop-pagination
+  >
     {
       pagination.previousPage ? (
-        <a
-          href={buildShopUrl(filters, pagination.previousPage, shopPath)}
+        <button
+          type="button"
           class="pagination-arrow"
+          data-shop-page={pagination.previousPage}
           aria-label="Previous page"
         >
           <svg
@@ -267,7 +276,7 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
           >
             <polyline points="15 18 9 12 15 6" />
           </svg>
-        </a>
+        </button>
       ) : (
         <span class="pagination-arrow pagination-arrow--disabled">
           <svg
@@ -298,9 +307,10 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
                 aria-current="page"
               />
             ) : (
-              <a
-                href={buildShopUrl(filters, p, shopPath)}
+              <button
+                type="button"
                 class="pagination-indicator"
+                data-shop-page={p}
                 aria-label={`Go to page ${p}`}
               />
             );
@@ -311,9 +321,10 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
 
     {
       pagination.nextPage ? (
-        <a
-          href={buildShopUrl(filters, pagination.nextPage, shopPath)}
+        <button
+          type="button"
           class="pagination-arrow"
+          data-shop-page={pagination.nextPage}
           aria-label="Next page"
         >
           <svg
@@ -329,7 +340,7 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
           >
             <polyline points="9 18 15 12 9 6" />
           </svg>
-        </a>
+        </button>
       ) : (
         <span class="pagination-arrow pagination-arrow--disabled">
           <svg
@@ -355,10 +366,35 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
   <header class="shop-guest-order-section__header">
     <h2 id="guest-order" class="page-title-brand">ORDER FORM</h2>
     <p class="shop-guest-order-section__intro">
-      Complete your details below, add products individually, then submit for review.
+      Complete your details below, add products individually, then submit for
+      review.
     </p>
   </header>
-  <form class="shop-guest-order-form form-grid" method="post" action="/api/guest-orders">
+  {
+    orderStatus === "submitted" && (
+      <FormSubmissionFeedback
+        variant="success"
+        title="Order submitted"
+        message={orderSuccessMessage}
+        clearParams={GUEST_ORDER_FEEDBACK_PARAMS}
+      />
+    )
+  }
+  {
+    orderStatus === "error" && (
+      <FormSubmissionFeedback
+        variant="error"
+        title="Order was not submitted"
+        message={orderErrorMessage}
+        clearParams={GUEST_ORDER_FEEDBACK_PARAMS}
+      />
+    )
+  }
+  <form
+    class="shop-guest-order-form form-grid"
+    method="post"
+    action="/api/guest-orders"
+  >
     {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
 
     <script
@@ -416,7 +452,8 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
     <fieldset class="shop-guest-order-form__panel">
       <legend>Order items</legend>
       <p class="shop-guest-order-form__items-hint">
-        Add products one at a time. You can include optional notes for each item.
+        Add products one at a time. You can include optional notes for each
+        item.
       </p>
 
       {
@@ -426,17 +463,25 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
             <div class="shop-guest-order-form__add-item-controls">
               <div class="field-row shop-guest-order-form__product-picker">
                 <label for="shop-order-product-select">Product</label>
-                <select id="shop-order-product-select" data-shop-order-product-select>
+                <select
+                  id="shop-order-product-select"
+                  data-shop-order-product-select
+                >
                   <option value="">Select a product</option>
                   {availableOrderProducts.map((product) => (
                     <option value={product.id}>
-                      {product.name} — PHP {Number(product.default_price).toFixed(2)} /{" "}
+                      {product.name} — PHP{" "}
+                      {Number(product.default_price).toFixed(2)} /{" "}
                       {product.unit_label}
                     </option>
                   ))}
                 </select>
               </div>
-              <button type="button" class="shop-guest-order-form__add-button" data-shop-order-add-item>
+              <button
+                type="button"
+                class="shop-guest-order-form__add-button"
+                data-shop-order-add-item
+              >
                 Add item
               </button>
             </div>
@@ -505,7 +550,9 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
               </div>
             </div>
             <div class="field-row shop-order-line__details">
-              <label data-shop-order-line-details-label>Item notes (optional)</label>
+              <label data-shop-order-line-details-label
+                >Item notes (optional)</label
+              >
               <input
                 type="text"
                 placeholder="Cut preference, packaging, etc."
@@ -522,7 +569,10 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
 
       <div class="shop-guest-order-form__total" aria-live="polite">
         <span class="shop-guest-order-form__total-label">Order total</span>
-        <strong class="shop-guest-order-form__total-value" data-shop-order-total-value>
+        <strong
+          class="shop-guest-order-form__total-value"
+          data-shop-order-total-value
+        >
           PHP 0.00
         </strong>
       </div>
@@ -534,7 +584,9 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
           turnstileSiteKey ? (
             <div class="cf-turnstile" data-sitekey={turnstileSiteKey} />
           ) : (
-            <p class="error-message">Guest order verification is not configured.</p>
+            <p class="error-message">
+              Guest order verification is not configured.
+            </p>
           )
         }
       </div>
@@ -565,41 +617,11 @@ const canSubmitOrder = availableOrderProducts.length > 0 && Boolean(turnstileSit
 }
 
 <script>
+  import { initShopFilters } from "@/lib/client/shop-filters";
   import { initShopGuestOrderForm } from "@/lib/client/shop-guest-order-form";
 
-  function initPriceSliders() {
-    const minInput = document.getElementById(
-      "minPrice",
-    ) as HTMLInputElement | null;
-    const maxInput = document.getElementById(
-      "maxPrice",
-    ) as HTMLInputElement | null;
-    const minVal = document.getElementById("minPriceVal");
-    const maxVal = document.getElementById("maxPriceVal");
-
-    if (minInput && minVal) {
-      minInput.addEventListener("input", () => {
-        minVal.textContent = minInput.value;
-        if (maxInput && Number(maxInput.value) < Number(minInput.value)) {
-          maxInput.value = minInput.value;
-          if (maxVal) maxVal.textContent = minInput.value;
-        }
-      });
-    }
-
-    if (maxInput && maxVal) {
-      maxInput.addEventListener("input", () => {
-        maxVal.textContent = maxInput.value;
-        if (minInput && Number(minInput.value) > Number(maxInput.value)) {
-          minInput.value = maxInput.value;
-          if (minVal) minVal.textContent = maxInput.value;
-        }
-      });
-    }
-  }
-
   function initShopPageScripts() {
-    initPriceSliders();
+    initShopFilters();
     initShopGuestOrderForm();
   }
 

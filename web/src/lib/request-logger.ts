@@ -26,6 +26,16 @@ type DevelopmentActionErrorLog = {
   url: URL | string;
 };
 
+type DevelopmentFormSubmitErrorLog = {
+  body: Record<string, unknown>;
+  enabled: boolean;
+  error: unknown;
+  logger?: RequestLogger;
+  scope: string;
+  status: number;
+  url: URL | string;
+};
+
 const sensitiveQueryKeyPattern =
   /(?:auth|code|cookie|key|password|secret|session|signature|token)/i;
 
@@ -95,25 +105,27 @@ export function logDevelopmentActionError({
   );
 }
 
+export function logDevelopmentFormSubmitError({
+  body,
+  enabled,
+  error,
+  logger = console.error,
+  scope,
+  status,
+  url,
+}: DevelopmentFormSubmitErrorLog) {
+  if (!enabled) return;
+
+  logger(
+    `[dev:form-submit] ${scope} ${buildSafeRequestTarget(url)} status=${status} body=${formatBodyForLog(body)} ${formatErrorForLog(error)}`,
+  );
+}
+
 function redactSensitivePath(pathname: string) {
   return pathname.replace(
     /^\/customer-registration\/[^/]+/,
     "/customer-registration/[token]",
   );
-}
-
-function formatErrorForLog(error: unknown) {
-  if (!(error instanceof Error)) {
-    return formatUnknownError(error);
-  }
-
-  const cause = error.cause instanceof Error
-    ? ` cause=${error.cause.message}`
-    : error.cause
-      ? ` cause=${formatUnknownError(error.cause)}`
-      : "";
-
-  return `${error.name}: ${error.message}${cause}`;
 }
 
 function formatUnknownError(error: unknown) {
@@ -139,5 +151,27 @@ function formatUnknownError(error: unknown) {
     return JSON.stringify(error);
   } catch {
     return Object.prototype.toString.call(error);
+  }
+}
+
+function formatErrorForLog(error: unknown) {
+  if (!(error instanceof Error)) {
+    return formatUnknownError(error);
+  }
+
+  const cause = error.cause instanceof Error
+    ? ` cause=${error.cause.message}`
+    : error.cause
+      ? ` cause=${formatUnknownError(error.cause)}`
+      : "";
+
+  return `${error.name}: ${error.message}${cause}`;
+}
+
+function formatBodyForLog(body: Record<string, unknown>) {
+  try {
+    return JSON.stringify(body);
+  } catch {
+    return "{}";
   }
 }

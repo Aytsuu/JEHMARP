@@ -1,4 +1,6 @@
 ---
+import FormSubmissionFeedback from "@/components/ui/FormSubmissionFeedback.astro";
+import { RESELLER_APPLICATION_FEEDBACK_PARAMS } from "@/lib/client/form-submission-feedback-url";
 import {
   plannedTransactionTypeLabels,
   type ResellerApplicationFeedback,
@@ -13,25 +15,6 @@ type Props = {
 const { feedback, turnstileSiteKey, returnPath } = Astro.props;
 const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
 ---
-
-{
-  feedback?.status === "submitted" && (
-    <section class="message-block" aria-labelledby="reseller-confirmation">
-      <h2 id="reseller-confirmation">Application submitted</h2>
-      <p>Your reseller application was submitted for review.</p>
-      {feedback.reference && <p>Reference: {feedback.reference}</p>}
-    </section>
-  )
-}
-
-{
-  feedback?.status === "error" && (
-    <section class="message-block" aria-labelledby="reseller-error">
-      <h2 id="reseller-error">Application was not submitted</h2>
-      <p>{feedback.message}</p>
-    </section>
-  )
-}
 
 <div class="business-layout">
   <div class="business-info">
@@ -94,6 +77,26 @@ const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
       >
         Reseller Form
       </h3>
+      {
+        feedback?.status === "submitted" && (
+          <FormSubmissionFeedback
+            variant="success"
+            title="Application submitted"
+            message="Your reseller application was submitted for review. Our team will contact you after verification."
+            clearParams={RESELLER_APPLICATION_FEEDBACK_PARAMS}
+          />
+        )
+      }
+      {
+        feedback?.status === "error" && (
+          <FormSubmissionFeedback
+            variant="error"
+            title="Application was not submitted"
+            message={feedback.message}
+            clearParams={RESELLER_APPLICATION_FEEDBACK_PARAMS}
+          />
+        )
+      }
       <form class="form-grid" method="post" action="/api/reseller-applications">
         {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
         <fieldset class="fieldset-block">

@@ -104,3 +104,7 @@ Deployment steps:
 3. Keep `SUPABASE_SECRET_KEY`, `TURNSTILE_SECRET_KEY`, `RESEND_API_KEY`, and `UPSTASH_REDIS_REST_TOKEN` server-only.
 4. Deploy after `npm run test`, `npm run check`, `npm run lint`, and `npm run build` pass locally.
 5. Verify the public forms, admin login, agent login, and dashboard routes on the deployed site.
+
+## Public edge hardening
+
+For custom domain setup, Bot Fight Mode, and Cloudflare rate-limit rules that complement in-app mitigations, see [`../contexts/runbooks/landing-ddos-edge-hardening.md`](../contexts/runbooks/landing-ddos-edge-hardening.md).
