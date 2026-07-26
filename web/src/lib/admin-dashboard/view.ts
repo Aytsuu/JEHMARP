@@ -11,6 +11,15 @@ export function formatCurrency(value: number) {
   }).format(value);
 }
 
+export function formatWholeCurrency(value: number) {
+  return new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  }).format(value);
+}
+
 export function formatCompactCurrency(value: number) {
   const normalizedValue = Number.isFinite(value) ? value : 0;
   const absoluteValue = Math.abs(normalizedValue);

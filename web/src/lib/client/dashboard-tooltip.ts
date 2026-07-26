@@ -1,7 +1,7 @@
 const FLOATING_TOOLTIP_ID = "dashboard-floating-tooltip";
 const TRIGGER_SELECTOR = ".dashboard-tooltip[data-tooltip]";
 
-export type DashboardTooltipPlacement = "above" | "below";
+export type DashboardTooltipPlacement = "above" | "below" | "right";
 
 type DashboardWindow = Window & {
   dashboardTooltipInitialized?: boolean;
@@ -14,7 +14,23 @@ function clamp(value: number, min: number, max: number) {
 export function getDashboardTooltipPlacement(
   trigger: HTMLElement,
 ): DashboardTooltipPlacement {
-  return trigger.dataset.tooltipPlacement === "below" ? "below" : "above";
+  if (trigger.dataset.tooltipPlacement === "below") {
+    return "below";
+  }
+
+  if (trigger.dataset.tooltipPlacement === "right") {
+    return "right";
+  }
+
+  return "above";
+}
+
+function isSidebarCollapsed() {
+  return document.documentElement.classList.contains("dashboard-sidebar-collapsed");
+}
+
+function shouldShowDashboardTooltip(trigger: HTMLElement) {
+  return trigger.dataset.tooltipSidebarOnly !== "true" || isSidebarCollapsed();
 }
 
 export function positionDashboardFloatingTooltip(
@@ -35,22 +51,43 @@ export function positionDashboardFloatingTooltip(
   let resolvedPlacement = placement;
   const layerRect = layer.getBoundingClientRect();
   const centerX = triggerRect.left + triggerRect.width / 2;
-  let left = centerX - layerRect.width / 2;
-  left = clamp(left, viewportMargin, window.innerWidth - layerRect.width - viewportMargin);
+  const centerY = triggerRect.top + triggerRect.height / 2;
+  let left = 0;
+  let top = 0;
 
-  let top = resolvedPlacement === "below"
-    ? triggerRect.bottom + gap
-    : triggerRect.top - layerRect.height - gap;
+  if (resolvedPlacement === "right") {
+    left = triggerRect.right + gap;
+    top = centerY - layerRect.height / 2;
+    top = clamp(top, viewportMargin, window.innerHeight - layerRect.height - viewportMargin);
 
-  if (resolvedPlacement === "above" && top < viewportMargin) {
-    resolvedPlacement = "below";
-    top = triggerRect.bottom + gap;
-  } else if (
-    resolvedPlacement === "below"
-    && top + layerRect.height > window.innerHeight - viewportMargin
-  ) {
-    resolvedPlacement = "above";
-    top = triggerRect.top - layerRect.height - gap;
+    if (left + layerRect.width > window.innerWidth - viewportMargin) {
+      resolvedPlacement = "above";
+      left = centerX - layerRect.width / 2;
+      left = clamp(left, viewportMargin, window.innerWidth - layerRect.width - viewportMargin);
+      top = triggerRect.top - layerRect.height - gap;
+
+      if (top < viewportMargin) {
+        resolvedPlacement = "below";
+        top = triggerRect.bottom + gap;
+      }
+    }
+  } else {
+    left = centerX - layerRect.width / 2;
+    left = clamp(left, viewportMargin, window.innerWidth - layerRect.width - viewportMargin);
+    top = resolvedPlacement === "below"
+      ? triggerRect.bottom + gap
+      : triggerRect.top - layerRect.height - gap;
+
+    if (resolvedPlacement === "above" && top < viewportMargin) {
+      resolvedPlacement = "below";
+      top = triggerRect.bottom + gap;
+    } else if (
+      resolvedPlacement === "below"
+      && top + layerRect.height > window.innerHeight - viewportMargin
+    ) {
+      resolvedPlacement = "above";
+      top = triggerRect.top - layerRect.height - gap;
+    }
   }
 
   layer.dataset.placement = resolvedPlacement;
@@ -59,8 +96,14 @@ export function positionDashboardFloatingTooltip(
 
   const arrow = layer.querySelector<HTMLElement>(".dashboard-floating-tooltip__arrow");
   if (arrow) {
-    const arrowLeft = centerX - left;
-    arrow.style.left = `${clamp(arrowLeft, 12, layerRect.width - 12)}px`;
+    if (resolvedPlacement === "right") {
+      arrow.style.left = "";
+      arrow.style.top = `${clamp(centerY - top, 12, layerRect.height - 12)}px`;
+    } else {
+      arrow.style.top = "";
+      const arrowLeft = centerX - left;
+      arrow.style.left = `${clamp(arrowLeft, 12, layerRect.width - 12)}px`;
+    }
   }
 
   layer.style.visibility = "";
@@ -90,7 +133,7 @@ let activeTrigger: HTMLElement | null = null;
 
 function showTooltip(trigger: HTMLElement) {
   const text = trigger.dataset.tooltip?.trim();
-  if (!text) return;
+  if (!text || !shouldShowDashboardTooltip(trigger)) return;
 
   const layer = ensureFloatingTooltip();
   const content = layer.querySelector<HTMLElement>(".dashboard-floating-tooltip__content");
@@ -103,7 +146,7 @@ function showTooltip(trigger: HTMLElement) {
   layer.classList.add("is-visible");
 }
 
-function hideTooltip() {
+export function hideDashboardTooltip() {
   const layer = document.getElementById(FLOATING_TOOLTIP_ID);
   if (!layer) return;
 
@@ -152,7 +195,7 @@ export function initDashboardTooltips() {
     const related = event.relatedTarget;
     if (related instanceof Node && trigger.contains(related)) return;
 
-    hideTooltip();
+    hideDashboardTooltip();
   });
 
   document.addEventListener("focusin", (event) => {
@@ -169,7 +212,7 @@ export function initDashboardTooltips() {
     const related = event.relatedTarget;
     if (related instanceof Node && trigger.contains(related)) return;
 
-    hideTooltip();
+    hideDashboardTooltip();
   });
 
   window.addEventListener("scroll", repositionActiveTooltip, true);

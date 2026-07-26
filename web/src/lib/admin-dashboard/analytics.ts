@@ -6,7 +6,7 @@ import {
   orderReceivableTotal,
   orderTotal,
   formatDate,
-  formatCurrency,
+  formatWholeCurrency,
 } from "./view";
 import { formatSignedMetricTrendDiff } from "@/lib/dashboard/metric-trend";
 import { formatOrderCode } from "@/lib/order-detail-nav";
@@ -274,11 +274,11 @@ function buildReceivablePaymentsTrend(
   previousValue: number,
 ): DashboardMetricTrend {
   const trend = buildMetricTrend(currentValue, previousValue);
-  const diffLabel = formatSignedMetricTrendDiff(trend.difference, formatCurrency);
+  const diffLabel = formatSignedMetricTrendDiff(trend.difference, formatWholeCurrency);
 
   return {
     ...trend,
-    tooltip: `${diffLabel} compared to the previous 30 days. Current receivable: ${formatCurrency(currentValue)}; 30 days ago: ${formatCurrency(previousValue)}. Based on processing orders with unpaid balance.`,
+    tooltip: `${diffLabel} compared to the previous 30 days. Current receivable: ${formatWholeCurrency(currentValue)}; 30 days ago: ${formatWholeCurrency(previousValue)}. Based on processing orders with unpaid balance.`,
   };
 }
 

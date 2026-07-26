@@ -1,18 +1,27 @@
 ---
 type Props = {
   text: string;
-  placement?: "above" | "below";
+  placement?: "above" | "below" | "right";
   class?: string;
+  sidebarOnly?: boolean;
+  focusable?: boolean;
 };
 
-const { text, placement = "above", class: className } = Astro.props;
+const {
+  text,
+  placement = "above",
+  class: className,
+  sidebarOnly = false,
+  focusable = true,
+} = Astro.props;
 ---
 
 <span
   class:list={["dashboard-tooltip", className]}
-  tabindex="0"
+  tabindex={focusable ? 0 : undefined}
   data-tooltip={text}
   data-tooltip-placement={placement}
+  data-tooltip-sidebar-only={sidebarOnly ? "true" : undefined}
   aria-label={text}
 >
   <slot />

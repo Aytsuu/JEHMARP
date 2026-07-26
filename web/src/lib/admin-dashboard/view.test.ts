@@ -11,6 +11,7 @@ import {
   customerOrderDistributionConversionBlockMessage,
   defaultProductCommissionAmount,
   formatCompactCurrency,
+  formatWholeCurrency,
   formatDateTime,
   formatSalePaymentSummary,
   getCustomerOrderDistributionConversionBlockReason,
@@ -63,6 +64,14 @@ describe("productAgentCommissionLabel", () => {
         unit_label: "tray",
       }),
     ).toBe("5% / tray");
+  });
+});
+
+describe("formatWholeCurrency", () => {
+  it("formats currency values without decimal places", () => {
+    expect(formatWholeCurrency(0)).toBe("\u20b10");
+    expect(formatWholeCurrency(70)).toBe("\u20b170");
+    expect(formatWholeCurrency(1234.56)).toBe("\u20b11,235");
   });
 });
 
