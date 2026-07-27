@@ -1,8 +1,8 @@
-import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
+import type { DocumentLayoutOptions } from "@/lib/order-documents/layout";
 import {
   buildOrderSlipLayout,
-  getBrandLines,
 } from "@/lib/order-documents/layout";
+import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
 import { buildPdfDocument, pdfPageWidth } from "@/lib/order-documents/pdf-document";
 
 const pageWidth = pdfPageWidth;
@@ -20,22 +20,19 @@ type OrderSlipPage = {
   pageCount: number;
 };
 
-export function buildOrderSlipContentStreams(order: DocumentOrder): string[] {
+export function buildOrderSlipContentStreams(order: DocumentOrder, options: DocumentLayoutOptions = {}): string[] {
   const pages = chunkOrderItems(order.customer_order_item);
-
   return pages.map((items, index) => buildOrderSlipPageContent(order, {
-    items,
-    pageNumber: index + 1,
-    pageCount: pages.length,
-  }));
+    items, pageNumber: index + 1, pageCount: pages.length,
+  }, options));
 }
 
-export function buildOrderSlipPdf(order: DocumentOrder): Uint8Array {
-  return buildPdfDocument(buildOrderSlipContentStreams(order));
+export function buildOrderSlipPdf(order: DocumentOrder, options: DocumentLayoutOptions = {}): Uint8Array {
+  return buildPdfDocument(buildOrderSlipContentStreams(order, options));
 }
 
-export function buildBulkOrderSlipPdf(orders: DocumentOrder[]): Uint8Array {
-  const contentStreams = orders.flatMap((order) => buildOrderSlipContentStreams(order));
+export function buildBulkOrderSlipPdf(orders: DocumentOrder[], options: DocumentLayoutOptions = {}): Uint8Array {
+  const contentStreams = orders.flatMap((order) => buildOrderSlipContentStreams(order, options));
 
   if (contentStreams.length === 0) {
     throw new Error("No order slip pages to generate.");
@@ -53,20 +50,18 @@ function chunkOrderItems(items: DocumentOrderItem[]) {
   });
 }
 
-function buildOrderSlipPageContent(order: DocumentOrder, page: OrderSlipPage) {
+function buildOrderSlipPageContent(order: DocumentOrder, page: OrderSlipPage, options: DocumentLayoutOptions = {}) {
   const commands: string[] = [];
-
-  drawHeader(commands, page);
-  drawOrderFields(commands, order);
-  const tableBottomY = drawItemsTable(commands, page.items);
-  drawOrderTotal(commands, order, tableBottomY);
-  drawTermsAndSignatures(commands, order);
-
+  const layout = buildOrderSlipLayout(order, options);
+  drawHeader(commands, page, layout.brandLines);
+  drawOrderFields(commands, layout);
+  const tableBottomY = drawItemsTable(commands, page.items, options);
+  drawOrderTotal(commands, layout, tableBottomY);
+  drawTermsAndSignatures(commands, layout);
   return commands.join("\n");
 }
 
-function drawHeader(commands: string[], page: OrderSlipPage) {
-  const brandLines = getBrandLines();
+function drawHeader(commands: string[], page: OrderSlipPage, brandLines: string[]) {
   addText(commands, pageWidth / 2, 802, brandLines[0], { align: "center", size: 13 });
   addText(commands, pageWidth / 2, 786, brandLines[1], { align: "center", size: 10 });
   addText(commands, pageWidth / 2, 771, brandLines[2], { align: "center", size: 10 });
@@ -78,8 +73,7 @@ function drawHeader(commands: string[], page: OrderSlipPage) {
   addText(commands, 525, 778, "LOGO", { align: "center", size: 9 });
 }
 
-function drawOrderFields(commands: string[], order: DocumentOrder) {
-  const layout = buildOrderSlipLayout(order);
+function drawOrderFields(commands: string[], layout: ReturnType<typeof buildOrderSlipLayout>) {
 
   addText(commands, 40, 717, layout.dateLabel, { size: 10 });
   drawLine(commands, 73, 713, 190, 713);
@@ -89,15 +83,10 @@ function drawOrderFields(commands: string[], order: DocumentOrder) {
   drawLine(commands, 370, 691, 555, 691);
 }
 
-function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
+function drawItemsTable(commands: string[], items: DocumentOrderItem[], options: DocumentLayoutOptions = {}) {
   const layout = buildOrderSlipLayout({
-    id: "",
-    created_at: "",
-    customer: null,
-    agent: null,
-    customer_order_item: items,
-    invoice: [],
-  });
+    id: "", created_at: "", customer: null, agent: null, customer_order_item: items, invoice: [],
+  }, options);
   const tableColumnWidths = layout.columns.map((column) => column.width);
   const tableTopY = 665;
   const rowHeight = 24;
@@ -139,26 +128,22 @@ function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
   return tableBottomY;
 }
 
-function drawOrderTotal(commands: string[], order: DocumentOrder, tableBottomY: number) {
+function drawOrderTotal(commands: string[], layout: ReturnType<typeof buildOrderSlipLayout>, tableBottomY: number) {
   const totalY = tableBottomY - 24;
-  const layout = buildOrderSlipLayout(order);
-
   addText(commands, 390, totalY, layout.totalLabel, { size: 11 });
   drawLine(commands, 440, totalY - 4, 555, totalY - 4);
 }
 
-function drawTermsAndSignatures(commands: string[], order: DocumentOrder) {
-  const layout = buildOrderSlipLayout(order);
+function drawTermsAndSignatures(commands: string[], layout: ReturnType<typeof buildOrderSlipLayout>) {
 
   addText(commands, 40, 348, layout.deliveryHeading, { size: 10 });
   addText(commands, 40, 330, layout.deliveryLines[0], { size: 9 });
   addText(commands, 40, 312, layout.deliveryLines[1], { size: 9 });
 
   addText(commands, 40, 277, layout.paymentHeading, { size: 10 });
-  addText(commands, 40, 259, layout.paymentLines[0], { size: 9 });
-
-  addText(commands, 40, 224, layout.paymentLines[1], { size: 9 });
-
+  layout.paymentLines.slice(0, 2).forEach((line, index) => {
+    addText(commands, 40, 259 - index * 18, line, { size: 9 });
+  });
   addText(commands, 40, 184, layout.confirmationText, { size: 8 });
 
   addText(commands, 40, 145, layout.buyerSignatureLines[0], { size: 10 });

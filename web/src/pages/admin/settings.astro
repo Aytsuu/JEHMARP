@@ -1,36 +1,45 @@
 ---
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminSettingsAccountsSecurity from "@/components/admin/settings/AdminSettingsAccountsSecurity.astro";
+import AdminSettingsBusinessProfile from "@/components/admin/settings/AdminSettingsBusinessProfile.astro";
+import AdminSettingsDefaults from "@/components/admin/settings/AdminSettingsDefaults.astro";
+import AdminSettingsDocuments from "@/components/admin/settings/AdminSettingsDocuments.astro";
+import AdminSettingsNotifications from "@/components/admin/settings/AdminSettingsNotifications.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const prerender = false;
 
 const adminRoute = await requireAdminRoute(Astro);
-
-if (!adminRoute.ready) {
-  return adminRoute.response;
-}
+if (!adminRoute.ready) return adminRoute.response;
 
 const feedback = formatAdminActionFeedback(Astro.url);
-const data = await loadAdminDashboardData();
+const [data, settings] = await Promise.all([
+  loadAdminDashboardData(),
+  loadPlatformSettings(createSupabaseAdminClient()),
+]);
 ---
 
 <AdminPageFrame
   title="Admin Settings - JEHMARP"
   description="Manage administrative settings and platform configurations."
   heading="Settings"
-  intro="Configure administrative rules, roles, pricing adjustments, and general system properties."
+  intro="Configure business identity, documents, defaults, notifications, and account security."
   feedback={feedback}
   dashboardData={data}
 >
-  <div class="admin-panel">
-    <div class="admin-card">
-      <h3 class="m-0 text-base font-bold text-gray-900 mb-2">Platform Settings</h3>
-      <p class="m-0 text-sm text-gray-500 mb-4">Configurations and preferences are managed here.</p>
-      <div style="padding: 3rem 2rem; border: 2px dashed #e5e7eb; border-radius: 0.5rem; text-align: center; color: #9ca3af; font-size: 0.875rem;">
-        Settings panel is under construction.
-      </div>
-    </div>
+  <div class="admin-settings-page">
+    <AdminSettingsBusinessProfile settings={settings} />
+    <AdminSettingsDocuments settings={settings} />
+    <AdminSettingsDefaults settings={settings} />
+    <AdminSettingsNotifications settings={settings} />
+    <AdminSettingsAccountsSecurity />
   </div>
 </AdminPageFrame>
+
+<style>
+  .admin-settings-page { display: grid; gap: 1.25rem; }
+</style>

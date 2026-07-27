@@ -4,6 +4,7 @@ import { loadAdminOrder } from "@/lib/admin-dashboard/data";
 import { buildSalesInvoicePdf } from "@/lib/admin-dashboard/sales-invoice-pdf";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import { fullName } from "@/lib/admin-dashboard/view";
+import { loadDocumentLayoutOptions } from "@/lib/platform-settings/document-layout";
 
 export const prerender = false;
 
@@ -20,19 +21,11 @@ export const GET: APIRoute = async (context) => {
     return new Response("Order not found.", { status: 404 });
   }
 
-  const order = await loadAdminOrder(orderId);
-
-  if (!order) {
-    return new Response("Order not found.", { status: 404 });
-  }
-
+  const [order, documentLayout] = await Promise.all([loadAdminOrder(orderId), loadDocumentLayoutOptions()]);
+  if (!order) return new Response("Order not found.", { status: 404 });
   const invoice = order.invoice[0];
-
-  if (!invoice) {
-    return new Response("Invoice not found.", { status: 404 });
-  }
-
-  const pdf = buildSalesInvoicePdf(order);
+  if (!invoice) return new Response("Invoice not found.", { status: 404 });
+  const pdf = buildSalesInvoicePdf(order, documentLayout);
   const body = new ArrayBuffer(pdf.byteLength);
   new Uint8Array(body).set(pdf);
   const fileName = `sales-invoice-${sanitizeFileName(fullName(order.customer))}-${invoice.invoice_number}.pdf`;

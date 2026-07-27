@@ -71,4 +71,33 @@ describe("dashboard-cell-popover-form-state", () => {
 
     cleanup();
   });
+
+  it("keeps save disabled while form is submitting", () => {
+    const form = renderForm(`
+      <form>
+        <input name="employeeId" value="A-100" />
+        <button type="submit">Save</button>
+      </form>
+    `);
+
+    const cleanup = bindPopoverFormSaveState(form);
+    const saveButton = form.querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    )!;
+
+    form.querySelector<HTMLInputElement>('input[name="employeeId"]')!.value =
+      "A-101";
+    form.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(saveButton.disabled).toBe(false);
+
+    form.dataset.isSubmitting = "true";
+    form.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(saveButton.disabled).toBe(true);
+
+    delete form.dataset.isSubmitting;
+    form.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(saveButton.disabled).toBe(false);
+
+    cleanup();
+  });
 });

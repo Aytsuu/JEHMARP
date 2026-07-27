@@ -1,0 +1,31 @@
+<section class="admin-card admin-settings-card">
+  <header class="admin-card__header">
+    <h3>Accounts &amp; security</h3>
+    <p>Update your admin password or send a password reset email to an agent account.</p>
+  </header>
+  <form method="post" class="admin-form admin-settings-form" data-astro-reload>
+    <input type="hidden" name="action" value="change-admin-password" />
+    <h4>Change admin password</h4>
+    <div class="admin-form-grid admin-settings-form__grid">
+      <label class="field-row admin-settings-form__full"><span>Current password</span><input name="currentPassword" type="password" autocomplete="current-password" required /></label>
+      <label class="field-row"><span>New password</span><input name="newPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+      <label class="field-row"><span>Confirm new password</span><input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+    </div>
+    <div class="admin-settings-form__actions"><button type="submit">Update password</button></div>
+  </form>
+  <form method="post" class="admin-form admin-settings-form admin-settings-form--section" data-astro-reload>
+    <input type="hidden" name="action" value="send-agent-password-reset" />
+    <h4>Agent password reset</h4>
+    <p class="admin-settings-help">Agents receive a reset link by email. Admins cannot view or set agent passwords directly.</p>
+    <label class="field-row admin-settings-form__full"><span>Agent email</span><input name="agentEmail" type="email" autocomplete="email" required /></label>
+    <div class="admin-settings-form__actions"><button type="submit">Send reset email</button></div>
+  </form>
+</section>
+
+<style>
+  .admin-settings-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+  .admin-settings-form__full { grid-column: 1 / -1; }
+  .admin-settings-form--section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }
+  .admin-settings-help { margin: 0 0 1rem; font-size: 0.8125rem; color: #6b7280; }
+  .admin-settings-form__actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+</style>

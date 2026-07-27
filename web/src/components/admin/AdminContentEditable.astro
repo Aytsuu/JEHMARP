@@ -1,0 +1,113 @@
+---
+import Popover from "@/components/ui/Popover.astro";
+import {
+  escapeTextareaValue,
+  jsonTextareaValue,
+} from "@/lib/admin-dashboard/view";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
+import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+
+type Props = {
+  contentEditing?: AdminContentEditingContext;
+  section: PublicPageSectionRecord;
+  fieldKey: string;
+  fieldLabel?: string;
+  value: string;
+  multiline?: boolean;
+  required?: boolean;
+  class?: string;
+};
+
+const {
+  contentEditing,
+  section,
+  fieldKey,
+  fieldLabel,
+  value,
+  multiline = false,
+  required = true,
+  class: className,
+} = Astro.props;
+
+const label =
+  fieldLabel ??
+  fieldKey
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+---
+
+{
+  contentEditing ? (
+    <div
+      class:list={["admin-content-editable", className]}
+      data-page-section-editable
+      data-section-id={section.id}
+      data-field-key={fieldKey}
+    >
+      <div class="admin-content-editable__surface">
+        <slot>{value}</slot>
+      </div>
+      <button
+        type="button"
+        class="admin-content-editable__trigger"
+        data-open-cell-popover
+        aria-label={`Edit ${label}`}
+      >
+        <span class="admin-content-editable__overlay" aria-hidden="true">
+          <span class="admin-content-editable__edit-label">Edit</span>
+        </span>
+      </button>
+      <Popover
+        title={`Edit ${label}`}
+        formClass="admin-page-section-form"
+        formDataAttributes={{ "data-page-section-form": "" }}
+      >
+        <input type="hidden" name="action" value="save-page-section" />
+        <input type="hidden" name="sectionId" value={section.id} />
+        <input type="hidden" name="pageId" value={section.page_id} />
+        <input type="hidden" name="type" value={section.type} />
+        <input type="hidden" name="sortOrder" value={section.sort_order} />
+        <input type="hidden" name="status" value={section.status} />
+        <input type="hidden" name="returnPath" value={contentEditing.returnPath} />
+        <input type="hidden" name="contentField" value={fieldKey} />
+        <input
+          type="hidden"
+          name="currentContent"
+          value={jsonTextareaValue(section.content)}
+        />
+        <label>
+          <span>{label}</span>
+          {multiline ? (
+            <textarea
+              name="contentValue"
+              required={required}
+              rows={5}
+              set:html={escapeTextareaValue(value)}
+            />
+          ) : (
+            <input name="contentValue" value={value} required={required} />
+          )}
+        </label>
+        <button slot="footer" type="submit" class="ui-popover__button-primary">
+          Save
+        </button>
+      </Popover>
+    </div>
+  ) : (
+    <slot>{value}</slot>
+  )
+}
+
+<script>
+  import { initPageSectionContentEditors } from "@/lib/client/page-section-content-editor";
+
+  function init() {
+    initPageSectionContentEditors();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:after-swap", init);
+  if (document.readyState !== "loading") {
+    init();
+  }
+</script>

@@ -184,7 +184,10 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
     <div class="cell-popover" id="cell-popover" aria-hidden="true">
       <div class="cell-popover__card">
         <header class="cell-popover__header">
-          <h3 class="cell-popover__title">Edit</h3>
+          <div class="cell-popover__heading">
+            <h3 class="cell-popover__title">Edit</h3>
+            <p class="cell-popover__description" hidden></p>
+          </div>
           <button
             type="button"
             class="dashboard-modal__close"

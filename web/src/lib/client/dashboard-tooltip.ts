@@ -52,8 +52,8 @@ export function positionDashboardFloatingTooltip(
   const layerRect = layer.getBoundingClientRect();
   const centerX = triggerRect.left + triggerRect.width / 2;
   const centerY = triggerRect.top + triggerRect.height / 2;
-  let left = 0;
-  let top = 0;
+  let left: number;
+  let top: number;
 
   if (resolvedPlacement === "right") {
     left = triggerRect.right + gap;

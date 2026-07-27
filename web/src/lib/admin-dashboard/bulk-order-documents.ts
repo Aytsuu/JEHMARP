@@ -5,6 +5,7 @@ import {
 } from "@/lib/admin-dashboard/data";
 import { buildBulkOrderSlipPdf } from "@/lib/admin-dashboard/order-slip-pdf";
 import { buildBulkSalesInvoicePdf } from "@/lib/admin-dashboard/sales-invoice-pdf";
+import { loadDocumentLayoutOptions } from "@/lib/platform-settings/document-layout";
 
 export type BulkOrderSelection = {
   id: string;
@@ -75,11 +76,9 @@ export async function buildBulkSalesInvoiceDocument(
     await resolveCustomerOrdersForBulkDocuments(selections),
   );
 
-  if (orders.length === 0) {
-    return null;
-  }
-
-  return buildBulkSalesInvoicePdf(orders);
+  if (orders.length === 0) return null;
+  const documentLayout = await loadDocumentLayoutOptions();
+  return buildBulkSalesInvoicePdf(orders, documentLayout);
 }
 
 export async function buildBulkOrderSlipDocument(
@@ -87,9 +86,7 @@ export async function buildBulkOrderSlipDocument(
 ): Promise<Uint8Array | null> {
   const orders = await resolveCustomerOrdersForBulkDocuments(selections);
 
-  if (orders.length === 0) {
-    return null;
-  }
-
-  return buildBulkOrderSlipPdf(orders);
+  if (orders.length === 0) return null;
+  const documentLayout = await loadDocumentLayoutOptions();
+  return buildBulkOrderSlipPdf(orders, documentLayout);
 }

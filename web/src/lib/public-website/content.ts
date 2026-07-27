@@ -49,15 +49,23 @@ type SectionLike = {
 export async function getPublicPageContent(
   _context: Pick<APIContext, "cookies" | "request">,
   slug: string,
+  options: { bypassCache?: boolean } = {},
 ): Promise<PublicPageContent> {
   const cacheKey = buildPublicPageCacheKey(slug);
-  const cached = await getCachedJson<PublicPageContent>(cacheKey);
-  if (cached) {
-    return cached;
+
+  if (!options.bypassCache) {
+    const cached = await getCachedJson<PublicPageContent>(cacheKey);
+    if (cached) {
+      return cached;
+    }
   }
 
   const content = await loadPublicPageContent(slug);
-  await setCachedJson(cacheKey, content);
+
+  if (!options.bypassCache) {
+    await setCachedJson(cacheKey, content);
+  }
+
   return content;
 }
 
@@ -169,6 +177,26 @@ export function getSectionEntries(section: Pick<SectionLike, "content">) {
 
     if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
       return [[toTitleCase(key), String(value)]];
+    }
+
+    return [];
+  });
+}
+
+export function getSectionFieldEntries(section: Pick<SectionLike, "content">) {
+  return Object.entries(section.content ?? {}).flatMap(([key, value]) => {
+    if (key === "heading" || value === null || value === undefined) {
+      return [];
+    }
+
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      return [
+        {
+          key,
+          label: toTitleCase(key),
+          value: String(value),
+        },
+      ];
     }
 
     return [];

@@ -1,0 +1,39 @@
+---
+import {
+  getTaglineMarkClassName,
+  isDefaultTaglineRunStyle,
+  type TaglineItem,
+} from "@/lib/public-website/home-taglines";
+
+type Props = {
+  items: TaglineItem[];
+};
+
+const { items } = Astro.props;
+---
+
+<div class="tagline-display-stack">
+  {
+    items.length > 0 ? (
+      items.map((item) => (
+        <p class="tagline-headline">
+          {
+            item.runs.map((run) =>
+              isDefaultTaglineRunStyle(run) ? (
+                run.text
+              ) : (
+                <span class={getTaglineMarkClassName(run)} data-tagline-mark="true">
+                  {run.text}
+                </span>
+              ),
+            )
+          }
+        </p>
+      ))
+    ) : (
+      <p class="tagline-headline tagline-headline--placeholder">
+        Taglines have not been added yet.
+      </p>
+    )
+  }
+</div>

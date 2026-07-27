@@ -4,6 +4,8 @@ import {
   sendResellerPriceList,
 } from "../../../../supabase/functions/reseller-application/workflow";
 import { getServerEnv } from "@/lib/env";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { resolvePrimaryNotificationEmail } from "@/lib/platform-settings/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type ResellerApplicationRow = {
@@ -41,16 +43,13 @@ export async function deliverResellerPriceListEmailIfConfigured(
   }
 
   const products = await loadActiveResellerProducts(supabase);
-  const emailResult = await sendResellerPriceList(
-    fetcher,
-    {
-      apiKey: env.resendApiKey,
-      from: env.resellerPriceListFrom,
-      adminEmail: env.resellerAdminEmail,
-    },
-    application,
-    products,
-  );
+  const settings = await loadPlatformSettings(supabase);
+  const adminEmail = resolvePrimaryNotificationEmail("reseller_application", settings, env.resellerAdminEmail);
+  const emailResult = await sendResellerPriceList(fetcher, {
+    apiKey: env.resendApiKey,
+    from: env.resellerPriceListFrom,
+    adminEmail,
+  }, application, products);
 
   await updateResellerApplicationEmailStatus(supabase, applicationId, emailResult);
 

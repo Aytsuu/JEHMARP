@@ -5,6 +5,7 @@ import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmpty
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Popover from "@/components/ui/Popover.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import type { AdminCustomerManagementData } from "@/lib/admin-dashboard/data";
@@ -55,7 +56,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             ))}
           </select>
         </label>
-        <label class="field-row"><span>Credit limit</span><input name="creditLimit" type="number" min="0" step="1" value="1000" required /></label>
+        <label class="field-row"><span>Credit limit</span><input name="creditLimit" type="number" min="0" step="1" value={data.defaultCustomerCreditLimit} required /></label>
         <label class="checkbox-row">
           <input name="isReseller" type="checkbox" />
           <span>Reseller customer</span>
@@ -191,14 +192,12 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                     type="button"
                     class="table-cell-trigger"
                     data-open-cell-popover
-                    data-popover-title={`Edit Customer: ${fullName(customer)}`}
                   >
                     <span class="order-customer-cell">
                       <span class="order-customer-cell__name">{fullName(customer)}</span>
                     </span>
                   </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
+                  <Popover title={`Edit Customer: ${fullName(customer)}`}>
                       <input type="hidden" name="action" value="save-customer" />
                       <input type="hidden" name="customerId" value={customer.id} />
                       <label><span>First name</span><input name="firstName" value={customer.first_name} required /></label>
@@ -209,9 +208,8 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                       <input type="hidden" name="assignedAgentId" value={customer.assigned_agent_id ?? ""} />
                       <input type="hidden" name="creditLimit" value={customer.credit_limit} />
                       {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
-                      <button type="submit">Save Changes</button>
-                    </form>
-                  </div>
+                      <button slot="footer" type="submit" class="ui-popover__button-primary">Save Changes</button>
+                    </Popover>
                 </td>
                 <td class="dashboard-table__cell--truncate">
                   <span class="customer-tracking-number">{customer.tracking_number}</span>
@@ -221,12 +219,10 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                     type="button"
                     class="table-cell-trigger"
                     data-open-cell-popover
-                    data-popover-title={`Edit Email: ${fullName(customer)}`}
                   >
                     <span>{customer.email ?? "No email"}</span>
                   </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
+                  <Popover title={`Edit Email: ${fullName(customer)}`}>
                       <input type="hidden" name="action" value="save-customer" />
                       <input type="hidden" name="customerId" value={customer.id} />
                       <input type="hidden" name="firstName" value={customer.first_name} />
@@ -237,21 +233,18 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                       <input type="hidden" name="creditLimit" value={customer.credit_limit} />
                       {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
                       <label><span>Email</span><input name="email" type="email" value={customer.email ?? ""} autocomplete="email" /></label>
-                      <button type="submit">Save Changes</button>
-                    </form>
-                  </div>
+                      <button slot="footer" type="submit" class="ui-popover__button-primary">Save Changes</button>
+                    </Popover>
                 </td>
                 <td class="dashboard-table__cell--truncate">
                   <button
                     type="button"
                     class="table-cell-trigger"
                     data-open-cell-popover
-                    data-popover-title={`Edit Contact: ${fullName(customer)}`}
                   >
                     <span>{customer.phone_number}</span>
                   </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
+                  <Popover title={`Edit Contact: ${fullName(customer)}`}>
                       <input type="hidden" name="action" value="save-customer" />
                       <input type="hidden" name="customerId" value={customer.id} />
                       <input type="hidden" name="firstName" value={customer.first_name} />
@@ -262,16 +255,14 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                       <input type="hidden" name="creditLimit" value={customer.credit_limit} />
                       {customer.is_reseller && <input type="hidden" name="isReseller" value="on" />}
                       <label><span>Phone number</span><input name="phoneNumber" value={customer.phone_number} required inputmode="tel" autocomplete="tel" /></label>
-                      <button type="submit">Save Changes</button>
-                    </form>
-                  </div>
+                      <button slot="footer" type="submit" class="ui-popover__button-primary">Save Changes</button>
+                    </Popover>
                 </td>
                 <td>
                   <button
                     type="button"
                     class="table-cell-trigger"
                     data-open-cell-popover
-                    data-popover-title={`Edit Type: ${fullName(customer)}`}
                   >
                     <StatusBadge
                       kind="customer-type"
@@ -279,8 +270,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                       label={customer.is_reseller ? "Reseller" : "Retail"}
                     />
                   </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
+                  <Popover title={`Edit Type: ${fullName(customer)}`}>
                       <input type="hidden" name="action" value="save-customer" />
                       <input type="hidden" name="customerId" value={customer.id} />
                       <input type="hidden" name="firstName" value={customer.first_name} />
@@ -294,21 +284,18 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                         <input name="isReseller" type="checkbox" checked={customer.is_reseller || undefined} />
                         <span>Reseller customer</span>
                       </label>
-                      <button type="submit">Save Changes</button>
-                    </form>
-                  </div>
+                      <button slot="footer" type="submit" class="ui-popover__button-primary">Save Changes</button>
+                    </Popover>
                 </td>
                 <td class="dashboard-table__cell--truncate">
                   <button
                     type="button"
                     class="table-cell-trigger"
                     data-open-cell-popover
-                    data-popover-title={`Edit Assigned Agent: ${fullName(customer)}`}
                   >
                     <span>{customer.assigned_agent_name ?? "None"}</span>
                   </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
+                  <Popover title={`Edit Assigned Agent: ${fullName(customer)}`}>
                       <input type="hidden" name="action" value="save-customer" />
                       <input type="hidden" name="customerId" value={customer.id} />
                       <input type="hidden" name="firstName" value={customer.first_name} />
@@ -330,16 +317,14 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                           ))}
                         </select>
                       </label>
-                      <button type="submit">Save Changes</button>
-                    </form>
-                  </div>
+                      <button slot="footer" type="submit" class="ui-popover__button-primary">Save Changes</button>
+                    </Popover>
                 </td>
                 <td>
                   <button
                     type="button"
                     class="table-cell-trigger"
                     data-open-cell-popover
-                    data-popover-title={`Edit Credit: ${fullName(customer)}`}
                   >
                     <span class="customer-credit-cell">
                       <span>
@@ -350,8 +335,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                       )}
                     </span>
                   </button>
-                  <div class="hidden-popover-form-holder" style="display: none;">
-                    <form method="post" class="admin-table-form">
+                  <Popover title={`Edit Credit: ${fullName(customer)}`}>
                       <input type="hidden" name="action" value="save-customer" />
                       <input type="hidden" name="customerId" value={customer.id} />
                       <input type="hidden" name="firstName" value={customer.first_name} />
@@ -368,9 +352,8 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
                         <span>Credit limit</span>
                         <input name="creditLimit" type="number" min="0" step="1" value={customer.credit_limit} required />
                       </label>
-                      <button type="submit">Save Changes</button>
-                    </form>
-                  </div>
+                      <button slot="footer" type="submit" class="ui-popover__button-primary">Save Changes</button>
+                    </Popover>
                 </td>
                 <td class="dashboard-table__actions-column">
                   <ViewButton href={`/admin/customers/${customer.id}`} />

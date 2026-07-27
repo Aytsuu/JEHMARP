@@ -13,6 +13,14 @@ import {
   ensureSalesInvoiceWhenOrderFullyPaid,
 } from "@/lib/admin-dashboard/order-invoice";
 import {
+  executePlatformSettingsAdminAction,
+  getPlatformSettingsActionSuccessMessage,
+  isPlatformSettingsAdminAction,
+  parsePlatformSettingsAdminAction,
+  type PlatformSettingsAdminAction,
+} from "@/lib/admin-dashboard/platform-settings-actions";
+import { DEFAULT_CUSTOMER_CREDIT_LIMIT } from "@/lib/platform-settings";
+import {
   assertAgentContactIsAvailable,
   assertAgentEmailIsAvailable,
   executeAgentProfileUpdate,
@@ -21,7 +29,28 @@ import {
 import {
   finalizeNewCustomerCreation,
 } from "@/lib/public-website/customer-tracking";
-import { invalidatePublicPageContentCacheForPage } from "@/lib/public-website/content";
+import {
+  invalidatePublicPageContentCacheForPage,
+} from "@/lib/public-website/content";
+import {
+  parseTaglineItemsEditorPayload,
+} from "@/lib/public-website/home-taglines";
+import {
+  getFaqDescription,
+  getFaqHeading,
+  parseFaqItemsEditorPayload,
+} from "@/lib/public-website/home-faq";
+import {
+  addHeroSlide,
+  collectRemovedHeroSlideSrcs,
+  deleteHeroSlide,
+  deleteHeroSlideBySrc,
+  HERO_SLIDE_NEW_MARKER,
+  normalizeHeroSlides,
+  parseHeroSlidesEditorPayload,
+  updateHeroSlideAlt,
+  updateHeroSlideImage,
+} from "@/lib/public-website/home-hero-slides";
 import {
   assertProfileEmailIsAvailable,
   assertProfilePhoneIsAvailable,
@@ -90,6 +119,7 @@ type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 type AdminActionResult = {
   redirectPath?: string;
   statusMessage?: string;
+  sectionContent?: Record<string, unknown>;
 };
 type PromotionAuthUser = {
   id: string;
@@ -133,6 +163,12 @@ export type AdminAction =
   | {
       type: "save-page-section";
       sectionId: string;
+      imageFile: ProductImageFile | null;
+      slideIndex: number | null;
+      slideAction: "add" | "delete" | null;
+      slideSrc: string | null;
+      slideImageFiles: ProductImageFile[];
+      slideNewImageIndexes: number[];
       payload: {
         page_id: string;
         type: string;
@@ -469,7 +505,8 @@ export type AdminAction =
       payload: {
         partial_quantity: number;
       };
-    };
+    }
+  | PlatformSettingsAdminAction;
 
 export function parseAdminActionFormData(
   formData: FormData,
@@ -570,6 +607,7 @@ export async function handleAdminDashboardAction(
       status: message,
       redirectPath,
       action: parsed.action.type,
+      sectionContent: actionResult?.sectionContent,
     });
   }
 
@@ -717,10 +755,10 @@ export async function executeAdminAction(
   options: { siteOrigin?: string } = {},
 ): Promise<AdminActionResult | void> {
   switch (action.type) {
-    case "save-page-section":
-      await executeTableUpdate(supabase, "page_section", action.sectionId, action.payload);
-      await invalidatePublicPageContentCacheForPage(action.payload.page_id);
-      return;
+    case "save-page-section": {
+      const sectionContent = await executePageSectionSave(supabase, action);
+      return { sectionContent };
+    }
     case "save-product":
       await executeProductSave(action);
       return;
@@ -930,6 +968,20 @@ export async function executeAdminAction(
     case "mark-all-admin-notifications-read":
       await markAllAdminNotificationsRead(supabase, adminUserId);
       return;
+    case "save-platform-settings-business-profile":
+    case "save-platform-settings-document-payment":
+    case "save-platform-settings-defaults":
+    case "save-platform-settings-notifications":
+    case "save-platform-settings-document-numbering":
+    case "change-admin-password":
+    case "send-agent-password-reset": {
+      const { data: authData } = await supabase.auth.getUser();
+      await executePlatformSettingsAdminAction(supabase, action, adminUserId, {
+        adminEmail: authData.user?.email,
+        siteOrigin: options.siteOrigin,
+      });
+      return;
+    }
   }
 }
 
@@ -994,10 +1046,92 @@ function parseAdminActionFormDataOrThrow(
 
   switch (action) {
     case "save-page-section": {
-      const content = parseSectionContent(requiredString(formData, "content"));
+      const contentField = optionalString(formData, "contentField");
+      const contentValue = formData.get("contentValue");
+      const imageFile = optionalSectionImage(formData, "imageFile");
+      const rawContent = optionalString(formData, "content");
+      const slideAction = optionalString(formData, "slideAction") as
+        | "add"
+        | "delete"
+        | undefined;
+      const slideIndex = optionalNonNegativeInteger(formData, "slideIndex");
+      const slideSrc = optionalString(formData, "slideSrc");
+      const slideImageFiles = optionalSlideImageFiles(formData);
+      const slideNewImageIndexes = parseSlideNewImageIndexes(formData);
+      let content: Record<string, unknown>;
+
+      if (slideAction === "add" || slideAction === "delete" || contentField || imageFile) {
+        const currentContent = parseSectionContent(
+          requiredString(formData, "currentContent"),
+        );
+
+        if (slideAction === "add") {
+          content = addHeroSlide(currentContent);
+        } else if (slideAction === "delete") {
+          if (slideIndex === null) {
+            throw new Error("Slide index is required.");
+          }
+
+          content = deleteHeroSlide(currentContent, slideIndex).content;
+        } else if (contentField === "slides") {
+          if (typeof contentValue !== "string") {
+            throw new Error("Content value is required.");
+          }
+
+          content = {
+            ...currentContent,
+            slides: parseHeroSlidesEditorPayload(JSON.parse(contentValue)),
+          };
+
+          if (slideImageFiles.length !== slideNewImageIndexes.length) {
+            throw new Error("Carousel image uploads do not match the selected slides.");
+          }
+        } else if (contentField === "items") {
+          if (typeof contentValue !== "string") {
+            throw new Error("Content value is required.");
+          }
+
+          content = {
+            ...currentContent,
+            items: parseTaglineItemsEditorPayload(contentValue),
+          };
+        } else if (contentField === "slideAlt") {
+          if (slideIndex === null) {
+            throw new Error("Slide index is required.");
+          }
+
+          if (typeof contentValue !== "string") {
+            throw new Error("Content value is required.");
+          }
+
+          content = updateHeroSlideAlt(currentContent, slideIndex, contentValue);
+        } else if (contentField) {
+          if (typeof contentValue !== "string") {
+            throw new Error("Content value is required.");
+          }
+
+          content = {
+            ...currentContent,
+            [contentField]: contentValue,
+          };
+        } else {
+          content = currentContent;
+        }
+      } else if (rawContent) {
+        content = parseSectionContent(rawContent);
+      } else {
+        content = parseSectionContent(requiredString(formData, "content"));
+      }
+
       return success({
         type: "save-page-section",
         sectionId: requiredUuid(formData, "sectionId"),
+        imageFile,
+        slideIndex,
+        slideAction: slideAction ?? null,
+        slideSrc: slideSrc ?? null,
+        slideImageFiles,
+        slideNewImageIndexes,
         payload: {
           page_id: uuidSchema.parse(requiredString(formData, "pageId")),
           type: requiredString(formData, "type"),
@@ -1419,10 +1553,11 @@ function parseAdminActionFormDataOrThrow(
         notificationId: requiredString(formData, "notificationId"),
       });
     case "mark-all-admin-notifications-read":
-      return success({
-        type: "mark-all-admin-notifications-read",
-      });
+      return success({ type: "mark-all-admin-notifications-read" });
     default:
+      if (isPlatformSettingsAdminAction(action)) {
+        return success(parsePlatformSettingsAdminAction(action, formData));
+      }
       throw new Error("Unknown admin action.");
   }
 }
@@ -3499,7 +3634,10 @@ async function executeTableUpdate(
   payload: Record<string, unknown>,
 ) {
   const { error } = await supabase.from(table).update(payload).eq("id", id);
-  if (error) throw new Error(`Unable to update ${table.replaceAll("_", " ")}.`);
+  if (error) {
+    const detail = error.message ? `: ${error.message}` : "";
+    throw new Error(`Unable to update ${table.replaceAll("_", " ")}${detail}.`, { cause: error });
+  }
 }
 
 async function executeTableDelete(
@@ -3631,6 +3769,25 @@ async function uploadProductImage(
   const extension = inferFileExtension(file);
   const fileNameBase = slugifyFileSegment(productName) || "product";
   const objectPath = `products/${fileNameBase}-${crypto.randomUUID()}.${extension}`;
+  return uploadManagedImage(supabase, file, objectPath);
+}
+
+async function uploadPageSectionImage(
+  supabase: SupabaseAdminClient,
+  file: ProductImageFile,
+  sectionType: string,
+) {
+  const extension = inferFileExtension(file);
+  const fileNameBase = slugifyFileSegment(sectionType) || "section";
+  const objectPath = `page-sections/${fileNameBase}-${crypto.randomUUID()}.${extension}`;
+  return uploadManagedImage(supabase, file, objectPath);
+}
+
+async function uploadManagedImage(
+  supabase: SupabaseAdminClient,
+  file: ProductImageFile,
+  objectPath: string,
+) {
   const { data, error } = await supabase.storage
     .from(PRODUCT_IMAGE_BUCKET)
     .upload(objectPath, file, {
@@ -3640,10 +3797,166 @@ async function uploadProductImage(
     });
 
   if (error || !data?.path) {
-    throw new Error("Unable to upload product image.");
+    throw new Error("Unable to upload image.");
   }
 
   return data.path;
+}
+
+async function loadPageSectionContent(
+  supabase: SupabaseServerClient,
+  sectionId: string,
+) {
+  const { data, error } = await supabase
+    .from("page_section")
+    .select("content")
+    .eq("id", sectionId)
+    .maybeSingle();
+
+  if (error || !data?.content || typeof data.content !== "object" || Array.isArray(data.content)) {
+    return null;
+  }
+
+  return data.content as Record<string, unknown>;
+}
+
+async function executePageSectionSave(
+  _supabase: SupabaseServerClient,
+  action: Extract<AdminAction, { type: "save-page-section" }>,
+): Promise<Record<string, unknown>> {
+  const adminSupabase = createSupabaseAdminClient();
+  const existingContent = await loadPageSectionContent(adminSupabase, action.sectionId);
+  const previousImageSrc =
+    typeof existingContent?.imageSrc === "string" ? existingContent.imageSrc : null;
+  let uploadedImagePath: string | null = null;
+  const cleanupPaths = new Set<string>();
+  let content = { ...action.payload.content };
+
+  try {
+    if (action.slideAction === "delete") {
+      const baseContent = existingContent ?? content;
+      const deleted = action.slideSrc
+        ? deleteHeroSlideBySrc(baseContent, action.slideSrc)
+        : action.slideIndex !== null
+          ? deleteHeroSlide(baseContent, action.slideIndex)
+          : null;
+
+      if (!deleted) {
+        throw new Error("Slide index is required.");
+      }
+
+      content = deleted.content;
+
+      if (
+        deleted.removedSlide.src !== HERO_SLIDE_NEW_MARKER &&
+        isManagedStoragePath(deleted.removedSlide.src)
+      ) {
+        cleanupPaths.add(deleted.removedSlide.src);
+      }
+    } else if (existingContent?.slides) {
+      collectRemovedHeroSlideSrcs(existingContent.slides, normalizeHeroSlides(content.slides)).forEach(
+        (imagePath) => cleanupPaths.add(imagePath),
+      );
+    }
+
+    if (action.slideImageFiles.length > 0) {
+      const slides = parseHeroSlidesEditorPayload(content.slides);
+
+      for (let fileIndex = 0; fileIndex < action.slideImageFiles.length; fileIndex += 1) {
+        const targetIndex = action.slideNewImageIndexes[fileIndex];
+        const file = action.slideImageFiles[fileIndex];
+
+        if (targetIndex === undefined || !file) {
+          throw new Error("Carousel image uploads do not match the selected slides.");
+        }
+
+        uploadedImagePath = await uploadPageSectionImage(
+          createSupabaseAdminClient(),
+          file,
+          `${action.payload.type}-slide`,
+        );
+
+        const previousSrc = slides[targetIndex]?.src ?? null;
+        slides[targetIndex] = {
+          ...slides[targetIndex],
+          src: uploadedImagePath,
+        };
+
+        if (
+          previousSrc &&
+          previousSrc !== HERO_SLIDE_NEW_MARKER &&
+          previousSrc !== uploadedImagePath
+        ) {
+          cleanupPaths.add(previousSrc);
+        }
+      }
+
+      content = {
+        ...content,
+        slides,
+      };
+    }
+
+    if (action.imageFile && action.slideIndex !== null) {
+      uploadedImagePath = await uploadPageSectionImage(
+        createSupabaseAdminClient(),
+        action.imageFile,
+        `${action.payload.type}-slide`,
+      );
+      const updatedSlide = updateHeroSlideImage(
+        content,
+        action.slideIndex,
+        uploadedImagePath,
+      );
+      content = updatedSlide.content;
+
+      if (updatedSlide.previousSrc) {
+        cleanupPaths.add(updatedSlide.previousSrc);
+      }
+    } else if (action.imageFile) {
+      uploadedImagePath = await uploadPageSectionImage(
+        createSupabaseAdminClient(),
+        action.imageFile,
+        action.payload.type,
+      );
+      content = {
+        ...content,
+        imageSrc: uploadedImagePath,
+      };
+
+      if (previousImageSrc) {
+        cleanupPaths.add(previousImageSrc);
+      }
+    }
+
+    if (action.payload.type === "faq") {
+      content = {
+        heading: getFaqHeading(content),
+        description: getFaqDescription(content),
+        items: parseFaqItemsEditorPayload(JSON.stringify(content.items ?? [])),
+      };
+    }
+
+    await executeTableUpdate(adminSupabase, "page_section", action.sectionId, {
+      ...action.payload,
+      content,
+    });
+
+    for (const imagePath of cleanupPaths) {
+      if (imagePath !== uploadedImagePath) {
+        await removeProductImage(createSupabaseAdminClient(), imagePath);
+      }
+    }
+  } catch (error) {
+    if (uploadedImagePath) {
+      await removeProductImage(createSupabaseAdminClient(), uploadedImagePath);
+    }
+
+    throw error;
+  }
+
+  await invalidatePublicPageContentCacheForPage(action.payload.page_id);
+  return content;
 }
 
 async function removeProductImage(
@@ -3811,6 +4124,22 @@ function nonNegativeInteger(formData: FormData, key: string) {
   return value;
 }
 
+function optionalNonNegativeInteger(formData: FormData, key: string) {
+  const rawValue = optionalString(formData, key);
+
+  if (!rawValue) {
+    return null;
+  }
+
+  const value = Number(rawValue);
+
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${toSentenceLabel(key)} must be a non-negative integer.`);
+  }
+
+  return value;
+}
+
 function nonNegativeNumber(formData: FormData, key: string) {
   const value = Number(requiredString(formData, key));
 
@@ -3956,7 +4285,7 @@ function parseCustomerFormPayload(
     address: requiredString(formData, "address"),
     assigned_agent_id: optionalUuid(formData, "assignedAgentId") ?? null,
     is_reseller: formData.get("isReseller") === "on",
-    credit_limit: optionalNonNegativeNumber(formData, "creditLimit", 1000),
+    credit_limit: optionalNonNegativeNumber(formData, "creditLimit", DEFAULT_CUSTOMER_CREDIT_LIMIT),
     created_by: options.isNew ? adminUserId : undefined,
     updated_at: new Date().toISOString(),
   };
@@ -3997,6 +4326,35 @@ function parseOrderItem(
 
 function normalizeFormDataEntry(value: FormDataEntryValue | undefined) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function optionalSectionImage(formData: FormData, key: string) {
+  return requiredProductImage(formData, key, { required: false });
+}
+
+function optionalSlideImageFiles(formData: FormData) {
+  return formData
+    .getAll("slideImages")
+    .flatMap((entry) => {
+      if (!(entry instanceof File) || entry.size === 0) {
+        return [];
+      }
+
+      return [entry as ProductImageFile];
+    });
+}
+
+function parseSlideNewImageIndexes(formData: FormData) {
+  const rawValue = optionalString(formData, "slideNewImageIndexes");
+
+  if (!rawValue) {
+    return [];
+  }
+
+  return rawValue
+    .split(",")
+    .map((value) => Number(value.trim()))
+    .filter((value) => Number.isInteger(value) && value >= 0);
 }
 
 function requiredProductImage(
@@ -4127,6 +4485,14 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Notification marked as read.";
     case "mark-all-admin-notifications-read":
       return "Notifications marked as read.";
+    case "save-platform-settings-business-profile":
+    case "save-platform-settings-document-payment":
+    case "save-platform-settings-defaults":
+    case "save-platform-settings-notifications":
+    case "save-platform-settings-document-numbering":
+    case "change-admin-password":
+    case "send-agent-password-reset":
+      return getPlatformSettingsActionSuccessMessage(action);
   }
 }
 
@@ -4166,7 +4532,15 @@ function normalizeQueryMessage(value: string | null) {
 }
 
 function acceptsJsonResponse(request: Request) {
-  return request.headers.get("Accept")?.includes("application/json") ?? false;
+  if (request.headers.get("Accept")?.includes("application/json")) {
+    return true;
+  }
+
+  return request.headers.get("X-Requested-With") === "XMLHttpRequest";
+}
+
+export function adminRequestPrefersJson(request: Request) {
+  return acceptsJsonResponse(request);
 }
 
 function toSentenceLabel(value: string) {

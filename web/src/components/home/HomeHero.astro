@@ -1,13 +1,18 @@
 ---
+import AdminContentEditable from "@/components/admin/AdminContentEditable.astro";
+import AdminHeroCarouselEditor from "@/components/admin/AdminHeroCarouselEditor.astro";
 import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
+import { getHeroSlides } from "@/lib/public-website/home-hero-slides";
 import { toAdminContentPreviewHref } from "@/lib/public-website/admin-content-preview";
 
 type Props = {
   section: PublicPageSectionRecord;
   previewRoot?: string;
+  contentEditing?: AdminContentEditingContext;
 };
 
-const { section, previewRoot } = Astro.props;
+const { section, previewRoot, contentEditing } = Astro.props;
 
 function linkHref(href: string) {
   return previewRoot ? toAdminContentPreviewHref(href) : href;
@@ -22,26 +27,7 @@ function stringValue(value: unknown): string | undefined {
 const heading = stringValue(section.content.heading) ?? "JEHMARP";
 const summary = stringValue(section.content.summary);
 const supportingText = stringValue(section.content.supportingText);
-const heroSlides = [
-  {
-    src: "/images/hero_carousel_1.jpg",
-    alt: "Fresh meat selection at JEHMARP",
-    width: 2560,
-    height: 1600,
-  },
-  {
-    src: "/images/hero_carousel_2.jpg",
-    alt: "JEHMARP butcher shop display",
-    width: 1280,
-    height: 881,
-  },
-  {
-    src: "/images/hero_carousel_3.jpg",
-    alt: "Premium cuts prepared at JEHMARP",
-    width: 3600,
-    height: 2025,
-  },
-] as const;
+const heroSlides = getHeroSlides(section.content);
 ---
 
 <section class="home-hero" aria-labelledby="home-hero-heading">
@@ -56,11 +42,9 @@ const heroSlides = [
           data-slide-index={index}
         >
           <img
-            src={slide.src}
+            src={slide.displaySrc}
             alt={slide.alt}
             class="home-hero__slide-image"
-            width={slide.width}
-            height={slide.height}
             loading={index === 0 ? "eager" : "lazy"}
             decoding="async"
           />
@@ -70,11 +54,31 @@ const heroSlides = [
   </div>
   <div class="home-hero__overlay"></div>
   <div class="home-hero__content">
-    <h1 id="home-hero-heading" class="home-hero__title">{heading}</h1>
-    {summary && <p class="home-hero__summary">{summary}</p>}
+    <AdminContentEditable
+      contentEditing={contentEditing}
+      section={section}
+      fieldKey="heading"
+      fieldLabel="Hero heading"
+      value={heading}
+      class="admin-content-editable--inline"
+    >
+      <h1 id="home-hero-heading" class="home-hero__title">{heading}</h1>
+    </AdminContentEditable>
+    {
+      summary && <p class="home-hero__summary">{summary}</p>
+    }
     {
       supportingText && (
-        <p class="home-hero__supporting-text">{supportingText}</p>
+        <AdminContentEditable
+          contentEditing={contentEditing}
+          section={section}
+          fieldKey="supportingText"
+          fieldLabel="Hero supporting text"
+          value={supportingText}
+          multiline
+        >
+          <p class="home-hero__supporting-text">{supportingText}</p>
+        </AdminContentEditable>
       )
     }
 
@@ -88,78 +92,47 @@ const heroSlides = [
     </div>
   </div>
 
-  <div class="home-hero__indicators" aria-label="Hero carousel navigation">
-    <button class="home-hero__indicator-dot home-hero__indicator-dot--active" aria-label="Go to slide 1" aria-current="true" data-indicator-index="0"></button>
-    <button class="home-hero__indicator-dot" aria-label="Go to slide 2" data-indicator-index="1"></button>
-    <button class="home-hero__indicator-dot" aria-label="Go to slide 3" data-indicator-index="2"></button>
+  <div class="home-hero__carousel-footer">
+    {
+      contentEditing && (
+        <AdminHeroCarouselEditor
+          contentEditing={contentEditing}
+          section={section}
+          slides={heroSlides}
+        />
+      )
+    }
+
+    <div class="home-hero__indicators" aria-label="Hero carousel navigation">
+      {
+        heroSlides.map((_, index) => (
+          <button
+            class:list={[
+              "home-hero__indicator-dot",
+              index === 0 && "home-hero__indicator-dot--active",
+            ]}
+            aria-label={`Go to slide ${index + 1}`}
+            aria-current={index === 0 ? "true" : undefined}
+            data-indicator-index={index}
+          />
+        ))
+      }
+    </div>
   </div>
 </section>
 
 <script>
-  function initHeroCarousel() {
-    const slides = document.querySelectorAll<HTMLElement>(".home-hero__slide");
-    const dots = document.querySelectorAll<HTMLButtonElement>(".home-hero__indicator-dot");
-    if (slides.length === 0 || dots.length === 0) return;
+  import { initHomeHeroCarousel, registerHomeHeroCarouselListeners } from "@/lib/client/home-hero-carousel";
 
-    let currentSlide = 0;
-    const intervalTime = 5000;
-    let timerId: number | undefined;
+  registerHomeHeroCarouselListeners();
 
-    function showSlide(index: number) {
-      slides.forEach((slide, i) => {
-        if (i === index) {
-          slide.classList.add("home-hero__slide--active");
-        } else {
-          slide.classList.remove("home-hero__slide--active");
-        }
-      });
-
-      dots.forEach((dot, i) => {
-        if (i === index) {
-          dot.classList.add("home-hero__indicator-dot--active");
-          dot.setAttribute("aria-current", "true");
-        } else {
-          dot.classList.remove("home-hero__indicator-dot--active");
-          dot.removeAttribute("aria-current");
-        }
-      });
-
-      currentSlide = index;
-    }
-
-    function startAutoPlay() {
-      stopAutoPlay();
-      timerId = window.setInterval(() => {
-        const nextIndex = (currentSlide + 1) % slides.length;
-        showSlide(nextIndex);
-      }, intervalTime);
-    }
-
-    function stopAutoPlay() {
-      if (timerId !== undefined) {
-        clearInterval(timerId);
-        timerId = undefined;
-      }
-    }
-
-    dots.forEach((dot, i) => {
-      dot.addEventListener("click", () => {
-        showSlide(i);
-        startAutoPlay();
-      });
-    });
-
-    // Start
-    showSlide(0);
-    startAutoPlay();
+  function init() {
+    initHomeHeroCarousel();
   }
 
-  // Initialize on load and on astro page transitions
-  document.addEventListener("DOMContentLoaded", initHeroCarousel);
-  document.addEventListener("astro:after-swap", initHeroCarousel);
-  
-  // Also run immediately if script executes after DOMContentLoaded
-  if (document.readyState === "complete" || document.readyState === "interactive") {
-    initHeroCarousel();
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:after-swap", init);
+  if (document.readyState !== "loading") {
+    init();
   }
 </script>

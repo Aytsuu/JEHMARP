@@ -6,6 +6,7 @@ import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNum
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import ResellerEmailDeliveryStatus from "@/components/admin/ResellerEmailDeliveryStatus.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Popover from "@/components/ui/Popover.astro";
 import type { AdminResellerApplicationManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminResellerApplicationFilters } from "@/lib/admin-dashboard/reseller-application-filters";
 import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
@@ -86,12 +87,10 @@ const skeletonRows = Array.from({ length: 6 });
                       type="button"
                       class="table-cell-trigger"
                       data-open-cell-popover
-                      data-popover-title={`Edit Status: ${application.name}`}
                     >
                       <StatusBadge kind="reseller" status={application.application_status} />
                     </button>
-                    <div class="hidden-popover-form-holder">
-                      <form method="post" class="admin-table-form">
+                    <Popover title={`Edit Status: ${application.name}`}>
                         <input type="hidden" name="action" value="update-reseller-application" />
                         <input type="hidden" name="applicationId" value={application.id} />
                         <label>
@@ -104,9 +103,8 @@ const skeletonRows = Array.from({ length: 6 });
                             ))}
                           </select>
                         </label>
-                        <button type="submit">Save Changes</button>
-                      </form>
-                    </div>
+                        <button slot="footer" type="submit" class="ui-popover__button-primary">Save Changes</button>
+                    </Popover>
                   </td>
                   <td class="dashboard-table__actions-column">
                     <ResellerEmailDeliveryStatus

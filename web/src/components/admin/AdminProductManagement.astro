@@ -5,6 +5,7 @@ import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmpty
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Popover from "@/components/ui/Popover.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminProductManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminProductFilters } from "@/lib/admin-dashboard/product-filters";
@@ -372,7 +373,6 @@ function formatStockStatus(status: string): string {
                         type="button"
                         class="table-cell-trigger dashboard-table__product-summary dashboard-table__product-button"
                         data-open-cell-popover
-                        data-popover-title={`Edit Product: ${product.name}`}
                       >
                         {product.image_path ? (
                           <img
@@ -390,15 +390,10 @@ function formatStockStatus(status: string): string {
                           {productDisplayLabel(product)}
                         </span>
                       </button>
-                      <div
-                        class="hidden-popover-form-holder"
-                        style="display: none;"
+                      <Popover
+                        title={`Edit Product: ${product.name}`}
+                        formEnctype="multipart/form-data"
                       >
-                        <form
-                          method="post"
-                          enctype="multipart/form-data"
-                          class="admin-table-form"
-                        >
                           <input
                             type="hidden"
                             name="action"
@@ -531,11 +526,10 @@ function formatStockStatus(status: string): string {
                               data-product-other-option-input
                             />
                           </label>
-                          <div class="button-row">
-                            <button type="submit">Save Changes</button>
-                          </div>
-                        </form>
-                      </div>
+                        <button slot="footer" type="submit" class="ui-popover__button-primary">
+                          Save Changes
+                        </button>
+                      </Popover>
                     </td>
 
                     {/* 2. Description Cell (Editable Popover) */}
@@ -544,7 +538,6 @@ function formatStockStatus(status: string): string {
                         type="button"
                         class="table-cell-trigger"
                         data-open-cell-popover
-                        data-popover-title={`Edit Description: ${product.name}`}
                       >
                         {product.description ? (
                           <span title={product.description}>
@@ -556,15 +549,10 @@ function formatStockStatus(status: string): string {
                           </span>
                         )}
                       </button>
-                      <div
-                        class="hidden-popover-form-holder"
-                        style="display: none;"
+                      <Popover
+                        title={`Edit Description: ${product.name}`}
+                        formEnctype="multipart/form-data"
                       >
-                        <form
-                          method="post"
-                          enctype="multipart/form-data"
-                          class="admin-table-form"
-                        >
                           <input
                             type="hidden"
                             name="action"
@@ -636,11 +624,10 @@ function formatStockStatus(status: string): string {
                               />
                             </>
                           </label>
-                          <div class="button-row">
-                            <button type="submit">Save Changes</button>
-                          </div>
-                        </form>
-                      </div>
+                        <button slot="footer" type="submit" class="ui-popover__button-primary">
+                          Save Changes
+                        </button>
+                      </Popover>
                     </td>
 
                     {/* 3. Pricing Cell (Editable Popover) */}
@@ -649,19 +636,16 @@ function formatStockStatus(status: string): string {
                         type="button"
                         class="table-cell-trigger"
                         data-open-cell-popover
-                        data-popover-title={`Edit Pricing: ${product.name}`}
                       >
                         <span>
                           {formatCurrency(product.default_price)} (
                           {formatCurrency(product.reseller_price)})
                         </span>
                       </button>
-                      <div class="hidden-popover-form-holder">
-                        <form
-                          method="post"
-                          enctype="multipart/form-data"
-                          class="admin-table-form"
-                        >
+                      <Popover
+                        title={`Edit Pricing: ${product.name}`}
+                        formEnctype="multipart/form-data"
+                      >
                           <input
                             type="hidden"
                             name="action"
@@ -778,11 +762,10 @@ function formatStockStatus(status: string): string {
                             <input type="hidden" name="isActive" value="on" />
                           )}
 
-                          <div class="button-row">
-                            <button type="submit">Save Changes</button>
-                          </div>
-                        </form>
-                      </div>
+                        <button slot="footer" type="submit" class="ui-popover__button-primary">
+                          Save Changes
+                        </button>
+                      </Popover>
                     </td>
 
                     {/* 4. Commission Cell (Editable Popover) */}
@@ -791,18 +774,15 @@ function formatStockStatus(status: string): string {
                         type="button"
                         class="table-cell-trigger"
                         data-open-cell-popover
-                        data-popover-title={`Edit Commission: ${product.name}`}
                       >
                         <span title={productAgentCommissionLabel(product)}>
                           {productAgentCommissionLabel(product)}
                         </span>
                       </button>
-                      <div class="hidden-popover-form-holder">
-                        <form
-                          method="post"
-                          enctype="multipart/form-data"
-                          class="admin-table-form"
-                        >
+                      <Popover
+                        title={`Edit Commission: ${product.name}`}
+                        formEnctype="multipart/form-data"
+                      >
                           <input
                             type="hidden"
                             name="action"
@@ -911,11 +891,10 @@ function formatStockStatus(status: string): string {
                             <input type="hidden" name="isActive" value="on" />
                           )}
 
-                          <div class="button-row">
-                            <button type="submit">Save Changes</button>
-                          </div>
-                        </form>
-                      </div>
+                        <button slot="footer" type="submit" class="ui-popover__button-primary">
+                          Save Changes
+                        </button>
+                      </Popover>
                     </td>
 
                     {/* 5. Status Cell (Editable Popover) */}
@@ -924,7 +903,6 @@ function formatStockStatus(status: string): string {
                         type="button"
                         class="table-cell-trigger"
                         data-open-cell-popover
-                        data-popover-title={`Edit Status: ${product.name}`}
                       >
                         <StatusBadge
                           kind="stock"
@@ -932,12 +910,10 @@ function formatStockStatus(status: string): string {
                           label={formatStockStatus(product.stock_status)}
                         />
                       </button>
-                      <div class="hidden-popover-form-holder">
-                        <form
-                          method="post"
-                          enctype="multipart/form-data"
-                          class="admin-table-form"
-                        >
+                      <Popover
+                        title={`Edit Status: ${product.name}`}
+                        formEnctype="multipart/form-data"
+                      >
                           <input
                             type="hidden"
                             name="action"
@@ -1011,11 +987,10 @@ function formatStockStatus(status: string): string {
                             value={product.description ?? ""}
                           />
 
-                          <div class="button-row">
-                            <button type="submit">Save Changes</button>
-                          </div>
-                        </form>
-                      </div>
+                        <button slot="footer" type="submit" class="ui-popover__button-primary">
+                          Save Changes
+                        </button>
+                      </Popover>
                     </td>
 
                     <td class="dashboard-table__actions-column"></td>

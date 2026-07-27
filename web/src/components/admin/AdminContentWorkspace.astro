@@ -10,6 +10,9 @@ type Props = {
 };
 
 const { homePreview, featuredProducts } = Astro.props;
+const contentEditing = {
+  returnPath: ADMIN_CONTENT_PREVIEW_ROOT,
+};
 ---
 
 <AdminContentPreviewFrame activePath="/">
@@ -17,5 +20,6 @@ const { homePreview, featuredProducts } = Astro.props;
     sections={homePreview.sections}
     featuredProducts={featuredProducts}
     previewRoot={ADMIN_CONTENT_PREVIEW_ROOT}
+    contentEditing={contentEditing}
   />
 </AdminContentPreviewFrame>

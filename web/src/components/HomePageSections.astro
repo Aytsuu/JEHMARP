@@ -1,8 +1,21 @@
 ---
+import AdminContentEditable from "@/components/admin/AdminContentEditable.astro";
+import AdminContentEditableImage from "@/components/admin/AdminContentEditableImage.astro";
+import AdminFaqEditor from "@/components/admin/AdminFaqEditor.astro";
+import AdminTaglinesEditor from "@/components/admin/AdminTaglinesEditor.astro";
+import TaglineDisplayStack from "@/components/home/TaglineDisplayStack.astro";
 import type {
   PublicFeaturedProduct,
   PublicPageSectionRecord,
 } from "@/lib/public-website/content";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
+import { getAboutSectionImage, getWhyChooseSectionImage } from "@/lib/public-website/home-section-image";
+import { normalizeTaglineItems } from "@/lib/public-website/home-taglines";
+import {
+  getFaqDescription,
+  getFaqHeading,
+  getFaqItems,
+} from "@/lib/public-website/home-faq";
 import MissionExpandableText from "@/components/MissionExpandableText.astro";
 import { toAdminContentPreviewHref } from "@/lib/public-website/admin-content-preview";
 import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
@@ -11,9 +24,10 @@ type Props = {
   sections: PublicPageSectionRecord[];
   featuredProducts: PublicFeaturedProduct[];
   previewRoot?: string;
+  contentEditing?: AdminContentEditingContext;
 };
 
-const { sections, featuredProducts, previewRoot } = Astro.props;
+const { sections, featuredProducts, previewRoot, contentEditing } = Astro.props;
 
 function linkHref(href: string) {
   return previewRoot ? toAdminContentPreviewHref(href) : href;
@@ -27,11 +41,25 @@ const taglines = sections.find((section) => section.type === "taglines");
 const shopInfoSource = sections.find(
   (section) => section.type === "images_gallery",
 );
+const whyChoose = sections.find((section) => section.type === "why_choose");
+const faq = sections.find((section) => section.type === "faq");
 
+const aboutHeading = stringValue(about?.content.heading) ?? "The Meatshop";
+const aboutSummary = stringValue(about?.content.summary);
+const aboutBody = stringValue(about?.content.body);
+const aboutImage = getAboutSectionImage(about?.content);
+const whyChooseImage = getWhyChooseSectionImage(whyChoose?.content);
+const whyChooseHeading =
+  stringValue(whyChoose?.content.heading) ?? "Why Choose JEHMARP";
+const missionText = stringValue(missionVisionCoreValues?.content.mission) ?? "";
+const visionText = stringValue(missionVisionCoreValues?.content.vision) ?? "";
 const coreValuesText = coreValuesContent(
   missionVisionCoreValues?.content.coreValues,
 );
-const taglineItems = asStringArray(taglines?.content.items);
+const taglineItems = normalizeTaglineItems(taglines?.content.items);
+const faqHeading = getFaqHeading(faq?.content);
+const faqDescription = getFaqDescription(faq?.content);
+const faqItems = getFaqItems(faq?.content);
 const storefrontBenefits = [
   {
     title: "Direct from Local Farmers",
@@ -62,29 +90,6 @@ const storefrontBenefits = [
     desc: "Dedicated to giving back, supporting community livelihoods, and uplifting the local neighborhood that has supported the business throughout the years.",
     class: "why-buy-card--4",
     icon: `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
-  },
-];
-
-const faqItems = [
-  {
-    question: "Is the meat fresh or frozen?",
-    answer:
-      "Fresh cuts are prepared daily and packed on-site for the day’s orders.",
-  },
-  {
-    question: "Do you accept custom cuts?",
-    answer:
-      "Yes. You can request preferred thickness, portioning, and preparation when ordering.",
-  },
-  {
-    question: "Can I order in bulk?",
-    answer:
-      "Yes. Family packs, party orders, and business quantities can be arranged ahead of time.",
-  },
-  {
-    question: "Do you offer pickup and delivery?",
-    answer:
-      "Pickup is supported directly, and delivery can be coordinated based on your area.",
   },
 ];
 
@@ -208,26 +213,6 @@ const featuredProductsList =
         category_name: "Fresh Cut",
       }));
 
-function formatTagline(tagline: string): string {
-  let formatted = tagline;
-  if (formatted.includes("for everyday")) {
-    formatted = formatted.replace("for everyday", "<em>for everyday</em>");
-  } else if (formatted.includes("practical")) {
-    formatted = formatted.replace("practical", "<em>practical</em>");
-  } else if (formatted.includes("dependable")) {
-    formatted = formatted.replace("dependable", "<em>dependable</em>");
-  } else {
-    const words = formatted.split(" ");
-    if (words.length > 3) {
-      const midStart = Math.floor(words.length / 2) - 1;
-      const midEnd = midStart + 2;
-      words[midStart] = "<em>" + words[midStart];
-      words[midEnd - 1] = words[midEnd - 1] + "</em>";
-      formatted = words.join(" ");
-    }
-  }
-  return formatted;
-}
 ---
 
 <div class="home-sections">
@@ -237,25 +222,63 @@ function formatTagline(tagline: string): string {
         <section class="about-section" aria-labelledby="home-about">
           <div class="about-section__grid">
             <div class="about-section__image-container">
-              <img
-                src="/images/about_photo.png"
-                alt="JEHMARP local meatshop interior and storefront"
-                class="about-section__image"
-              />
+              {
+                contentEditing && about ? (
+                  <AdminContentEditableImage
+                    contentEditing={contentEditing}
+                    section={about}
+                    imageSrc={aboutImage.imageSrc}
+                    imageAlt={aboutImage.imageAlt}
+                    displaySrc={aboutImage.displaySrc}
+                    imageClass="about-section__image"
+                    popoverTitle="Replace Image"
+                  />
+                ) : (
+                  <img
+                    src={aboutImage.displaySrc}
+                    alt={aboutImage.imageAlt}
+                    class="about-section__image"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                )
+              }
             </div>
             <div class="about-section__content">
-              <h2 id="home-about" class="about-section__title">
-                The Meatshop
-              </h2>
-              {stringValue(about.content.summary) && (
-                <p class="about-section__summary">
-                  {stringValue(about.content.summary)}
-                </p>
+              <AdminContentEditable
+                contentEditing={contentEditing}
+                section={about}
+                fieldKey="heading"
+                fieldLabel="About heading"
+                value={aboutHeading}
+              >
+                <h2 id="home-about" class="about-section__title">
+                  {aboutHeading}
+                </h2>
+              </AdminContentEditable>
+              {aboutSummary && (
+                <AdminContentEditable
+                  contentEditing={contentEditing}
+                  section={about}
+                  fieldKey="summary"
+                  fieldLabel="About summary"
+                  value={aboutSummary}
+                  multiline
+                >
+                  <p class="about-section__summary">{aboutSummary}</p>
+                </AdminContentEditable>
               )}
-              {stringValue(about.content.body) && (
-                <p class="about-section__body">
-                  {stringValue(about.content.body)}
-                </p>
+              {aboutBody && (
+                <AdminContentEditable
+                  contentEditing={contentEditing}
+                  section={about}
+                  fieldKey="body"
+                  fieldLabel="About body"
+                  value={aboutBody}
+                  multiline
+                >
+                  <p class="about-section__body">{aboutBody}</p>
+                </AdminContentEditable>
               )}
             </div>
           </div>
@@ -293,12 +316,19 @@ function formatTagline(tagline: string): string {
                   </svg>
                 </div>
                 <h3 class="mission-card__heading">Mission</h3>
-                <MissionExpandableText
-                  text={
-                    stringValue(missionVisionCoreValues.content.mission) ?? ""
-                  }
-                  fallback="Mission content is not available yet."
-                />
+                <AdminContentEditable
+                  contentEditing={contentEditing}
+                  section={missionVisionCoreValues}
+                  fieldKey="mission"
+                  fieldLabel="Mission"
+                  value={missionText}
+                  multiline
+                >
+                  <MissionExpandableText
+                    text={missionText}
+                    fallback="Mission content is not available yet."
+                  />
+                </AdminContentEditable>
               </article>
               <article class="mission-card mission-card--vision">
                 <div class="mission-card__icon-wrapper">
@@ -319,12 +349,19 @@ function formatTagline(tagline: string): string {
                   </svg>
                 </div>
                 <h3 class="mission-card__heading">Vision</h3>
-                <MissionExpandableText
-                  text={
-                    stringValue(missionVisionCoreValues.content.vision) ?? ""
-                  }
-                  fallback="Vision content is not available yet."
-                />
+                <AdminContentEditable
+                  contentEditing={contentEditing}
+                  section={missionVisionCoreValues}
+                  fieldKey="vision"
+                  fieldLabel="Vision"
+                  value={visionText}
+                  multiline
+                >
+                  <MissionExpandableText
+                    text={visionText}
+                    fallback="Vision content is not available yet."
+                  />
+                </AdminContentEditable>
               </article>
               <article class="mission-card mission-card--values">
                 <div class="mission-card__icon-wrapper">
@@ -344,10 +381,19 @@ function formatTagline(tagline: string): string {
                   </svg>
                 </div>
                 <h3 class="mission-card__heading">Core Values</h3>
-                <MissionExpandableText
-                  text={coreValuesText ?? ""}
-                  fallback="Core values have not been added yet."
-                />
+                <AdminContentEditable
+                  contentEditing={contentEditing}
+                  section={missionVisionCoreValues}
+                  fieldKey="coreValues"
+                  fieldLabel="Core values"
+                  value={coreValuesText ?? ""}
+                  multiline
+                >
+                  <MissionExpandableText
+                    text={coreValuesText ?? ""}
+                    fallback="Core values have not been added yet."
+                  />
+                </AdminContentEditable>
               </article>
             </div>
           </section>
@@ -510,19 +556,17 @@ function formatTagline(tagline: string): string {
       <div class="tagline-section">
         <div class="home-container">
           <div class="tagline-container">
-            <div class="tagline-display-stack">
-              {taglineItems.length > 0 ? (
-                taglineItems.map((tagline) => (
-                  <p class="tagline-headline">
-                    <span set:html={formatTagline(tagline)} />
-                  </p>
-                ))
+            {
+              contentEditing ? (
+                <AdminTaglinesEditor
+                  contentEditing={contentEditing}
+                  section={taglines}
+                  items={taglineItems}
+                />
               ) : (
-                <p class="tagline-headline">
-                  Taglines have not been added yet.
-                </p>
-              )}
-            </div>
+                <TaglineDisplayStack items={taglineItems} />
+              )
+            }
             <a href={linkHref("/our-story")} class="tagline-button">
               Our Story
             </a>
@@ -600,45 +644,65 @@ function formatTagline(tagline: string): string {
             </section>
           </div>
         </div>
+      </>
+    )
+  }
 
-        <div class="why-choose-banner-section">
-          <div class="home-container">
-            <section aria-labelledby="home-why-buy" class="why-choose-banner">
-              <div class="why-choose-banner__image-wrapper">
-                <img
-                  src="/images/why_choose_banner.png"
-                  alt="Why Choose JEHMARP - Prime Cuts & Quality Meat"
-                  class="why-choose-banner__image"
-                  loading="lazy"
-                />
-              </div>
-
-              <div class="why-choose-banner__content">
-                <h2 id="home-why-buy" class="why-choose-banner__title">
-                  Why Choose JEHMARP
-                </h2>
-
-                <div class="why-choose-banner__benefits">
-                  {storefrontBenefits.map((benefit) => (
-                    <div class="why-choose-benefit-pill">
-                      <div
-                        class="why-choose-benefit-pill__icon"
-                        set:html={benefit.icon}
-                      />
-                      <span class="why-choose-benefit-pill__title">
-                        {benefit.title}
-                      </span>
-                      <span class="why-choose-benefit-pill__desc">
-                        {benefit.desc}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          </div>
+  <div class="why-choose-banner-section">
+    <div class="home-container">
+      <section aria-labelledby="home-why-buy" class="why-choose-banner">
+        <div class="why-choose-banner__image-wrapper">
+          {
+            contentEditing && whyChoose ? (
+              <AdminContentEditableImage
+                contentEditing={contentEditing}
+                section={whyChoose}
+                imageSrc={whyChooseImage.imageSrc}
+                imageAlt={whyChooseImage.imageAlt}
+                displaySrc={whyChooseImage.displaySrc}
+                imageClass="why-choose-banner__image"
+                popoverTitle="Replace Image"
+              />
+            ) : (
+              <img
+                src={whyChooseImage.displaySrc}
+                alt={whyChooseImage.imageAlt}
+                class="why-choose-banner__image"
+                loading="lazy"
+              />
+            )
+          }
         </div>
 
+        <div class="why-choose-banner__content">
+          <h2 id="home-why-buy" class="why-choose-banner__title">
+            {whyChooseHeading}
+          </h2>
+
+          <div class="why-choose-banner__benefits">
+            {storefrontBenefits.map((benefit) => (
+              <div class="why-choose-benefit-pill">
+                <div
+                  class="why-choose-benefit-pill__icon"
+                  set:html={benefit.icon}
+                />
+                <span class="why-choose-benefit-pill__title">
+                  {benefit.title}
+                </span>
+                <span class="why-choose-benefit-pill__desc">
+                  {benefit.desc}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  {
+    shopInfoSource && (
+      <>
         <div class="ordering-works-section">
           <div class="home-container">
             <section aria-labelledby="home-ordering-process">
@@ -786,32 +850,70 @@ function formatTagline(tagline: string): string {
           </div>
         </div>
 
-        <div class="faq-section">
+        <div class="faq-section" data-faq-preview-root={faq?.id}>
           <div class="home-container">
             <section aria-labelledby="home-faq">
               <div class="faq-section__grid">
                 <div class="faq-section__intro">
                   <h2 id="home-faq" class="faq-section__title">
-                    FREQUENTLY ASKED QUESTIONS
+                    {faqHeading}
                   </h2>
-                  <p class="faq-section__desc">
-                    Find quick answers to common questions about our fresh meat
-                    cuts, ordering process, and pickup/delivery options.
-                  </p>
+                  {
+                    contentEditing && faq ? (
+                      <AdminContentEditable
+                        contentEditing={contentEditing}
+                        section={faq}
+                        fieldKey="description"
+                        fieldLabel="Section description"
+                        value={faqDescription}
+                        multiline
+                      >
+                        <p class="faq-section__desc">{faqDescription}</p>
+                      </AdminContentEditable>
+                    ) : (
+                      <p class="faq-section__desc">{faqDescription}</p>
+                    )
+                  }
                 </div>
-                <div class="faq-accordion">
-                  {faqItems.map((item) => (
-                    <article class="faq-item">
-                      <button class="faq-item__trigger" type="button">
-                        {item.question}
-                        <span class="faq-item__icon">+</span>
-                      </button>
-                      <div class="faq-item__content">
-                        <p>{item.answer}</p>
+                {
+                  contentEditing && faq ? (
+                    <AdminFaqEditor
+                      contentEditing={contentEditing}
+                      section={faq}
+                      heading={faqHeading}
+                      description={faqDescription}
+                      items={faqItems}
+                    >
+                      <div class="faq-accordion" data-faq-accordion>
+                        {faqItems.map((item) => (
+                          <article class="faq-item">
+                            <button class="faq-item__trigger" type="button">
+                              {item.question}
+                              <span class="faq-item__icon">+</span>
+                            </button>
+                            <div class="faq-item__content">
+                              <p>{item.answer}</p>
+                            </div>
+                          </article>
+                        ))}
                       </div>
-                    </article>
-                  ))}
-                </div>
+                    </AdminFaqEditor>
+                  ) : (
+                    <div class="faq-accordion" data-faq-accordion>
+                      {faqItems.map((item) => (
+                        <article class="faq-item">
+                          <button class="faq-item__trigger" type="button">
+                            {item.question}
+                            <span class="faq-item__icon">+</span>
+                          </button>
+                          <div class="faq-item__content">
+                            <p>{item.answer}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )
+                }
               </div>
             </section>
           </div>
@@ -822,20 +924,44 @@ function formatTagline(tagline: string): string {
 </div>
 
 <script>
-  // Dynamic FAQ Accordion toggle behavior
-  const faqItems = document.querySelectorAll(".faq-item");
-  faqItems.forEach((item) => {
-    const trigger = item.querySelector(".faq-item__trigger");
-    trigger?.addEventListener("click", () => {
-      const isActive = item.classList.contains("faq-item--active");
-      // Collapse all FAQ items first
-      faqItems.forEach((i) => i.classList.remove("faq-item--active"));
-      if (!isActive) {
-        // Expand clicked FAQ item
-        item.classList.add("faq-item--active");
+  function initFaqAccordion() {
+    document.querySelectorAll<HTMLElement>("[data-faq-accordion]").forEach((accordion) => {
+      if (accordion.dataset.faqAccordionBound === "true") {
+        return;
       }
+
+      accordion.dataset.faqAccordionBound = "true";
+      accordion.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) {
+          return;
+        }
+
+        const trigger = target.closest<HTMLButtonElement>(".faq-item__trigger");
+        if (!trigger || !accordion.contains(trigger)) {
+          return;
+        }
+
+        const item = trigger.closest<HTMLElement>(".faq-item");
+        if (!item) {
+          return;
+        }
+
+        const isActive = item.classList.contains("faq-item--active");
+        accordion.querySelectorAll(".faq-item").forEach((faqItem) => {
+          faqItem.classList.remove("faq-item--active");
+        });
+
+        if (!isActive) {
+          item.classList.add("faq-item--active");
+        }
+      });
     });
-  });
+  }
+
+  initFaqAccordion();
+  document.addEventListener("astro:after-swap", initFaqAccordion);
+  document.addEventListener("faq-accordion:refresh", initFaqAccordion);
 
   function initMissionTextExpand() {
     document.querySelectorAll("[data-mission-text-expand]").forEach((wrap) => {

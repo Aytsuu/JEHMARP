@@ -53,6 +53,13 @@ function applySubmittingState(
   }
 }
 
+export function setFormSubmittingState(
+  form: HTMLFormElement,
+  submitter: HTMLButtonElement | null,
+) {
+  applySubmittingState(form, submitter);
+}
+
 export function resetFormSubmissionState(form: HTMLFormElement) {
   delete form.dataset[SUBMITTING_FLAG];
 
