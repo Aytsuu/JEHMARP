@@ -7,6 +7,10 @@ import type {
   PlatformSettings,
 } from "./types";
 import { notificationEvents } from "./types";
+import {
+  DEFAULT_CONTACT_DETAILS_EMAIL,
+  DEFAULT_CONTACT_DETAILS_PHONE,
+} from "./contact-sync";
 
 export const DEFAULT_BRAND_LINES = [
   "Meat and Poultry Products",
@@ -20,9 +24,11 @@ export const DEFAULT_BUSINESS_PROFILE: BusinessProfileSettings = {
   tradeName: DEFAULT_BRAND_LINES[0],
   legalName: "",
   address: DEFAULT_BRAND_LINES[1],
-  phone: "0917 777 0118 | 0932 215 9289",
+  phone: DEFAULT_CONTACT_DETAILS_PHONE,
   tin: "",
   logoPath: null,
+  primaryEmail: DEFAULT_CONTACT_DETAILS_EMAIL,
+  secondaryEmail: "",
 };
 
 export const DEFAULT_DOCUMENT_PAYMENT: DocumentPaymentSettings = {

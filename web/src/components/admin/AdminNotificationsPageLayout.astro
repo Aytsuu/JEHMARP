@@ -86,7 +86,7 @@ const hasHeadingTitle = Astro.slots.has("heading-title");
   >
     <div
       class="admin-notifications-page__inner"
-      style={`max-width: ${contentMaxWidth};`}
+      style={`--notifications-page-max-width: ${contentMaxWidth}; max-width: ${contentMaxWidth};`}
     >
       <header class="admin-notifications-page__header">
         <div class="admin-notifications-page__heading-row">

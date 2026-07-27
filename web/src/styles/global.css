@@ -337,7 +337,7 @@
     width: 1.875rem;
     height: 1.875rem;
     border: 1px dashed currentColor;
-    border-radius: 0.45rem;
+    border-radius: 50%;
     font-size: 0.5rem;
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -349,8 +349,8 @@
   .site-nav__brand-logo {
     width: 1.875rem;
     height: 1.875rem;
-    border-radius: 0.45rem;
-    object-fit: contain;
+    border-radius: 50%;
+    object-fit: cover;
     flex-shrink: 0;
   }
 
@@ -468,6 +468,19 @@
   .site-nav__list a.site-nav__link--button.site-nav__link--active {
     background-color: var(--color-brand-red) !important;
     color: #ffffff !important;
+  }
+
+  .site-nav__list .site-nav__link--button.site-nav__link--disabled,
+  .site-nav__mobile-link.site-nav__link--disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  .footer-column__links .footer-column__link--disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    pointer-events: none;
   }
 
   .page-shell {
@@ -2596,6 +2609,7 @@
     flex-direction: column;
     width: 100%;
     max-width: var(--notifications-page-max-width, none);
+    min-width: 0;
     min-height: 0;
     height: 100%;
     margin: 0 auto;
@@ -2627,6 +2641,8 @@
   .admin-notifications-page__content {
     display: grid;
     gap: 1rem;
+    min-width: 0;
+    max-width: 100%;
   }
 
   .admin-notifications-page .status-message,
@@ -8495,6 +8511,11 @@
   .order-create-sheet__footer button[type="submit"],
   .product-create-sheet__footer button[type="submit"],
   .agent-create-sheet__footer button[type="submit"] {
+    width: auto;
+    margin-top: 0;
+  }
+
+  .order-create-sheet__footer .ui-button {
     width: auto;
     margin-top: 0;
   }

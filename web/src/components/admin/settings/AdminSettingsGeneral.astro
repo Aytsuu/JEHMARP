@@ -1,0 +1,304 @@
+---
+import type { PlatformSettings } from "@/lib/platform-settings";
+import Button from "@/components/ui/Button.astro";
+import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
+
+type Props = {
+  settings: PlatformSettings;
+};
+
+const { settings } = Astro.props;
+const profile = settings.businessProfile;
+const logoUrl = resolvePublicStorageUrl(profile.logoPath);
+---
+
+<section class="admin-settings-card" data-admin-settings-general>
+  <header class="admin-settings-card__header">
+    <div class="admin-settings-card__heading-row">
+      <div class="admin-settings-card__heading-copy">
+        <h3>General</h3>
+        <p>Business profile, notification receivers, and default customer credit limit.</p>
+      </div>
+      <Button
+        type="submit"
+        class="admin-settings-card__save-button"
+        data-settings-save-button
+        form="admin-settings-general-form"
+        disabled
+      >
+        Save changes
+      </Button>
+    </div>
+    <p class="admin-settings-save-status" data-settings-save-status aria-live="polite" hidden></p>
+  </header>
+
+  <form
+    id="admin-settings-general-form"
+    class="admin-form admin-settings-form"
+    data-settings-general-form
+  >
+    <input type="hidden" name="logoPath" value={profile.logoPath ?? ""} />
+
+    <div class="admin-settings-section-row">
+      <div class="admin-settings-section-row__intro">
+        <h4>Logo</h4>
+        <p>Displayed in the admin sidebar, website navigation, and other customer-facing pages.</p>
+      </div>
+      <div class="admin-settings-section-row__content">
+        <div
+          class:list={[
+            "admin-content-editable admin-content-editable--image admin-settings-logo-editable",
+            !logoUrl && "is-empty",
+          ]}
+          data-settings-logo-editable
+        >
+          <div class="admin-content-editable__surface">
+            <img
+              src={logoUrl ?? ""}
+              alt=""
+              class="admin-settings-logo-field__preview"
+              data-settings-logo-preview
+              hidden={!logoUrl}
+            />
+            <div
+              class="admin-settings-logo-field__placeholder"
+              data-settings-logo-placeholder
+              hidden={Boolean(logoUrl)}
+            >
+              No logo uploaded
+            </div>
+          </div>
+          <button
+            type="button"
+            class="admin-content-editable__trigger"
+            data-settings-logo-trigger
+            aria-label="Replace logo"
+          >
+            <span class="admin-content-editable__overlay" aria-hidden="true">
+              <span class="admin-content-editable__edit-label">Replace logo</span>
+            </span>
+          </button>
+        </div>
+        <input
+          name="logoFile"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          hidden
+        />
+      </div>
+    </div>
+
+    <div class="admin-settings-section-row">
+      <div class="admin-settings-section-row__intro">
+        <h4>Business profile</h4>
+        <p>Website name, phone number, and notification email addresses for operational alerts.</p>
+      </div>
+      <div class="admin-settings-section-row__content admin-settings-profile-fields">
+        <label class="field-row">
+          <span>Website name</span>
+          <input name="tradeName" required value={profile.tradeName} autocomplete="organization" />
+        </label>
+        <label class="field-row">
+          <span>Phone</span>
+          <input name="phone" required value={profile.phone} autocomplete="tel" />
+        </label>
+        <label class="field-row">
+          <span>Primary notification email</span>
+          <input
+            name="primaryEmail"
+            type="email"
+            autocomplete="email"
+            placeholder="name@company.com"
+            value={profile.primaryEmail}
+          />
+        </label>
+        <label class="field-row">
+          <span>Secondary notification email</span>
+          <input
+            name="secondaryEmail"
+            type="email"
+            autocomplete="email"
+            placeholder="backup@company.com"
+            value={profile.secondaryEmail}
+          />
+        </label>
+        <p class="admin-settings-help">
+          These inboxes receive alerts such as new orders, inquiries, and credit notifications.
+        </p>
+      </div>
+    </div>
+
+    <div class="admin-settings-section-row">
+      <div class="admin-settings-section-row__intro">
+        <h4>Defaults</h4>
+        <p>Applies to new customers only. Existing customer credit limits stay unchanged.</p>
+      </div>
+      <div class="admin-settings-section-row__content">
+        <label class="field-row admin-settings-defaults-field">
+          <span>Default customer credit limit</span>
+          <input
+            name="customerCreditLimit"
+            type="number"
+            min="0"
+            step="0.01"
+            required
+            value={settings.defaults.customerCreditLimit}
+          />
+        </label>
+      </div>
+    </div>
+  </form>
+</section>
+
+<script>
+  import { initAdminSettingsGeneral } from "@/lib/client/admin-settings-editor";
+
+  function init() {
+    initAdminSettingsGeneral(document);
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:after-swap", init);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    init();
+  }
+</script>
+
+<style>
+  .admin-settings-card {
+    min-width: 0;
+    max-width: 100%;
+    display: grid;
+    gap: 0;
+  }
+
+  .admin-settings-card__header {
+    display: grid;
+    gap: 0.35rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .admin-settings-card__header h3,
+  .admin-settings-card__heading-copy p {
+    margin: 0;
+  }
+
+  .admin-settings-card__header h3 {
+    font-size: 1.2rem;
+    line-height: 1.16;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #111827;
+  }
+
+  .admin-settings-card__heading-copy p {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: rgba(75, 85, 99, 0.9);
+  }
+
+  .admin-settings-card__heading-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .admin-settings-card__save-button {
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .admin-settings-save-status {
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    color: #6b7280;
+  }
+
+  .admin-settings-save-status[data-state="saved"] {
+    color: #15803d;
+  }
+
+  .admin-settings-save-status[data-state="error"] {
+    color: #b91c1c;
+  }
+
+  .admin-settings-form {
+    display: grid;
+    gap: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .admin-settings-logo-editable {
+    width: 7rem;
+    height: 7rem;
+    border-radius: 50%;
+  }
+
+  .admin-settings-logo-editable :global(.admin-content-editable__surface) {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    box-shadow: none;
+  }
+
+  .admin-settings-logo-editable.is-empty :global(.admin-content-editable__surface) {
+    border-style: dashed;
+    border-color: rgba(102, 24, 24, 0.35);
+  }
+
+  .admin-settings-logo-editable:hover :global(.admin-content-editable__surface),
+  .admin-settings-logo-editable:focus-within :global(.admin-content-editable__surface) {
+    box-shadow: none;
+  }
+
+  .admin-settings-logo-editable.is-empty:hover :global(.admin-content-editable__surface),
+  .admin-settings-logo-editable.is-empty:focus-within :global(.admin-content-editable__surface) {
+    border-color: rgba(102, 24, 24, 0.7);
+  }
+
+  .admin-settings-logo-field__preview,
+  .admin-settings-logo-field__placeholder {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #fff;
+  }
+
+  .admin-settings-logo-field__placeholder {
+    display: grid;
+    place-items: center;
+    color: #9ca3af;
+    font-size: 0.75rem;
+    text-align: center;
+    padding: 0.5rem;
+  }
+
+  .admin-settings-profile-fields {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .admin-settings-form :global(.field-row) {
+    max-width: 28rem;
+  }
+
+  .admin-settings-defaults-field {
+    max-width: 18rem;
+  }
+
+  .admin-settings-help {
+    margin: 0;
+    max-width: 28rem;
+    font-size: 0.8125rem;
+    color: #6b7280;
+  }
+</style>

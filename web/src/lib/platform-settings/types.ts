@@ -22,6 +22,8 @@ export type BusinessProfileSettings = {
   phone: string;
   tin: string;
   logoPath: string | null;
+  primaryEmail: string;
+  secondaryEmail: string;
 };
 
 export type DocumentPaymentSettings = {

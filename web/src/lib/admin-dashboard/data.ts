@@ -939,6 +939,11 @@ export async function loadAdminAgentManagementData(
   };
 }
 
+export async function loadAdminSettingsAgents(): Promise<AdminAgent[]> {
+  const supabase = createSupabaseAdminClient();
+  return loadAgents(supabase);
+}
+
 export async function loadAdminInquiryManagementData(
   inquiryFilters: AdminInquiryFilters = {},
   pagination: AdminPaginationParams = defaultAdminPagination,

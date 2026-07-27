@@ -1,6 +1,7 @@
 ---
 import Accordion from "@/components/ui/Accordion.astro";
 import ActionMenu from "@/components/ActionMenu.astro";
+import Button from "@/components/ui/Button.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminOrderManagementData } from "@/lib/admin-dashboard/data";
 import ViewButton from "@/components/ViewButton.astro";
@@ -547,14 +548,15 @@ function pendingCustomerOrderLabel(count: number) {
             },
           ]}
         />
-        <button
+        <Button
           type="button"
-          class="btn-table-manage order-management-toolbar__create"
+          class="order-management-toolbar__create"
           data-open-create-sheet
           data-sheet-target="#create-order-sheet"
           disabled={!canCreateOrder}
-          >Create Order</button
         >
+          Create Order
+        </Button>
       </div>
     </div>
 

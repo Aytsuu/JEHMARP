@@ -2,19 +2,26 @@ import {
   loadPlatformSettings,
   normalizeBusinessProfile,
   normalizeDefaults,
-  normalizeDocumentNumbering,
-  normalizeDocumentPayment,
   normalizeNotifications,
   savePlatformSettings,
 } from "@/lib/platform-settings";
-import { PRODUCT_IMAGE_BUCKET, isManagedStoragePath } from "@/lib/supabase/storage";
+import { syncContactDetailsFromBusinessProfile } from "@/lib/platform-settings/contact-sync";
+import { notificationEvents } from "@/lib/platform-settings/types";
+import { PRODUCT_IMAGE_BUCKET, isManagedStoragePath, resolvePublicStorageUrl } from "@/lib/supabase/storage";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { NotificationEvent } from "@/lib/platform-settings";
 
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 type ProductImageFile = File & { name: string };
+
+export type PlatformSettingsGeneralSaveResult = {
+  logoPath: string | null;
+  logoUrl: string | null;
+  primaryEmail: string;
+  secondaryEmail: string;
+  customerCreditLimit: number;
+};
 
 const allowedLogoMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
@@ -88,20 +95,18 @@ async function removePlatformLogo(adminClient: SupabaseAdminClient, logoPath: st
 }
 
 export type PlatformSettingsAdminAction =
-  | { type: "save-platform-settings-business-profile"; payload: ReturnType<typeof normalizeBusinessProfile>; logoFile: ProductImageFile | null; removeLogo: boolean }
-  | { type: "save-platform-settings-document-payment"; payload: ReturnType<typeof normalizeDocumentPayment> }
-  | { type: "save-platform-settings-defaults"; payload: ReturnType<typeof normalizeDefaults> }
-  | { type: "save-platform-settings-notifications"; payload: ReturnType<typeof normalizeNotifications> }
-  | { type: "save-platform-settings-document-numbering"; payload: ReturnType<typeof normalizeDocumentNumbering> }
+  | {
+      type: "save-platform-settings-general";
+      businessProfile: ReturnType<typeof normalizeBusinessProfile>;
+      defaults: ReturnType<typeof normalizeDefaults>;
+      logoFile: ProductImageFile | null;
+      removeLogo: boolean;
+    }
   | { type: "change-admin-password"; currentPassword: string; newPassword: string; confirmPassword: string }
-  | { type: "send-agent-password-reset"; email: string };
+  | { type: "send-agent-password-reset"; agentId: string };
 
 const PLATFORM_ACTIONS = [
-  "save-platform-settings-business-profile",
-  "save-platform-settings-document-payment",
-  "save-platform-settings-defaults",
-  "save-platform-settings-notifications",
-  "save-platform-settings-document-numbering",
+  "save-platform-settings-general",
   "change-admin-password",
   "send-agent-password-reset",
 ] as const;
@@ -123,77 +128,48 @@ function optionalString(formData: FormData, key: string) {
 
 function optionalEmail(formData: FormData, key: string) {
   const value = optionalString(formData, key);
-  if (!value) return "";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) throw new Error(`${key} must be a valid email.`);
-  return value;
+  if (!value) {
+    return "";
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+    throw new Error(`${key} must be a valid email.`);
+  }
+
+  return value.toLowerCase();
+}
+
+function buildNotificationRoutes(primaryEmail: string, secondaryEmail: string) {
+  return notificationEvents.map((event) => ({
+    event,
+    primaryEmail,
+    secondaryEmail,
+  }));
 }
 
 export function parsePlatformSettingsAdminAction(actionName: string, formData: FormData): PlatformSettingsAdminAction {
   switch (actionName) {
-    case "save-platform-settings-business-profile": {
-      const logoFile = formData.get("logoFile");
-      return {
-        type: "save-platform-settings-business-profile",
-        payload: normalizeBusinessProfile({
-          tradeName: requiredString(formData, "tradeName"),
-          legalName: optionalString(formData, "legalName"),
-          address: requiredString(formData, "address"),
-          phone: requiredString(formData, "phone"),
-          tin: optionalString(formData, "tin"),
-          logoPath: optionalString(formData, "logoPath") || null,
-        }),
-        logoFile: logoFile instanceof File && logoFile.size > 0 ? logoFile as ProductImageFile : null,
-        removeLogo: formData.get("removeLogo") === "on",
-      };
-    }
-    case "save-platform-settings-document-payment":
-      return {
-        type: "save-platform-settings-document-payment",
-        payload: normalizeDocumentPayment({
-          instructions: optionalString(formData, "paymentInstructions"),
-          bankName: optionalString(formData, "bankName"),
-          accountName: optionalString(formData, "accountName"),
-          accountNumber: optionalString(formData, "accountNumber"),
-          gcashNumber: optionalString(formData, "gcashNumber"),
-          mayaNumber: optionalString(formData, "mayaNumber"),
-        }),
-      };
-    case "save-platform-settings-defaults": {
+    case "save-platform-settings-general": {
       const creditLimit = Number(requiredString(formData, "customerCreditLimit"));
       if (!Number.isFinite(creditLimit) || creditLimit < 0) {
         throw new Error("Default customer credit limit must be zero or greater.");
       }
+
+      const logoFile = formData.get("logoFile");
+      const primaryEmail = optionalEmail(formData, "primaryEmail");
+      const secondaryEmail = optionalEmail(formData, "secondaryEmail");
       return {
-        type: "save-platform-settings-defaults",
-        payload: normalizeDefaults({ customerCreditLimit: creditLimit }),
-      };
-    }
-    case "save-platform-settings-notifications": {
-      const events: NotificationEvent[] = ["new_order", "reseller_application", "contact_inquiry", "credit_alert"];
-      return {
-        type: "save-platform-settings-notifications",
-        payload: normalizeNotifications({
-          routes: events.map((event) => ({
-            event,
-            primaryEmail: optionalEmail(formData, `${event}PrimaryEmail`),
-            secondaryEmail: optionalEmail(formData, `${event}SecondaryEmail`),
-          })),
+        type: "save-platform-settings-general",
+        businessProfile: normalizeBusinessProfile({
+          tradeName: requiredString(formData, "tradeName"),
+          phone: requiredString(formData, "phone"),
+          primaryEmail,
+          secondaryEmail,
+          logoPath: optionalString(formData, "logoPath") || null,
         }),
-      };
-    }
-    case "save-platform-settings-document-numbering": {
-      const invoiceNext = Number(requiredString(formData, "invoiceNext"));
-      const orderSlipNext = Number(requiredString(formData, "orderSlipNext"));
-      if (!Number.isFinite(invoiceNext) || invoiceNext < 1) throw new Error("Invoice next number must be at least 1.");
-      if (!Number.isFinite(orderSlipNext) || orderSlipNext < 1) throw new Error("Order slip next number must be at least 1.");
-      return {
-        type: "save-platform-settings-document-numbering",
-        payload: normalizeDocumentNumbering({
-          invoicePrefix: requiredString(formData, "invoicePrefix"),
-          invoiceNext,
-          orderSlipPrefix: requiredString(formData, "orderSlipPrefix"),
-          orderSlipNext,
-        }),
+        defaults: normalizeDefaults({ customerCreditLimit: creditLimit }),
+        logoFile: logoFile instanceof File && logoFile.size > 0 ? logoFile as ProductImageFile : null,
+        removeLogo: formData.get("removeLogo") === "on",
       };
     }
     case "change-admin-password": {
@@ -204,11 +180,11 @@ export function parsePlatformSettingsAdminAction(actionName: string, formData: F
       if (newPassword !== confirmPassword) throw new Error("New password confirmation does not match.");
       return { type: "change-admin-password", currentPassword, newPassword, confirmPassword };
     }
-    case "send-agent-password-reset": {
-      const email = requiredString(formData, "agentEmail");
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Agent email must be valid.");
-      return { type: "send-agent-password-reset", email };
-    }
+    case "send-agent-password-reset":
+      return {
+        type: "send-agent-password-reset",
+        agentId: requiredString(formData, "agentId"),
+      };
     default:
       throw new Error("Unknown admin action.");
   }
@@ -216,13 +192,12 @@ export function parsePlatformSettingsAdminAction(actionName: string, formData: F
 
 export function getPlatformSettingsActionSuccessMessage(action: PlatformSettingsAdminAction) {
   switch (action.type) {
-    case "save-platform-settings-business-profile": return "Business profile saved.";
-    case "save-platform-settings-document-payment": return "Document payment details saved.";
-    case "save-platform-settings-defaults": return "Defaults saved.";
-    case "save-platform-settings-notifications": return "Notification routing saved.";
-    case "save-platform-settings-document-numbering": return "Document numbering saved.";
-    case "change-admin-password": return "Password updated.";
-    case "send-agent-password-reset": return "Password reset email sent.";
+    case "save-platform-settings-general":
+      return "Settings saved.";
+    case "change-admin-password":
+      return "Password updated.";
+    case "send-agent-password-reset":
+      return "Password reset email sent.";
   }
 }
 
@@ -231,45 +206,75 @@ export async function executePlatformSettingsAdminAction(
   action: PlatformSettingsAdminAction,
   adminUserId: string,
   options: { adminEmail?: string | null; siteOrigin?: string } = {},
-) {
+): Promise<PlatformSettingsGeneralSaveResult | void> {
   const adminClient = createSupabaseAdminClient();
 
   switch (action.type) {
-    case "save-platform-settings-business-profile":
-      return executeBusinessProfileSave(adminClient, action, adminUserId);
-    case "save-platform-settings-document-payment":
-      return savePlatformSettings(adminClient, { documentPayment: action.payload }, adminUserId);
-    case "save-platform-settings-defaults":
-      return savePlatformSettings(adminClient, { defaults: action.payload }, adminUserId);
-    case "save-platform-settings-notifications":
-      return savePlatformSettings(adminClient, { notifications: action.payload }, adminUserId);
-    case "save-platform-settings-document-numbering":
-      return savePlatformSettings(adminClient, { documentNumbering: action.payload }, adminUserId);
+    case "save-platform-settings-general":
+      return executeGeneralSettingsSave(adminClient, action, adminUserId);
     case "change-admin-password":
       await executeAdminPasswordChange(supabase, action, options.adminEmail);
       return;
     case "send-agent-password-reset":
-      await executeAgentPasswordReset(action, options.siteOrigin);
+      await executeAgentPasswordReset(adminClient, action, options.siteOrigin);
       return;
   }
 }
 
-async function executeBusinessProfileSave(
+async function executeGeneralSettingsSave(
   adminClient: SupabaseAdminClient,
-  action: Extract<PlatformSettingsAdminAction, { type: "save-platform-settings-business-profile" }>,
+  action: Extract<PlatformSettingsAdminAction, { type: "save-platform-settings-general" }>,
   adminUserId: string,
-) {
+): Promise<PlatformSettingsGeneralSaveResult> {
   const current = await loadPlatformSettings(adminClient);
-  let logoPath = action.payload.logoPath;
+  let logoPath = action.businessProfile.logoPath ?? current.businessProfile.logoPath;
+
   if (action.removeLogo) {
     await removePlatformLogo(adminClient, logoPath);
     logoPath = null;
   }
+
   if (action.logoFile) {
     await removePlatformLogo(adminClient, current.businessProfile.logoPath);
     logoPath = await uploadPlatformLogo(adminClient, action.logoFile);
   }
-  return savePlatformSettings(adminClient, { businessProfile: { ...action.payload, logoPath } }, adminUserId);
+
+  const businessProfile = normalizeBusinessProfile({
+    ...current.businessProfile,
+    tradeName: action.businessProfile.tradeName,
+    phone: action.businessProfile.phone,
+    primaryEmail: action.businessProfile.primaryEmail,
+    secondaryEmail: action.businessProfile.secondaryEmail,
+    logoPath,
+  });
+
+  await savePlatformSettings(
+    adminClient,
+    {
+      businessProfile,
+      defaults: action.defaults,
+      notifications: normalizeNotifications({
+        routes: buildNotificationRoutes(
+          businessProfile.primaryEmail,
+          businessProfile.secondaryEmail,
+        ),
+      }),
+    },
+    adminUserId,
+  );
+
+  await syncContactDetailsFromBusinessProfile(adminClient, {
+    phone: businessProfile.phone,
+    primaryEmail: businessProfile.primaryEmail,
+  });
+
+  return {
+    logoPath,
+    logoUrl: resolvePublicStorageUrl(logoPath),
+    primaryEmail: businessProfile.primaryEmail,
+    secondaryEmail: businessProfile.secondaryEmail,
+    customerCreditLimit: action.defaults.customerCreditLimit,
+  };
 }
 
 async function executeAdminPasswordChange(
@@ -287,24 +292,33 @@ async function executeAdminPasswordChange(
   if (error) throw new Error(error.message || "Unable to update password.");
 }
 
-async function findAuthUserByEmail(adminClient: SupabaseAdminClient, email: string) {
-  const normalizedEmail = email.trim().toLowerCase();
-  const { data, error } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 200 });
-  if (error) throw new Error("Unable to validate agent email.");
-  return (data?.users ?? []).find((item) => (item.email ?? "").trim().toLowerCase() === normalizedEmail) ?? null;
-}
-
 async function executeAgentPasswordReset(
+  adminClient: SupabaseAdminClient,
   action: Extract<PlatformSettingsAdminAction, { type: "send-agent-password-reset" }>,
   siteOrigin?: string,
 ) {
-  const adminClient = createSupabaseAdminClient();
-  const authUser = await findAuthUserByEmail(adminClient, action.email);
-  if (!authUser) throw new Error("No agent account was found for that email.");
-  const { data: agent, error } = await adminClient.from("agent").select("id").eq("user_id", authUser.id).maybeSingle();
-  if (error || !agent) throw new Error("That email does not belong to an agent account.");
-  const { error: resetError } = await adminClient.auth.resetPasswordForEmail(action.email, {
+  const { data: agent, error } = await adminClient
+    .from("agent")
+    .select("id, user_id")
+    .eq("id", action.agentId)
+    .maybeSingle();
+
+  if (error || !agent?.user_id) {
+    throw new Error("Agent account was not found.");
+  }
+
+  const { data: authData, error: authError } = await adminClient.auth.admin.getUserById(agent.user_id);
+  const email = authData.user?.email?.trim();
+
+  if (authError || !email) {
+    throw new Error("This agent does not have a login email on file.");
+  }
+
+  const { error: resetError } = await adminClient.auth.resetPasswordForEmail(email, {
     redirectTo: siteOrigin ? `${siteOrigin}/login` : undefined,
   });
-  if (resetError) throw new Error(resetError.message || "Unable to send password reset email.");
+
+  if (resetError) {
+    throw new Error(resetError.message || "Unable to send password reset email.");
+  }
 }

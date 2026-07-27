@@ -1,12 +1,9 @@
 ---
-import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import AdminSettingsPageLayout from "@/components/admin/AdminSettingsPageLayout.astro";
 import AdminSettingsAccountsSecurity from "@/components/admin/settings/AdminSettingsAccountsSecurity.astro";
-import AdminSettingsBusinessProfile from "@/components/admin/settings/AdminSettingsBusinessProfile.astro";
-import AdminSettingsDefaults from "@/components/admin/settings/AdminSettingsDefaults.astro";
-import AdminSettingsDocuments from "@/components/admin/settings/AdminSettingsDocuments.astro";
-import AdminSettingsNotifications from "@/components/admin/settings/AdminSettingsNotifications.astro";
+import AdminSettingsGeneral from "@/components/admin/settings/AdminSettingsGeneral.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { loadAdminDashboardData, loadAdminSettingsAgents } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import { loadPlatformSettings } from "@/lib/platform-settings";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -16,30 +13,112 @@ export const prerender = false;
 const adminRoute = await requireAdminRoute(Astro);
 if (!adminRoute.ready) return adminRoute.response;
 
+const activeTab = Astro.url.searchParams.get("tab") === "accounts" ? "accounts" : "general";
 const feedback = formatAdminActionFeedback(Astro.url);
-const [data, settings] = await Promise.all([
+const [data, settings, agents] = await Promise.all([
   loadAdminDashboardData(),
   loadPlatformSettings(createSupabaseAdminClient()),
+  loadAdminSettingsAgents(),
 ]);
 ---
 
-<AdminPageFrame
+<AdminSettingsPageLayout
   title="Admin Settings - JEHMARP"
   description="Manage administrative settings and platform configurations."
   heading="Settings"
-  intro="Configure business identity, documents, defaults, notifications, and account security."
+  intro="Configure business profile, defaults, and account security."
+  activeTab={activeTab}
   feedback={feedback}
   dashboardData={data}
 >
-  <div class="admin-settings-page">
-    <AdminSettingsBusinessProfile settings={settings} />
-    <AdminSettingsDocuments settings={settings} />
-    <AdminSettingsDefaults settings={settings} />
-    <AdminSettingsNotifications settings={settings} />
-    <AdminSettingsAccountsSecurity />
+  <div class="admin-settings-page__content">
+    <div
+      class:list={[
+        "admin-settings-page__tab-panel",
+        activeTab === "general" && "is-active",
+      ]}
+      data-admin-settings-tab-panel="general"
+      role="tabpanel"
+      hidden={activeTab !== "general"}
+    >
+      <AdminSettingsGeneral settings={settings} />
+    </div>
+    <div
+      class:list={[
+        "admin-settings-page__tab-panel",
+        activeTab === "accounts" && "is-active",
+      ]}
+      data-admin-settings-tab-panel="accounts"
+      role="tabpanel"
+      hidden={activeTab !== "accounts"}
+    >
+      <AdminSettingsAccountsSecurity agents={agents} />
+    </div>
   </div>
-</AdminPageFrame>
+</AdminSettingsPageLayout>
 
 <style>
-  .admin-settings-page { display: grid; gap: 1.25rem; }
+  .admin-settings-page__content {
+    display: grid;
+    gap: 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  .admin-settings-page__content :global(.admin-settings-card) {
+    min-width: 0;
+    max-width: 100%;
+    gap: 1rem;
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .admin-settings-page__content :global(.admin-settings-form) {
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .admin-settings-page__content :global(.admin-settings-section-row) {
+    display: grid;
+    grid-template-columns: 16rem minmax(0, 1fr);
+    gap: 1.5rem 2rem;
+    align-items: start;
+    padding: 1.25rem 0;
+  }
+
+  .admin-settings-page__content :global(.admin-settings-section-row + .admin-settings-section-row) {
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .admin-settings-page__content :global(.admin-settings-section-row__intro) {
+    flex-shrink: 0;
+  }
+
+  .admin-settings-page__content :global(.admin-settings-section-row__intro h4) {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #111827;
+  }
+
+  .admin-settings-page__content :global(.admin-settings-section-row__intro p) {
+    margin: 0.35rem 0 0;
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #6b7280;
+  }
+
+  .admin-settings-page__content :global(.admin-settings-section-row__content) {
+    min-width: 0;
+  }
+
+  @media (max-width: 768px) {
+    .admin-settings-page__content :global(.admin-settings-section-row) {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+  }
 </style>
