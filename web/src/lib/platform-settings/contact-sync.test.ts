@@ -8,7 +8,11 @@ import {
 } from "./contact-sync";
 
 const { invalidatePublicPageContentCacheForPage } = vi.hoisted(() => ({
-  invalidatePublicPageContentCacheForPage: vi.fn<[string], Promise<void>>(async () => undefined),
+  invalidatePublicPageContentCacheForPage: vi.fn(
+    async (pageId: string): Promise<void> => {
+      void pageId;
+    },
+  ),
 }));
 
 vi.mock("@/lib/public-website/content", () => ({
