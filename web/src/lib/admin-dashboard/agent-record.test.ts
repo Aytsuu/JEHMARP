@@ -1,12 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import type { AdminAgentOrder, AdminOrder } from "./data";
-import { buildAgentPerformanceQuickStats, formatKgSoldTrendDiff } from "./agent-record";
+import type { AdminAgentOrder, AdminOrder, AdminProduct } from "./data";
+import {
+  agentRecordCommissionTotal,
+  agentRecordEstimatedInvoiceTotal,
+  buildAgentPerformanceQuickStats,
+  buildAgentReceivableSegments,
+  formatKgSoldTrendDiff,
+} from "./agent-record";
 
 const products = [
   { id: "product-pork", category: "pork" },
   { id: "product-chicken", category: "chicken" },
 ] as const;
+
+type AgentOrderProduct = Pick<
+  AdminProduct,
+  "id" | "name" | "unit_label" | "default_price" | "agent_commission_type" | "agent_commission_value"
+>;
+
+function createAgentOrderProduct(
+  overrides: Partial<AgentOrderProduct> & Pick<AgentOrderProduct, "default_price">,
+): AgentOrderProduct {
+  return {
+    id: "product-test",
+    name: "Test Product",
+    unit_label: "kg",
+    agent_commission_type: "value",
+    agent_commission_value: 0,
+    ...overrides,
+  };
+}
 
 function createCustomerOrder(
   overrides: Partial<AdminOrder> & Pick<AdminOrder, "id">,
@@ -281,5 +305,226 @@ describe("buildAgentPerformanceQuickStats", () => {
       earned_at: "2026-07-10",
     });
     expect(stats.commissionEarnedTotal).toBe(40);
+  });
+});
+
+describe("agentRecordCommissionTotal", () => {
+  it("only counts commission from closed and fully paid orders", () => {
+    const total = agentRecordCommissionTotal(
+      [
+        createCustomerOrder({
+          id: "order-open",
+          order_status: "processing",
+          payment_status: "unpaid",
+          customer_order_item: [{
+            id: "item-1",
+            product_id: "product-pork",
+            partial_quantity: 1,
+            final_quantity: 1,
+            unit_price: 100,
+            price_type: "retail",
+            add_details: null,
+            agent_commission_amount: 30,
+            agent_commission_paid: false,
+            product: null,
+          }],
+        }),
+        createCustomerOrder({
+          id: "order-earned",
+          order_status: "closed",
+          payment_status: "paid",
+          customer_order_item: [{
+            id: "item-2",
+            product_id: "product-pork",
+            partial_quantity: 2,
+            final_quantity: 2,
+            unit_price: 100,
+            price_type: "retail",
+            add_details: null,
+            agent_commission_amount: 40,
+            agent_commission_paid: false,
+            product: null,
+          }],
+        }),
+      ],
+      [
+        createAgentOrder({
+          id: "agent-order-open",
+          order_status: "processing",
+          agent_order_item: [{
+            id: "agent-item-1",
+            product_id: "product-chicken",
+            quantity: 1,
+            add_details: null,
+            agent_commission_amount: 25,
+            agent_commission_updated_by: null,
+            agent_commission_updated_at: null,
+            created_at: "2026-07-01T00:00:00.000Z",
+            updated_at: "2026-07-01T00:00:00.000Z",
+            product: createAgentOrderProduct({ default_price: 100 }),
+          }],
+        }),
+        createAgentOrder({
+          id: "agent-order-earned",
+          order_status: "closed",
+          customer_order: [{
+            ...createCustomerOrder({
+              id: "child-paid",
+              order_status: "closed",
+              payment_status: "paid",
+            }),
+            customer_order_item: [],
+            payment: [],
+            invoice: [],
+          }],
+          agent_order_item: [{
+            id: "agent-item-2",
+            product_id: "product-chicken",
+            quantity: 1,
+            add_details: null,
+            agent_commission_amount: 15,
+            agent_commission_updated_by: null,
+            agent_commission_updated_at: null,
+            created_at: "2026-07-01T00:00:00.000Z",
+            updated_at: "2026-07-01T00:00:00.000Z",
+            product: createAgentOrderProduct({ default_price: 100 }),
+          }],
+        }),
+      ],
+    );
+
+    expect(total).toBe(55);
+  });
+});
+
+describe("agent record receivable summaries", () => {
+  it("merges pending customer orders and pending agent distributions into one pending segment", () => {
+    const customerOrders = [
+      createCustomerOrder({
+        id: "customer-pending",
+        order_status: "pending",
+        payment_status: "unpaid",
+        customer_order_item: [{
+          id: "item-1",
+          product_id: "product-pork",
+          partial_quantity: 1,
+          final_quantity: 1,
+          unit_price: 100,
+          price_type: "retail",
+          add_details: null,
+          agent_commission_amount: 0,
+          agent_commission_paid: false,
+          product: null,
+        }],
+      }),
+    ];
+    const agentOrders = [
+      createAgentOrder({
+        id: "agent-pending-customers",
+        order_status: "pending_customers",
+        agent_order_item: [{
+          id: "agent-item-1",
+          product_id: "product-chicken",
+          quantity: 2,
+          add_details: null,
+          agent_commission_amount: 20,
+          agent_commission_updated_by: null,
+          agent_commission_updated_at: null,
+          created_at: "2026-07-01T00:00:00.000Z",
+          updated_at: "2026-07-01T00:00:00.000Z",
+          product: createAgentOrderProduct({ default_price: 300 }),
+        }],
+      }),
+      createAgentOrder({
+        id: "agent-pending-order",
+        order_status: "pending_order",
+        agent_order_item: [{
+          id: "agent-item-2",
+          product_id: "product-chicken",
+          quantity: 1,
+          add_details: null,
+          agent_commission_amount: 10,
+          agent_commission_updated_by: null,
+          agent_commission_updated_at: null,
+          created_at: "2026-07-01T00:00:00.000Z",
+          updated_at: "2026-07-01T00:00:00.000Z",
+          product: createAgentOrderProduct({ default_price: 200 }),
+        }],
+      }),
+    ];
+
+    expect(agentRecordEstimatedInvoiceTotal(customerOrders, agentOrders)).toBe(870);
+    expect(buildAgentReceivableSegments(customerOrders, agentOrders)).toEqual([
+      expect.objectContaining({
+        bucket: "pending",
+        label: "Pending",
+        color: "#f97316",
+        receivable: 870,
+        invoiceCount: 3,
+        tooltip: expect.stringContaining("Personal orders:"),
+      }),
+    ]);
+    expect(buildAgentReceivableSegments(customerOrders, agentOrders)[0]?.tooltip).toContain(
+      "Unallocated distribution orders:",
+    );
+  });
+
+  it("does not double count attached customer orders on pending agent distributions", () => {
+    const attachedOrder = createCustomerOrder({
+      id: "attached-pending",
+      order_status: "pending",
+      payment_status: "unpaid",
+      customer_order_item: [{
+        id: "item-1",
+        product_id: "product-pork",
+        partial_quantity: 1,
+        final_quantity: 1,
+        unit_price: 100,
+        price_type: "retail",
+        add_details: null,
+        agent_commission_amount: 0,
+        agent_commission_paid: false,
+        product: null,
+      }],
+    });
+    const customerOrders = [attachedOrder];
+    const agentOrders = [
+      createAgentOrder({
+        id: "agent-pending-customers",
+        order_status: "pending_customers",
+        customer_order: [attachedOrder],
+        agent_order_item: [{
+          id: "agent-item-1",
+          product_id: "product-chicken",
+          quantity: 1,
+          add_details: null,
+          agent_commission_amount: 0,
+          agent_commission_updated_by: null,
+          agent_commission_updated_at: null,
+          created_at: "2026-07-01T00:00:00.000Z",
+          updated_at: "2026-07-01T00:00:00.000Z",
+          product: createAgentOrderProduct({
+            default_price: 100,
+            agent_commission_value: 0,
+          }),
+        }],
+      }),
+    ];
+
+    expect(agentRecordEstimatedInvoiceTotal(customerOrders, agentOrders)).toBe(100);
+    const segments = buildAgentReceivableSegments(customerOrders, agentOrders);
+
+    expect(segments).toEqual([
+      expect.objectContaining({
+        bucket: "pending",
+        label: "Pending",
+        color: "#f97316",
+        receivable: 100,
+        invoiceCount: 1,
+      }),
+    ]);
+    expect(segments[0]?.tooltip).toContain("Allocated on distributions:");
+    expect(segments[0]?.tooltip).not.toContain("Personal orders:");
+    expect(segments[0]?.tooltip).not.toContain("Unallocated distribution orders:");
   });
 });

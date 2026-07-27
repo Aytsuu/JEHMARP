@@ -2,6 +2,8 @@
 import AdminAgentRecordTabTable from "@/components/admin/AdminAgentRecordTabTable.astro";
 import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordTabTable.astro";
 import MetricTrend from "@/components/ui/MetricTrend.astro";
+import Tooltip from "@/components/ui/Tooltip.astro";
+import AlertDialog from "@/components/ui/AlertDialog.astro";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import Popover from "@/components/ui/Popover.astro";
@@ -12,6 +14,7 @@ import {
   formatKgSoldTrendDiff,
   type AgentPerformanceQuickStats,
   type AgentPreviousOrderRow,
+  type AgentReceivableSegment,
   type AgentRecordFilters,
   type AgentRecordOrderRow,
   type AgentRecordTab,
@@ -19,7 +22,6 @@ import {
 import type {
   CustomerInvoiceRow,
   CustomerPaymentRow,
-  CustomerReceivableSegment,
   CustomerSalesRow,
 } from "@/lib/admin-dashboard/customer-record";
 import type { AdminPagination } from "@/lib/admin-dashboard/pagination";
@@ -27,6 +29,7 @@ import {
   formatCompactCurrency,
   formatCurrency,
   formatDate,
+  fullName,
   selected,
 } from "@/lib/admin-dashboard/view";
 type Props = {
@@ -55,13 +58,14 @@ type Props = {
   };
   processingReceivableTotal: number;
   estimatedInvoiceTotal: number;
-  receivableSegments: CustomerReceivableSegment[];
+  receivableSegments: AgentReceivableSegment[];
   assignedCustomersCount: number;
   commissionEarned: number;
   paymentsSubmitted: number;
   performanceQuickStats: AgentPerformanceQuickStats;
   agentReturnTo: string;
   showPreviousOrdersTab: boolean;
+  hasAgentDistributionOrders: boolean;
 };
 
 const {
@@ -92,8 +96,12 @@ const {
   performanceQuickStats,
   agentReturnTo,
   showPreviousOrdersTab,
+  hasAgentDistributionOrders,
 } = Astro.props;
 
+const promotedCustomerName = linkedCustomer
+  ? fullName(linkedCustomer)
+  : agent.display_name;
 const agentBasePath = `/admin/agents/${agent.id}`;
 const receivableBarTotal = receivableSegments.reduce(
   (total, segment) => total + segment.receivable,
@@ -140,21 +148,28 @@ const customerTabTableProps = {
   data-agent-id={agent.id}
 >
   {
-    agent.promoted_from_customer_at && (
-      <section class="customer-record-banner" aria-label="Agent promotion status">
+    agent.promoted_from_customer_id && (
+      <section
+        class="customer-record-banner"
+        aria-label="Agent promotion status"
+      >
         <p class="customer-record-banner__copy">
-          This agent was promoted from a customer record.
-          {
-            linkedCustomer && (
-              <>
-                {" "}
-                <a class="customer-record-banner__action" href={`/admin/customers/${linkedCustomer.id}?returnTo=${agentReturnTo}`}>
-                  View customer record
-                </a>
-              </>
-            )
-          }
-          {" "}Completed customer orders remain unchanged; eligible unpaid orders can be converted into agent distribution orders in the Previous orders tab.
+          This agent was promoted from a customer record. If that was accidental,
+          you can cancel the promotion.{" "}
+          <button
+            type="button"
+            class="customer-record-banner__action"
+            data-open-alert-dialog={
+              hasAgentDistributionOrders
+                ? "revoke-customer-promotion-blocked-dialog"
+                : "revoke-customer-promotion-dialog"
+            }
+            {...!hasAgentDistributionOrders && {
+              "data-alert-dialog-form": "revoke-customer-promotion-form",
+            }}
+          >
+            Cancel Promotion
+          </button>
         </p>
       </section>
     )
@@ -163,7 +178,9 @@ const customerTabTableProps = {
   <div class="customer-record-cards">
     <article class="customer-record-card">
       <h2 class="customer-record-card__title">Contact information</h2>
-      <dl class="customer-record-card__list customer-record-card__list--contact">
+      <dl
+        class="customer-record-card__list customer-record-card__list--contact"
+      >
         <div class="customer-record-card__field">
           <dt class="customer-record-card__contact-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
@@ -179,7 +196,9 @@ const customerTabTableProps = {
         <div class="customer-record-card__field">
           <dt class="customer-record-card__contact-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
-              <path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"></path>
+              <path
+                d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"
+              ></path>
               <path d="m22 6-10 7L2 6"></path>
             </svg>
             <span class="sr-only">Email</span>
@@ -189,7 +208,9 @@ const customerTabTableProps = {
         <div class="customer-record-card__field">
           <dt class="customer-record-card__contact-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
-              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z"></path>
+              <path
+                d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.12.86.3 1.7.54 2.5a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.58-1.11a2 2 0 0 1 2.11-.45c.8.24 1.64.42 2.5.54A2 2 0 0 1 22 16.92Z"
+              ></path>
             </svg>
             <span class="sr-only">Contact</span>
           </dt>
@@ -198,7 +219,8 @@ const customerTabTableProps = {
         <div class="customer-record-card__field">
           <dt class="customer-record-card__contact-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24">
-              <path d="M12 21s-7-4.35-7-10a7 7 0 1 1 14 0c0 5.65-7 10-7 10Z"></path>
+              <path d="M12 21s-7-4.35-7-10a7 7 0 1 1 14 0c0 5.65-7 10-7 10Z"
+              ></path>
               <circle cx="12" cy="11" r="2.5"></circle>
             </svg>
             <span class="sr-only">Address</span>
@@ -237,7 +259,11 @@ const customerTabTableProps = {
         >
           <input type="hidden" name="action" value="update-agent" />
           <input type="hidden" name="agentId" value={agent.id} />
-          <input type="hidden" name="employeeId" value={agent.employee_id ?? ""} />
+          <input
+            type="hidden"
+            name="employeeId"
+            value={agent.employee_id ?? ""}
+          />
           <input type="hidden" name="firstName" value={agent.first_name} />
           <input type="hidden" name="lastName" value={agent.last_name} />
           <input type="hidden" name="contact" value={agent.contact ?? ""} />
@@ -245,17 +271,31 @@ const customerTabTableProps = {
           <label>
             <span>Status</span>
             <select name="status">
-              <option value="active" selected={selected(agent.status, "active")}>Active</option>
-              <option value="inactive" selected={selected(agent.status, "inactive")}>Inactive</option>
-              <option value="suspended" selected={selected(agent.status, "suspended")}>Suspended</option>
+              <option value="active" selected={selected(agent.status, "active")}
+                >Active</option
+              >
+              <option
+                value="inactive"
+                selected={selected(agent.status, "inactive")}>Inactive</option
+              >
+              <option
+                value="suspended"
+                selected={selected(agent.status, "suspended")}>Suspended</option
+              >
             </select>
           </label>
-          <button slot="footer" type="submit" class="ui-popover__button-primary">
+          <button
+            slot="footer"
+            type="submit"
+            class="ui-popover__button-primary"
+          >
             Save changes
           </button>
         </Popover>
       </div>
-      <dl class="customer-record-card__list customer-record-card__list--status customer-record-card__list--sentence-case">
+      <dl
+        class="customer-record-card__list customer-record-card__list--status customer-record-card__list--sentence-case"
+      >
         <div class="customer-record-card__field">
           <dt>Account</dt>
           <dd>
@@ -287,7 +327,9 @@ const customerTabTableProps = {
 
     <article class="customer-record-card">
       <h2 class="customer-record-card__title">Agent orders</h2>
-      <dl class="customer-record-card__list customer-record-card__list--stats customer-record-card__list--sentence-case">
+      <dl
+        class="customer-record-card__list customer-record-card__list--stats customer-record-card__list--sentence-case"
+      >
         <div class="customer-record-card__field">
           <dt>Total</dt><dd>{orderCounts.total}</dd>
         </div>
@@ -308,7 +350,9 @@ const customerTabTableProps = {
     <div class="customer-record-receivables__totals">
       <div class="customer-record-receivables__total">
         <div class="customer-record-receivables__summary-line">
-          <span class="customer-record-receivables__label">Total receivable amount:</span>
+          <span class="customer-record-receivables__label"
+            >Total receivable amount:</span
+          >
           <strong class="customer-record-receivables__value">
             {formatCurrency(processingReceivableTotal)}
           </strong>
@@ -317,12 +361,16 @@ const customerTabTableProps = {
       </div>
       <div class="customer-record-receivables__total">
         <div class="customer-record-receivables__summary-line">
-          <span class="customer-record-receivables__label">Total estimated invoice value:</span>
+          <span class="customer-record-receivables__label"
+            >Total estimated invoice value:</span
+          >
           <strong class="customer-record-receivables__value">
             {formatCurrency(estimatedInvoiceTotal)}
           </strong>
         </div>
-        <p class="customer-record-receivables__hint">Pending, processing, and closed orders</p>
+        <p class="customer-record-receivables__hint">
+          Pending, processing, and closed orders
+        </p>
       </div>
     </div>
 
@@ -347,30 +395,43 @@ const customerTabTableProps = {
       {
         receivableSegments.map((segment) => (
           <li>
-            <span
-              class="customer-record-receivables__dot"
-              style={`background-color: ${segment.color};`}
-            />
-            <span class="customer-record-receivables__legend-label">{segment.label}</span>
-            <span class="customer-record-receivables__legend-meta">
-              {segment.invoiceCount} invoice
-              {segment.invoiceCount === 1 ? "" : "s"}
-            </span>
-            <strong class="customer-record-receivables__legend-value">
-              {formatCurrency(segment.receivable)}
-            </strong>
+            <Tooltip
+              text={segment.tooltip}
+              placement="below"
+              class="customer-record-receivables__legend-tooltip"
+            >
+              <span
+                class="customer-record-receivables__dot"
+                style={`background-color: ${segment.color};`}
+              />
+              <span class="customer-record-receivables__legend-label">
+                {segment.label}
+              </span>
+              <span class="customer-record-receivables__legend-meta">
+                {segment.invoiceCount} invoice
+                {segment.invoiceCount === 1 ? "" : "s"}
+              </span>
+              <strong class="customer-record-receivables__legend-value">
+                {formatCurrency(segment.receivable)}
+              </strong>
+            </Tooltip>
           </li>
         ))
       }
     </ul>
 
-    <div class="agent-record-quick-stats" aria-label="Agent performance quick stats">
+    <div
+      class="agent-record-quick-stats"
+      aria-label="Agent performance quick stats"
+    >
       <article class="agent-record-quick-stats__card">
         <h3 class="agent-record-quick-stats__title">Kg sold</h3>
         <p class="agent-record-quick-stats__value">
-          {performanceQuickStats.kgSold.toLocaleString("en-PH", {
-            maximumFractionDigits: 1,
-          })}
+          {
+            performanceQuickStats.kgSold.toLocaleString("en-PH", {
+              maximumFractionDigits: 1,
+            })
+          }
           <span class="agent-record-quick-stats__unit">kg</span>
           <MetricTrend
             diff={kgSoldTrend.diff}
@@ -390,10 +451,12 @@ const customerTabTableProps = {
                 {performanceQuickStats.topCategory.label}
               </p>
               <p class="agent-record-quick-stats__hint">
-                {performanceQuickStats.topCategory.quantity.toLocaleString("en-PH", {
-                  maximumFractionDigits: 1,
-                })}
-                {" "}
+                {performanceQuickStats.topCategory.quantity.toLocaleString(
+                  "en-PH",
+                  {
+                    maximumFractionDigits: 1,
+                  },
+                )}{" "}
                 kg sold
               </p>
             </>
@@ -403,14 +466,22 @@ const customerTabTableProps = {
         }
       </article>
 
-      <div class="agent-record-quick-stats__row" data-agent-commission-preview-row>
-        <article class="agent-record-quick-stats__card" data-agent-remittance-card>
+      <div
+        class="agent-record-quick-stats__row"
+        data-agent-commission-preview-row
+      >
+        <article
+          class="agent-record-quick-stats__card"
+          data-agent-remittance-card
+        >
           <h3 class="agent-record-quick-stats__title">
             <span>Remittance performance</span>
             {
               performanceQuickStats.remittance.performanceLabel && (
                 <MetricTrend
-                  tooltip={performanceQuickStats.remittance.performanceTooltip ?? ""}
+                  tooltip={
+                    performanceQuickStats.remittance.performanceTooltip ?? ""
+                  }
                   placement="below"
                   class="agent-record-quick-stats__title-badge"
                 >
@@ -449,7 +520,9 @@ const customerTabTableProps = {
             </div>
             <div>
               <dt>Last 30 days</dt>
-              <dd>{performanceQuickStats.remittance.recentSubmissions30Days}</dd>
+              <dd>
+                {performanceQuickStats.remittance.recentSubmissions30Days}
+              </dd>
             </div>
             <div>
               <dt>Pending review</dt>
@@ -457,7 +530,13 @@ const customerTabTableProps = {
             </div>
             <div>
               <dt>Total remitted</dt>
-              <dd>{formatCompactCurrency(performanceQuickStats.remittance.totalRemitted)}</dd>
+              <dd>
+                {
+                  formatCompactCurrency(
+                    performanceQuickStats.remittance.totalRemitted,
+                  )
+                }
+              </dd>
             </div>
           </dl>
         </article>
@@ -466,15 +545,26 @@ const customerTabTableProps = {
           class="agent-record-quick-stats__card agent-record-quick-stats__card--paired"
           data-agent-commission-card
         >
-          <div class="agent-record-quick-stats__card-header" data-agent-commission-header>
+          <div
+            class="agent-record-quick-stats__card-header"
+            data-agent-commission-header
+          >
             <div>
-              <h3 class="agent-record-quick-stats__title">Commission tracking</h3>
+              <h3 class="agent-record-quick-stats__title">
+                Commission tracking
+              </h3>
               <p class="agent-record-quick-stats__hint">
                 Closed and fully paid orders only
               </p>
             </div>
-            <p class="agent-record-quick-stats__value agent-record-quick-stats__value--compact">
-              {formatCompactCurrency(performanceQuickStats.commissionEarnedTotal)}
+            <p
+              class="agent-record-quick-stats__value agent-record-quick-stats__value--compact"
+            >
+              {
+                formatCompactCurrency(
+                  performanceQuickStats.commissionEarnedTotal,
+                )
+              }
             </p>
           </div>
 
@@ -485,31 +575,37 @@ const customerTabTableProps = {
                   class="agent-record-quick-stats__commission-list"
                   data-agent-commission-preview-list
                 >
-                  {
-                    commissionPreviewEntries.map((entry) => (
-                      <li data-agent-commission-entry>
-                        <a href={entry.href} class="agent-record-quick-stats__commission-link">
-                          <span class="agent-record-quick-stats__commission-date">
-                            {formatDate(entry.earned_at)}
-                          </span>
-                          <span class="agent-record-quick-stats__commission-order">
-                            {entry.order_label}
-                          </span>
-                          <strong class="agent-record-quick-stats__commission-amount">
-                            {formatCurrency(entry.amount)}
-                          </strong>
-                        </a>
-                      </li>
-                    ))
-                  }
+                  {commissionPreviewEntries.map((entry) => (
+                    <li data-agent-commission-entry>
+                      <a
+                        href={entry.href}
+                        class="agent-record-quick-stats__commission-link"
+                      >
+                        <span class="agent-record-quick-stats__commission-date">
+                          {formatDate(entry.earned_at)}
+                        </span>
+                        <span class="agent-record-quick-stats__commission-order">
+                          {entry.order_label}
+                        </span>
+                        <strong class="agent-record-quick-stats__commission-amount">
+                          {formatCurrency(entry.amount)}
+                        </strong>
+                      </a>
+                    </li>
+                  ))}
                 </ul>
               ) : (
-                <p class="agent-record-quick-stats__empty">No earned commission yet</p>
+                <p class="agent-record-quick-stats__empty">
+                  No earned commission yet
+                </p>
               )
             }
           </div>
 
-          <div class="agent-record-quick-stats__commission-footer" data-agent-commission-footer>
+          <div
+            class="agent-record-quick-stats__commission-footer"
+            data-agent-commission-footer
+          >
             {
               hiddenCommissionCount > 0 && (
                 <p class="agent-record-quick-stats__truncation">
@@ -545,26 +641,26 @@ const customerTabTableProps = {
     {
       performanceQuickStats.commissionEntries.length > 0 ? (
         <ul class="agent-commission-modal-list">
-          {
-            performanceQuickStats.commissionEntries.map((entry) => (
-              <li class="agent-commission-modal-item">
-                <div class="agent-commission-modal-item__header">
-                  <span class="agent-commission-modal-item__date">
-                    {formatDate(entry.earned_at)}
-                  </span>
-                  <strong class="agent-commission-modal-item__amount">
-                    {formatCurrency(entry.amount)}
-                  </strong>
-                </div>
-                <p class="agent-commission-modal-item__order">{entry.order_label}</p>
-                <div class="agent-commission-modal-item__actions">
-                  <a class="agent-commission-modal-item__link" href={entry.href}>
-                    View order details
-                  </a>
-                </div>
-              </li>
-            ))
-          }
+          {performanceQuickStats.commissionEntries.map((entry) => (
+            <li class="agent-commission-modal-item">
+              <div class="agent-commission-modal-item__header">
+                <span class="agent-commission-modal-item__date">
+                  {formatDate(entry.earned_at)}
+                </span>
+                <strong class="agent-commission-modal-item__amount">
+                  {formatCurrency(entry.amount)}
+                </strong>
+              </div>
+              <p class="agent-commission-modal-item__order">
+                {entry.order_label}
+              </p>
+              <div class="agent-commission-modal-item__actions">
+                <a class="agent-commission-modal-item__link" href={entry.href}>
+                  View order details
+                </a>
+              </div>
+            </li>
+          ))}
         </ul>
       ) : (
         <p class="dashboard-modal__empty">No earned commission yet</p>
@@ -574,24 +670,60 @@ const customerTabTableProps = {
 
   <div class="customer-record-tabs">
     <nav class="customer-record-tabs__nav" aria-label="Agent record sections">
-      <a href={tabHref("orders")} class:list={["customer-record-tabs__link", activeTab === "orders" && "is-active"]}>
+      <a
+        href={tabHref("orders")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "orders" && "is-active",
+        ]}
+      >
         Orders
       </a>
-      <a href={tabHref("sales")} class:list={["customer-record-tabs__link", activeTab === "sales" && "is-active"]}>
+      <a
+        href={tabHref("sales")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "sales" && "is-active",
+        ]}
+      >
         Sales
       </a>
-      <a href={tabHref("invoices")} class:list={["customer-record-tabs__link", activeTab === "invoices" && "is-active"]}>
+      <a
+        href={tabHref("invoices")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "invoices" && "is-active",
+        ]}
+      >
         Invoices
       </a>
-      <a href={tabHref("payments")} class:list={["customer-record-tabs__link", activeTab === "payments" && "is-active"]}>
+      <a
+        href={tabHref("payments")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "payments" && "is-active",
+        ]}
+      >
         Payment records
       </a>
-      <a href={tabHref("customers")} class:list={["customer-record-tabs__link", activeTab === "customers" && "is-active"]}>
+      <a
+        href={tabHref("customers")}
+        class:list={[
+          "customer-record-tabs__link",
+          activeTab === "customers" && "is-active",
+        ]}
+      >
         Customers
       </a>
       {
         showPreviousOrdersTab && (
-          <a href={tabHref("previous-orders")} class:list={["customer-record-tabs__link", activeTab === "previous-orders" && "is-active"]}>
+          <a
+            href={tabHref("previous-orders")}
+            class:list={[
+              "customer-record-tabs__link",
+              activeTab === "previous-orders" && "is-active",
+            ]}
+          >
             Previous orders
           </a>
         )
@@ -618,16 +750,27 @@ const customerTabTableProps = {
     }
 
     {
-      (activeTab === "sales" || activeTab === "invoices" || activeTab === "payments") && (
-        <section class="customer-record-tab-panel" aria-label={`Agent ${activeTab}`}>
-          <AdminCustomerRecordTabTable tab={activeTab} {...customerTabTableProps} />
+      (activeTab === "sales" ||
+        activeTab === "invoices" ||
+        activeTab === "payments") && (
+        <section
+          class="customer-record-tab-panel"
+          aria-label={`Agent ${activeTab}`}
+        >
+          <AdminCustomerRecordTabTable
+            tab={activeTab}
+            {...customerTabTableProps}
+          />
         </section>
       )
     }
 
     {
       (activeTab === "customers" || activeTab === "previous-orders") && (
-        <section class="customer-record-tab-panel" aria-label={`Agent ${activeTab}`}>
+        <section
+          class="customer-record-tab-panel"
+          aria-label={`Agent ${activeTab}`}
+        >
           <AdminAgentRecordTabTable
             tab={activeTab}
             agentBasePath={agentBasePath}
@@ -644,6 +787,45 @@ const customerTabTableProps = {
       )
     }
   </div>
+
+  {
+    agent.promoted_from_customer_id && (
+      <>
+        <form
+          id="revoke-customer-promotion-form"
+          method="post"
+          hidden
+          data-astro-reload
+        >
+          <input
+            type="hidden"
+            name="action"
+            value="revoke-customer-agent-promotion"
+          />
+          <input
+            type="hidden"
+            name="customerId"
+            value={agent.promoted_from_customer_id}
+          />
+        </form>
+
+        <AlertDialog
+          id="revoke-customer-promotion-dialog"
+          title="Cancel agent promotion?"
+          description={`This will deactivate the linked agent account for ${promotedCustomerName} and restore the customer record. Active processing orders will be detached from the agent.`}
+          confirmLabel="Cancel promotion"
+          variant="danger"
+        />
+
+        <AlertDialog
+          id="revoke-customer-promotion-blocked-dialog"
+          title="Cannot cancel promotion"
+          description={`${promotedCustomerName} has linked distribution orders. Cancel promotion is only available before any distribution orders are created.`}
+          confirmLabel="OK"
+        />
+      </>
+    )
+  }
 </div>
 
 <script>
@@ -943,12 +1125,17 @@ const customerTabTableProps = {
   .customer-record-receivables__legend li {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
     font-size: 0.86rem;
     color: #374151;
   }
 
-  .customer-record-receivables__dot {
+  :global(.customer-record-receivables__legend-tooltip) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  :global(.customer-record-receivables__legend-tooltip .customer-record-receivables__dot) {
     width: 0.55rem;
     height: 0.55rem;
     border-radius: 9999px;

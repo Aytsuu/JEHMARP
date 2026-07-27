@@ -30,6 +30,7 @@ type Props = {
   assignedAgent: AdminAgent | null;
   linkedAgent: AdminAgent | undefined;
   isPromotedCustomer: boolean;
+  hasAgentDistributionOrders: boolean;
   activeTab: CustomerRecordTab;
   tabQueryBase: string;
   filterQuery: string;
@@ -65,6 +66,7 @@ const {
   assignedAgent,
   linkedAgent,
   isPromotedCustomer,
+  hasAgentDistributionOrders,
   activeTab,
   filterQuery,
   orderFilters,
@@ -121,10 +123,16 @@ function tabHref(tab: CustomerRecordTab) {
           <button
             type="button"
             class="customer-record-banner__action"
-            data-open-alert-dialog="revoke-customer-promotion-dialog"
-            data-alert-dialog-form="revoke-customer-promotion-form"
+            data-open-alert-dialog={
+              hasAgentDistributionOrders
+                ? "revoke-customer-promotion-blocked-dialog"
+                : "revoke-customer-promotion-dialog"
+            }
+            {...!hasAgentDistributionOrders && {
+              "data-alert-dialog-form": "revoke-customer-promotion-form",
+            }}
           >
-            Not an Agent
+            Cancel Promotion
           </button>
         </p>
       ) : (
@@ -654,10 +662,10 @@ function tabHref(tab: CustomerRecordTab) {
 
   {
     !isPromotedCustomer && (
-      <Sheet id="promote-customer-agent-sheet" width="32rem">
-        <div slot="header">
+      <Sheet id="promote-customer-agent-sheet" width="34rem">
+        <div slot="header" class="promote-agent-sheet__header-copy">
           <h3 class="drawer-sheet__title">Promote to agent</h3>
-          <p>
+          <p class="promote-agent-sheet__header-description">
             Create an agent login for {customerName}. Profile details come from
             this customer record.
           </p>
@@ -720,7 +728,7 @@ function tabHref(tab: CustomerRecordTab) {
             </label>
           </div>
         </form>
-        <div slot="footer">
+        <div slot="footer" class="promote-agent-sheet__footer">
           <button
             type="button"
             data-open-alert-dialog="promote-customer-confirm-dialog"
@@ -758,8 +766,15 @@ function tabHref(tab: CustomerRecordTab) {
     id="revoke-customer-promotion-dialog"
     title="Cancel agent promotion?"
     description={`This will deactivate the linked agent account for ${customerName} and restore the customer record. Active processing orders will be detached from the agent.`}
-    confirmLabel="Not an agent"
+    confirmLabel="Cancel promotion"
     variant="danger"
+  />
+
+  <AlertDialog
+    id="revoke-customer-promotion-blocked-dialog"
+    title="Cannot cancel promotion"
+    description={`${customerName} has linked distribution orders. Cancel promotion is only available before any distribution orders are created.`}
+    confirmLabel="OK"
   />
 </div>
 

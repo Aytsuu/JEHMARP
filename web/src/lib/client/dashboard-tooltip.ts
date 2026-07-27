@@ -141,6 +141,10 @@ function showTooltip(trigger: HTMLElement) {
 
   activeTrigger = trigger;
   content.textContent = text;
+  content.classList.toggle(
+    "dashboard-floating-tooltip__content--multiline",
+    text.includes("\n"),
+  );
   positionDashboardFloatingTooltip(trigger, layer, getDashboardTooltipPlacement(trigger));
   layer.hidden = false;
   layer.classList.add("is-visible");

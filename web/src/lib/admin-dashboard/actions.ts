@@ -2799,6 +2799,22 @@ async function executeRevokeCustomerAgentPromotion(customerId: string) {
     throw new Error("This customer is not linked to a promoted agent record.");
   }
 
+  const { count: distributionOrderCount, error: distributionOrdersError } = await adminClient
+    .from("order")
+    .select("id", { count: "exact", head: true })
+    .eq("order_kind", "distribution")
+    .eq("agent_id", agentId);
+
+  if (distributionOrdersError) {
+    throw new Error("Unable to check linked agent distribution orders.");
+  }
+
+  if ((distributionOrderCount ?? 0) > 0) {
+    throw new Error(
+      "Cannot cancel agent promotion while the agent has linked distribution orders.",
+    );
+  }
+
   const { error: detachOrdersError } = await adminClient
     .from("order")
     .update({

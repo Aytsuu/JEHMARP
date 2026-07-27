@@ -911,6 +911,21 @@ export async function loadAdminCustomerRecord(customerId: string): Promise<Admin
     : null;
 }
 
+export async function agentHasDistributionOrders(agentId: string) {
+  const supabase = createSupabaseAdminClient();
+  const { count, error } = await supabase
+    .from("order")
+    .select("id", { count: "exact", head: true })
+    .eq("order_kind", "distribution")
+    .eq("agent_id", agentId);
+
+  if (error) {
+    throwLoadError("Unable to check agent distribution orders.", error);
+  }
+
+  return (count ?? 0) > 0;
+}
+
 export async function loadAdminAgentManagementData(
   agentFilters: AdminAgentFilters = {},
   pagination: AdminPaginationParams = defaultAdminPagination,

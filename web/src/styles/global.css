@@ -3075,6 +3075,11 @@
     white-space: normal;
   }
 
+  .dashboard-floating-tooltip__content--multiline {
+    white-space: pre-line;
+    max-width: min(22rem, calc(100vw - 1rem));
+  }
+
   .dashboard-floating-tooltip__arrow {
     position: absolute;
     width: 0.5rem;
@@ -3860,8 +3865,15 @@
 
   .dashboard-interactive-table.customer-record-table .dashboard-table-board tbody tr.empty-row {
     display: table-row;
-    width: auto;
-    min-width: 0;
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .dashboard-interactive-table.customer-record-table .dashboard-table-board tbody tr.empty-row td.empty-state {
+    display: table-cell;
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: none !important;
   }
 
   .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__footer {
@@ -8655,6 +8667,38 @@
 
   .agent-create-sheet__footer {
     display: flex;
+  }
+
+  #promote-customer-agent-sheet .promote-agent-form {
+    border: 0;
+    background: transparent;
+    padding: 0;
+  }
+
+  #promote-customer-agent-sheet .promote-agent-form__grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  #promote-customer-agent-sheet .promote-agent-sheet__header-copy {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  #promote-customer-agent-sheet .promote-agent-sheet__header-description {
+    margin: 0;
+    color: rgba(75, 85, 99, 0.82);
+    font-size: 0.92rem;
+    line-height: 1.5;
+  }
+
+  #promote-customer-agent-sheet .promote-agent-sheet__footer {
+    display: flex;
+    justify-content: flex-end;
+    width: 100%;
+  }
+
+  #promote-customer-agent-sheet .promote-agent-sheet__footer button {
+    width: auto;
   }
 
   .product-image-field {

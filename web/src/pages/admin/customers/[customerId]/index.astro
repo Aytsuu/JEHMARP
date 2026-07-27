@@ -23,6 +23,7 @@ import {
   parseCustomerRecordTab,
 } from "@/lib/admin-dashboard/customer-record";
 import {
+  agentHasDistributionOrders,
   loadAdminCustomerRecord,
   loadAdminDashboardData,
 } from "@/lib/admin-dashboard/data";
@@ -86,6 +87,10 @@ const isPromotedCustomer = Boolean(
   customer.promoted_to_agent_id ||
   linkedAgent?.promoted_from_customer_id === customer.id,
 );
+const promotedAgentId = customer.promoted_to_agent_id ?? linkedAgent?.id ?? null;
+const hasAgentDistributionOrders = promotedAgentId
+  ? await agentHasDistributionOrders(promotedAgentId)
+  : false;
 const feedback = formatAdminActionFeedback(Astro.url);
 const customerName = fullName(customer);
 const customerReturnTo = encodeURIComponent(`/admin/customers/${customer.id}`);
@@ -178,6 +183,7 @@ const tabQueryBase = filterQuery
     assignedAgent={assignedAgent}
     linkedAgent={linkedAgent}
     isPromotedCustomer={isPromotedCustomer}
+    hasAgentDistributionOrders={hasAgentDistributionOrders}
     activeTab={activeTab}
     tabQueryBase={tabQueryBase}
     filterQuery={filterQuery}
