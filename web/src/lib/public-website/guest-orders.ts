@@ -3,6 +3,11 @@ import { createHash } from "node:crypto";
 
 import { getServerEnv } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import {
+  resolveOperationalNotificationRecipients,
+  sendOperationalNotificationEmail,
+} from "@/lib/platform-settings/operational-notification-email";
 import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
 import {
   loadGuestOrderTrackingNumber,
@@ -133,11 +138,9 @@ export async function submitGuestOrder(
     const orderId = data;
     const trackingNumber = await loadGuestOrderTrackingNumber(orderId, supabase);
     const trackingEmailStatus = await deliverGuestOrderTrackingEmail(
-      payload,
-      trackingNumber,
-      options.siteOrigin,
-      fetcher,
+      payload, trackingNumber, options.siteOrigin, fetcher,
     );
+    await notifyAdminsOfGuestOrder({ supabase, orderId, payload, fetch: fetcher });
 
     return {
       orderId,
@@ -181,6 +184,27 @@ async function deliverGuestOrderTrackingEmail(
   }
 
   return emailResult.status;
+}
+
+async function notifyAdminsOfGuestOrder(options: {
+  supabase: ReturnType<typeof createSupabaseAdminClient>;
+  orderId: string;
+  payload: GuestOrderPayload;
+  fetch: typeof fetch;
+}) {
+  const settings = await loadPlatformSettings(options.supabase);
+  const recipients = resolveOperationalNotificationRecipients("new_order", settings);
+  if (recipients.length === 0) return;
+  const customerName = `${options.payload.customer.firstName} ${options.payload.customer.lastName}`.trim();
+  const result = await sendOperationalNotificationEmail({
+    event: "new_order",
+    recipients,
+    subject: `New guest order ${options.orderId.slice(0, 8)}`,
+    text: `A new guest order was submitted by ${customerName}. Order ID: ${options.orderId}.`,
+    html: `<p>A new guest order was submitted by <strong>${customerName}</strong>.</p><p>Order ID: ${options.orderId}</p>`,
+    fetch: options.fetch,
+  });
+  if (result === "failed") console.error("Unable to deliver new-order admin notification.");
 }
 
 async function enforceGuestOrderRateLimit(

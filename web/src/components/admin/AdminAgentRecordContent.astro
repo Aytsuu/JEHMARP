@@ -1,9 +1,10 @@
 ---
 import AdminAgentRecordTabTable from "@/components/admin/AdminAgentRecordTabTable.astro";
 import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordTabTable.astro";
-import DashboardMetricTrend from "@/components/dashboard/DashboardMetricTrend.astro";
+import MetricTrend from "@/components/ui/MetricTrend.astro";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Popover from "@/components/ui/Popover.astro";
 import type { AdminAgent, AdminCustomer } from "@/lib/admin-dashboard/data";
 import {
   agentAccountLabel,
@@ -226,31 +227,33 @@ const customerTabTableProps = {
           type="button"
           class="customer-record-card__edit-trigger table-cell-trigger"
           data-open-cell-popover
-          data-popover-title={`Edit status: ${agent.display_name}`}
           aria-label={`Edit status for ${agent.display_name}`}
         >
           <span class="sr-only">Edit status</span>
         </button>
-        <div class="hidden-popover-form-holder">
-          <form method="post" class="admin-table-form" data-astro-reload>
-            <input type="hidden" name="action" value="update-agent" />
-            <input type="hidden" name="agentId" value={agent.id} />
-            <input type="hidden" name="employeeId" value={agent.employee_id ?? ""} />
-            <input type="hidden" name="firstName" value={agent.first_name} />
-            <input type="hidden" name="lastName" value={agent.last_name} />
-            <input type="hidden" name="contact" value={agent.contact ?? ""} />
-            <input type="hidden" name="email" value={agent.email ?? ""} />
-            <label>
-              <span>Status</span>
-              <select name="status">
-                <option value="active" selected={selected(agent.status, "active")}>Active</option>
-                <option value="inactive" selected={selected(agent.status, "inactive")}>Inactive</option>
-                <option value="suspended" selected={selected(agent.status, "suspended")}>Suspended</option>
-              </select>
-            </label>
-            <button type="submit">Save changes</button>
-          </form>
-        </div>
+        <Popover
+          title={`Edit status: ${agent.display_name}`}
+          formDataAttributes={{ "data-astro-reload": "" }}
+        >
+          <input type="hidden" name="action" value="update-agent" />
+          <input type="hidden" name="agentId" value={agent.id} />
+          <input type="hidden" name="employeeId" value={agent.employee_id ?? ""} />
+          <input type="hidden" name="firstName" value={agent.first_name} />
+          <input type="hidden" name="lastName" value={agent.last_name} />
+          <input type="hidden" name="contact" value={agent.contact ?? ""} />
+          <input type="hidden" name="email" value={agent.email ?? ""} />
+          <label>
+            <span>Status</span>
+            <select name="status">
+              <option value="active" selected={selected(agent.status, "active")}>Active</option>
+              <option value="inactive" selected={selected(agent.status, "inactive")}>Inactive</option>
+              <option value="suspended" selected={selected(agent.status, "suspended")}>Suspended</option>
+            </select>
+          </label>
+          <button slot="footer" type="submit" class="ui-popover__button-primary">
+            Save changes
+          </button>
+        </Popover>
       </div>
       <dl class="customer-record-card__list customer-record-card__list--status customer-record-card__list--sentence-case">
         <div class="customer-record-card__field">
@@ -369,7 +372,7 @@ const customerTabTableProps = {
             maximumFractionDigits: 1,
           })}
           <span class="agent-record-quick-stats__unit">kg</span>
-          <DashboardMetricTrend
+          <MetricTrend
             diff={kgSoldTrend.diff}
             formattedDiff={formatKgSoldTrendDiff(kgSoldTrend.diff)}
             tooltip={kgSoldTrend.tooltip}
@@ -406,14 +409,13 @@ const customerTabTableProps = {
             <span>Remittance performance</span>
             {
               performanceQuickStats.remittance.performanceLabel && (
-                <span
-                  class="agent-record-quick-stats__title-badge agent-record-quick-stats__tooltip-trigger agent-record-quick-stats__tooltip-trigger--below"
-                  tabindex="0"
-                  data-tooltip={performanceQuickStats.remittance.performanceTooltip}
-                  aria-label={performanceQuickStats.remittance.performanceTooltip}
+                <MetricTrend
+                  tooltip={performanceQuickStats.remittance.performanceTooltip ?? ""}
+                  placement="below"
+                  class="agent-record-quick-stats__title-badge"
                 >
                   ({performanceQuickStats.remittance.performanceLabel})
-                </span>
+                </MetricTrend>
               )
             }
           </h3>

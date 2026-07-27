@@ -167,6 +167,16 @@ describe("submitResellerApplication", () => {
         return { select: productSelect };
       }
 
+      if (table === "platform_settings") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+            })),
+          })),
+        };
+      }
+
       throw new Error(`Unexpected table ${table}`);
     });
 
@@ -214,11 +224,10 @@ describe("getResellerApplicationFeedback", () => {
   it("parses submitted and error feedback from the business page URL", () => {
     expect(
       getResellerApplicationFeedback(
-        new URL("https://example.test/business?application=submitted&reference=abc"),
+        new URL("https://example.test/business?application=submitted"),
       ),
     ).toEqual({
       status: "submitted",
-      reference: "abc",
     });
 
     expect(

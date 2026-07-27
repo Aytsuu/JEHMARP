@@ -131,11 +131,10 @@ describe("getContactInquiryFeedback", () => {
   it("parses submitted and error feedback from the contact page URL", () => {
     expect(
       getContactInquiryFeedback(
-        new URL("https://example.test/contact?inquiry=submitted&reference=abc"),
+        new URL("https://example.test/contact?inquiry=submitted"),
       ),
     ).toEqual({
       status: "submitted",
-      reference: "abc",
     });
 
     expect(

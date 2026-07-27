@@ -1,4 +1,7 @@
 ---
+import Tooltip from "@/components/ui/Tooltip.astro";
+import { formatResellerEmailDeliveryErrorMessage } from "../../../../supabase/functions/reseller-application/workflow";
+
 type Props = {
   status: "pending" | "sent" | "failed";
   error?: string | null;
@@ -6,22 +9,20 @@ type Props = {
 
 const { status, error } = Astro.props;
 
-const failedMessage = error?.trim() || "Email delivery failed.";
-const ariaLabel =
+const tooltipText =
   status === "sent"
     ? "Price list email sent"
     : status === "failed"
-      ? `Price list email failed: ${failedMessage}`
+      ? formatResellerEmailDeliveryErrorMessage(error)
       : "Price list email pending";
 ---
 
-<span
+<Tooltip
+  text={tooltipText}
   class:list={[
     "dashboard-table__delivery-status",
     `dashboard-table__delivery-status--${status}`,
   ]}
-  title={status === "failed" ? failedMessage : undefined}
-  aria-label={ariaLabel}
 >
   {
     status === "sent" && (
@@ -50,5 +51,4 @@ const ariaLabel =
       </svg>
     )
   }
-  {status === "failed" && <span class="sr-only">{failedMessage}</span>}
-</span>
+</Tooltip>

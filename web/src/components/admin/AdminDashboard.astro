@@ -1,10 +1,10 @@
 ---
 import AdminCharts from "@/components/admin/AdminCharts";
-import DashboardMetricTrend from "@/components/dashboard/DashboardMetricTrend.astro";
+import MetricTrend from "@/components/ui/MetricTrend.astro";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
 import { formatSignedMetricTrendDiff } from "@/lib/dashboard/metric-trend";
-import { formatCurrency } from "@/lib/admin-dashboard/view";
+import { formatCurrency, formatWholeCurrency } from "@/lib/admin-dashboard/view";
 
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 
@@ -18,7 +18,7 @@ const pendingCustomerBalances = analytics.pendingCustomerBalances;
 const receivableTrend = analytics.summary.pendingOrderPaymentsTrend;
 const receivableTrendDiffLabel = formatSignedMetricTrendDiff(
   receivableTrend.difference,
-  formatCurrency,
+  formatWholeCurrency,
 );
 const numberFormatter = new Intl.NumberFormat("en-PH");
 ---
@@ -26,14 +26,14 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
 <section class="admin-summary-grid" aria-label="Dashboard summary">
   <article class="admin-summary-card admin-summary-card--brand">
     <h2>Net Income</h2>
-    <p>{formatCurrency(analytics.summary.netIncome)}</p>
+    <p>{formatWholeCurrency(analytics.summary.netIncome)}</p>
     <a href="/admin/sales">Review sales</a>
   </article>
   <article class="admin-summary-card" data-summary-card="pendingOrderPayments">
     <h2>Receivable</h2>
     <p class="admin-summary-card__value-with-trend">
-      {formatCurrency(analytics.summary.pendingOrderPayments)}
-      <DashboardMetricTrend
+      {formatWholeCurrency(analytics.summary.pendingOrderPayments)}
+      <MetricTrend
         diff={receivableTrend.difference}
         formattedDiff={receivableTrendDiffLabel}
         tooltip={receivableTrend.tooltip}

@@ -1,5 +1,8 @@
 import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
 import { fullName, orderTotal } from "@/lib/order-documents/view";
+import { getBrandLines as getSettingsBrandLines } from "@/lib/platform-settings/branding";
+import { formatDocumentPaymentLines, formatOrderSlipPaymentLines } from "@/lib/platform-settings/document-payment";
+import type { DocumentLayoutOptions } from "@/lib/platform-settings/types";
 
 const orderSlipColumnWidths = [145, 60, 75, 75, 160] as const;
 const salesInvoiceColumnWidths = [235, 80, 100, 100] as const;
@@ -51,12 +54,13 @@ export type SalesInvoiceLayout = {
   issuerSubline: string;
 };
 
-export function buildOrderSlipLayout(order: DocumentOrder): OrderSlipLayout {
+export function buildOrderSlipLayout(order: DocumentOrder, options: DocumentLayoutOptions = {}): OrderSlipLayout {
+  const sellerName = getSellerName(order, options);
   return {
-    brandLines: getBrandLines(),
+    brandLines: getBrandLines(options.businessProfile),
     title: "ORDER SLIP",
     dateLabel: `Date: ${formatDocumentDate(order.created_at)}`,
-    sellerLabel: `Seller: ${getSellerName(order)}`,
+    sellerLabel: `Seller: ${sellerName}`,
     orderedByLabel: `Ordered by: ${fullName(order.customer)}`,
     columns: [
       { label: "Product", width: orderSlipColumnWidths[0] },
@@ -81,10 +85,7 @@ export function buildOrderSlipLayout(order: DocumentOrder): OrderSlipLayout {
       "Preferred Delivery Date and Time: ___________________",
     ],
     paymentHeading: "Payment Terms (For Order Confirmation)",
-    paymentLines: [
-      "( ) Cash on Delivery (COD)  ( ) Bank Transfer   ( ) Gcash",
-      "Payment Due: ( ) Upon Delivery  ( ) Within___days",
-    ],
+    paymentLines: formatOrderSlipPaymentLines(options.documentPayment),
     confirmationText:
       "I hereby confirm the above order and agree to the pricing, delivery arrangement, and payment terms stated herein.",
     buyerSignatureLines: [
@@ -95,19 +96,20 @@ export function buildOrderSlipLayout(order: DocumentOrder): OrderSlipLayout {
     ],
     sellerSignatureHeading: "Accepted by (Seller)",
     sellerSignatureLines: [
-      `Name: ${getSellerName(order)}`,
+      `Name: ${sellerName}`,
       "Signature: ___________________",
       "Date: ________________________",
     ],
   };
 }
 
-export function buildSalesInvoiceLayout(order: DocumentOrder): SalesInvoiceLayout {
+export function buildSalesInvoiceLayout(order: DocumentOrder, options: DocumentLayoutOptions = {}): SalesInvoiceLayout {
   const invoice = order.invoice[0];
   const payment = order.payment?.[0] ?? null;
-
+  const issuerName = getIssuerName(order, options);
+  const paymentDetailLines = formatDocumentPaymentLines(options.documentPayment);
   return {
-    brandLines: getBrandLines(),
+    brandLines: getBrandLines(options.businessProfile),
     title: "SALES INVOICE",
     dateLabel: `Date: ${formatDocumentDate(invoice?.issued_at ?? invoice?.created_at ?? order.created_at)}`,
     invoiceNumberLabel: `Invoice No: ${invoice?.invoice_number ?? ""}`,
@@ -133,9 +135,10 @@ export function buildSalesInvoiceLayout(order: DocumentOrder): SalesInvoiceLayou
       "Mode of Payment (/)",
       `${paymentCheckbox(payment?.payment_method === "Cash")} Cash   ${paymentCheckbox(payment?.payment_method === "Check")} Check`,
       `${paymentCheckbox(payment?.payment_terms === "Cash on Delivery (COD)")} Cash on Delivery (COD)  ${paymentCheckbox(payment?.payment_terms === "Bank Transfer")} Bank Transfer   ${paymentCheckbox(payment?.payment_terms === "Gcash")} Gcash`,
+      ...paymentDetailLines,
     ],
     issuerHeading: "Issued by:",
-    issuerName: defaultSellerName,
+    issuerName,
     issuerSubline: "Owner / Authorized Representative",
   };
 }
@@ -146,22 +149,26 @@ function paymentCheckbox(checked: boolean) {
 
 export function getDocumentColumnTemplate(columns: DocumentTableColumn[]) {
   const totalWidth = columns.reduce((sum, column) => sum + column.width, 0);
-
   return columns
     .map((column) => `minmax(0, ${((column.width / totalWidth) * 100).toFixed(4)}fr)`)
     .join(" ");
 }
 
-export function getBrandLines() {
-  return [
-    "Meat and Poultry Products",
-    "Brgy. Tolo-Tolo Consolacion, Cebu",
-    "Cell #: 0917 777 0118 | 0932 215 9289",
-  ];
+export function getBrandLines(profile?: DocumentLayoutOptions["businessProfile"]) {
+  return getSettingsBrandLines(profile);
 }
 
-export function getSellerName(order: DocumentOrder) {
-  return order.agent?.display_name ?? defaultSellerName;
+export function getSellerName(order: DocumentOrder, options: DocumentLayoutOptions = {}) {
+  return order.agent?.display_name
+    ?? options.businessProfile?.legalName?.trim()
+    ?? options.businessProfile?.tradeName?.trim()
+    ?? defaultSellerName;
+}
+
+function getIssuerName(order: DocumentOrder, options: DocumentLayoutOptions = {}) {
+  return options.businessProfile?.legalName?.trim()
+    || options.businessProfile?.tradeName?.trim()
+    || getSellerName(order, options);
 }
 
 export function formatDocumentDate(value: string | null) {
@@ -179,3 +186,5 @@ export function formatQuantity(value: number) {
 export function documentRowKey(item: DocumentOrderItem, index: number) {
   return `${item.product?.name ?? "item"}-${index}`;
 }
+
+export type { DocumentLayoutOptions };

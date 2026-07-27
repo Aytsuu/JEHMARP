@@ -10,6 +10,10 @@ vi.mock("./data", () => ({
   loadAdminAgentOrder,
 }));
 
+vi.mock("@/lib/platform-settings/document-layout", () => ({
+  loadDocumentLayoutOptions: vi.fn(async () => ({})),
+}));
+
 describe("bulk-order-documents", () => {
   beforeEach(() => {
     loadAdminOrder.mockReset();

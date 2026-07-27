@@ -4,6 +4,9 @@ import {
   toAdminContentPreviewHref,
   toPublicPathFromAdminPreview,
 } from "@/lib/public-website/admin-content-preview";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
   activePath?: string;
@@ -36,6 +39,10 @@ const navItems = [
     variant: item.href === "/login" ? ("button" as const) : ("link" as const),
   })),
 ];
+
+const platformSettings = await loadPlatformSettings(createSupabaseAdminClient());
+const brandText = platformSettings.businessProfile.tradeName || "JEHMARP";
+const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPath);
 ---
 
 <header class="site-nav">
@@ -47,8 +54,12 @@ const navItems = [
   </div>
   <nav class="site-nav__inner" aria-label="Primary navigation">
     <a class="site-nav__brand" href={linkHref("/")}>
-      <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
-      <span class="site-nav__brand-text">JEHMARP</span>
+      {logoUrl ? (
+        <img src={logoUrl} alt="" class="site-nav__brand-logo" />
+      ) : (
+        <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
+      )}
+      <span class="site-nav__brand-text">{brandText}</span>
     </a>
     <button
       type="button"

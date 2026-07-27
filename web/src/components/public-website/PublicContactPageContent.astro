@@ -1,9 +1,13 @@
 ---
+import AdminContentEditable from "@/components/admin/AdminContentEditable.astro";
+import FormSubmissionFeedback from "@/components/ui/FormSubmissionFeedback.astro";
+import { CONTACT_INQUIRY_FEEDBACK_PARAMS } from "@/lib/client/form-submission-feedback-url";
 import {
-  getSectionEntries,
+  getSectionFieldEntries,
   getSectionHeading,
   type PublicPageContent,
 } from "@/lib/public-website/content";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
 import type { ContactInquiryFeedback } from "@/lib/public-website/contact-inquiries";
 
 type Props = {
@@ -11,14 +15,16 @@ type Props = {
   feedback: ContactInquiryFeedback | null;
   turnstileSiteKey: string | null;
   returnPath?: string;
+  contentEditing?: AdminContentEditingContext;
 };
 
-const { content, feedback, turnstileSiteKey, returnPath } = Astro.props;
+const { content, feedback, turnstileSiteKey, returnPath, contentEditing } = Astro.props;
 
 const detailsSection = content.sections.find((s) => s.type === "contact_details");
 const orderingSection = content.sections.find((s) => s.type === "ordering_note");
 
-const detailsEntries = detailsSection ? getSectionEntries(detailsSection) : [];
+const detailsEntries = detailsSection ? getSectionFieldEntries(detailsSection) : [];
+const detailsHeading = detailsSection ? getSectionHeading(detailsSection) : "";
 const orderingSummaryText =
   orderingSection?.content &&
   typeof orderingSection.content === "object" &&
@@ -49,25 +55,6 @@ function getIconTypeFromLabel(label: string) {
 }
 ---
 
-{
-  feedback?.status === "submitted" && (
-    <section class="message-block" aria-labelledby="contact-confirmation">
-      <h2 id="contact-confirmation">Inquiry submitted</h2>
-      <p>Your message was sent to the JEHMARP team.</p>
-      {feedback.reference && <p>Reference: {feedback.reference}</p>}
-    </section>
-  )
-}
-
-{
-  feedback?.status === "error" && (
-    <section class="message-block" aria-labelledby="contact-error">
-      <h2 id="contact-error">Inquiry was not submitted</h2>
-      <p>{feedback.message}</p>
-    </section>
-  )
-}
-
 <div class="business-layout">
   <div class="business-form">
     <section
@@ -82,6 +69,26 @@ function getIconTypeFromLabel(label: string) {
       >
         Inquiry Form
       </h3>
+      {
+        feedback?.status === "submitted" && (
+          <FormSubmissionFeedback
+            variant="success"
+            title="Inquiry submitted"
+            message="Your message was sent to the JEHMARP team. We will follow up using the contact details you provided."
+            clearParams={CONTACT_INQUIRY_FEEDBACK_PARAMS}
+          />
+        )
+      }
+      {
+        feedback?.status === "error" && (
+          <FormSubmissionFeedback
+            variant="error"
+            title="Inquiry was not submitted"
+            message={feedback.message}
+            clearParams={CONTACT_INQUIRY_FEEDBACK_PARAMS}
+          />
+        )
+      }
       <form class="form-grid" method="post" action="/api/contact-inquiries">
         {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
         <fieldset class="fieldset-block">
@@ -152,13 +159,21 @@ function getIconTypeFromLabel(label: string) {
           class="contact-details-section"
           aria-labelledby="contact-details-heading"
         >
-          <h3 id="contact-details-heading" class="business-subtitle">
-            {getSectionHeading(detailsSection)}
-          </h3>
+          <AdminContentEditable
+            contentEditing={contentEditing}
+            section={detailsSection}
+            fieldKey="heading"
+            fieldLabel="Contact details heading"
+            value={detailsHeading}
+          >
+            <h3 id="contact-details-heading" class="business-subtitle">
+              {detailsHeading}
+            </h3>
+          </AdminContentEditable>
 
           <div class="contact-details-list">
-            {detailsEntries.map(([label, value]) => {
-              const iconType = getIconTypeFromLabel(label);
+            {detailsEntries.map((entry) => {
+              const iconType = getIconTypeFromLabel(entry.label);
               return (
                 <div class="contact-details-item">
                   <span class="contact-details-icon" aria-hidden="true">
@@ -241,7 +256,16 @@ function getIconTypeFromLabel(label: string) {
                       </svg>
                     )}
                   </span>
-                  <span class="contact-details-value">{value}</span>
+                  <AdminContentEditable
+                    contentEditing={contentEditing}
+                    section={detailsSection}
+                    fieldKey={entry.key}
+                    fieldLabel={entry.label}
+                    value={entry.value}
+                    class="admin-content-editable--inline"
+                  >
+                    <span class="contact-details-value">{entry.value}</span>
+                  </AdminContentEditable>
                 </div>
               );
             })}
@@ -251,9 +275,18 @@ function getIconTypeFromLabel(label: string) {
     }
 
     {
-      orderingSummaryText && (
+      orderingSection && orderingSummaryText && (
         <div class="contact-ordering-summary">
-          <p class="business-text">{orderingSummaryText}</p>
+          <AdminContentEditable
+            contentEditing={contentEditing}
+            section={orderingSection}
+            fieldKey="summary"
+            fieldLabel="Ordering note summary"
+            value={orderingSummaryText}
+            multiline
+          >
+            <p class="business-text">{orderingSummaryText}</p>
+          </AdminContentEditable>
         </div>
       )
     }

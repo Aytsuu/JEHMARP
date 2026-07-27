@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getServerEnv } from "@/lib/env";
+import { assertEdgeFunctionSuccess } from "@/lib/public-website/edge-function-response";
 import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
 
 const optionalContactEmail = z.preprocess(
@@ -53,7 +54,6 @@ export type ContactInquirySubmitOptions = {
 export type ContactInquiryFeedback =
   | {
       status: "submitted";
-      reference: string | null;
     }
   | {
       status: "error";
@@ -116,13 +116,12 @@ export async function submitContactInquiry(
     headers,
     body: JSON.stringify(payload),
   });
-  const body = await readJsonResponse(response);
+  const body = await assertEdgeFunctionSuccess(
+    response,
+    "Unable to submit contact inquiry.",
+  );
 
-  if (!response.ok || typeof body.id !== "string") {
-    throw new Error(typeof body.error === "string" ? body.error : "Unable to submit contact inquiry.");
-  }
-
-  return body.id;
+  return body.id as string;
 }
 
 export function getContactInquiryFeedback(url: URL): ContactInquiryFeedback {
@@ -131,7 +130,6 @@ export function getContactInquiryFeedback(url: URL): ContactInquiryFeedback {
   if (status === "submitted") {
     return {
       status,
-      reference: url.searchParams.get("reference"),
     };
   }
 
@@ -143,10 +141,4 @@ export function getContactInquiryFeedback(url: URL): ContactInquiryFeedback {
   }
 
   return null;
-}
-
-async function readJsonResponse(response: Response): Promise<Record<string, unknown>> {
-  const data = await response.json().catch(() => ({}));
-
-  return typeof data === "object" && data !== null ? data as Record<string, unknown> : {};
 }

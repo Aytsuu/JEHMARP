@@ -1,6 +1,6 @@
 import type { APIContext } from "astro";
 
-import { handleAdminDashboardAction } from "./actions";
+import { handleAdminDashboardAction, adminRequestPrefersJson } from "./actions";
 import {
   getDashboardRoleForSignedInUser,
   getSignedInUser,
@@ -31,6 +31,13 @@ export async function requireAdminRoute(
   const user = await getSignedInUser(context);
 
   if (!user) {
+    if (adminRequestPrefersJson(context.request)) {
+      return {
+        ready: false,
+        response: Response.json({ success: false, error: "Sign in required." }, { status: 401 }),
+      };
+    }
+
     return {
       ready: false,
       response: context.redirect("/login", 302),
@@ -40,6 +47,13 @@ export async function requireAdminRoute(
   const role = await getDashboardRoleForSignedInUser(context, user.id);
 
   if (role !== "admin") {
+    if (adminRequestPrefersJson(context.request)) {
+      return {
+        ready: false,
+        response: Response.json({ success: false, error: "Admin access required." }, { status: 403 }),
+      };
+    }
+
     return {
       ready: false,
       response: context.redirect("/agent", 302),
@@ -102,5 +116,9 @@ export async function requireAdminRoute(
 }
 
 function redirectWithActionError(context: AdminRouteContext, message: string): Response {
+  if (adminRequestPrefersJson(context.request)) {
+    return Response.json({ success: false, error: message }, { status: 400 });
+  }
+
   return context.redirect(`${context.url.pathname}?error=${encodeURIComponent(message)}`, 303);
 }

@@ -1,0 +1,32 @@
+---
+import { NOTIFICATION_EVENT_LABELS } from "@/lib/platform-settings/notifications";
+import type { PlatformSettings } from "@/lib/platform-settings";
+type Props = { settings: PlatformSettings };
+const { settings } = Astro.props;
+---
+
+<section class="admin-card admin-settings-card">
+  <header class="admin-card__header">
+    <h3>Notifications</h3>
+    <p>Route operational events to the right inbox. Empty fields fall back to legacy environment variables where available.</p>
+  </header>
+  <form method="post" class="admin-form admin-settings-form" data-astro-reload>
+    <input type="hidden" name="action" value="save-platform-settings-notifications" />
+    <div class="admin-settings-notifications-grid">
+      {settings.notifications.routes.map((route) => (
+        <fieldset class="admin-settings-notification-route">
+          <legend>{NOTIFICATION_EVENT_LABELS[route.event]}</legend>
+          <label class="field-row"><span>Primary email</span><input type="email" name={`${route.event}PrimaryEmail`} value={route.primaryEmail} /></label>
+          <label class="field-row"><span>Secondary email</span><input type="email" name={`${route.event}SecondaryEmail`} value={route.secondaryEmail} /></label>
+        </fieldset>
+      ))}
+    </div>
+    <div class="admin-settings-form__actions"><button type="submit">Save notification routing</button></div>
+  </form>
+</section>
+
+<style>
+  .admin-settings-notifications-grid { display: grid; gap: 1rem; }
+  .admin-settings-notification-route { margin: 0; padding: 1rem; border: 1px solid #e5e7eb; border-radius: 0.75rem; display: grid; gap: 0.75rem; }
+  .admin-settings-form__actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+</style>

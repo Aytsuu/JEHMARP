@@ -2,18 +2,10 @@
 import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
 import PublicShopPageContent from "@/components/public-website/PublicShopPageContent.astro";
-import {
-  listOrderablePublicProducts,
-  listPublicProducts,
-  parseShopFilters,
-} from "@/lib/public-website/shop";
+import { listOrderablePublicProducts } from "@/lib/public-website/shop";
 import { getPublicEnv } from "@/lib/env";
 
-const filters = parseShopFilters(Astro.url);
-const [{ products, pagination }, orderableProducts] = await Promise.all([
-  listPublicProducts(Astro, filters),
-  listOrderablePublicProducts(),
-]);
+const products = await listOrderablePublicProducts();
 const orderStatus = Astro.url.searchParams.get("order");
 const orderEmailSent = Astro.url.searchParams.get("email") === "1";
 const orderMessage = Astro.url.searchParams.get("message");
@@ -26,10 +18,7 @@ const { turnstileSiteKey } = getPublicEnv();
 >
   <PageShell title="Shop">
     <PublicShopPageContent
-      filters={filters}
       products={products}
-      orderableProducts={orderableProducts}
-      pagination={pagination}
       orderStatus={orderStatus}
       orderEmailSent={orderEmailSent}
       orderMessage={orderMessage}

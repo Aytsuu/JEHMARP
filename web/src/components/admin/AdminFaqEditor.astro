@@ -1,0 +1,140 @@
+---
+import Popover from "@/components/ui/Popover.astro";
+import { jsonTextareaValue } from "@/lib/admin-dashboard/view";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
+import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+import type { FaqItem } from "@/lib/public-website/home-faq";
+
+type Props = {
+  contentEditing: AdminContentEditingContext;
+  section: PublicPageSectionRecord;
+  heading: string;
+  description: string;
+  items: FaqItem[];
+};
+
+const { contentEditing, section, heading, description, items } = Astro.props;
+
+const currentContent = {
+  heading,
+  description,
+  items,
+};
+---
+
+<div class="admin-content-editable admin-content-editable--faq">
+  <div class="admin-content-editable__surface">
+    <slot />
+  </div>
+  <button
+    type="button"
+    class="admin-content-editable__trigger"
+    data-open-cell-popover
+    aria-label="Edit FAQs"
+  >
+    <span class="admin-content-editable__overlay" aria-hidden="true">
+      <span class="admin-content-editable__edit-label">Edit</span>
+    </span>
+  </button>
+
+  <Popover
+    title="Edit FAQs"
+    description="Add, edit, or remove questions and answers. Click Save when you are done."
+    width="wide"
+    formClass="admin-faq-form"
+    formDataAttributes={{ "data-faq-form": "" }}
+  >
+    <input type="hidden" name="action" value="save-page-section" />
+    <input type="hidden" name="sectionId" value={section.id} />
+    <input type="hidden" name="pageId" value={section.page_id} />
+    <input type="hidden" name="type" value={section.type} />
+    <input type="hidden" name="sortOrder" value={section.sort_order} />
+    <input type="hidden" name="status" value={section.status} />
+    <input type="hidden" name="returnPath" value={contentEditing.returnPath} />
+    <input
+      type="hidden"
+      name="content"
+      data-faq-json
+      value={jsonTextareaValue(currentContent)}
+    />
+    <input
+      type="hidden"
+      name="currentContent"
+      value={jsonTextareaValue(section.content)}
+    />
+    <input type="hidden" name="faqHeading" data-faq-heading value={heading} />
+
+    <div class="admin-faq-form__list-header">
+      <span>Questions</span>
+    </div>
+    <ul class="admin-faq-list" data-faq-list>
+      {
+        items.map((item, index) => (
+          <li class="admin-faq-item" data-faq-item>
+            <div class="admin-faq-item__header">
+              <span class="admin-faq-item__label" data-faq-item-label>
+                Question {index + 1}
+              </span>
+              <button
+                type="button"
+                class="admin-faq-item__remove"
+                data-faq-remove
+                aria-label={`Remove question ${index + 1}`}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <label class="admin-faq-form__field">
+              <span>Question</span>
+              <input
+                type="text"
+                data-faq-question
+                value={item.question}
+                required
+              />
+            </label>
+            <label class="admin-faq-form__field">
+              <span>Answer</span>
+              <textarea data-faq-answer rows={3} required>{item.answer}</textarea>
+            </label>
+          </li>
+        ))
+      }
+    </ul>
+
+    <div slot="footer" class="ui-popover__footer-actions">
+      <button type="button" class="ui-popover__button-secondary" data-faq-add>
+        Add question
+      </button>
+      <button type="submit" class="ui-popover__button-primary">Save</button>
+    </div>
+  </Popover>
+</div>
+
+<script>
+  import { initFaqEditors } from "@/lib/client/faq-editor";
+
+  function init() {
+    initFaqEditors();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:after-swap", init);
+  if (document.readyState !== "loading") {
+    init();
+  }
+</script>

@@ -1,0 +1,88 @@
+---
+type PopoverWidth = "default" | "wide" | "carousel";
+
+type Props = {
+  title: string;
+  description?: string;
+  width?: PopoverWidth;
+  formMethod?: "get" | "post";
+  formEnctype?: string;
+  formAction?: string;
+  formClass?: string;
+  formId?: string;
+  formDataAttributes?: Record<string, string>;
+};
+
+const {
+  title,
+  description = "",
+  width = "default",
+  formMethod = "post",
+  formEnctype,
+  formAction,
+  formClass = "",
+  formId,
+  formDataAttributes = {},
+} = Astro.props;
+
+const hasFooter = Astro.slots.has("footer");
+const hasDescription = description.trim().length > 0;
+---
+
+<div class="hidden-popover-form-holder" style="display: none;">
+  <div class:list={["ui-popover", `ui-popover--${width}`]} data-popover-panel>
+    <header class="ui-popover__header">
+      <div class="ui-popover__heading">
+        <h3 class="ui-popover__title">{title}</h3>
+        {
+          hasDescription ? (
+            <p class="ui-popover__description">{description}</p>
+          ) : (
+            <p class="ui-popover__description" hidden></p>
+          )
+        }
+      </div>
+      <button
+        type="button"
+        class="ui-popover__close dashboard-modal__close"
+        data-close-cell-popover
+        aria-label="Close popover"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.25"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </header>
+    <form
+      id={formId}
+      method={formMethod}
+      action={formAction}
+      enctype={formEnctype}
+      class:list={["ui-popover__form", "admin-table-form", formClass]}
+      {...formDataAttributes}
+    >
+      <div class="ui-popover__body" data-popover-body>
+        <slot />
+      </div>
+      {
+        hasFooter ? (
+          <footer class="ui-popover__footer" data-popover-footer>
+            <slot name="footer" />
+          </footer>
+        ) : null
+      }
+    </form>
+  </div>
+</div>

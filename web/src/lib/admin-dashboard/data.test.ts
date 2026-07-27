@@ -389,6 +389,7 @@ describe("loadAdminDashboardData", () => {
     expect(from).toHaveBeenCalledWith("agent");
     expect(result.customers).toEqual([customerRow]);
     expect(result.agents).toEqual([]);
+    expect(result.defaultCustomerCreditLimit).toBe(1000);
     expect(result.pagination.totalRows).toBe(1);
   });
 

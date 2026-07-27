@@ -4,6 +4,7 @@ import AdminContentPreviewFrame from "@/components/admin/AdminContentPreviewFram
 import PageShell from "@/components/PageShell.astro";
 import PublicOurStoryPageContent from "@/components/public-website/PublicOurStoryPageContent.astro";
 import { loadAdminContentPreviewPage } from "@/lib/admin-dashboard/content-preview-page";
+import { ADMIN_CONTENT_PREVIEW_ROOT } from "@/lib/public-website/admin-content-preview";
 import { getPublicPageContent } from "@/lib/public-website/content";
 
 export const prerender = false;
@@ -14,6 +15,7 @@ if (!preview.ready) {
   return preview.response;
 }
 
+const ourStoryPath = `${ADMIN_CONTENT_PREVIEW_ROOT}/our-story`;
 const content = await getPublicPageContent(Astro, "our-story");
 const title = content.page?.title ?? "Our Story";
 ---
@@ -26,7 +28,10 @@ const title = content.page?.title ?? "Our Story";
 >
   <AdminContentPreviewFrame activePath="/our-story">
     <PageShell title={title}>
-      <PublicOurStoryPageContent content={content} />
+      <PublicOurStoryPageContent
+        content={content}
+        contentEditing={{ returnPath: ourStoryPath }}
+      />
     </PageShell>
   </AdminContentPreviewFrame>
 </AdminContentPageLayout>

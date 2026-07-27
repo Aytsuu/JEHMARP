@@ -1,8 +1,6 @@
+import type { DocumentLayoutOptions } from "@/lib/order-documents/layout";
+import { buildSalesInvoiceLayout } from "@/lib/order-documents/layout";
 import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
-import {
-  buildSalesInvoiceLayout,
-  getBrandLines,
-} from "@/lib/order-documents/layout";
 import { buildPdfDocument, pdfPageWidth } from "@/lib/order-documents/pdf-document";
 
 const pageWidth = pdfPageWidth;
@@ -20,22 +18,19 @@ type SalesInvoicePage = {
   pageCount: number;
 };
 
-export function buildSalesInvoiceContentStreams(order: DocumentOrder): string[] {
+export function buildSalesInvoiceContentStreams(order: DocumentOrder, options: DocumentLayoutOptions = {}): string[] {
   const pages = chunkOrderItems(order.customer_order_item);
-
   return pages.map((items, index) => buildSalesInvoicePageContent(order, {
-    items,
-    pageNumber: index + 1,
-    pageCount: pages.length,
-  }));
+    items, pageNumber: index + 1, pageCount: pages.length,
+  }, options));
 }
 
-export function buildSalesInvoicePdf(order: DocumentOrder): Uint8Array {
-  return buildPdfDocument(buildSalesInvoiceContentStreams(order));
+export function buildSalesInvoicePdf(order: DocumentOrder, options: DocumentLayoutOptions = {}): Uint8Array {
+  return buildPdfDocument(buildSalesInvoiceContentStreams(order, options));
 }
 
-export function buildBulkSalesInvoicePdf(orders: DocumentOrder[]): Uint8Array {
-  const contentStreams = orders.flatMap((order) => buildSalesInvoiceContentStreams(order));
+export function buildBulkSalesInvoicePdf(orders: DocumentOrder[], options: DocumentLayoutOptions = {}): Uint8Array {
+  const contentStreams = orders.flatMap((order) => buildSalesInvoiceContentStreams(order, options));
 
   if (contentStreams.length === 0) {
     throw new Error("No sales invoice pages to generate.");
@@ -53,20 +48,18 @@ function chunkOrderItems(items: DocumentOrderItem[]) {
   });
 }
 
-function buildSalesInvoicePageContent(order: DocumentOrder, page: SalesInvoicePage) {
+function buildSalesInvoicePageContent(order: DocumentOrder, page: SalesInvoicePage, options: DocumentLayoutOptions = {}) {
   const commands: string[] = [];
-
-  drawHeader(commands, page);
-  drawInvoiceFields(commands, order);
-  const tableBottomY = drawItemsTable(commands, page.items);
-  drawInvoiceTotal(commands, order, tableBottomY);
-  drawPaymentAndIssuer(commands, order);
-
+  const layout = buildSalesInvoiceLayout(order, options);
+  drawHeader(commands, page, layout.brandLines);
+  drawInvoiceFields(commands, layout);
+  const tableBottomY = drawItemsTable(commands, page.items, options);
+  drawInvoiceTotal(commands, layout, tableBottomY);
+  drawPaymentAndIssuer(commands, layout);
   return commands.join("\n");
 }
 
-function drawHeader(commands: string[], page: SalesInvoicePage) {
-  const brandLines = getBrandLines();
+function drawHeader(commands: string[], page: SalesInvoicePage, brandLines: string[]) {
   addText(commands, pageWidth / 2, 802, brandLines[0], { align: "center", size: 13 });
   addText(commands, pageWidth / 2, 786, brandLines[1], { align: "center", size: 10 });
   addText(commands, pageWidth / 2, 771, brandLines[2], { align: "center", size: 10 });
@@ -78,8 +71,7 @@ function drawHeader(commands: string[], page: SalesInvoicePage) {
   addText(commands, 525, 778, "LOGO", { align: "center", size: 9 });
 }
 
-function drawInvoiceFields(commands: string[], order: DocumentOrder) {
-  const layout = buildSalesInvoiceLayout(order);
+function drawInvoiceFields(commands: string[], layout: ReturnType<typeof buildSalesInvoiceLayout>) {
 
   addText(commands, 40, 717, layout.dateLabel, { size: 10 });
   drawLine(commands, 73, 713, 190, 713);
@@ -91,15 +83,10 @@ function drawInvoiceFields(commands: string[], order: DocumentOrder) {
   drawLine(commands, 355, 691, 555, 691);
 }
 
-function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
+function drawItemsTable(commands: string[], items: DocumentOrderItem[], options: DocumentLayoutOptions = {}) {
   const layout = buildSalesInvoiceLayout({
-    id: "",
-    created_at: "",
-    customer: null,
-    agent: null,
-    customer_order_item: items,
-    invoice: [],
-  });
+    id: "", created_at: "", customer: null, agent: null, customer_order_item: items, invoice: [],
+  }, options);
   const tableColumnWidths = layout.columns.map((column) => column.width);
   const tableTopY = 665;
   const rowHeight = 24;
@@ -139,24 +126,21 @@ function drawItemsTable(commands: string[], items: DocumentOrderItem[]) {
   return tableBottomY;
 }
 
-function drawInvoiceTotal(commands: string[], order: DocumentOrder, tableBottomY: number) {
+function drawInvoiceTotal(commands: string[], layout: ReturnType<typeof buildSalesInvoiceLayout>, tableBottomY: number) {
   const totalY = tableBottomY - 24;
-  const layout = buildSalesInvoiceLayout(order);
-
   addText(commands, 330, totalY, layout.totalLabel, { size: 11 });
   drawLine(commands, 430, totalY - 4, 555, totalY - 4);
 }
 
-function drawPaymentAndIssuer(commands: string[], order: DocumentOrder) {
-  const layout = buildSalesInvoiceLayout(order);
-
+function drawPaymentAndIssuer(commands: string[], layout: ReturnType<typeof buildSalesInvoiceLayout>) {
   addText(commands, 40, 348, "Delivery Preference", { size: 10 });
-  addText(commands, 40, 330, layout.paymentLines[0], { size: 9 });
-  addTextWithVectorCheckmarks(commands, 40, 312, layout.paymentLines[1], { size: 9 });
-
+  addText(commands, 40, 330, layout.paymentLines[0] ?? "", { size: 9 });
+  addTextWithVectorCheckmarks(commands, 40, 312, layout.paymentLines[1] ?? "", { size: 9 });
   addText(commands, 40, 277, layout.paymentHeading, { size: 10 });
-  addTextWithVectorCheckmarks(commands, 40, 259, layout.paymentLines[2], { size: 9 });
-
+  addTextWithVectorCheckmarks(commands, 40, 259, layout.paymentLines[2] ?? "", { size: 9 });
+  layout.paymentLines.slice(3).forEach((line, index) => {
+    addText(commands, 40, 241 - index * 18, line, { size: 9 });
+  });
   addText(commands, 405, 184, layout.issuerHeading, { size: 10 });
   addText(commands, 340, 156, layout.issuerName, { size: 10 });
   drawLine(commands, 330, 152, 555, 152);

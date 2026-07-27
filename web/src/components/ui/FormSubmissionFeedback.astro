@@ -1,0 +1,114 @@
+---
+type Props = {
+  variant: "success" | "error";
+  title: string;
+  message: string;
+  clearParams: readonly string[];
+};
+
+const {
+  variant,
+  title,
+  message,
+  clearParams,
+} = Astro.props;
+---
+
+<div
+  class:list={["form-submission-feedback", `form-submission-feedback--${variant}`]}
+  role="alert"
+  aria-live={variant === "error" ? "assertive" : "polite"}
+  tabindex="-1"
+  data-form-submission-feedback
+  data-clear-params={JSON.stringify(clearParams)}
+>
+  <span class="form-submission-feedback__icon" aria-hidden="true">
+    {
+      variant === "success" ? (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      ) : (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      )
+    }
+  </span>
+  <div class="form-submission-feedback__content">
+    <p class="form-submission-feedback__title">{title}</p>
+    <p class="form-submission-feedback__message">{message}</p>
+  </div>
+</div>
+
+<script>
+  import {
+    buildPathWithFeedbackParamsRemoved,
+  } from "@/lib/client/form-submission-feedback-url";
+
+  function readClearParams(banner: HTMLElement): string[] {
+    const raw = banner.dataset.clearParams;
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      return Array.isArray(parsed)
+        ? parsed.filter((value): value is string => typeof value === "string")
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function clearFeedbackParamsFromUrl(banner: HTMLElement) {
+    const clearParams = readClearParams(banner);
+    if (clearParams.length === 0) return;
+
+    const nextPath = buildPathWithFeedbackParamsRemoved(
+      new URL(window.location.href),
+      clearParams,
+    );
+    const currentPath = `${window.location.pathname}${window.location.search}`;
+
+    if (nextPath !== currentPath) {
+      window.history.replaceState(window.history.state, "", nextPath);
+    }
+  }
+
+  function focusFormSubmissionFeedback() {
+    const banner = document.querySelector<HTMLElement>(
+      "[data-form-submission-feedback]",
+    );
+    if (!banner) return;
+
+    clearFeedbackParamsFromUrl(banner);
+    banner.scrollIntoView({ behavior: "smooth", block: "center" });
+    banner.focus({ preventScroll: true });
+  }
+
+  focusFormSubmissionFeedback();
+  document.addEventListener("astro:after-swap", focusFormSubmissionFeedback);
+</script>

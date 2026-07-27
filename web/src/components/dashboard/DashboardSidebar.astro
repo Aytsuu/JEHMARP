@@ -1,4 +1,5 @@
 ---
+import Tooltip from "@/components/ui/Tooltip.astro";
 import {
   getDashboardSidebarCategories,
   type DashboardSidebarUnreadBadge,
@@ -7,6 +8,9 @@ import {
   getDashboardRouteStatuses,
   getPageStatusLabel,
 } from "@/lib/page-availability";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
   navLabel: string;
@@ -17,14 +21,21 @@ const { navLabel, sidebarUnreadBadges = {} } = Astro.props;
 const isAdmin = Astro.url.pathname.startsWith("/admin");
 const categories = getDashboardSidebarCategories(isAdmin);
 const routeStatuses = getDashboardRouteStatuses();
+const platformSettings = await loadPlatformSettings(createSupabaseAdminClient());
+const brandText = platformSettings.businessProfile.tradeName || "JEHMARP";
+const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPath);
 ---
 
 <div class="dashboard-sidebar-shell" transition:persist="dashboard-sidebar-shell">
   <aside class="dashboard-sidebar" aria-labelledby="dashboard-sidebar-title">
     <div class="dashboard-sidebar__header">
       <a class="dashboard-sidebar__brand" href="/">
-        <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
-        <span class="dashboard-sidebar__brand-text">JEHMARP</span>
+        {logoUrl ? (
+          <img src={logoUrl} alt="" class="site-nav__brand-logo" />
+        ) : (
+          <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
+        )}
+        <span class="dashboard-sidebar__brand-text">{brandText}</span>
       </a>
     </div>
     <div class="dashboard-sidebar__scroll">
@@ -61,72 +72,82 @@ const routeStatuses = getDashboardRouteStatuses();
                       <li>
                         {item.isAction ? (
                           <div class="dashboard-sidebar__logout-form">
-                            <button
-                              type="button"
-                              data-open-alert-dialog="dashboard-logout-dialog"
-                              data-alert-dialog-form="dashboard-logout-form"
+                            <Tooltip
+                              text={item.label}
+                              placement="right"
+                              sidebarOnly={true}
+                              focusable={false}
+                              class="dashboard-sidebar__nav-tooltip"
+                            >
+                              <button
+                                type="button"
+                                data-open-alert-dialog="dashboard-logout-dialog"
+                                data-alert-dialog-form="dashboard-logout-form"
+                              >
+                                <span class="dashboard-sidebar__nav-link-content">
+                                  <span class="nav-icon-wrapper" set:html={item.icon} />
+                                  <span class="dashboard-sidebar__nav-label">{item.label}</span>
+                                </span>
+                              </button>
+                            </Tooltip>
+                          </div>
+                        ) : (
+                          <Tooltip
+                            text={item.label}
+                            placement="right"
+                            sidebarOnly={true}
+                            focusable={false}
+                            class="dashboard-sidebar__nav-tooltip"
+                          >
+                            <a
+                              href={item.href}
+                              class={isCurrent ? "active" : ""}
+                              data-dashboard-nav-link
+                              data-astro-prefetch="false"
+                              aria-current={isCurrent ? "page" : undefined}
                             >
                               <span class="dashboard-sidebar__nav-link-content">
                                 <span class="nav-icon-wrapper" set:html={item.icon} />
                                 <span class="dashboard-sidebar__nav-label">{item.label}</span>
                               </span>
-                              <span class="dashboard-sidebar__tooltip" aria-hidden="true">
-                                {item.label}
-                              </span>
-                            </button>
-                          </div>
-                        ) : (
-                          <a
-                            href={item.href}
-                            class={isCurrent ? "active" : ""}
-                            data-dashboard-nav-link
-                            data-astro-prefetch="false"
-                            aria-current={isCurrent ? "page" : undefined}
-                          >
-                            <span class="dashboard-sidebar__nav-link-content">
-                              <span class="nav-icon-wrapper" set:html={item.icon} />
-                              <span class="dashboard-sidebar__nav-label">{item.label}</span>
-                            </span>
-                            <span class="dashboard-sidebar__tooltip" aria-hidden="true">
-                              {item.label}
-                            </span>
-                            {
-                              showRouteStatus && (
-                                <span
-                                  class={`dashboard-sidebar__status dashboard-sidebar__status--${routeStatus.status}`}
-                                  aria-label={`${item.label} status: ${routeStatusLabel}`}
-                                  title={`${item.label}: ${routeStatusLabel}`}
-                                  set:html={routeStatusIcon}
-                                />
-                              )
-                            }
-                            {
-                              unreadBadge &&
-                                ("count" in unreadBadge
-                                  ? unreadBadge.count > 0
-                                  : unreadBadge.ids.length > 0) && (
+                              {
+                                showRouteStatus && (
                                   <span
-                                    class="dashboard-sidebar__nav-badge"
-                                    data-sidebar-unread-badge={
-                                      "count" in unreadBadge ? undefined : true
-                                    }
-                                    data-storage-key={
-                                      "count" in unreadBadge ? undefined : unreadBadge.storageKey
-                                    }
-                                    data-unread-ids={
-                                      "count" in unreadBadge
-                                        ? undefined
-                                        : JSON.stringify(unreadBadge.ids)
-                                    }
-                                    aria-label={`${item.label} unread count`}
-                                  >
-                                    {"count" in unreadBadge
-                                      ? unreadBadge.count
-                                      : unreadBadge.ids.length}
-                                  </span>
+                                    class={`dashboard-sidebar__status dashboard-sidebar__status--${routeStatus.status}`}
+                                    aria-label={`${item.label} status: ${routeStatusLabel}`}
+                                    title={`${item.label}: ${routeStatusLabel}`}
+                                    set:html={routeStatusIcon}
+                                  />
                                 )
-                            }
-                          </a>
+                              }
+                              {
+                                unreadBadge &&
+                                  ("count" in unreadBadge
+                                    ? unreadBadge.count > 0
+                                    : unreadBadge.ids.length > 0) && (
+                                    <span
+                                      class="dashboard-sidebar__nav-badge"
+                                      data-sidebar-unread-badge={
+                                        "count" in unreadBadge ? undefined : true
+                                      }
+                                      data-storage-key={
+                                        "count" in unreadBadge ? undefined : unreadBadge.storageKey
+                                      }
+                                      data-unread-ids={
+                                        "count" in unreadBadge
+                                          ? undefined
+                                          : JSON.stringify(unreadBadge.ids)
+                                      }
+                                      aria-label={`${item.label} unread count`}
+                                    >
+                                      {"count" in unreadBadge
+                                        ? unreadBadge.count
+                                        : unreadBadge.ids.length}
+                                    </span>
+                                  )
+                              }
+                            </a>
+                          </Tooltip>
                         )}
                       </li>
                     );
@@ -139,38 +160,35 @@ const routeStatuses = getDashboardRouteStatuses();
       </nav>
     </div>
   </aside>
-  <button
-    type="button"
-    class="dashboard-sidebar__toggle"
-    data-dashboard-sidebar-toggle
-    aria-expanded="true"
-    aria-label="Collapse sidebar"
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2.25"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
+  <div class="dashboard-sidebar__toggle-anchor">
+    <Tooltip
+      text="Collapse sidebar"
+      placement="right"
+      focusable={false}
+      class="dashboard-sidebar__toggle-tooltip-trigger"
     >
-      <polyline points="15 18 9 12 15 6"></polyline>
-    </svg>
-    <span
-      class="dashboard-sidebar__toggle-tooltip dashboard-sidebar__toggle-tooltip--collapse"
-      aria-hidden="true"
-    >
-      Collapse sidebar
-    </span>
-    <span
-      class="dashboard-sidebar__toggle-tooltip dashboard-sidebar__toggle-tooltip--expand"
-      aria-hidden="true"
-    >
-      Expand sidebar
-    </span>
-  </button>
+      <button
+        type="button"
+        class="dashboard-sidebar__toggle"
+        data-dashboard-sidebar-toggle
+        aria-expanded="true"
+        aria-label="Collapse sidebar"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.25"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+    </Tooltip>
+  </div>
 </div>

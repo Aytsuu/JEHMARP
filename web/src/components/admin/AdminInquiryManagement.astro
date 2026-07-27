@@ -4,6 +4,7 @@ import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmpty
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Popover from "@/components/ui/Popover.astro";
 import type { AdminInquiryManagementData } from "@/lib/admin-dashboard/data";
 import type { AdminInquiryFilters } from "@/lib/admin-dashboard/inquiry-filters";
 import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
@@ -73,12 +74,10 @@ const skeletonRows = Array.from({ length: 6 });
                       type="button"
                       class="table-cell-trigger"
                       data-open-cell-popover
-                      data-popover-title={`Edit Status: ${inquiry.name}`}
                     >
                       <StatusBadge kind="inquiry" status={inquiry.inquiry_status} />
                     </button>
-                    <div class="hidden-popover-form-holder">
-                      <form method="post" class="admin-table-form">
+                    <Popover title={`Edit Status: ${inquiry.name}`}>
                         <input type="hidden" name="action" value="update-inquiry" />
                         <input type="hidden" name="inquiryId" value={inquiry.id} />
                         <input type="hidden" name="internalNotes" value={inquiry.internal_notes ?? ""} />
@@ -92,9 +91,8 @@ const skeletonRows = Array.from({ length: 6 });
                             ))}
                           </select>
                         </label>
-                        <button type="submit">Save Changes</button>
-                      </form>
-                    </div>
+                        <button slot="footer" type="submit" class="ui-popover__button-primary">Save Changes</button>
+                    </Popover>
                   </td>
                 </tr>
               ))}

@@ -1,0 +1,36 @@
+---
+type Props = {
+  text: string;
+  placement?: "above" | "below" | "right";
+  class?: string;
+  sidebarOnly?: boolean;
+  focusable?: boolean;
+};
+
+const {
+  text,
+  placement = "above",
+  class: className,
+  sidebarOnly = false,
+  focusable = true,
+} = Astro.props;
+---
+
+<span
+  class:list={["dashboard-tooltip", className]}
+  tabindex={focusable ? 0 : undefined}
+  data-tooltip={text}
+  data-tooltip-placement={placement}
+  data-tooltip-sidebar-only={sidebarOnly ? "true" : undefined}
+  aria-label={text}
+>
+  <slot />
+</span>
+
+<script>
+  import { initDashboardTooltips } from "@/lib/client/dashboard-tooltip";
+
+  initDashboardTooltips();
+  document.addEventListener("astro:after-swap", initDashboardTooltips);
+  document.addEventListener("astro:page-load", initDashboardTooltips);
+</script>

@@ -16,7 +16,7 @@ if (!preview.ready) {
 }
 
 const [homePreview, featuredProducts] = await Promise.all([
-  getPublicPageContent(Astro, "home"),
+  getPublicPageContent(Astro, "home", { bypassCache: true }),
   getFeaturedPublicProducts(Astro, 4),
 ]);
 ---

@@ -1,6 +1,9 @@
 import { z } from "zod";
 
 import { getServerEnv } from "@/lib/env";
+import {
+  assertEdgeFunctionSuccess,
+} from "@/lib/public-website/edge-function-response";
 import { deliverResellerPriceListEmailIfConfigured } from "@/lib/public-website/reseller-price-list-email";
 import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
 
@@ -66,7 +69,6 @@ export type ResellerApplicationSubmitOptions = {
 export type ResellerApplicationFeedback =
   | {
       status: "submitted";
-      reference: string | null;
     }
   | {
       status: "error";
@@ -132,20 +134,19 @@ export async function submitResellerApplication(
     headers,
     body: JSON.stringify(payload),
   });
-  const body = await readJsonResponse(response);
-
-  if (!response.ok || typeof body.id !== "string") {
-    throw new Error(typeof body.error === "string" ? body.error : "Unable to submit reseller application.");
-  }
+  const body = await assertEdgeFunctionSuccess(
+    response,
+    "Unable to submit reseller application.",
+  );
 
   if (body.emailDeliveryStatus !== "sent") {
-    await deliverResellerPriceListEmailIfConfigured(body.id, {
+    await deliverResellerPriceListEmailIfConfigured(body.id as string, {
       fetch: fetcher,
       supabase: options.supabase,
     });
   }
 
-  return body.id;
+  return body.id as string;
 }
 
 export function getResellerApplicationFeedback(url: URL): ResellerApplicationFeedback {
@@ -154,7 +155,6 @@ export function getResellerApplicationFeedback(url: URL): ResellerApplicationFee
   if (status === "submitted") {
     return {
       status,
-      reference: url.searchParams.get("reference"),
     };
   }
 
@@ -166,10 +166,4 @@ export function getResellerApplicationFeedback(url: URL): ResellerApplicationFee
   }
 
   return null;
-}
-
-async function readJsonResponse(response: Response): Promise<Record<string, unknown>> {
-  const data = await response.json().catch(() => ({}));
-
-  return typeof data === "object" && data !== null ? data as Record<string, unknown> : {};
 }

@@ -15,6 +15,15 @@ vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: mocks.createSupabaseServerClient,
 }));
 
+vi.mock("@/lib/public-website/content", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/public-website/content")>();
+
+  return {
+    ...actual,
+    invalidatePublicPageContentCacheForPage: vi.fn(async () => undefined),
+  };
+});
+
 import {
   executeAdminAction,
   formatAdminActionFeedback,
@@ -902,6 +911,211 @@ describe("parseAdminActionFormData", () => {
       success: false,
       errors: ["Section id is required."],
     });
+  });
+
+  it("merges a single page section field when contentField is provided", () => {
+    const formData = new FormData();
+    formData.set("action", "save-page-section");
+    formData.set("sectionId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
+    formData.set("pageId", "9db3dfbf-4271-456f-a7dd-6897ad099515");
+    formData.set("type", "hero");
+    formData.set("sortOrder", "0");
+    formData.set("status", "published");
+    formData.set("contentField", "heading");
+    formData.set("contentValue", "Updated heading");
+    formData.set("currentContent", JSON.stringify({ heading: "Old heading", summary: "Summary" }));
+
+    const result = parseAdminActionFormData(formData, adminUserId);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.action).toMatchObject({
+        type: "save-page-section",
+        payload: {
+          content: {
+            heading: "Updated heading",
+            summary: "Summary",
+          },
+        },
+      });
+    }
+  });
+
+  it("deletes a hero slide when slideAction is delete", () => {
+    const formData = new FormData();
+    formData.set("action", "save-page-section");
+    formData.set("sectionId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
+    formData.set("pageId", "9db3dfbf-4271-456f-a7dd-6897ad099515");
+    formData.set("type", "hero");
+    formData.set("sortOrder", "0");
+    formData.set("status", "published");
+    formData.set("slideAction", "delete");
+    formData.set("slideIndex", "1");
+    formData.set("slideSrc", "/images/hero_carousel_2.jpg");
+    formData.set(
+      "currentContent",
+      JSON.stringify({
+        heading: "FROM FARM TO TABLE",
+        slides: [
+          { src: "/images/hero_carousel_1.jpg", alt: "Slide 1" },
+          { src: "/images/hero_carousel_2.jpg", alt: "Slide 2" },
+        ],
+      }),
+    );
+
+    const result = parseAdminActionFormData(formData, adminUserId);
+
+    expect(result.success).toBe(true);
+    if (result.success && result.action.type === "save-page-section") {
+      expect(result.action.slideAction).toBe("delete");
+      expect(result.action.slideIndex).toBe(1);
+      expect(result.action.slideSrc).toBe("/images/hero_carousel_2.jpg");
+      expect(result.action.payload.content.slides).toEqual([
+        { src: "/images/hero_carousel_1.jpg", alt: "Slide 1" },
+      ]);
+    }
+  });
+
+  it("replaces hero slides when contentField is slides", () => {
+    const formData = new FormData();
+    formData.set("action", "save-page-section");
+    formData.set("sectionId", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
+    formData.set("pageId", "9db3dfbf-4271-456f-a7dd-6897ad099515");
+    formData.set("type", "hero");
+    formData.set("sortOrder", "0");
+    formData.set("status", "published");
+    formData.set("contentField", "slides");
+    formData.set(
+      "contentValue",
+      JSON.stringify([
+        { src: "/images/hero_carousel_2.jpg", alt: "Slide 2" },
+        { src: "/images/hero_carousel_1.jpg", alt: "Slide 1" },
+      ]),
+    );
+    formData.set(
+      "currentContent",
+      JSON.stringify({
+        heading: "FROM FARM TO TABLE",
+        slides: [
+          { src: "/images/hero_carousel_1.jpg", alt: "Slide 1" },
+          { src: "/images/hero_carousel_2.jpg", alt: "Slide 2" },
+        ],
+      }),
+    );
+
+    const result = parseAdminActionFormData(formData, adminUserId);
+
+    expect(result.success).toBe(true);
+    if (result.success && result.action.type === "save-page-section") {
+      expect(result.action.payload.content.slides).toEqual([
+        { src: "/images/hero_carousel_2.jpg", alt: "Slide 2" },
+        { src: "/images/hero_carousel_1.jpg", alt: "Slide 1" },
+      ]);
+      expect(result.action.slideImageFiles).toEqual([]);
+      expect(result.action.slideNewImageIndexes).toEqual([]);
+    }
+  });
+
+  it("replaces tagline items when contentField is items", () => {
+    const formData = new FormData();
+    formData.set("action", "save-page-section");
+    formData.set("sectionId", "0f99f0c8-c846-4217-a289-ce643d9c1c49");
+    formData.set("pageId", "9db3dfbf-4271-456f-a7dd-6897ad099515");
+    formData.set("type", "taglines");
+    formData.set("sortOrder", "3");
+    formData.set("status", "published");
+    formData.set("contentField", "items");
+    formData.set(
+      "contentValue",
+      JSON.stringify([
+        {
+          runs: [
+            {
+              text: "Fresh - Quality - Trusted",
+              fontSize: "lg",
+              fontWeight: 600,
+              italic: false,
+            },
+          ],
+        },
+        {
+          runs: [
+            { text: "From farmers to ", fontSize: "lg", fontWeight: 600, italic: false },
+            { text: "families", fontSize: "xl", fontWeight: 700, italic: true },
+            { text: " - Quality you can trust", fontSize: "lg", fontWeight: 600, italic: false },
+          ],
+        },
+      ]),
+    );
+    formData.set(
+      "currentContent",
+      JSON.stringify({
+        heading: "Taglines",
+        items: ["Old tagline"],
+      }),
+    );
+
+    const result = parseAdminActionFormData(formData, adminUserId);
+
+    expect(result.success).toBe(true);
+    if (result.success && result.action.type === "save-page-section") {
+      expect(result.action.payload.content.items).toEqual([
+        {
+          runs: [
+            {
+              text: "Fresh - Quality - Trusted",
+              fontSize: "lg",
+              fontWeight: 600,
+              italic: false,
+            },
+          ],
+        },
+        {
+          runs: [
+            { text: "From farmers to ", fontSize: "lg", fontWeight: 600, italic: false },
+            { text: "families", fontSize: "xl", fontWeight: 700, italic: true },
+            { text: " - Quality you can trust", fontSize: "lg", fontWeight: 600, italic: false },
+          ],
+        },
+      ]);
+    }
+  });
+
+  it("replaces FAQ content when the full content payload is posted", () => {
+    const formData = new FormData();
+    formData.set("action", "save-page-section");
+    formData.set("sectionId", "a4f8c1d2-6e7b-4a9f-9c3d-2b1e8f5a6d70");
+    formData.set("pageId", "cbbe5f4d-7ce5-4d84-90fe-020735a7fc50");
+    formData.set("type", "faq");
+    formData.set("sortOrder", "6");
+    formData.set("status", "published");
+    formData.set(
+      "content",
+      JSON.stringify({
+        heading: "FAQ",
+        description: "Answers for shoppers.",
+        items: [{ question: "Fresh?", answer: "Yes." }],
+      }),
+    );
+    formData.set(
+      "currentContent",
+      JSON.stringify({
+        heading: "Old heading",
+        description: "Old description",
+        items: [{ question: "Old?", answer: "Old." }],
+      }),
+    );
+
+    const result = parseAdminActionFormData(formData, adminUserId);
+
+    expect(result.success).toBe(true);
+    if (result.success && result.action.type === "save-page-section") {
+      expect(result.action.payload.content).toEqual({
+        heading: "FAQ",
+        description: "Answers for shoppers.",
+        items: [{ question: "Fresh?", answer: "Yes." }],
+      });
+    }
   });
 
   it("sets commission audit fields when a commission is managed", () => {
@@ -4101,6 +4315,81 @@ describe("executeAdminAction", () => {
     }, adminUserId);
 
     expect(orderItemsDeleteEq).toHaveBeenCalledWith("id", "45e73d23-f25f-4de7-ae3a-ebcf34e995f1");
+  });
+
+  it("deletes a hero carousel slide from persisted section content", async () => {
+    const sectionId = "45e73d23-f25f-4de7-ae3a-ebcf34e995f1";
+    const pageId = "9db3dfbf-4271-456f-a7dd-6897ad099515";
+    const existingSlides = [
+      { src: "/images/hero_carousel_1.jpg", alt: "Slide 1" },
+      { src: "/images/hero_carousel_2.jpg", alt: "Slide 2" },
+      { src: "/images/hero_carousel_3.jpg", alt: "Slide 3" },
+    ];
+    const existingContent = {
+      heading: "FROM FARM TO TABLE",
+      slides: existingSlides,
+    };
+    const pageSectionUpdateEq = vi.fn(async () => ({ error: null }));
+    const pageSectionUpdate = vi.fn(() => ({ eq: pageSectionUpdateEq }));
+    const pageSectionMaybeSingle = vi.fn(async () => ({
+      data: { content: existingContent },
+      error: null,
+    }));
+    const pageSectionSelectEq = vi.fn(() => ({ maybeSingle: pageSectionMaybeSingle }));
+    const pageSectionSelect = vi.fn(() => ({ eq: pageSectionSelectEq }));
+    const adminFrom = vi.fn((table: string) => {
+      if (table === "page_section") {
+        return {
+          select: pageSectionSelect,
+          update: pageSectionUpdate,
+        };
+      }
+
+      throw new Error(`Unexpected admin table ${table}`);
+    });
+
+    mocks.createSupabaseAdminClient.mockReturnValue({ from: adminFrom });
+
+    const result = await executeAdminAction({ from: vi.fn() } as never, {
+      type: "save-page-section",
+      sectionId,
+      imageFile: null,
+      slideIndex: 1,
+      slideAction: "delete",
+      slideSrc: "/images/hero_carousel_2.jpg",
+      slideImageFiles: [],
+      slideNewImageIndexes: [],
+      payload: {
+        page_id: pageId,
+        type: "hero",
+        sort_order: 0,
+        content: {
+          heading: "FROM FARM TO TABLE",
+          slides: [existingSlides[0], existingSlides[2]],
+        },
+        status: "published",
+        updated_at: "2026-07-26T11:00:00.000Z",
+      },
+    });
+
+    expect(result).toEqual({
+      sectionContent: {
+        heading: "FROM FARM TO TABLE",
+        slides: [existingSlides[0], existingSlides[2]],
+      },
+    });
+    expect(pageSectionUpdate).toHaveBeenCalledWith({
+      page_id: pageId,
+      type: "hero",
+      sort_order: 0,
+      content: {
+        heading: "FROM FARM TO TABLE",
+        slides: [existingSlides[0], existingSlides[2]],
+      },
+      status: "published",
+      updated_at: "2026-07-26T11:00:00.000Z",
+    });
+    expect(pageSectionUpdateEq).toHaveBeenCalledWith("id", sectionId);
   });
 });
 

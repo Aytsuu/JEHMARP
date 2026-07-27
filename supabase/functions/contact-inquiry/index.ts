@@ -12,6 +12,8 @@ type AppConfig = {
   supabaseServiceKey: string;
   upstashRedisRestUrl?: string;
   upstashRedisRestToken?: string;
+  resendApiKey?: string;
+  notificationFrom?: string;
 };
 
 type ContactInquiryRow = {
@@ -95,6 +97,8 @@ async function handleCreateInquiry(
     throw new Error("Contact inquiry insert did not return a row.");
   }
 
+  await notifyAdminsOfContactInquiry(config, inquiry);
+
   return jsonResponse({ id: inquiry.id }, 201);
 }
 
@@ -161,6 +165,49 @@ async function checkDatabaseRateLimits(
   }
 
   return { allowed: true };
+}
+
+async function notifyAdminsOfContactInquiry(config: AppConfig, inquiry: ContactInquiryRow): Promise<void> {
+  if (!config.resendApiKey || !config.notificationFrom) return;
+  const settings = await loadPlatformSettings(config);
+  const routes = Array.isArray(settings?.notifications?.routes) ? settings.notifications.routes : [];
+  const route = routes.find((entry) => entry?.event === "contact_inquiry");
+  const recipients = [route?.primaryEmail, route?.secondaryEmail]
+    .map((value) => (typeof value === "string" ? value.trim() : ""))
+    .filter(Boolean);
+  if (recipients.length === 0) return;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: config.notificationFrom,
+      to: recipients,
+      subject: `New contact inquiry from ${inquiry.name}`,
+      text: [
+        `Name: ${inquiry.name}`,
+        inquiry.email ? `Email: ${inquiry.email}` : "",
+        inquiry.phone_number ? `Phone: ${inquiry.phone_number}` : "",
+        "",
+        inquiry.message,
+      ].filter(Boolean).join("\n"),
+    }),
+  });
+  if (!response.ok) console.warn("Unable to deliver contact inquiry notification email.");
+}
+
+async function loadPlatformSettings(config: AppConfig): Promise<Record<string, unknown> | null> {
+  try {
+    const rows = await restJson<Array<{ settings?: Record<string, unknown> }>>(
+      config,
+      "platform_settings?select=settings&id=eq.default",
+    );
+    return rows[0]?.settings ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function insertInquiry(
@@ -236,6 +283,8 @@ function getConfig(): AppConfig {
     supabaseServiceKey,
     upstashRedisRestUrl: Deno.env.get("UPSTASH_REDIS_REST_URL") ?? undefined,
     upstashRedisRestToken: Deno.env.get("UPSTASH_REDIS_REST_TOKEN") ?? undefined,
+    resendApiKey: Deno.env.get("RESEND_API_KEY") ?? undefined,
+    notificationFrom: Deno.env.get("RESELLER_PRICE_LIST_FROM") ?? undefined,
   };
 }
 

@@ -8,6 +8,7 @@ import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmpty
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Popover from "@/components/ui/Popover.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import type { AdminAgentOrder, AdminOrder } from "@/lib/admin-dashboard/data";
@@ -277,7 +278,6 @@ const defaultTotalCommission = commissionBreakdown.reduce(
                       type="button"
                       class="agent-order-detail-stat__commission-edit table-cell-trigger"
                       data-open-cell-popover
-                      data-popover-title="Edit commission"
                       aria-label="Edit commission"
                     >
                       <span class="sr-only">Edit commission</span>
@@ -286,12 +286,12 @@ const defaultTotalCommission = commissionBreakdown.reduce(
                 }
                 {
                   !isCommissionLocked && (
-                    <div class="hidden-popover-form-holder">
+                    <Popover
+                      title="Edit commission"
+                      description="Update the total commission. The amount is distributed across products based on each line total."
+                      formDataAttributes={{ "data-astro-reload": "" }}
+                    >
                       <div class="agent-order-commission-popover">
-                        <p class="agent-order-commission-popover__intro">
-                          Update the total commission. The amount is distributed across
-                          products based on each line total.
-                        </p>
                         <div class="agent-order-commission-popover__breakdown">
                           {
                             commissionBreakdown.map((item) => (
@@ -309,40 +309,36 @@ const defaultTotalCommission = commissionBreakdown.reduce(
                             ))
                           }
                         </div>
-                        <form
-                          method="post"
-                          class="agent-order-commission-popover__total-form"
-                          data-astro-reload
-                        >
-                          <input
-                            type="hidden"
-                            name="action"
-                            value="update-agent-order-total-commission"
-                          />
-                          <input
-                            type="hidden"
-                            name="agentOrderId"
-                            value={agentOrder.id}
-                          />
-                          <label class="agent-order-commission-popover__total-label" for="agent-order-commission-total">
-                            Total commission
-                          </label>
-                          <input
-                            id="agent-order-commission-total"
-                            type="number"
-                            name="amount"
-                            min="0"
-                            step="0.01"
-                            value={totalCommission.toFixed(2)}
-                            required
-                          />
-                          <button type="submit">Save</button>
-                          <p class="agent-order-commission-popover__default-total">
-                            Default total {formatCurrency(defaultTotalCommission)}
-                          </p>
-                        </form>
+                        <input
+                          type="hidden"
+                          name="action"
+                          value="update-agent-order-total-commission"
+                        />
+                        <input
+                          type="hidden"
+                          name="agentOrderId"
+                          value={agentOrder.id}
+                        />
+                        <label class="agent-order-commission-popover__total-label" for="agent-order-commission-total">
+                          Total commission
+                        </label>
+                        <input
+                          id="agent-order-commission-total"
+                          type="number"
+                          name="amount"
+                          min="0"
+                          step="0.01"
+                          value={totalCommission.toFixed(2)}
+                          required
+                        />
+                        <p class="agent-order-commission-popover__default-total">
+                          Default total {formatCurrency(defaultTotalCommission)}
+                        </p>
                       </div>
-                    </div>
+                      <button slot="footer" type="submit" class="ui-popover__button-primary">
+                        Save
+                      </button>
+                    </Popover>
                   )
                 }
               </dd>

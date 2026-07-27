@@ -1,0 +1,164 @@
+---
+import Popover from "@/components/ui/Popover.astro";
+import { jsonTextareaValue } from "@/lib/admin-dashboard/view";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
+import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+import type { HeroSlideView } from "@/lib/public-website/home-hero-slides";
+
+type Props = {
+  contentEditing: AdminContentEditingContext;
+  section: PublicPageSectionRecord;
+  slides: HeroSlideView[];
+};
+
+const { contentEditing, section, slides } = Astro.props;
+
+const currentContent = {
+  ...section.content,
+  slides: slides.map(({ src, alt }) => ({ src, alt })),
+};
+---
+
+<div class="admin-hero-carousel-editor">
+  <button
+    type="button"
+    class="admin-hero-carousel-editor__trigger"
+    data-open-cell-popover
+    aria-label="Edit Carousel"
+  >
+    <span class="admin-hero-carousel-editor__label">Edit Carousel</span>
+  </button>
+
+  <Popover
+    title="Edit Carousel"
+    description="Top-to-bottom order matches left-to-right in the carousel."
+    width="carousel"
+    formEnctype="multipart/form-data"
+    formAction={contentEditing.returnPath}
+    formClass="admin-hero-carousel-form"
+    formDataAttributes={{ "data-hero-carousel-form": "" }}
+  >
+    <input type="hidden" name="action" value="save-page-section" />
+    <input type="hidden" name="sectionId" value={section.id} />
+    <input type="hidden" name="pageId" value={section.page_id} />
+    <input type="hidden" name="type" value={section.type} />
+    <input type="hidden" name="sortOrder" value={section.sort_order} />
+    <input type="hidden" name="status" value={section.status} />
+    <input type="hidden" name="returnPath" value={contentEditing.returnPath} />
+    <input type="hidden" name="contentField" value="slides" />
+    <input type="hidden" name="contentValue" value="" data-hero-slides-json />
+    <input
+      type="hidden"
+      name="slideNewImageIndexes"
+      value=""
+      data-hero-new-image-indexes
+    />
+    <input
+      type="hidden"
+      name="currentContent"
+      value={jsonTextareaValue(currentContent)}
+    />
+    <input
+      type="file"
+      accept="image/*"
+      multiple
+      class="sr-only"
+      data-hero-carousel-add-input
+      tabindex="-1"
+      aria-hidden="true"
+    />
+
+    <ul class="admin-hero-carousel-list" data-hero-carousel-list>
+      {
+        slides.map((slide, index) => (
+          <li
+            class="admin-hero-carousel-item"
+            data-hero-carousel-item
+            data-slide-src={slide.src}
+            data-slide-alt={slide.alt}
+            data-slide-index={index}
+          >
+            <button
+              type="button"
+              class="admin-hero-carousel-item__grip"
+              data-hero-carousel-grip
+              aria-label={`Reorder carousel image ${index + 1}`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle cx="9" cy="6" r="1.5" fill="currentColor" />
+                <circle cx="9" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="9" cy="18" r="1.5" fill="currentColor" />
+                <circle cx="15" cy="6" r="1.5" fill="currentColor" />
+                <circle cx="15" cy="12" r="1.5" fill="currentColor" />
+                <circle cx="15" cy="18" r="1.5" fill="currentColor" />
+              </svg>
+            </button>
+            <div class="admin-hero-carousel-item__main">
+              <div class="admin-hero-carousel-item__preview" data-hero-carousel-preview>
+                <img
+                  src={slide.displaySrc}
+                  alt=""
+                  class="admin-hero-carousel-item__image"
+                />
+              </div>
+              <span class="admin-hero-carousel-item__label" data-hero-carousel-label>
+                Carousel image {index + 1}
+              </span>
+            </div>
+            <button
+              type="button"
+              class="admin-hero-carousel-item__remove"
+              data-hero-carousel-remove
+              aria-label={`Remove carousel image ${index + 1}`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </li>
+        ))
+      }
+    </ul>
+
+    <button
+      slot="footer"
+      type="button"
+      class="ui-popover__button-secondary admin-hero-carousel-form__add"
+      data-hero-carousel-add
+    >
+      Add image
+    </button>
+  </Popover>
+</div>
+
+<script>
+  import { initHeroCarouselEditors } from "@/lib/client/hero-carousel-editor";
+
+  function init() {
+    initHeroCarouselEditors();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:after-swap", init);
+  if (document.readyState !== "loading") {
+    init();
+  }
+</script>

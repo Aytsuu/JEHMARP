@@ -1,11 +1,18 @@
 import { bindPopoverFormSaveState } from "@/lib/client/dashboard-cell-popover-form-state";
+import { initHeroCarouselEditors } from "@/lib/client/hero-carousel-editor";
+import { initFaqEditors } from "@/lib/client/faq-editor";
+import { initPageSectionContentEditors } from "@/lib/client/page-section-content-editor";
+import { initTaglinesEditors } from "@/lib/client/taglines-editor";
 
 const OPEN_BODY_CLASS = "cell-popover-open";
+const CLOSE_TRANSITION_MS = 180;
 
 let currentHolder: HTMLElement | null = null;
 let currentContent: HTMLElement | null = null;
 let currentTrigger: HTMLElement | null = null;
 let currentFormStateCleanup: (() => void) | null = null;
+let closeFinalizeTimer: ReturnType<typeof setTimeout> | null = null;
+let isClosingPopover = false;
 
 function getPopover() {
   return document.getElementById("cell-popover");
@@ -14,9 +21,27 @@ function getPopover() {
 function getPopoverParts(popover: HTMLElement) {
   return {
     popoverCard: popover.querySelector<HTMLElement>(".cell-popover__card"),
-    popoverBody: popover.querySelector<HTMLElement>("[data-cell-popover-body]"),
+    popoverMount:
+      popover.querySelector<HTMLElement>("[data-cell-popover-mount]") ??
+      popover.querySelector<HTMLElement>("[data-cell-popover-body]"),
     popoverTitle: popover.querySelector<HTMLElement>(".cell-popover__title"),
+    popoverDescription: popover.querySelector<HTMLElement>(
+      ".cell-popover__description",
+    ),
+    legacyHeader: popover.querySelector<HTMLElement>(".cell-popover__header"),
   };
+}
+
+function syncPopoverDescription(
+  popoverDescription: HTMLElement | null,
+  description: string,
+) {
+  if (!popoverDescription) {
+    return;
+  }
+
+  popoverDescription.textContent = description;
+  popoverDescription.hidden = description.length === 0;
 }
 
 function portalPopoverToBody(popover: HTMLElement) {
@@ -65,30 +90,141 @@ function positionPopover(popoverCard: HTMLElement, trigger: HTMLElement) {
   popoverCard.style.top = `${top}px`;
 }
 
-function closeCellPopover() {
-  const popover = getPopover();
-  if (!popover) return;
+function isPopoverPanel(content: HTMLElement) {
+  return content.matches("[data-popover-panel]");
+}
 
-  currentFormStateCleanup?.();
-  currentFormStateCleanup = null;
+function findPopoverContent(holder: HTMLElement) {
+  const panel = holder.querySelector<HTMLElement>("[data-popover-panel]");
+  if (panel) {
+    return panel;
+  }
 
-  const { popoverBody } = getPopoverParts(popover);
+  const firstChild = holder.firstElementChild;
+  return firstChild instanceof HTMLElement ? firstChild : null;
+}
+
+function isEventInsidePopover(event: Event, popoverCard: HTMLElement | null): boolean {
+  if (!popoverCard) {
+    return false;
+  }
+
+  return event.composedPath().includes(popoverCard);
+}
+
+function isEventInsideTrigger(event: Event, trigger: HTMLElement | null): boolean {
+  if (!trigger) {
+    return false;
+  }
+
+  return event.composedPath().includes(trigger);
+}
+
+function findPopoverForm(content: HTMLElement) {
+  if (content instanceof HTMLFormElement) {
+    return content;
+  }
+
+  return content.querySelector<HTMLFormElement>("form");
+}
+
+function clearCloseFinalizeTimer() {
+  if (closeFinalizeTimer !== null) {
+    clearTimeout(closeFinalizeTimer);
+    closeFinalizeTimer = null;
+  }
+}
+
+function resetPopoverCardPosition(popoverCard: HTMLElement | null) {
+  if (!popoverCard) {
+    return;
+  }
+
+  popoverCard.style.left = "";
+  popoverCard.style.top = "";
+}
+
+function finalizePopoverClose(popover: HTMLElement) {
+  clearCloseFinalizeTimer();
+  isClosingPopover = false;
+
+  const { popoverMount, popoverDescription, legacyHeader, popoverCard } =
+    getPopoverParts(popover);
 
   if (currentContent && currentHolder) {
     currentHolder.appendChild(currentContent);
   }
 
-  popover.classList.remove("cell-popover--open");
-  popover.setAttribute("aria-hidden", "true");
+  syncPopoverDescription(popoverDescription, "");
+  legacyHeader?.removeAttribute("hidden");
 
-  if (popoverBody) {
-    popoverBody.innerHTML = "";
+  if (popoverMount) {
+    popoverMount.replaceChildren();
   }
+
+  resetPopoverCardPosition(popoverCard);
 
   currentHolder = null;
   currentContent = null;
   currentTrigger = null;
+}
+
+function closeCellPopover(options?: { immediate?: boolean }) {
+  const popover = getPopover();
+  if (!popover) return;
+
+  if (isClosingPopover && !options?.immediate) {
+    return;
+  }
+
+  const isOpen = popover.classList.contains("cell-popover--open");
+  if (!isOpen && !currentContent) {
+    return;
+  }
+
+  currentFormStateCleanup?.();
+  currentFormStateCleanup = null;
+
+  popover.classList.remove("cell-popover--open");
+  popover.setAttribute("aria-hidden", "true");
   syncScrollLock(false);
+
+  if (options?.immediate || !currentContent) {
+    finalizePopoverClose(popover);
+    return;
+  }
+
+  isClosingPopover = true;
+  const { popoverCard } = getPopoverParts(popover);
+  let finalized = false;
+
+  const finish = () => {
+    if (finalized) {
+      return;
+    }
+
+    finalized = true;
+    finalizePopoverClose(popover);
+  };
+
+  if (!popoverCard) {
+    finish();
+    return;
+  }
+
+  const handleTransitionEnd = (event: TransitionEvent) => {
+    if (event.target !== popoverCard || event.propertyName !== "opacity") {
+      return;
+    }
+
+    finish();
+  };
+
+  popoverCard.addEventListener("transitionend", handleTransitionEnd);
+  closeFinalizeTimer = setTimeout(() => {
+    popoverCard.removeEventListener("transitionend", handleTransitionEnd);
+    finish();
+  }, CLOSE_TRANSITION_MS);
 }
 
 function openCellPopover(trigger: HTMLElement) {
@@ -97,34 +233,53 @@ function openCellPopover(trigger: HTMLElement) {
 
   portalPopoverToBody(popover);
 
-  const { popoverCard, popoverBody, popoverTitle } = getPopoverParts(popover);
-  if (!popoverCard || !popoverBody || !popoverTitle) return;
+  const {
+    popoverCard,
+    popoverMount,
+    popoverTitle,
+    popoverDescription,
+    legacyHeader,
+  } = getPopoverParts(popover);
+  if (!popoverCard || !popoverMount) return;
 
   const holder = trigger.parentElement?.querySelector<HTMLElement>(
     ".hidden-popover-form-holder",
   );
-  const content = holder?.firstElementChild;
-  if (!holder || !(content instanceof HTMLElement)) return;
+  const content = holder ? findPopoverContent(holder) : null;
+  if (!holder || !content) return;
 
   if (currentContent) {
-    closeCellPopover();
+    closeCellPopover({ immediate: true });
   }
 
   currentHolder = holder;
   currentContent = content;
   currentTrigger = trigger;
 
-  popoverTitle.textContent = trigger.dataset.popoverTitle || "Edit";
-  popoverBody.appendChild(content);
-
-  if (content instanceof HTMLFormElement) {
-    currentFormStateCleanup = bindPopoverFormSaveState(content);
+  if (isPopoverPanel(content)) {
+    legacyHeader?.setAttribute("hidden", "true");
+    popoverMount.replaceChildren(content);
   } else {
-    const form = content.querySelector("form");
-    if (form instanceof HTMLFormElement) {
-      currentFormStateCleanup = bindPopoverFormSaveState(form);
+    legacyHeader?.removeAttribute("hidden");
+    if (popoverTitle) {
+      popoverTitle.textContent = trigger.dataset.popoverTitle || "Edit";
     }
+    syncPopoverDescription(
+      popoverDescription,
+      trigger.dataset.popoverDescription?.trim() ?? "",
+    );
+    popoverMount.replaceChildren(content);
   }
+
+  const form = findPopoverForm(content);
+  if (form) {
+    currentFormStateCleanup = bindPopoverFormSaveState(form);
+  }
+
+  initHeroCarouselEditors({ rebind: true });
+  initFaqEditors({ rebind: true });
+  initTaglinesEditors({ rebind: true });
+  initPageSectionContentEditors({ rebind: true });
 
   popover.classList.add("cell-popover--open");
   popover.setAttribute("aria-hidden", "false");
@@ -172,9 +327,10 @@ export function initDashboardCellPopovers() {
 
     if (!isOpen || !popover) return;
 
-    const popoverCard = popover.querySelector(".cell-popover__card");
-    if (popoverCard?.contains(target)) return;
-    if (currentTrigger?.contains(target)) return;
+    const popoverCard = popover.querySelector<HTMLElement>(".cell-popover__card");
+    if (isEventInsidePopover(event, popoverCard)) return;
+    if (isEventInsideTrigger(event, currentTrigger)) return;
+    if (target.closest("select")) return;
 
     closeCellPopover();
   });
@@ -196,4 +352,8 @@ export function initDashboardCellPopovers() {
       closeCellPopover();
     }
   });
+}
+
+export function closeDashboardCellPopover() {
+  closeCellPopover({ immediate: true });
 }

@@ -18,7 +18,7 @@ describe("buildAdminAnalytics", () => {
         previousValue: 0,
         difference: 20,
         direction: "up",
-        tooltip: "+₱20.00 compared to the previous 30 days. Current receivable: ₱20.00; 30 days ago: ₱0.00. Based on processing orders with unpaid balance.",
+        tooltip: "+₱20 compared to the previous 30 days. Current receivable: ₱20; 30 days ago: ₱0. Based on processing orders with unpaid balance.",
       },
       orderCount: 3,
       newResellerApplications: 1,
@@ -372,7 +372,7 @@ describe("buildAdminAnalytics", () => {
       previousValue: 140,
       difference: -70,
       direction: "down",
-      tooltip: "-₱70.00 compared to the previous 30 days. Current receivable: ₱70.00; 30 days ago: ₱140.00. Based on processing orders with unpaid balance.",
+      tooltip: "-₱70 compared to the previous 30 days. Current receivable: ₱70; 30 days ago: ₱140. Based on processing orders with unpaid balance.",
     });
     expect(buildMetricTrend(120, 120)).toEqual({
       previousValue: 120,

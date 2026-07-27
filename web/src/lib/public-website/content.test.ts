@@ -11,6 +11,7 @@ vi.mock("@/lib/supabase/public", () => ({
 import {
   getFeaturedPublicProducts,
   getSectionEntries,
+  getSectionFieldEntries,
   getSectionHeading,
 } from "./content";
 
@@ -53,6 +54,24 @@ describe("public content helpers", () => {
     ).toEqual([
       ["Summary", "Local farm supply"],
       ["Sort Order", "2"],
+    ]);
+  });
+
+  it("returns keyed primitive content entries for inline editing", () => {
+    expect(
+      getSectionFieldEntries({
+        content: {
+          heading: "Ignored heading",
+          email: "hello@example.com",
+          nested: { unsafe: "ignored" },
+        },
+      }),
+    ).toEqual([
+      {
+        key: "email",
+        label: "Email",
+        value: "hello@example.com",
+      },
     ]);
   });
 });

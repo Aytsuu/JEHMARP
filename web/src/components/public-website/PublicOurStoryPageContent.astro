@@ -1,15 +1,18 @@
 ---
+import AdminContentEditable from "@/components/admin/AdminContentEditable.astro";
 import {
-  getSectionEntries,
+  getSectionFieldEntries,
   getSectionHeading,
   type PublicPageContent,
 } from "@/lib/public-website/content";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
 
 type Props = {
   content: PublicPageContent;
+  contentEditing?: AdminContentEditingContext;
 };
 
-const { content } = Astro.props;
+const { content, contentEditing } = Astro.props;
 ---
 
 <div class="our-story-container">
@@ -18,7 +21,7 @@ const { content } = Astro.props;
     {
       content.sections.length > 0 ? (
         content.sections.map((section) => {
-          const entries = getSectionEntries(section);
+          const fields = getSectionFieldEntries(section);
           const heading = getSectionHeading(section);
           const hasCustomHeading =
             heading && heading !== "Our Story" && heading !== "Section";
@@ -26,10 +29,27 @@ const { content } = Astro.props;
           return (
             <div class="our-story-section">
               {hasCustomHeading && (
-                <h3 class="our-story-subheading">{heading}</h3>
+                <AdminContentEditable
+                  contentEditing={contentEditing}
+                  section={section}
+                  fieldKey="heading"
+                  fieldLabel="Section heading"
+                  value={heading}
+                >
+                  <h3 class="our-story-subheading">{heading}</h3>
+                </AdminContentEditable>
               )}
-              {entries.map(([, value]) => (
-                <p class="our-story-paragraph">{value}</p>
+              {fields.map((field) => (
+                <AdminContentEditable
+                  contentEditing={contentEditing}
+                  section={section}
+                  fieldKey={field.key}
+                  fieldLabel={field.label}
+                  value={field.value}
+                  multiline
+                >
+                  <p class="our-story-paragraph">{field.value}</p>
+                </AdminContentEditable>
               ))}
             </div>
           );

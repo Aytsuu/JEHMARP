@@ -37,6 +37,7 @@ const feedback = getContactInquiryFeedback(Astro.url);
         feedback={feedback}
         turnstileSiteKey={turnstileSiteKey ?? null}
         returnPath={contactPath}
+        contentEditing={{ returnPath: contactPath }}
       />
     </PageShell>
   </AdminContentPreviewFrame>

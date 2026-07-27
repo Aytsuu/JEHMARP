@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { throwLoadError } from "@/lib/load-error";
+import { loadPlatformSettings } from "@/lib/platform-settings";
 import { sortOrderPaymentsDescending } from "@/lib/order-payments";
 import {
   agentSummaryWithProfileSelect,
@@ -674,6 +675,7 @@ export type AdminCustomerManagementData = {
   customers: AdminCustomerTableRow[];
   agents: AdminAgent[];
   pagination: AdminPaginatedResult<AdminCustomerTableRow>["pagination"];
+  defaultCustomerCreditLimit: number;
 };
 
 export type AdminAgentManagementData = Pick<
@@ -880,15 +882,17 @@ export async function loadAdminCustomerManagementData(
   pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminCustomerManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [customers, agents] = await Promise.all([
+  const [customers, agents, settings] = await Promise.all([
     loadPaginatedAdminCustomerRows(supabase, customerFilters, pagination),
     loadAgents(supabase),
+    loadPlatformSettings(supabase),
   ]);
 
   return {
     customers: customers.records,
     agents,
     pagination: customers.pagination,
+    defaultCustomerCreditLimit: settings.defaults.customerCreditLimit,
   };
 }
 

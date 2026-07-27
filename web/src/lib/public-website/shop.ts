@@ -25,6 +25,8 @@ export type ProductCategory = (typeof categories)[number];
 export type ProductStockStatus = (typeof stockStatuses)[number];
 export type ProductSort = (typeof sortOptions)[number];
 
+export const SHOP_PAGE_SIZE = 12;
+
 export type ShopFilters = {
   category?: ProductCategory;
   stockStatus?: ProductStockStatus;
@@ -75,7 +77,68 @@ export function parseShopFilters(url: URL): ShopFilters {
     maxPrice: parseNonNegativeNumber(url.searchParams.get("maxPrice")),
     sort,
     page,
-    pageSize: 12,
+    pageSize: SHOP_PAGE_SIZE,
+  };
+}
+
+export function sortPublicProducts(
+  products: PublicProduct[],
+  sort: ProductSort,
+): PublicProduct[] {
+  const sorted = [...products];
+
+  switch (sort) {
+    case "name_desc":
+      return sorted.sort((left, right) => right.name.localeCompare(left.name));
+    case "price_asc":
+      return sorted.sort((left, right) => left.default_price - right.default_price);
+    case "price_desc":
+      return sorted.sort((left, right) => right.default_price - left.default_price);
+    case "newest":
+      return sorted.sort(
+        (left, right) =>
+          new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
+      );
+    case "name_asc":
+    default:
+      return sorted.sort((left, right) => left.name.localeCompare(right.name));
+  }
+}
+
+export function applyShopFilters(
+  products: PublicProduct[],
+  filters: ShopFilters,
+): ProductListResult {
+  let filtered = [...products];
+
+  if (filters.category) {
+    filtered = filtered.filter((product) => product.category === filters.category);
+  }
+
+  if (filters.stockStatus) {
+    filtered = filtered.filter((product) => product.stock_status === filters.stockStatus);
+  }
+
+  if (filters.minPrice !== undefined) {
+    filtered = filtered.filter((product) => product.default_price >= filters.minPrice!);
+  }
+
+  if (filters.maxPrice !== undefined) {
+    filtered = filtered.filter((product) => product.default_price <= filters.maxPrice!);
+  }
+
+  filtered = sortPublicProducts(filtered, filters.sort);
+
+  const pagination = buildPagination({
+    count: filtered.length,
+    page: filters.page,
+    pageSize: filters.pageSize,
+  });
+  const start = (pagination.currentPage - 1) * filters.pageSize;
+
+  return {
+    products: filtered.slice(start, start + filters.pageSize),
+    pagination,
   };
 }
 

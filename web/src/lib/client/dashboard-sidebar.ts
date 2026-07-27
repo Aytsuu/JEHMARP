@@ -1,3 +1,5 @@
+import { hideDashboardTooltip } from "@/lib/client/dashboard-tooltip";
+
 const STORAGE_KEY = "dashboard-sidebar-collapsed";
 const COLLAPSED_CLASS = "dashboard-sidebar-collapsed";
 const ANIMATING_CLASS = "dashboard-sidebar-animating";
@@ -70,161 +72,31 @@ function beginSidebarAnimation() {
   }, 240);
 }
 
-function positionFloatingTooltip(trigger: HTMLElement, tooltip: HTMLElement) {
-  const rect = trigger.getBoundingClientRect();
-  tooltip.style.setProperty("--sidebar-tooltip-top", `${rect.top + rect.height / 2}px`);
-  tooltip.style.setProperty("--sidebar-tooltip-left", `${rect.right + 8}px`);
-}
-
-function showFloatingTooltip(trigger: HTMLElement, tooltip: HTMLElement) {
-  positionFloatingTooltip(trigger, tooltip);
-  tooltip.classList.add("is-visible");
-}
-
-function hideFloatingTooltip(tooltip: HTMLElement) {
-  tooltip.classList.remove("is-visible");
-  tooltip.style.removeProperty("--sidebar-tooltip-top");
-  tooltip.style.removeProperty("--sidebar-tooltip-left");
-}
-
-function hideAllFloatingTooltips() {
+function syncSidebarToggleTooltip(collapsed: boolean) {
   document
-    .querySelectorAll<HTMLElement>(
-      ".dashboard-sidebar__tooltip.is-visible, .dashboard-sidebar__toggle-tooltip.is-visible",
-    )
-    .forEach((tooltip) => {
-      hideFloatingTooltip(tooltip);
+    .querySelectorAll<HTMLElement>(".dashboard-sidebar__toggle-tooltip-trigger[data-tooltip]")
+    .forEach((trigger) => {
+      trigger.dataset.tooltip = collapsed ? "Expand sidebar" : "Collapse sidebar";
     });
 }
 
-function getVisibleToggleTooltip(toggle: HTMLElement) {
-  return toggle.querySelector<HTMLElement>(
-    isSidebarCollapsed()
-      ? ".dashboard-sidebar__toggle-tooltip--expand"
-      : ".dashboard-sidebar__toggle-tooltip--collapse",
-  );
-}
-
-function bindSidebarTooltipDelegation() {
+function bindSidebarScrollTooltipDismissal() {
   const dashboardWindow = window as Window & {
-    dashboardSidebarTooltipDelegationInitialized?: boolean;
+    dashboardSidebarScrollTooltipDismissalInitialized?: boolean;
   };
-  if (dashboardWindow.dashboardSidebarTooltipDelegationInitialized) return;
-  dashboardWindow.dashboardSidebarTooltipDelegationInitialized = true;
-
-  document.addEventListener("mouseover", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-
-    const navTrigger = target.closest<HTMLElement>(
-      ".dashboard-sidebar__nav a, .dashboard-sidebar__logout-form button",
-    );
-    if (navTrigger && isSidebarCollapsed()) {
-      const tooltip = navTrigger.querySelector<HTMLElement>(".dashboard-sidebar__tooltip");
-      if (tooltip) {
-        showFloatingTooltip(navTrigger, tooltip);
-      }
-      return;
-    }
-
-    const toggle = target.closest<HTMLButtonElement>("[data-dashboard-sidebar-toggle]");
-    if (toggle) {
-      const tooltip = getVisibleToggleTooltip(toggle);
-      if (tooltip) {
-        showFloatingTooltip(toggle, tooltip);
-      }
-    }
-  });
-
-  document.addEventListener("mouseout", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-
-    const navTrigger = target.closest<HTMLElement>(
-      ".dashboard-sidebar__nav a, .dashboard-sidebar__logout-form button",
-    );
-    if (navTrigger) {
-      const related = event.relatedTarget;
-      if (related instanceof Node && navTrigger.contains(related)) return;
-      const tooltip = navTrigger.querySelector<HTMLElement>(".dashboard-sidebar__tooltip");
-      if (tooltip) hideFloatingTooltip(tooltip);
-      return;
-    }
-
-    const toggle = target.closest<HTMLButtonElement>("[data-dashboard-sidebar-toggle]");
-    if (toggle) {
-      const related = event.relatedTarget;
-      if (related instanceof Node && toggle.contains(related)) return;
-      toggle
-        .querySelectorAll<HTMLElement>(".dashboard-sidebar__toggle-tooltip")
-        .forEach((tooltip) => {
-          hideFloatingTooltip(tooltip);
-        });
-    }
-  });
-
-  document.addEventListener("focusin", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-
-    const navTrigger = target.closest<HTMLElement>(
-      ".dashboard-sidebar__nav a, .dashboard-sidebar__logout-form button",
-    );
-    if (navTrigger && isSidebarCollapsed()) {
-      const tooltip = navTrigger.querySelector<HTMLElement>(".dashboard-sidebar__tooltip");
-      if (tooltip) showFloatingTooltip(navTrigger, tooltip);
-      return;
-    }
-
-    const toggle = target.closest<HTMLButtonElement>("[data-dashboard-sidebar-toggle]");
-    if (toggle) {
-      const tooltip = getVisibleToggleTooltip(toggle);
-      if (tooltip) showFloatingTooltip(toggle, tooltip);
-    }
-  });
-
-  document.addEventListener("focusout", (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-
-    const navTrigger = target.closest<HTMLElement>(
-      ".dashboard-sidebar__nav a, .dashboard-sidebar__logout-form button",
-    );
-    if (navTrigger) {
-      const related = event.relatedTarget;
-      if (related instanceof Node && navTrigger.contains(related)) return;
-      const tooltip = navTrigger.querySelector<HTMLElement>(".dashboard-sidebar__tooltip");
-      if (tooltip) hideFloatingTooltip(tooltip);
-      return;
-    }
-
-    const toggle = target.closest<HTMLButtonElement>("[data-dashboard-sidebar-toggle]");
-    if (toggle) {
-      const related = event.relatedTarget;
-      if (related instanceof Node && toggle.contains(related)) return;
-      toggle
-        .querySelectorAll<HTMLElement>(".dashboard-sidebar__toggle-tooltip")
-        .forEach((tooltip) => {
-          hideFloatingTooltip(tooltip);
-        });
-    }
-  });
+  if (dashboardWindow.dashboardSidebarScrollTooltipDismissalInitialized) return;
+  dashboardWindow.dashboardSidebarScrollTooltipDismissalInitialized = true;
 
   document.addEventListener(
     "scroll",
     (event) => {
       const target = event.target;
-      if (
-        target instanceof Element &&
-        target.closest(".dashboard-sidebar__scroll")
-      ) {
-        hideAllFloatingTooltips();
+      if (target instanceof Element && target.closest(".dashboard-sidebar__scroll")) {
+        hideDashboardTooltip();
       }
     },
     true,
   );
-
-  window.addEventListener("resize", hideAllFloatingTooltips, { passive: true });
 }
 
 function syncSidebarToggleState(
@@ -236,7 +108,8 @@ function syncSidebarToggleState(
   }
 
   document.documentElement.classList.toggle(COLLAPSED_CLASS, collapsed);
-  hideAllFloatingTooltips();
+  hideDashboardTooltip();
+  syncSidebarToggleTooltip(collapsed);
 
   document.querySelectorAll<HTMLButtonElement>("[data-dashboard-sidebar-toggle]").forEach(
     (button) => {
@@ -264,7 +137,7 @@ export function initDashboardSidebarCollapse() {
   dashboardWindow.dashboardSidebarCollapseInitialized = true;
 
   applyDashboardSidebarPreference();
-  bindSidebarTooltipDelegation();
+  bindSidebarScrollTooltipDismissal();
 
   document.addEventListener("click", (event) => {
     const target = event.target;

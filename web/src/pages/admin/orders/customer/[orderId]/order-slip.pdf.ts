@@ -4,6 +4,7 @@ import { loadAdminOrder } from "@/lib/admin-dashboard/data";
 import { buildOrderSlipPdf } from "@/lib/admin-dashboard/order-slip-pdf";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
 import { fullName } from "@/lib/admin-dashboard/view";
+import { loadDocumentLayoutOptions } from "@/lib/platform-settings/document-layout";
 
 export const prerender = false;
 
@@ -20,13 +21,9 @@ export const GET: APIRoute = async (context) => {
     return new Response("Order not found.", { status: 404 });
   }
 
-  const order = await loadAdminOrder(orderId);
-
-  if (!order) {
-    return new Response("Order not found.", { status: 404 });
-  }
-
-  const pdf = buildOrderSlipPdf(order);
+  const [order, documentLayout] = await Promise.all([loadAdminOrder(orderId), loadDocumentLayoutOptions()]);
+  if (!order) return new Response("Order not found.", { status: 404 });
+  const pdf = buildOrderSlipPdf(order, documentLayout);
   const body = new ArrayBuffer(pdf.byteLength);
   new Uint8Array(body).set(pdf);
   const fileName = `order-slip-${sanitizeFileName(fullName(order.customer))}-${order.id.slice(0, 8)}.pdf`;

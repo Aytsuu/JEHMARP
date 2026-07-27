@@ -4,7 +4,11 @@ import {
   buildPriceListHtml,
   buildPriceListText,
   checkRedisResellerApplicationRateLimit,
+  formatResellerEmailDeliveryErrorMessage,
+  isResellerEmailValidationError,
   releaseRedisRateLimitReservation,
+  RESELLER_EMAIL_DELIVERY_ERROR_MESSAGE,
+  RESELLER_EMAIL_VALIDATION_ERROR_MESSAGE,
   sendResellerPriceList,
   validateResellerApplicationInput,
   verifyTurnstileToken,
@@ -114,9 +118,82 @@ describe("reseller application edge workflow helpers", () => {
       sendResellerPriceList(fetcher as typeof fetch, {}, application, products),
     ).resolves.toEqual({
       status: "failed",
-      error: "Email provider is not configured.",
+      error: RESELLER_EMAIL_DELIVERY_ERROR_MESSAGE,
     });
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("maps Resend validation failures to a user-facing email error", async () => {
+    const fetcher = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            statusCode: 422,
+            name: "validation_error",
+            message: "Invalid `to` field",
+          }),
+          { status: 422 },
+        ),
+      ),
+    );
+
+    await expect(
+      sendResellerPriceList(
+        fetcher as typeof fetch,
+        {
+          apiKey: "re_test_key",
+          from: "JEHMARP <sales@example.com>",
+        },
+        application,
+        products,
+      ),
+    ).resolves.toEqual({
+      status: "failed",
+      error: RESELLER_EMAIL_VALIDATION_ERROR_MESSAGE,
+    });
+  });
+
+  it("maps unexpected provider failures to a generic delivery error", async () => {
+    const fetcher = vi.fn(() =>
+      Promise.resolve(
+        new Response("Internal Server Error", { status: 500 }),
+      ),
+    );
+
+    await expect(
+      sendResellerPriceList(
+        fetcher as typeof fetch,
+        {
+          apiKey: "re_test_key",
+          from: "JEHMARP <sales@example.com>",
+        },
+        application,
+        products,
+      ),
+    ).resolves.toEqual({
+      status: "failed",
+      error: RESELLER_EMAIL_DELIVERY_ERROR_MESSAGE,
+    });
+  });
+
+  it("formats stored provider errors for admin display", () => {
+    expect(
+      formatResellerEmailDeliveryErrorMessage(
+        JSON.stringify({
+          statusCode: 422,
+          name: "validation_error",
+          message: "Invalid `to` field",
+        }),
+      ),
+    ).toBe(RESELLER_EMAIL_VALIDATION_ERROR_MESSAGE);
+
+    expect(
+      formatResellerEmailDeliveryErrorMessage(
+        "Error: Something went wrong\n    at sendEmail (file.ts:10:5)",
+      ),
+    ).toBe(RESELLER_EMAIL_DELIVERY_ERROR_MESSAGE);
+
+    expect(isResellerEmailValidationError("mailbox not found for recipient")).toBe(true);
   });
 
   it("reserves Redis duplicate and rate-limit counters before expensive reseller work", async () => {

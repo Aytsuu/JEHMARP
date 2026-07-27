@@ -87,6 +87,16 @@ describe("deliverResellerPriceListEmailIfConfigured", () => {
         return { select: productSelect };
       }
 
+      if (table === "platform_settings") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+            })),
+          })),
+        };
+      }
+
       throw new Error(`Unexpected table ${table}`);
     });
 

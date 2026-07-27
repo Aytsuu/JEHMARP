@@ -77,6 +77,46 @@ export type EmailDeliveryResult =
       error: string;
     };
 
+export const RESELLER_EMAIL_VALIDATION_ERROR_MESSAGE = "Invalid email or email not found.";
+export const RESELLER_EMAIL_DELIVERY_ERROR_MESSAGE = "Price list email could not be sent.";
+
+export function formatResellerEmailDeliveryErrorMessage(error?: string | null): string {
+  const normalized = error?.trim();
+
+  if (!normalized) {
+    return RESELLER_EMAIL_DELIVERY_ERROR_MESSAGE;
+  }
+
+  if (
+    normalized === RESELLER_EMAIL_VALIDATION_ERROR_MESSAGE
+    || normalized === RESELLER_EMAIL_DELIVERY_ERROR_MESSAGE
+  ) {
+    return normalized;
+  }
+
+  if (isResellerEmailValidationError(normalized)) {
+    return RESELLER_EMAIL_VALIDATION_ERROR_MESSAGE;
+  }
+
+  return RESELLER_EMAIL_DELIVERY_ERROR_MESSAGE;
+}
+
+export function isResellerEmailValidationError(error: string): boolean {
+  const parsedError = parseResellerEmailProviderError(error);
+
+  if (parsedError) {
+    if (parsedError.name === "validation_error" || parsedError.statusCode === 422) {
+      return true;
+    }
+
+    if (parsedError.message && isEmailValidationMessage(parsedError.message)) {
+      return true;
+    }
+  }
+
+  return isEmailValidationMessage(error);
+}
+
 export type FetchLike = typeof fetch;
 
 type ValidationResult =
@@ -199,7 +239,7 @@ export async function sendResellerPriceList(
   if (!config.apiKey || !config.from) {
     return {
       status: "failed",
-      error: "Email provider is not configured.",
+      error: formatResellerEmailDeliveryErrorMessage("Email provider is not configured."),
     };
   }
 
@@ -629,9 +669,51 @@ async function sha256Hex(value: string): Promise<string> {
 }
 
 function normalizeProviderError(value: string): string {
-  if (!value) {
-    return "Email provider rejected the message.";
+  return formatResellerEmailDeliveryErrorMessage(value);
+}
+
+function parseResellerEmailProviderError(error: string): {
+  statusCode?: number;
+  name?: string;
+  message?: string;
+} | null {
+  const candidates = [error];
+
+  const jsonMatch = error.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    candidates.push(jsonMatch[0]);
   }
 
-  return value.length > 500 ? `${value.slice(0, 497)}...` : value;
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (!isRecord(parsed)) continue;
+
+      return {
+        statusCode: typeof parsed.statusCode === "number" ? parsed.statusCode : undefined,
+        name: typeof parsed.name === "string" ? parsed.name : undefined,
+        message: typeof parsed.message === "string" ? parsed.message : undefined,
+      };
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function isEmailValidationMessage(value: string): boolean {
+  const lower = value.toLowerCase();
+
+  return (
+    lower.includes("validation_error")
+    || lower.includes("invalid email")
+    || lower.includes("email not found")
+    || /invalid [`']?to[`']? field/i.test(value)
+    || (lower.includes("recipient") && (lower.includes("invalid") || lower.includes("not found")))
+    || (lower.includes("mailbox") && lower.includes("not found"))
+    || lower.includes("does not exist")
+    || lower.includes("no such user")
+    || lower.includes("undeliverable")
+  );
 }

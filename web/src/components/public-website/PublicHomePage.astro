@@ -5,22 +5,31 @@ import type {
   PublicFeaturedProduct,
   PublicPageSectionRecord,
 } from "@/lib/public-website/content";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
 
 type Props = {
   sections: PublicPageSectionRecord[];
   featuredProducts: PublicFeaturedProduct[];
   previewRoot?: string;
+  contentEditing?: AdminContentEditingContext;
 };
 
-const { sections, featuredProducts, previewRoot } = Astro.props;
+const { sections, featuredProducts, previewRoot, contentEditing } = Astro.props;
 
 const heroSection = sections.find((section) => section.type === "hero");
 const otherSections = sections.filter((section) => section.type !== "hero");
 ---
 
-{heroSection && <HomeHero section={heroSection} previewRoot={previewRoot} />}
+{heroSection && (
+  <HomeHero
+    section={heroSection}
+    previewRoot={previewRoot}
+    contentEditing={contentEditing}
+  />
+)}
 <HomePageSections
   sections={otherSections}
   featuredProducts={featuredProducts}
   previewRoot={previewRoot}
+  contentEditing={contentEditing}
 />

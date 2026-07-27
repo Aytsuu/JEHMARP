@@ -96,9 +96,10 @@ export function bindPopoverFormSaveState(form: HTMLFormElement): () => void {
   const { signal } = controller;
 
   const sync = () => {
+    const isSubmitting = form.dataset.isSubmitting === "true";
     const hasChanges = formHasChanges(form, snapshot);
     form.querySelectorAll<HTMLButtonElement>('button[type="submit"]').forEach((button) => {
-      button.disabled = !hasChanges;
+      button.disabled = isSubmitting || !hasChanges;
     });
   };
 

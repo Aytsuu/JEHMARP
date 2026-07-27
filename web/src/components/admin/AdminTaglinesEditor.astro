@@ -1,0 +1,184 @@
+---
+import TaglineDisplayStack from "@/components/home/TaglineDisplayStack.astro";
+import Popover from "@/components/ui/Popover.astro";
+import { jsonTextareaValue } from "@/lib/admin-dashboard/view";
+import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
+import type { PublicPageSectionRecord } from "@/lib/public-website/content";
+import {
+  TAGLINE_FONT_SIZES,
+  TAGLINE_FONT_WEIGHTS,
+  renderTaglinesEditorHtml,
+  type TaglineItem,
+} from "@/lib/public-website/home-taglines";
+
+type Props = {
+  contentEditing: AdminContentEditingContext;
+  section: PublicPageSectionRecord;
+  items: TaglineItem[];
+};
+
+const { contentEditing, section, items } = Astro.props;
+const editorHtml = renderTaglinesEditorHtml(items);
+---
+
+<div
+  class="admin-content-editable admin-content-editable--taglines"
+  data-taglines-preview-root={section.id}
+>
+  <div class="admin-content-editable__surface">
+    <TaglineDisplayStack items={items} />
+  </div>
+  <button
+    type="button"
+    class="admin-content-editable__trigger"
+    data-open-cell-popover
+    aria-label="Edit taglines"
+  >
+    <span class="admin-content-editable__overlay" aria-hidden="true">
+      <span class="admin-content-editable__edit-label">Edit</span>
+    </span>
+  </button>
+  <Popover
+    title="Edit taglines"
+    description="Use Enter for a new line. Select text and use the toolbar to style it. Changes save automatically."
+    width="wide"
+    formClass="admin-taglines-form"
+    formDataAttributes={{ "data-taglines-form": "" }}
+  >
+    <input type="hidden" name="action" value="save-page-section" />
+    <input type="hidden" name="sectionId" value={section.id} />
+    <input type="hidden" name="pageId" value={section.page_id} />
+    <input type="hidden" name="type" value={section.type} />
+    <input type="hidden" name="sortOrder" value={section.sort_order} />
+    <input type="hidden" name="status" value={section.status} />
+    <input type="hidden" name="returnPath" value={contentEditing.returnPath} />
+    <input type="hidden" name="contentField" value="items" />
+    <input
+      type="hidden"
+      name="currentContent"
+      value={jsonTextareaValue(section.content)}
+    />
+    <input
+      type="hidden"
+      name="contentValue"
+      data-taglines-json
+      value={JSON.stringify(items)}
+    />
+
+    <div class="admin-taglines-panel" data-taglines-panel>
+        <div class="admin-taglines-toolbar" role="toolbar" aria-label="Tagline formatting">
+          <div class="admin-taglines-toolbar__group">
+            <button
+              type="button"
+              class="admin-taglines-toolbar__button"
+              data-tagline-command="undo"
+              aria-label="Undo"
+              title="Undo"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M9 7H5v4"></path>
+                <path d="M5 11c1.5-3 4.5-5 8-5 4.4 0 8 3.6 8 8s-3.6 8-8 8"></path>
+              </svg>
+            </button>
+            <button
+              type="button"
+              class="admin-taglines-toolbar__button"
+              data-tagline-command="redo"
+              aria-label="Redo"
+              title="Redo"
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M15 7h4v4"></path>
+                <path d="M19 11c-1.5-3-4.5-5-8-5-4.4 0-8 3.6-8 8s3.6 8 8 8"></path>
+              </svg>
+            </button>
+          </div>
+
+          <span class="admin-taglines-toolbar__separator" aria-hidden="true"></span>
+
+          <div class="admin-taglines-toolbar__group">
+            <button
+              type="button"
+              class="admin-taglines-toolbar__button"
+              data-tagline-italic
+              aria-label="Italic"
+              title="Italic"
+            >
+              <em>I</em>
+            </button>
+          </div>
+
+          <span class="admin-taglines-toolbar__separator" aria-hidden="true"></span>
+
+          <label class="admin-taglines-toolbar__control">
+            <span class="sr-only">Font size</span>
+            <select data-tagline-size-select aria-label="Font size">
+              <option value="__mixed__" disabled hidden>Mixed</option>
+              {
+                TAGLINE_FONT_SIZES.map((size) => (
+                  <option value={size} selected={size === "lg"}>
+                    {size === "sm"
+                      ? "Small"
+                      : size === "md"
+                        ? "Medium"
+                        : size === "lg"
+                          ? "Large"
+                          : "Extra large"}
+                  </option>
+                ))
+              }
+            </select>
+          </label>
+
+          <label class="admin-taglines-toolbar__control">
+            <span class="sr-only">Font weight</span>
+            <select data-tagline-weight-select aria-label="Font weight">
+              <option value="__mixed__" disabled hidden>Mixed</option>
+              {
+                TAGLINE_FONT_WEIGHTS.map((weight) => (
+                  <option value={weight} selected={weight === 600}>
+                    {weight === 400
+                      ? "Regular"
+                      : weight === 500
+                        ? "Medium"
+                        : weight === 600
+                          ? "Semibold"
+                          : "Bold"}
+                  </option>
+                ))
+              }
+            </select>
+          </label>
+        </div>
+
+        <div
+          class="admin-taglines-editor tagline-headline"
+          contenteditable="true"
+          role="textbox"
+          aria-multiline="true"
+          data-taglines-editor
+          data-placeholder={"Fresh - Quality - Trusted\nFrom farmers to families - Quality you can trust"}
+          set:html={editorHtml}
+        />
+      </div>
+
+    <p class="admin-taglines-form__hint">
+      Press Enter for a new line. Select text to apply size, weight, or italic styling.
+      Changes save automatically.
+    </p>
+  </Popover>
+</div>
+
+<script>
+  import { initTaglinesEditors } from "@/lib/client/taglines-editor";
+
+  function init() {
+    initTaglinesEditors();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:after-swap", init);
+  if (document.readyState !== "loading") {
+    init();
+  }
+</script>
