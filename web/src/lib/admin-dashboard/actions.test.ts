@@ -2393,6 +2393,65 @@ describe("executeAdminAction", () => {
     expect(deleteUser).not.toHaveBeenCalled();
   });
 
+  it("rejects revoking customer promotion when the linked agent has distribution orders", async () => {
+    const customerId = "b10bb955-d8b1-4a26-a6e2-928fd33949e1";
+    const agentId = "1b1e62e9-8203-4bfd-884e-4f64d4ed5f89";
+    const customerMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        id: customerId,
+        promoted_to_agent_id: agentId,
+      },
+      error: null,
+    }));
+    const customerEq = vi.fn(() => ({ maybeSingle: customerMaybeSingle }));
+    const customerSelect = vi.fn(() => ({ eq: customerEq }));
+    const agentMaybeSingle = vi.fn(() => Promise.resolve({
+      data: {
+        id: agentId,
+        promoted_from_customer_id: customerId,
+      },
+      error: null,
+    }));
+    const agentEq = vi.fn(() => ({ maybeSingle: agentMaybeSingle }));
+    const agentSelect = vi.fn(() => ({ eq: agentEq }));
+    const distributionAgentEq = vi.fn(() => Promise.resolve({
+      count: 1,
+      error: null,
+    }));
+    const distributionKindEq = vi.fn(() => ({ eq: distributionAgentEq }));
+    const from = vi.fn((table: string) => {
+      if (table === "customer") {
+        return { select: customerSelect };
+      }
+
+      if (table === "agent") {
+        return { select: agentSelect };
+      }
+
+      if (table === "order") {
+        return {
+          select: vi.fn((columns: string, options?: { count?: string; head?: boolean }) => {
+            if (options?.count === "exact" && options.head) {
+              return { eq: distributionKindEq };
+            }
+
+            throw new Error(`Unexpected order select: ${columns}`);
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mocks.createSupabaseAdminClient.mockReturnValue({ from });
+
+    await expect(executeAdminAction({ from: vi.fn() } as never, {
+      type: "revoke-customer-agent-promotion",
+      customerId,
+    }, adminUserId)).rejects.toThrow(
+      "Cannot cancel agent promotion while the agent has linked distribution orders.",
+    );
+  });
+
   it("confirms agent received payments through the trusted RPC", async () => {
     const rpc = vi.fn(() => Promise.resolve({
       data: "1b1e62e9-8203-4bfd-884e-4f64d4ed5f89",

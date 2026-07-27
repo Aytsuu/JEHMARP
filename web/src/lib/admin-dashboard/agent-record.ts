@@ -11,12 +11,21 @@ import { parseAdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
 import type { AdminPaginationPageSize } from "@/lib/admin-dashboard/pagination";
 import { buildAdminPagination } from "@/lib/admin-dashboard/pagination";
 import {
+  buildCustomerReceivableSegments,
+  customerEstimatedInvoiceTotal,
+  type CustomerReceivableBucket,
+  type CustomerReceivableSegment,
+} from "@/lib/admin-dashboard/customer-record";
+import {
   agentOrderCommissionTotal,
   agentOrderPaymentStatus,
+  agentOrderReceivableTotal,
   agentOrderTotal,
+  formatCurrency,
   fullName,
   orderBalance,
   orderCommissionTotal,
+  orderReceivableTotal,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { formatOrderCode } from "@/lib/order-detail-nav";
@@ -238,9 +247,317 @@ export function agentRecordCommissionTotal(
   customerOrders: AdminOrder[],
   agentOrders: AdminAgentOrder[],
 ) {
+  const customerCommission = customerOrders
+    .filter(isCustomerOrderCommissionEarned)
+    .reduce((total, order) => total + orderCommissionTotal(order), 0);
+  const agentCommission = agentOrders
+    .filter(isAgentOrderCommissionEarned)
+    .reduce((total, order) => total + agentOrderCommissionTotal(order), 0);
+
+  return roundCurrency(customerCommission + agentCommission);
+}
+
+const PENDING_RECEIVABLE_COLOR = "#f97316";
+
+export type AgentReceivableSegment = CustomerReceivableSegment & {
+  tooltip: string;
+};
+
+type ReceivableBreakdownLine = {
+  label: string;
+  amount: number;
+  count: number;
+  countLabel?: string;
+};
+
+function invoiceCountLabel(count: number) {
+  return `${count} invoice${count === 1 ? "" : "s"}`;
+}
+
+function distributionCountLabel(count: number) {
+  return `${count} distribution${count === 1 ? "" : "s"}`;
+}
+
+function formatReceivableSegmentTooltip(
+  segmentLabel: string,
+  lines: ReceivableBreakdownLine[],
+) {
+  const visibleLines = lines.filter((line) => line.amount > 0 || line.count > 0);
+
+  if (visibleLines.length === 0) {
+    return `No ${segmentLabel.toLowerCase()} orders.`;
+  }
+
+  return [
+    segmentLabel,
+    ...visibleLines.map((line) => {
+      const countLabel = line.countLabel ?? invoiceCountLabel(line.count);
+      return `${line.label}: ${formatCurrency(line.amount)} (${countLabel})`;
+    }),
+  ].join("\n");
+}
+
+function allAttachedCustomerOrderIds(agentOrders: AdminAgentOrder[]) {
+  return new Set(
+    agentOrders.flatMap((order) => order.customer_order.map((child) => child.id)),
+  );
+}
+
+function pendingAgentUnallocatedReceivable(agentOrder: AdminAgentOrder) {
+  const attachedReceivable = agentOrder.customer_order.reduce(
+    (total, order) => total + orderReceivableTotal(order, "final_quantity"),
+    0,
+  );
+
+  return roundCurrency(Math.max(agentOrderReceivableTotal(agentOrder) - attachedReceivable, 0));
+}
+
+function sumPersonalPendingCustomerOrders(customerOrders: AdminOrder[], agentOrders: AdminAgentOrder[]) {
+  const attachedOnPendingIds = attachedCustomerOrderIdsOnPendingAgents(agentOrders);
+
+  return customerOrders.reduce(
+    (totals, order) => {
+      if (order.order_status !== "pending" || attachedOnPendingIds.has(order.id)) {
+        return totals;
+      }
+
+      return {
+        amount: roundCurrency(totals.amount + orderReceivableTotal(order, "final_quantity")),
+        count: totals.count + 1,
+      };
+    },
+    { amount: 0, count: 0 },
+  );
+}
+
+function sumPendingDistributionBreakdown(agentOrders: AdminAgentOrder[]) {
+  return agentOrders.reduce(
+    (totals, order) => {
+      if (!isPendingAgentDistributionOrder(order)) {
+        return totals;
+      }
+
+      const unallocated = pendingAgentUnallocatedReceivable(order);
+      if (unallocated > 0) {
+        totals.unallocated.amount = roundCurrency(totals.unallocated.amount + unallocated);
+        totals.unallocated.count += 1;
+      }
+
+      for (const customerOrder of order.customer_order) {
+        if (customerOrder.order_status !== "pending") {
+          continue;
+        }
+
+        const receivable = orderReceivableTotal(customerOrder, "final_quantity");
+        if (receivable <= 0) {
+          continue;
+        }
+
+        totals.allocated.amount = roundCurrency(totals.allocated.amount + receivable);
+        totals.allocated.count += 1;
+      }
+
+      return totals;
+    },
+    {
+      unallocated: { amount: 0, count: 0 },
+      allocated: { amount: 0, count: 0 },
+    },
+  );
+}
+
+function resolveCustomerOrderReceivableBucket(order: AdminOrder): CustomerReceivableBucket | null {
+  if (order.order_status === "pending") {
+    return "pending";
+  }
+
+  if (order.payment_status === "paid") {
+    return "paid";
+  }
+
+  if (order.payment_status === "partial") {
+    return "partial";
+  }
+
+  return "unpaid";
+}
+
+function sumCustomerOrdersByBucket(
+  customerOrders: AdminOrder[],
+  bucket: CustomerReceivableBucket,
+  attachedCustomerOrderIds: Set<string>,
+) {
+  return customerOrders.reduce(
+    (totals, order) => {
+      if (resolveCustomerOrderReceivableBucket(order) !== bucket) {
+        return totals;
+      }
+
+      const isPersonal = !attachedCustomerOrderIds.has(order.id);
+      const target = isPersonal ? totals.personal : totals.distribution;
+      const amount = bucket === "pending" || bucket === "paid"
+        ? orderReceivableTotal(order, "final_quantity")
+        : orderBalance(order);
+
+      target.amount = roundCurrency(target.amount + amount);
+      target.count += 1;
+
+      return totals;
+    },
+    {
+      personal: { amount: 0, count: 0 },
+      distribution: { amount: 0, count: 0 },
+    },
+  );
+}
+
+function buildAgentReceivableSegmentTooltip(
+  bucket: CustomerReceivableBucket,
+  customerOrders: AdminOrder[],
+  agentOrders: AdminAgentOrder[],
+) {
+  const segmentLabel = bucket === "paid"
+    ? "Paid"
+    : bucket === "partial"
+      ? "Partial"
+      : bucket === "unpaid"
+        ? "Unpaid"
+        : "Pending";
+
+  if (bucket === "pending") {
+    const personal = sumPersonalPendingCustomerOrders(customerOrders, agentOrders);
+    const distribution = sumPendingDistributionBreakdown(agentOrders);
+
+    return formatReceivableSegmentTooltip(segmentLabel, [
+      { label: "Personal orders", ...personal },
+      {
+        label: "Unallocated distribution orders",
+        ...distribution.unallocated,
+        countLabel: distributionCountLabel(distribution.unallocated.count),
+      },
+      {
+        label: "Allocated on distributions",
+        ...distribution.allocated,
+      },
+    ]);
+  }
+
+  const attachedCustomerOrderIds = allAttachedCustomerOrderIds(agentOrders);
+  const totals = sumCustomerOrdersByBucket(customerOrders, bucket, attachedCustomerOrderIds);
+
+  return formatReceivableSegmentTooltip(segmentLabel, [
+    { label: "Personal orders", ...totals.personal },
+    { label: "Distribution customer orders", ...totals.distribution },
+  ]);
+}
+
+function attachAgentReceivableTooltips(
+  segments: CustomerReceivableSegment[],
+  customerOrders: AdminOrder[],
+  agentOrders: AdminAgentOrder[],
+): AgentReceivableSegment[] {
+  return segments.map((segment) => ({
+    ...segment,
+    tooltip: buildAgentReceivableSegmentTooltip(segment.bucket, customerOrders, agentOrders),
+  }));
+}
+
+function attachedCustomerOrderIdsOnPendingAgents(agentOrders: AdminAgentOrder[]) {
+  return new Set(
+    agentOrders
+      .filter(isPendingAgentDistributionOrder)
+      .flatMap((order) => order.customer_order.map((child) => child.id)),
+  );
+}
+
+function sumPendingAgentDistributionReceivable(agentOrders: AdminAgentOrder[]) {
+  return agentOrders.reduce(
+    (totals, order) => {
+      if (!isPendingAgentDistributionOrder(order)) {
+        return totals;
+      }
+
+      return {
+        amount: roundCurrency(totals.amount + agentOrderReceivableTotal(order)),
+        count: totals.count + 1,
+      };
+    },
+    { amount: 0, count: 0 },
+  );
+}
+
+function customerOrdersForAgentReceivableSegments(
+  customerOrders: AdminOrder[],
+  agentOrders: AdminAgentOrder[],
+) {
+  const attachedPendingCustomerOrderIds = attachedCustomerOrderIdsOnPendingAgents(agentOrders);
+
+  return customerOrders.filter(
+    (order) => order.order_status !== "pending" || !attachedPendingCustomerOrderIds.has(order.id),
+  );
+}
+
+function withAgentPendingSegmentColor(segments: CustomerReceivableSegment[]) {
+  return segments.map((segment) => (
+    segment.bucket === "pending"
+      ? { ...segment, color: PENDING_RECEIVABLE_COLOR }
+      : segment
+  ));
+}
+
+function isPendingAgentDistributionOrder(order: AdminAgentOrder) {
+  return order.order_status === "pending_customers" || order.order_status === "pending_order";
+}
+
+export function agentRecordEstimatedInvoiceTotal(
+  customerOrders: AdminOrder[],
+  agentOrders: AdminAgentOrder[],
+) {
+  const pendingAgentContribution = sumPendingAgentDistributionReceivable(agentOrders).amount;
+
   return roundCurrency(
-    customerOrders.reduce((total, order) => total + orderCommissionTotal(order), 0)
-    + agentOrders.reduce((total, order) => total + agentOrderCommissionTotal(order), 0),
+    customerEstimatedInvoiceTotal(
+      customerOrdersForAgentReceivableSegments(customerOrders, agentOrders),
+    ) + pendingAgentContribution,
+  );
+}
+
+export function buildAgentReceivableSegments(
+  customerOrders: AdminOrder[],
+  agentOrders: AdminAgentOrder[],
+): AgentReceivableSegment[] {
+  const pendingAgentContribution = sumPendingAgentDistributionReceivable(agentOrders);
+  const segments = buildCustomerReceivableSegments(
+    customerOrdersForAgentReceivableSegments(customerOrders, agentOrders),
+  );
+
+  if (pendingAgentContribution.amount <= 0) {
+    return attachAgentReceivableTooltips(
+      withAgentPendingSegmentColor(segments),
+      customerOrders,
+      agentOrders,
+    );
+  }
+
+  const withoutPending = segments.filter((segment) => segment.bucket !== "pending");
+  const customerPendingSegment = segments.find((segment) => segment.bucket === "pending");
+
+  const mergedPending: CustomerReceivableSegment = {
+    bucket: "pending",
+    label: "Pending",
+    color: PENDING_RECEIVABLE_COLOR,
+    invoiceCount: (customerPendingSegment?.invoiceCount ?? 0) + pendingAgentContribution.count,
+    receivable: roundCurrency(
+      (customerPendingSegment?.receivable ?? 0) + pendingAgentContribution.amount,
+    ),
+  };
+
+  return attachAgentReceivableTooltips(
+    [...withoutPending, mergedPending].sort(
+      (left, right) => right.receivable - left.receivable,
+    ),
+    customerOrders,
+    agentOrders,
   );
 }
 

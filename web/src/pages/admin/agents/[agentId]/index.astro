@@ -5,11 +5,13 @@ import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import {
   agentRecordCommissionTotal,
+  agentRecordEstimatedInvoiceTotal,
   agentRecordOrderCounts,
   agentRecordPaymentsSubmitted,
   buildAgentAssignedCustomerRows,
   buildAgentPerformanceQuickStats,
   buildAgentPreviousOrderRows,
+  buildAgentReceivableSegments,
   buildAgentRecordOrderRows,
   filterAgentAssignedCustomerRows,
   filterAgentPreviousOrderRows,
@@ -22,9 +24,7 @@ import {
 import {
   buildCustomerInvoiceRows,
   buildCustomerPaymentRows,
-  buildCustomerReceivableSegments,
   buildCustomerSalesRows,
-  customerEstimatedInvoiceTotal,
   customerProcessingReceivableTotal,
   filterCustomerInvoiceRows,
   filterCustomerPaymentRows,
@@ -32,6 +32,7 @@ import {
 } from "@/lib/admin-dashboard/customer-record";
 import {
   loadAdminAgentDetailsData,
+  loadAdminCustomerRecord,
   loadAdminDashboardData,
 } from "@/lib/admin-dashboard/data";
 import { mergeAdminPaginationQuery, parseAdminPagination } from "@/lib/admin-dashboard/pagination";
@@ -80,10 +81,12 @@ const activeTab = parseAgentRecordTab(Astro.url.searchParams.get("tab"));
 const orderFilters = parseAgentRecordFilters(Astro.url);
 const pagination = parseAdminPagination(Astro.url);
 const customerOrders = detailData.customerOrders;
-const linkedCustomerId = agent.promoted_from_customer_id ?? agent.customer_id ?? null;
-const linkedCustomer = linkedCustomerId
-  ? dashboardData.customers.find((customer) => customer.id === linkedCustomerId) ?? null
-  : null;
+const promotedCustomerId = agent.promoted_from_customer_id ?? null;
+const linkedCustomer = promotedCustomerId
+  ? await loadAdminCustomerRecord(promotedCustomerId)
+  : agent.customer_id
+    ? dashboardData.customers.find((customer) => customer.id === agent.customer_id) ?? null
+    : null;
 const showPreviousOrdersTab = Boolean(agent.promoted_from_customer_id);
 
 const orderCounts = agentRecordOrderCounts(customerOrders, detailData.agentOrders);
@@ -97,8 +100,14 @@ const performanceQuickStats = buildAgentPerformanceQuickStats(
   agentReturnTo,
 );
 const processingReceivableTotal = customerProcessingReceivableTotal(customerOrders);
-const estimatedInvoiceTotal = customerEstimatedInvoiceTotal(customerOrders);
-const receivableSegments = buildCustomerReceivableSegments(customerOrders);
+const estimatedInvoiceTotal = agentRecordEstimatedInvoiceTotal(
+  customerOrders,
+  detailData.agentOrders,
+);
+const receivableSegments = buildAgentReceivableSegments(
+  customerOrders,
+  detailData.agentOrders,
+);
 
 const filteredOrders = filterAgentRecordOrderRows(
   buildAgentRecordOrderRows(customerOrders, detailData.agentOrders, agentReturnTo),
@@ -221,6 +230,7 @@ const filterQuery = mergeAdminPaginationQuery(
     performanceQuickStats={performanceQuickStats}
     agentReturnTo={agentReturnTo}
     showPreviousOrdersTab={showPreviousOrdersTab}
+    hasAgentDistributionOrders={detailData.agentOrders.length > 0}
   />
 </AdminNotificationsPageLayout>
 
