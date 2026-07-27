@@ -1,6 +1,7 @@
 ---
 import FormSubmissionFeedback from "@/components/ui/FormSubmissionFeedback.astro";
 import { RESELLER_APPLICATION_FEEDBACK_PARAMS } from "@/lib/client/form-submission-feedback-url";
+import { isAdminContentPreviewPath } from "@/lib/public-website/admin-content-preview";
 import {
   plannedTransactionTypeLabels,
   type ResellerApplicationFeedback,
@@ -14,6 +15,10 @@ type Props = {
 
 const { feedback, turnstileSiteKey, returnPath } = Astro.props;
 const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
+const disableFormSubmission = returnPath
+  ? isAdminContentPreviewPath(returnPath)
+  : false;
+const previewSubmissionTitle = "Submissions are disabled in content preview";
 ---
 
 <div class="business-layout">
@@ -97,7 +102,12 @@ const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
           />
         )
       }
-      <form class="form-grid" method="post" action="/api/reseller-applications">
+      <form
+        class="form-grid"
+        method="post"
+        action="/api/reseller-applications"
+        onsubmit={disableFormSubmission ? "return false;" : undefined}
+      >
         {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
         <fieldset class="fieldset-block">
           <legend>Business details</legend>
@@ -190,9 +200,13 @@ const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
         </div>
 
         <div class="button-row">
-          <button type="submit" disabled={!turnstileSiteKey}
-            >Submit application</button
+          <button
+            type="submit"
+            disabled={disableFormSubmission || !turnstileSiteKey}
+            title={disableFormSubmission ? previewSubmissionTitle : undefined}
           >
+            Submit application
+          </button>
         </div>
       </form>
     </section>

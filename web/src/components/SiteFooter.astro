@@ -11,9 +11,14 @@ type Props = {
 };
 
 const { previewRoot } = Astro.props;
+const disableGuestActions = Boolean(previewRoot);
 
 function linkHref(href: string) {
   return previewRoot ? toAdminContentPreviewHref(href) : href;
+}
+
+function isDisabledGuestAction(href: string) {
+  return disableGuestActions && href === "/login";
 }
 
 const content = await getPublicPageContent(Astro, "contact");
@@ -108,7 +113,17 @@ function toEmailLink(value: string) {
         <ul class="footer-column__links">
           {authRoutes.map((item) => (
             <li>
-              <a href={linkHref(item.href)}>{item.label}</a>
+              {isDisabledGuestAction(item.href) ? (
+                <span
+                  class="footer-column__link--disabled"
+                  aria-disabled="true"
+                  title="Login is unavailable in content preview"
+                >
+                  {item.label}
+                </span>
+              ) : (
+                <a href={linkHref(item.href)}>{item.label}</a>
+              )}
             </li>
           ))}
         </ul>

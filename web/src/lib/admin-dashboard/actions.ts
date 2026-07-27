@@ -20,6 +20,7 @@ import {
   type PlatformSettingsAdminAction,
 } from "@/lib/admin-dashboard/platform-settings-actions";
 import { DEFAULT_CUSTOMER_CREDIT_LIMIT } from "@/lib/platform-settings";
+import { isLockedContactDetailsField } from "@/lib/platform-settings/contact-sync";
 import {
   assertAgentContactIsAvailable,
   assertAgentEmailIsAvailable,
@@ -248,6 +249,11 @@ export type AdminAction =
       type: "update-agent";
       agentId: string;
       payload: ReturnType<typeof parseAgentProfileUpdateFields>;
+    }
+  | {
+      type: "set-agent-status";
+      agentId: string;
+      status: "active" | "inactive";
     }
   | {
       type: "create-order";
@@ -776,6 +782,9 @@ export async function executeAdminAction(
     case "update-agent":
       await executeAgentProfileUpdate(createSupabaseAdminClient(), action.agentId, action.payload);
       return;
+    case "set-agent-status":
+      await executeAgentStatusUpdate(createSupabaseAdminClient(), action.agentId, action.status);
+      return;
     case "create-order":
       return await executeOrderCreate(supabase, action, options);
     case "update-order-status":
@@ -968,18 +977,21 @@ export async function executeAdminAction(
     case "mark-all-admin-notifications-read":
       await markAllAdminNotificationsRead(supabase, adminUserId);
       return;
-    case "save-platform-settings-business-profile":
-    case "save-platform-settings-document-payment":
-    case "save-platform-settings-defaults":
-    case "save-platform-settings-notifications":
-    case "save-platform-settings-document-numbering":
+    case "save-platform-settings-general":
     case "change-admin-password":
     case "send-agent-password-reset": {
       const { data: authData } = await supabase.auth.getUser();
-      await executePlatformSettingsAdminAction(supabase, action, adminUserId, {
+      const result = await executePlatformSettingsAdminAction(supabase, action, adminUserId, {
         adminEmail: authData.user?.email,
         siteOrigin: options.siteOrigin,
       });
+
+      if (action.type === "save-platform-settings-general" && result) {
+        return {
+          sectionContent: result,
+        };
+      }
+
       return;
     }
   }
@@ -1046,6 +1058,7 @@ function parseAdminActionFormDataOrThrow(
 
   switch (action) {
     case "save-page-section": {
+      const sectionType = requiredString(formData, "type");
       const contentField = optionalString(formData, "contentField");
       const contentValue = formData.get("contentValue");
       const imageFile = optionalSectionImage(formData, "imageFile");
@@ -1106,6 +1119,10 @@ function parseAdminActionFormDataOrThrow(
 
           content = updateHeroSlideAlt(currentContent, slideIndex, contentValue);
         } else if (contentField) {
+          if (sectionType === "contact_details" && isLockedContactDetailsField(contentField)) {
+            throw new Error("Contact email and phone are managed in Settings.");
+          }
+
           if (typeof contentValue !== "string") {
             throw new Error("Content value is required.");
           }
@@ -1237,6 +1254,12 @@ function parseAdminActionFormDataOrThrow(
         type: "update-agent",
         agentId: uuidSchema.parse(requiredString(formData, "agentId")),
         payload: parseAgentProfileUpdateFields(formData),
+      });
+    case "set-agent-status":
+      return success({
+        type: "set-agent-status",
+        agentId: uuidSchema.parse(requiredString(formData, "agentId")),
+        status: enumValue(formData, "status", ["active", "inactive"] as const),
       });
     case "create-order": {
       const existingCustomerId = optionalUuid(formData, "customerId");
@@ -1607,6 +1630,35 @@ async function executeAgentCreate(
     }
 
     throw error;
+  }
+}
+
+async function executeAgentStatusUpdate(
+  adminClient: SupabaseAdminClient,
+  agentId: string,
+  status: "active" | "inactive",
+) {
+  const { data: agent, error: loadError } = await adminClient
+    .from("agent")
+    .select("id")
+    .eq("id", agentId)
+    .maybeSingle();
+
+  if (loadError) {
+    throw new Error("Unable to load agent profile.");
+  }
+
+  if (!agent) {
+    throw new Error("Agent profile was not found.");
+  }
+
+  const { error } = await adminClient
+    .from("agent")
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq("id", agentId);
+
+  if (error) {
+    throw new Error("Unable to update agent status.");
   }
 }
 
@@ -4437,6 +4489,8 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Customer promotion revoked.";
     case "update-agent":
       return "Agent updated.";
+    case "set-agent-status":
+      return action.status === "active" ? "Agent activated." : "Agent deactivated.";
     case "create-order":
       return "Order created.";
     case "update-order-status":
@@ -4501,11 +4555,7 @@ function getActionSuccessMessage(action: AdminAction) {
       return "Notification marked as read.";
     case "mark-all-admin-notifications-read":
       return "Notifications marked as read.";
-    case "save-platform-settings-business-profile":
-    case "save-platform-settings-document-payment":
-    case "save-platform-settings-defaults":
-    case "save-platform-settings-notifications":
-    case "save-platform-settings-document-numbering":
+    case "save-platform-settings-general":
     case "change-admin-password":
     case "send-agent-password-reset":
       return getPlatformSettingsActionSuccessMessage(action);

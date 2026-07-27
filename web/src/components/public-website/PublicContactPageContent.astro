@@ -7,6 +7,8 @@ import {
   getSectionHeading,
   type PublicPageContent,
 } from "@/lib/public-website/content";
+import { isLockedContactDetailsField } from "@/lib/platform-settings/contact-sync";
+import { isAdminContentPreviewPath } from "@/lib/public-website/admin-content-preview";
 import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
 import type { ContactInquiryFeedback } from "@/lib/public-website/contact-inquiries";
 
@@ -19,6 +21,11 @@ type Props = {
 };
 
 const { content, feedback, turnstileSiteKey, returnPath, contentEditing } = Astro.props;
+
+const disableFormSubmission = returnPath
+  ? isAdminContentPreviewPath(returnPath)
+  : false;
+const previewSubmissionTitle = "Submissions are disabled in content preview";
 
 const detailsSection = content.sections.find((s) => s.type === "contact_details");
 const orderingSection = content.sections.find((s) => s.type === "ordering_note");
@@ -89,7 +96,12 @@ function getIconTypeFromLabel(label: string) {
           />
         )
       }
-      <form class="form-grid" method="post" action="/api/contact-inquiries">
+      <form
+        class="form-grid"
+        method="post"
+        action="/api/contact-inquiries"
+        onsubmit={disableFormSubmission ? "return false;" : undefined}
+      >
         {returnPath && <input type="hidden" name="returnPath" value={returnPath} />}
         <fieldset class="fieldset-block">
           <legend>Contact details</legend>
@@ -146,7 +158,13 @@ function getIconTypeFromLabel(label: string) {
         </div>
 
         <div class="button-row">
-          <button type="submit" disabled={!turnstileSiteKey}>Send inquiry</button>
+          <button
+            type="submit"
+            disabled={disableFormSubmission || !turnstileSiteKey}
+            title={disableFormSubmission ? previewSubmissionTitle : undefined}
+          >
+            Send inquiry
+          </button>
         </div>
       </form>
     </section>
@@ -256,16 +274,22 @@ function getIconTypeFromLabel(label: string) {
                       </svg>
                     )}
                   </span>
-                  <AdminContentEditable
-                    contentEditing={contentEditing}
-                    section={detailsSection}
-                    fieldKey={entry.key}
-                    fieldLabel={entry.label}
-                    value={entry.value}
-                    class="admin-content-editable--inline"
-                  >
-                    <span class="contact-details-value">{entry.value}</span>
-                  </AdminContentEditable>
+                  {
+                    isLockedContactDetailsField(entry.key) ? (
+                      <span class="contact-details-value">{entry.value}</span>
+                    ) : (
+                      <AdminContentEditable
+                        contentEditing={contentEditing}
+                        section={detailsSection}
+                        fieldKey={entry.key}
+                        fieldLabel={entry.label}
+                        value={entry.value}
+                        class="admin-content-editable--inline"
+                      >
+                        <span class="contact-details-value">{entry.value}</span>
+                      </AdminContentEditable>
+                    )
+                  }
                 </div>
               );
             })}

@@ -5,6 +5,7 @@ import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmpty
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import DashboardTablePagination from "@/components/dashboard/DashboardTablePagination.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Button from "@/components/ui/Button.astro";
 import Popover from "@/components/ui/Popover.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import type { AdminProductManagementData } from "@/lib/admin-dashboard/data";
@@ -319,12 +320,14 @@ function formatStockStatus(status: string): string {
         </div>
       </form>
       <div class="product-management-toolbar__actions">
-        <button
+        <Button
           type="button"
-          class="btn-table-manage product-management-toolbar__create"
+          class="product-management-toolbar__create"
           data-open-create-sheet
-          data-sheet-target="#create-product-sheet">Create Product</button
+          data-sheet-target="#create-product-sheet"
         >
+          Create Product
+        </Button>
       </div>
     </div>
 

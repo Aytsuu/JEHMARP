@@ -21,8 +21,24 @@ describe("mergePlatformSettings", () => {
 });
 
 describe("resolveNotificationEmails", () => {
-  it("prefers configured route emails over fallbacks", () => {
+  it("prefers business profile emails over route and fallback values", () => {
     const settings = mergePlatformSettings(normalizePlatformSettings({}), {
+      businessProfile: { primaryEmail: "ops@example.com", secondaryEmail: "backup@example.com" },
+      notifications: {
+        routes: [
+          { event: "new_order", primaryEmail: "legacy@example.com", secondaryEmail: "" },
+          ...DEFAULT_PLATFORM_SETTINGS.notifications.routes.slice(1),
+        ],
+      },
+    });
+
+    expect(resolveNotificationEmails("new_order", settings, { new_order: "fallback@example.com" }))
+      .toEqual(["ops@example.com", "backup@example.com"]);
+  });
+
+  it("prefers configured route emails over fallbacks when profile emails are empty", () => {
+    const settings = mergePlatformSettings(normalizePlatformSettings({}), {
+      businessProfile: { primaryEmail: "", secondaryEmail: "" },
       notifications: {
         routes: [
           { event: "new_order", primaryEmail: "ops@example.com", secondaryEmail: "" },

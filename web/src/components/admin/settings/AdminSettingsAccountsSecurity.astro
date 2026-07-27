@@ -1,31 +1,218 @@
-<section class="admin-card admin-settings-card">
-  <header class="admin-card__header">
+---
+import ActionMenu from "@/components/ActionMenu.astro";
+import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
+import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
+import Button from "@/components/ui/Button.astro";
+import Sheet from "@/components/ui/Sheet.astro";
+import type { AdminAgent } from "@/lib/admin-dashboard/data";
+
+type Props = {
+  agents: AdminAgent[];
+};
+
+const { agents } = Astro.props;
+---
+
+<section class="admin-settings-card" data-admin-settings-accounts>
+  <header class="admin-settings-card__header">
     <h3>Accounts &amp; security</h3>
-    <p>Update your admin password or send a password reset email to an agent account.</p>
+    <p>Update your admin password and manage agent login accounts.</p>
   </header>
-  <form method="post" class="admin-form admin-settings-form" data-astro-reload>
-    <input type="hidden" name="action" value="change-admin-password" />
-    <h4>Change admin password</h4>
-    <div class="admin-form-grid admin-settings-form__grid">
-      <label class="field-row admin-settings-form__full"><span>Current password</span><input name="currentPassword" type="password" autocomplete="current-password" required /></label>
-      <label class="field-row"><span>New password</span><input name="newPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
-      <label class="field-row"><span>Confirm new password</span><input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
+
+  <div class="admin-settings-section-row">
+    <div class="admin-settings-section-row__intro">
+      <h4>Admin password</h4>
+      <p>Update your admin sign-in password. You will need your current password to confirm the change.</p>
     </div>
-    <div class="admin-settings-form__actions"><button type="submit">Update password</button></div>
-  </form>
-  <form method="post" class="admin-form admin-settings-form admin-settings-form--section" data-astro-reload>
-    <input type="hidden" name="action" value="send-agent-password-reset" />
-    <h4>Agent password reset</h4>
-    <p class="admin-settings-help">Agents receive a reset link by email. Admins cannot view or set agent passwords directly.</p>
-    <label class="field-row admin-settings-form__full"><span>Agent email</span><input name="agentEmail" type="email" autocomplete="email" required /></label>
-    <div class="admin-settings-form__actions"><button type="submit">Send reset email</button></div>
-  </form>
+    <div class="admin-settings-section-row__content">
+      <Button
+        type="button"
+        variant="outlined"
+        data-open-create-sheet
+        data-sheet-target="#admin-reset-password-sheet"
+      >
+        Reset password
+      </Button>
+    </div>
+  </div>
+
+  <Sheet
+    id="admin-reset-password-sheet"
+    header="Reset admin password"
+    description="Enter your current password, then choose a new password with at least 8 characters."
+    width="34rem"
+  >
+    <form
+      id="admin-reset-password-form"
+      method="post"
+      class="admin-form agent-create-form"
+      aria-label="Reset admin password"
+      data-astro-reload
+    >
+      <input type="hidden" name="action" value="change-admin-password" />
+      <div class="admin-form-grid agent-create-form__grid">
+        <label class="field-row">
+          <span>Current password</span>
+          <input name="currentPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <label class="field-row">
+          <span>New password</span>
+          <input name="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
+        <label class="field-row">
+          <span>Confirm new password</span>
+          <input name="confirmPassword" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
+      </div>
+    </form>
+    <div slot="footer" class="order-create-sheet__footer">
+      <Button type="submit" form="admin-reset-password-form">Update password</Button>
+    </div>
+  </Sheet>
+
+  <div class="admin-settings-section-row" data-admin-settings-agents>
+    <div class="admin-settings-section-row__intro">
+      <h4>Agent accounts</h4>
+      <p>Deactivate accounts to block sign-in, or send a password reset email to the agent.</p>
+    </div>
+    <div class="admin-settings-section-row__content">
+      <div class="table-wrap admin-settings-agents-table-wrap">
+        <table class="dashboard-table admin-settings-agents-table">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col">Email</th>
+              <th scope="col">Employee ID</th>
+              <th scope="col">Contact</th>
+              <DashboardTableActionsHeader />
+            </tr>
+          </thead>
+          <tbody>
+            {
+              agents.length === 0 ? (
+                <DashboardTableEmptyState colspan={5} message="No agent accounts found." />
+              ) : (
+                agents.map((agent) => {
+                  const isActive = agent.status === "active";
+
+                  return (
+                    <tr data-agent-id={agent.id} data-agent-status={isActive ? "active" : "inactive"}>
+                      <td class="dashboard-table__cell--truncate">{agent.display_name}</td>
+                      <td class="dashboard-table__cell--truncate">{agent.email ?? "No email"}</td>
+                      <td class="dashboard-table__cell--truncate">{agent.employee_id ?? "—"}</td>
+                      <td class="dashboard-table__cell--truncate">{agent.contact ?? "—"}</td>
+                      <td class="dashboard-table__actions-column">
+                        <span class="sr-only" data-settings-agent-status>
+                          {isActive ? "Active" : "Inactive"}
+                        </span>
+                        <ActionMenu
+                          menuLabel={`Actions for ${agent.display_name}`}
+                          items={[
+                            {
+                              label: isActive ? "Deactivate" : "Activate",
+                              dataAction: "toggle-agent-status",
+                            },
+                            {
+                              label: "Reset password",
+                              dataAction: "reset-agent-password",
+                              disabled: !agent.email,
+                            },
+                          ]}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })
+              )
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </section>
 
+<script>
+  import { initAdminSettingsAgents } from "@/lib/client/admin-settings-agents";
+
+  function init() {
+    const section = document.querySelector<HTMLElement>("[data-admin-settings-agents]");
+    if (!section) {
+      return;
+    }
+
+    section.querySelectorAll<HTMLElement>("[data-action-menu-item][data-action='toggle-agent-status']").forEach((item) => {
+      const row = item.closest<HTMLTableRowElement>("tr[data-agent-id]");
+      const nextStatus = row?.dataset.agentStatus === "active" ? "inactive" : "active";
+      item.dataset.nextStatus = nextStatus;
+    });
+
+    initAdminSettingsAgents(section);
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:after-swap", init);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    init();
+  }
+</script>
+
 <style>
-  .admin-settings-form__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
-  .admin-settings-form__full { grid-column: 1 / -1; }
-  .admin-settings-form--section { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; }
-  .admin-settings-help { margin: 0 0 1rem; font-size: 0.8125rem; color: #6b7280; }
-  .admin-settings-form__actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+  .admin-settings-card {
+    min-width: 0;
+    max-width: 100%;
+    display: grid;
+    gap: 0;
+  }
+
+  .admin-settings-card__header {
+    display: grid;
+    gap: 0.35rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .admin-settings-card__header h3,
+  .admin-settings-card__header p {
+    margin: 0;
+  }
+
+  .admin-settings-card__header h3 {
+    font-size: 1.2rem;
+    line-height: 1.16;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #111827;
+  }
+
+  .admin-settings-card__header p {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: rgba(75, 85, 99, 0.9);
+  }
+
+  .admin-settings-agents-table-wrap {
+    width: 100%;
+    max-width: 56rem;
+    min-width: 0;
+  }
+
+  .admin-settings-agents-table {
+    width: 100%;
+    min-width: 0;
+    table-layout: fixed;
+  }
+
+  .admin-settings-agents-table :global(th),
+  .admin-settings-agents-table :global(td) {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .admin-settings-agents-table :global(.dashboard-table__actions-column) {
+    width: auto;
+    min-width: 2rem;
+    max-width: none;
+  }
 </style>

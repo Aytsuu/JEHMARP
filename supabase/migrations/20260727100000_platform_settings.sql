@@ -17,9 +17,11 @@ values (
       'tradeName', 'Meat and Poultry Products',
       'legalName', '',
       'address', 'Brgy. Tolo-Tolo Consolacion, Cebu',
-      'phone', '0917 777 0118 | 0932 215 9289',
+      'phone', '09322159289 | 09177770118',
       'tin', '',
-      'logoPath', null
+      'logoPath', null,
+      'primaryEmail', 'jehmarp2020@gmail.com',
+      'secondaryEmail', ''
     ),
     'documentPayment', jsonb_build_object(
       'instructions', '',

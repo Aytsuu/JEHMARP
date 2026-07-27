@@ -20,9 +20,14 @@ const pathname =
   (previewRoot
     ? toPublicPathFromAdminPreview(Astro.url.pathname)
     : Astro.url.pathname);
+const disableGuestActions = Boolean(previewRoot);
 
 function linkHref(href: string) {
   return previewRoot ? toAdminContentPreviewHref(href) : href;
+}
+
+function isDisabledGuestAction(href: string) {
+  return disableGuestActions && href === "/login";
 }
 
 const isActive = (href: string) => {
@@ -86,9 +91,19 @@ const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPat
 
           return (
             <li>
-              <a href={linkHref(item.href)} class={linkClass}>
-                {item.label}
-              </a>
+              {isDisabledGuestAction(item.href) ? (
+                <span
+                  class={`${linkClass} site-nav__link--disabled`.trim()}
+                  aria-disabled="true"
+                  title="Login is unavailable in content preview"
+                >
+                  {item.label}
+                </span>
+              ) : (
+                <a href={linkHref(item.href)} class={linkClass}>
+                  {item.label}
+                </a>
+              )}
             </li>
           );
         })
@@ -115,16 +130,31 @@ const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPat
           const active = isActive(item.href);
           return (
             <li>
-              <a
-                href={linkHref(item.href)}
-                class:list={[
-                  "site-nav__mobile-link",
-                  active && "site-nav__mobile-link--active",
-                  item.variant === "button" && "site-nav__mobile-link--button",
-                ]}
-              >
-                {item.label}
-              </a>
+              {isDisabledGuestAction(item.href) ? (
+                <span
+                  class:list={[
+                    "site-nav__mobile-link",
+                    active && "site-nav__mobile-link--active",
+                    item.variant === "button" && "site-nav__mobile-link--button",
+                    "site-nav__link--disabled",
+                  ]}
+                  aria-disabled="true"
+                  title="Login is unavailable in content preview"
+                >
+                  {item.label}
+                </span>
+              ) : (
+                <a
+                  href={linkHref(item.href)}
+                  class:list={[
+                    "site-nav__mobile-link",
+                    active && "site-nav__mobile-link--active",
+                    item.variant === "button" && "site-nav__mobile-link--button",
+                  ]}
+                >
+                  {item.label}
+                </a>
+              )}
             </li>
           );
         })

@@ -5,6 +5,7 @@ import {
   formatTrackingOrderStatus,
   lookupCustomerOrdersByTrackingNumber,
 } from "@/lib/public-website/customer-tracking";
+import { isAdminContentPreviewPath } from "@/lib/public-website/admin-content-preview";
 
 type Props = {
   submittedTrackingNumber: string;
@@ -25,6 +26,9 @@ const {
   formAction = "/track",
   inputId = "tracking-number",
 } = Astro.props;
+
+const disableFormSubmission = isAdminContentPreviewPath(formAction);
+const previewSubmissionTitle = "Submissions are disabled in content preview";
 
 function getOrderStatusStep(status: string): number {
   const norm = status.toLowerCase();
@@ -49,7 +53,12 @@ function getOrderStatusStep(status: string): number {
   </div>
 
   <div class="track-page__search-card">
-    <form class="track-page__form" method="get" action={formAction}>
+    <form
+      class="track-page__form"
+      method="get"
+      action={formAction}
+      onsubmit={disableFormSubmission ? "return false;" : undefined}
+    >
       <div class="track-page__form-row">
         <div class="track-page__input-container">
           <svg
@@ -80,7 +89,12 @@ function getOrderStatusStep(status: string): number {
             class="track-page__input"
           />
         </div>
-        <button type="submit" class="track-page__submit-btn">
+        <button
+          type="submit"
+          class="track-page__submit-btn"
+          disabled={disableFormSubmission}
+          title={disableFormSubmission ? previewSubmissionTitle : undefined}
+        >
           Track Orders
         </button>
       </div>

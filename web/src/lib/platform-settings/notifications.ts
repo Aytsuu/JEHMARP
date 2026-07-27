@@ -14,6 +14,15 @@ export function resolveNotificationEmails(
   settings: PlatformSettings,
   fallbacks: NotificationEmailFallbacks = {},
 ): string[] {
+  const profileEmails = [
+    settings.businessProfile.primaryEmail.trim(),
+    settings.businessProfile.secondaryEmail.trim(),
+  ].filter(Boolean);
+
+  if (profileEmails.length > 0) {
+    return [...new Set(profileEmails)];
+  }
+
   const route = settings.notifications.routes.find((entry) => entry.event === event);
   const routeEmails = [
     route?.primaryEmail?.trim(),

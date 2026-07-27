@@ -53,11 +53,40 @@ function normalizeNotificationRoute(value: unknown, fallbackEvent: NotificationE
   };
 }
 
+function normalizeEmail(value: unknown) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) {
+    return "";
+  }
+
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? trimmed : "";
+}
+
+function deriveNotificationEmailsFromRoutes(routes: NotificationRoute[]) {
+  for (const route of routes) {
+    const primaryEmail = normalizeEmail(route.primaryEmail);
+    const secondaryEmail = normalizeEmail(route.secondaryEmail);
+    if (primaryEmail || secondaryEmail) {
+      return { primaryEmail, secondaryEmail };
+    }
+  }
+
+  return { primaryEmail: "", secondaryEmail: "" };
+}
+
 export function normalizeBusinessProfile(value: unknown): BusinessProfileSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return { ...DEFAULT_BUSINESS_PROFILE };
   }
   const record = value as Record<string, unknown>;
+  const legacyEmails = Array.isArray(record.emails) ? record.emails : [];
+  const legacyPrimary = typeof legacyEmails[0] === "string" ? normalizeEmail(legacyEmails[0]) : "";
+  const legacySecondary = typeof legacyEmails[1] === "string" ? normalizeEmail(legacyEmails[1]) : "";
+
   return {
     tradeName: normalizeString(record.tradeName, DEFAULT_BUSINESS_PROFILE.tradeName),
     legalName: normalizeString(record.legalName),
@@ -65,6 +94,8 @@ export function normalizeBusinessProfile(value: unknown): BusinessProfileSetting
     phone: normalizeString(record.phone, DEFAULT_BUSINESS_PROFILE.phone),
     tin: normalizeString(record.tin),
     logoPath: normalizeNullableString(record.logoPath),
+    primaryEmail: normalizeEmail(record.primaryEmail) || legacyPrimary,
+    secondaryEmail: normalizeEmail(record.secondaryEmail) || legacySecondary,
   };
 }
 
@@ -138,11 +169,20 @@ export function normalizePlatformSettings(value: unknown): PlatformSettings {
     };
   }
   const record = value as Record<string, unknown>;
+  const notifications = normalizeNotifications(record.notifications);
+  const businessProfile = normalizeBusinessProfile(record.businessProfile);
+
+  if (!businessProfile.primaryEmail && !businessProfile.secondaryEmail) {
+    const derived = deriveNotificationEmailsFromRoutes(notifications.routes);
+    businessProfile.primaryEmail = derived.primaryEmail;
+    businessProfile.secondaryEmail = derived.secondaryEmail;
+  }
+
   return {
-    businessProfile: normalizeBusinessProfile(record.businessProfile),
+    businessProfile,
     documentPayment: normalizeDocumentPayment(record.documentPayment),
     defaults: normalizeDefaults(record.defaults),
-    notifications: normalizeNotifications(record.notifications),
+    notifications,
     documentNumbering: normalizeDocumentNumbering(record.documentNumbering),
   };
 }

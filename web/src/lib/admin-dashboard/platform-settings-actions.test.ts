@@ -13,32 +13,42 @@ vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => createSupabaseAdminClient(),
 }));
 
+vi.mock("@/lib/platform-settings/contact-sync", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/platform-settings/contact-sync")>();
+  return {
+    ...actual,
+    syncContactDetailsFromBusinessProfile: vi.fn(async () => undefined),
+  };
+});
+
+vi.mock("@/lib/supabase/storage", () => ({
+  PRODUCT_IMAGE_BUCKET: "product-images",
+  isManagedStoragePath: (path: string) => path.startsWith("platform/"),
+  resolvePublicStorageUrl: (path: string | null) => (path ? `https://cdn.test/${path}` : null),
+}));
+
 describe("platform settings admin actions", () => {
   it("detects platform settings action names", () => {
-    expect(isPlatformSettingsAdminAction("save-platform-settings-defaults")).toBe(true);
+    expect(isPlatformSettingsAdminAction("save-platform-settings-general")).toBe(true);
     expect(isPlatformSettingsAdminAction("save-customer")).toBe(false);
   });
 
-  it("parses defaults form data", () => {
+  it("parses general settings form data", () => {
     const formData = new FormData();
+    formData.set("tradeName", "JEHMARP");
+    formData.set("phone", "09171234567");
     formData.set("customerCreditLimit", "2500");
-    const action = parsePlatformSettingsAdminAction("save-platform-settings-defaults", formData);
-    expect(action.type).toBe("save-platform-settings-defaults");
-    if (action.type === "save-platform-settings-defaults") {
-      expect(action.payload.customerCreditLimit).toBe(2500);
-    }
-  });
+    formData.set("primaryEmail", "ops@example.com");
+    formData.set("secondaryEmail", "alerts@example.com");
 
-  it("parses document numbering form data", () => {
-    const formData = new FormData();
-    formData.set("invoicePrefix", "INV-");
-    formData.set("invoiceNext", "42");
-    formData.set("orderSlipPrefix", "OS-");
-    formData.set("orderSlipNext", "7");
-    const action = parsePlatformSettingsAdminAction("save-platform-settings-document-numbering", formData);
-    expect(action.type).toBe("save-platform-settings-document-numbering");
-    if (action.type === "save-platform-settings-document-numbering") {
-      expect(action.payload.invoiceNext).toBe(42);
+    const action = parsePlatformSettingsAdminAction("save-platform-settings-general", formData);
+    expect(action.type).toBe("save-platform-settings-general");
+
+    if (action.type === "save-platform-settings-general") {
+      expect(action.businessProfile.tradeName).toBe("JEHMARP");
+      expect(action.businessProfile.primaryEmail).toBe("ops@example.com");
+      expect(action.businessProfile.secondaryEmail).toBe("alerts@example.com");
+      expect(action.defaults.customerCreditLimit).toBe(2500);
     }
   });
 
@@ -60,18 +70,21 @@ describe("platform settings admin actions", () => {
     });
 
     const logoFile = new File([new Uint8Array([1, 2, 3])], "brand.png", { type: "image/png" });
-    await executePlatformSettingsAdminAction(
+    const result = await executePlatformSettingsAdminAction(
       {} as never,
       {
-        type: "save-platform-settings-business-profile",
-        payload: {
+        type: "save-platform-settings-general",
+        businessProfile: {
           tradeName: "JEHMARP",
           legalName: "",
           address: "Cebu",
           phone: "0917",
           tin: "",
           logoPath: null,
+          primaryEmail: "",
+          secondaryEmail: "",
         },
+        defaults: { customerCreditLimit: 1000 },
         logoFile: logoFile as File & { name: string },
         removeLogo: false,
       },
@@ -84,5 +97,11 @@ describe("platform settings admin actions", () => {
       expect.objectContaining({ contentType: "image/png" }),
     );
     expect(update).toHaveBeenCalled();
+    expect(result).toEqual(
+      expect.objectContaining({
+        logoPath: "platform/logo-test.png",
+        customerCreditLimit: 1000,
+      }),
+    );
   });
 });

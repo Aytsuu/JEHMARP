@@ -16,6 +16,7 @@ type Props = {
   items: ActionMenuItem[];
   triggerLabel?: string;
   triggerClass?: string;
+  triggerIcon?: "horizontal" | "vertical";
   disabled?: boolean;
   id?: string;
 };
@@ -25,6 +26,7 @@ const {
   items,
   triggerLabel,
   triggerClass = "",
+  triggerIcon = "vertical",
   disabled = false,
   id,
 } = Astro.props;
@@ -52,6 +54,12 @@ const triggerClasses = [
     {
       isButtonTrigger ? (
         <span>{triggerLabel}</span>
+      ) : triggerIcon === "vertical" ? (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="5" r="1.75"></circle>
+          <circle cx="12" cy="12" r="1.75"></circle>
+          <circle cx="12" cy="19" r="1.75"></circle>
+        </svg>
       ) : (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <circle cx="5" cy="12" r="1.75"></circle>
