@@ -10,7 +10,7 @@ const optionalEmailEnv = z.preprocess(
 );
 
 const localDevSupabaseDefaults = {
-  url: "http://127.0.0.1:55421",
+  url: "http://127.0.0.1:54321",
   publishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
   secretKey: "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz",
 } as const;

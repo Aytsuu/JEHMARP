@@ -51,7 +51,7 @@ Use the conditional variables when the reseller application email workflow is en
 
 Keep all server-only values in non-public variables. Only `PUBLIC_*` values belong in browser-exposed configuration.
 
-In development, the app prefers the local Supabase stack automatically and will use the local CLI defaults at `http://127.0.0.1:55421` unless you override them with `LOCAL_SUPABASE_*`. That prevents `npm run dev` from pointing at production even when `.env` still contains hosted project credentials.
+In development, the app prefers the local Supabase stack automatically and will use the local CLI defaults at `http://127.0.0.1:54321` unless you override them with `LOCAL_SUPABASE_*`. That prevents `npm run dev` from pointing at production even when `.env` still contains hosted project credentials.
 
 ## Local Supabase Data
 

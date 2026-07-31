@@ -4,7 +4,7 @@
 
 Auth users are **not** seeded automatically. After `supabase start` / `supabase db reset`, create accounts in local Studio:
 
-1. Open http://127.0.0.1:55423
+1. Open http://127.0.0.1:54323
 2. Go to **Authentication → Users → Add user**
 3. Map roles in the database as needed:
    - Admin access: row in `public.admin_role` for the user's auth id
