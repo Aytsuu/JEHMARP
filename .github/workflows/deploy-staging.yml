@@ -172,9 +172,13 @@ jobs:
       - name: Inject staging SESSION KV id
         run: bash .github/scripts/inject-staging-kv-id.sh
 
+      - name: Prepare generated staging Worker config
+        working-directory: web
+        run: bash ../.github/scripts/prepare-staging-wrangler-config.sh
+
       - name: Deploy staging Worker
         working-directory: web
-        run: npx wrangler deploy --env staging --env-file .env.staging
+        run: npx wrangler deploy --config dist/server/wrangler.json --env-file .env.staging
 
       - name: Verify staging worker name
         run: |
