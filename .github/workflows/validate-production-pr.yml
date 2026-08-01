@@ -88,7 +88,6 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         with:
           script: |
-            const core = require('@actions/core');
             const headSha = process.env.HEAD_SHA;
             const { owner, repo } = context.repo;
             const maxAttempts = Number(process.env.STAGING_EVIDENCE_WAIT_ATTEMPTS);

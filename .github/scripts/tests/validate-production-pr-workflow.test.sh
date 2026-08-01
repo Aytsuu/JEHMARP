@@ -49,6 +49,11 @@ if ! printf '%s\n' "$validation_job" | grep -q 'conclusion === .success.' \
   exit 1
 fi
 
+if printf '%s\n' "$validation_job" | grep -q "require('@actions/core')"; then
+  echo "actions/github-script already injects core; validation must not redeclare it." >&2
+  exit 1
+fi
+
 if ! grep -A 12 '^  production-migration-dry-run:$' "$WORKFLOW" | grep -q '^    needs: validate$'; then
   echo "Production migration dry-run must wait for the secret-free validation job." >&2
   exit 1
