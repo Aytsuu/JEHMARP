@@ -63,7 +63,18 @@ copied into staging without an approved data-handling process.
 ## Required GitHub Environments and Secrets
 
 Create protected `staging` and `production` GitHub Environments. Production
-requires reviewers; staging may use lighter approval.
+requires reviewers; staging may use lighter approval. Also create
+`production-validation` for the `dev → main` pull-request gate. It is a
+non-deploying environment: do not attach production deployment approvals or a
+main-only branch policy to it, because GitHub evaluates pull requests using a
+`refs/pull/*/merge` ref. It may hold only the credentials needed for the
+read-only production migration dry-run; the protected `production` environment
+remains reserved for actual `main` deployments and Contract releases.
+The validation job runs only for the repository's own `dev → main` pull
+requests, never forks. Its credentialed dry-run job checks out automation from
+the trusted `main` base revision and overlays only the candidate
+`supabase/migrations/` SQL, so it never executes pull-request-authored scripts
+with production-validation credentials.
 
 | Secret | Staging | Production | Purpose |
 | :-- | :--: | :--: | :-- |

@@ -251,18 +251,27 @@ jobs:
 
   production-dry-run:
     name: Production migration dry-run
-    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
     needs: local-migration-safety
     runs-on: ubuntu-latest
-    environment: production
-
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    # This PR gate only plans production migrations; it does not deploy them.
+    environment: production-validation
 
     steps:
-      - name: Checkout
+      - name: Checkout trusted migration automation
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+
+      - name: Checkout candidate migrations
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+
+      - name: Overlay candidate migration SQL
+        run: rsync -a --delete candidate/supabase/migrations/ trusted/supabase/migrations/
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
@@ -272,10 +281,17 @@ jobs:
       - name: Link production Supabase project
         id: supabase_link
         continue-on-error: true
+        working-directory: trusted
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
 
       - name: Dry-run production migrations
+        working-directory: trusted
         env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
           SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
           SUPABASE_DB_PUSH_DRY_RUN: "true"
         run: |
