@@ -7,12 +7,8 @@ FIXTURE_DIR="$(mktemp -d)"
 trap 'rm -rf "$FIXTURE_DIR"' EXIT
 
 BASELINE_VERSION="20260802000000"
-ARCHIVED_CHECKPOINT="${REPOSITORY_ROOT}/supabase/_archived_migrations/20260802_checkpoint_prebaseline"
-mapfile -t ARCHIVED_VERSIONS < <(
-  find "$ARCHIVED_CHECKPOINT" -maxdepth 1 -type f -name '*.sql' -printf '%f\n' \
-    | sed -nE 's/^([0-9]{14})_.+\.sql$/\1/p' \
-    | sort -u
-)
+ARCHIVED_VERSIONS_FILE="${REPOSITORY_ROOT}/.github/config/baseline-compaction-20260802.archived-versions.txt"
+mapfile -t ARCHIVED_VERSIONS < "$ARCHIVED_VERSIONS_FILE"
 
 if [ "${#ARCHIVED_VERSIONS[@]}" -eq 0 ]; then
   echo "Expected archived checkpoint versions for tests." >&2
@@ -44,6 +40,7 @@ run_guard() {
   set +e
   output="$(
   BASELINE_LEDGER_TARGET=staging \
+    BASELINE_LEDGER_REPO_ROOT="${BASELINE_LEDGER_REPO_ROOT:-$REPOSITORY_ROOT}" \
     bash "$SCRIPT_PATH" "${connection_args[@]}" 2>&1
   )"
   status=$?
@@ -71,6 +68,12 @@ if ! printf '%s\n' "$output" | grep -Fq "target: staging"; then
   echo "Expected archived-checkpoint rejection to name target staging." >&2
   exit 1
 fi
+
+output_prod="$(run_guard 1 --linked --migration-list-file "$archived_list_file" --target production)"
+if ! printf '%s\n' "$output_prod" | grep -Fq "target: production"; then
+  echo "Expected archived-checkpoint rejection to name target production." >&2
+  exit 1
+fi
 if ! printf '%s\n' "$output" | grep -Fq "expected_baseline_version: ${BASELINE_VERSION}"; then
   echo "Expected archived-checkpoint rejection to name baseline version." >&2
   exit 1
@@ -94,7 +97,7 @@ empty_list_file="${FIXTURE_DIR}/empty.txt"
 write_migration_list_fixture "$empty_list_file"
 
 output="$(run_guard 1 --linked --migration-list-file "$empty_list_file")"
-if ! printf '%s\n' "$output" | grep -Fq "does not match the archived checkpoint or the single-baseline state"; then
+if ! printf '%s\n' "$output" | grep -Fq "does not match the archived checkpoint or the active baseline state"; then
   echo "Expected empty remote ledger to fail closed as drift." >&2
   printf '%s\n' "$output" >&2
   exit 1
@@ -104,7 +107,7 @@ mixed_list_file="${FIXTURE_DIR}/mixed.txt"
 write_migration_list_fixture "$mixed_list_file" "$BASELINE_VERSION" "${ARCHIVED_VERSIONS[0]}"
 
 output="$(run_guard 1 --linked --migration-list-file "$mixed_list_file")"
-if ! printf '%s\n' "$output" | grep -Fq "does not match the archived checkpoint or the single-baseline state"; then
+if ! printf '%s\n' "$output" | grep -Fq "does not match the archived checkpoint or the active baseline state"; then
   echo "Expected mixed remote ledger to fail closed as drift." >&2
   printf '%s\n' "$output" >&2
   exit 1
@@ -166,6 +169,23 @@ mv "${secret_probe}.tmp" "$secret_probe"
 output="$(run_guard 1 --linked --migration-list-file "$secret_probe")"
 if printf '%s\n' "$output" | grep -Eiq 'postgresql://|password='; then
   echo "Failure output must not echo secret-bearing fixture content." >&2
+  printf '%s\n' "$output" >&2
+  exit 1
+fi
+
+prefix_repo="${FIXTURE_DIR}/prefix-repo"
+checkpoint="${prefix_repo}/supabase/_archived_migrations/20260802_checkpoint_prebaseline"
+mkdir -p "${prefix_repo}/supabase/migrations" "${prefix_repo}/.github/config" "${prefix_repo}/.github/scripts" "${checkpoint}"
+cp "${REPOSITORY_ROOT}/.github/config/baseline-compaction-20260802.manifest" "${prefix_repo}/.github/config/"
+cp "$ARCHIVED_VERSIONS_FILE" "${prefix_repo}/.github/config/baseline-compaction-20260802.archived-versions.txt"
+cp -r "${REPOSITORY_ROOT}/supabase/_archived_migrations/20260802_checkpoint_prebaseline/." "$checkpoint/"
+printf '%s\n' '-- baseline' > "${prefix_repo}/supabase/migrations/${BASELINE_VERSION}_baseline_schema.sql"
+printf '%s\n' '-- expand' > "${prefix_repo}/supabase/migrations/20260803000000_add_feature.sql"
+
+BASELINE_LEDGER_REPO_ROOT="$prefix_repo" \
+  output="$(run_guard 0 --linked --migration-list-file "$baseline_list_file" --policy active-prefix)"
+if ! printf '%s\n' "$output" | grep -Fq "valid applied prefix"; then
+  echo "Expected active-prefix policy to accept baseline-only remote ledger with newer local migrations." >&2
   printf '%s\n' "$output" >&2
   exit 1
 fi

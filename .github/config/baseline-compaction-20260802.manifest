@@ -1,0 +1,7 @@
+# Trusted history-compaction manifest for the 2026-08-02 baseline cutover.
+# Used by production-validation automation to classify remote ledgers and validate
+# candidate archive overlays without executing candidate-controlled scripts.
+COMPACTION_ID=20260802
+CHECKPOINT_DIRECTORY=supabase/_archived_migrations/20260802_checkpoint_prebaseline
+BASELINE_VERSION=20260802000000
+ARCHIVED_VERSIONS_FILE=.github/config/baseline-compaction-20260802.archived-versions.txt

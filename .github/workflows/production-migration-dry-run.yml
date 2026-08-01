@@ -1,0 +1,154 @@
+name: Production Migration Dry-Run (Trusted)
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: production-migration-dry-run-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  production-migration-dry-run:
+    name: Production migration dry-run
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.ref == 'dev' &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    # Trusted base-branch workflow definition only. Candidate PR workflow YAML
+    # cannot alter this job or receive production-validation secrets.
+    environment: production-validation
+
+    env:
+      MIGRATION_REVIEWED: ${{ contains(github.event.pull_request.labels.*.name, 'migration-reviewed') }}
+
+    steps:
+      - name: Checkout trusted migration automation
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted
+
+      - name: Checkout candidate migration data
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+
+      - name: Overlay candidate migration data into trusted checkout
+        run: |
+          bash trusted/.github/scripts/overlay-candidate-migration-data.sh \
+            --trusted trusted \
+            --candidate candidate \
+            --validate-manifest
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.109.1
+
+      - name: Link production Supabase project
+        id: supabase_link
+        continue-on-error: true
+        working-directory: trusted
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: Assert production baseline ledger state
+        id: baseline_guard
+        working-directory: trusted
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DNS_RESOLVER: https
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          set -euo pipefail
+
+          guard_args=(--target production --policy active-prefix)
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            guard_args+=(--linked)
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            guard_args+=(--db-url "$SUPABASE_DB_POOLER_URL")
+          else
+            echo "Cannot assert production baseline ledger state without a linked project or SUPABASE_DB_POOLER_URL."
+            exit 1
+          fi
+
+          bash .github/scripts/assert-supabase-baseline-ledger-state.sh "${guard_args[@]}"
+
+      - name: Dry-run pending production migrations
+        if: steps.baseline_guard.outcome == 'success'
+        working-directory: trusted
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+          SUPABASE_DB_PUSH_DRY_RUN: "true"
+        run: |
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            export SUPABASE_LINKED=true
+          else
+            export SUPABASE_LINKED=false
+          fi
+          bash .github/scripts/supabase-db-push-remote.sh
+
+      - name: Show production migration status
+        if: steps.baseline_guard.outcome == 'success'
+        working-directory: trusted
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DNS_RESOLVER: https
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            supabase migration list --linked --dns-resolver https
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            supabase migration list --db-url "$SUPABASE_DB_POOLER_URL" --dns-resolver https
+          else
+            echo "Skipping migration list because Supabase link failed."
+            exit 1
+          fi
+
+      - name: Validate pending production migration metadata
+        if: steps.baseline_guard.outcome == 'success'
+        working-directory: trusted
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DNS_RESOLVER: https
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f .github/scripts/validate-migration-phase-metadata.sh ]; then
+            echo "Trusted base does not yet contain the pending-migration metadata helper."
+            echo "Candidate migration metadata was validated in the secret-free PR validation job."
+            exit 0
+          fi
+
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            MIGRATION_REVIEWED="${MIGRATION_REVIEWED}" \
+              bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-linked
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            MIGRATION_REVIEWED="${MIGRATION_REVIEWED}" \
+              bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-db-url "$SUPABASE_DB_POOLER_URL"
+          else
+            echo "Cannot validate pending production migrations without a linked project or SUPABASE_DB_POOLER_URL."
+            exit 1
+          fi

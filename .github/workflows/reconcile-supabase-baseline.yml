@@ -31,6 +31,10 @@ on:
         description: Required only with execute-ledger-repair; type APPLY_METADATA_ONLY
         required: false
         type: string
+      migration_source_sha:
+        description: Immutable dev commit SHA supplying candidate migration/archive data (required for production)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -48,8 +52,49 @@ jobs:
     environment: ${{ inputs.target }}
 
     steps:
-      - name: Checkout
+      - name: Checkout trusted automation
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve candidate migration source
+        id: migration_source
+        shell: bash
+        env:
+          TARGET: ${{ inputs.target }}
+          MIGRATION_SOURCE_SHA: ${{ inputs.migration_source_sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "$TARGET" = "production" ] && [ -z "${MIGRATION_SOURCE_SHA:-}" ]; then
+            echo "production reconciliation requires migration_source_sha." >&2
+            exit 1
+          fi
+
+          if [ -n "${MIGRATION_SOURCE_SHA:-}" ]; then
+            resolved_sha="$(
+              bash .github/scripts/validate-migration-source-sha.sh --sha "$MIGRATION_SOURCE_SHA"
+            )"
+            echo "resolved_sha=${resolved_sha}" >> "$GITHUB_OUTPUT"
+            echo "use_candidate_overlay=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "use_candidate_overlay=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout candidate migration data
+        if: steps.migration_source.outputs.use_candidate_overlay == 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.migration_source.outputs.resolved_sha }}
+          path: candidate
+
+      - name: Overlay candidate migration data into trusted checkout
+        if: steps.migration_source.outputs.use_candidate_overlay == 'true'
+        run: |
+          bash .github/scripts/overlay-candidate-migration-data.sh \
+            --trusted "$GITHUB_WORKSPACE" \
+            --candidate candidate \
+            --validate-manifest
 
       - name: Validate acknowledgement and local baseline shape
         shell: bash
@@ -114,6 +159,13 @@ jobs:
           fi
 
           printf '%s\n' "$BASELINE_VERSION" > baseline-reconciliation/expected-baseline-version.txt
+
+          if [ "${{ steps.migration_source.outputs.use_candidate_overlay }}" = "true" ]; then
+            printf '%s\n' "${{ steps.migration_source.outputs.resolved_sha }}" \
+              > baseline-reconciliation/migration-source-sha.txt
+          else
+            printf '%s\n' "${{ github.sha }}" > baseline-reconciliation/migration-source-sha.txt
+          fi
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
@@ -190,6 +242,7 @@ jobs:
             echo
             echo "- Target: \`$TARGET\`"
             echo "- Expected baseline version: \`$BASELINE_VERSION\`"
+            echo "- Migration source SHA: \`$(cat baseline-reconciliation/migration-source-sha.txt)\`"
             echo "- Local migration files: \`1\`"
             echo "- Historical remote ledger entries: \`$remote_count\`"
             echo "- Archived checkpoint entries: \`$(wc -l < baseline-reconciliation/archived-versions.txt | tr -d ' ')\`"

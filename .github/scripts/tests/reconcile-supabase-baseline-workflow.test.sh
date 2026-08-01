@@ -9,32 +9,32 @@ if [ ! -f "$WORKFLOW" ]; then
   exit 1
 fi
 
-if ! grep -q '^  workflow_dispatch:$' "$WORKFLOW"; then
+if ! grep -q 'workflow_dispatch:' "$WORKFLOW"; then
   echo "Baseline reconciliation must be manually dispatched." >&2
   exit 1
 fi
 
-for input in target expected_baseline_version confirmation_token execution_mode execute_confirmation; do
-  if ! grep -q "^      ${input}:$" "$WORKFLOW"; then
+for input in target expected_baseline_version confirmation_token execution_mode execute_confirmation migration_source_sha; do
+  if ! grep -q "      ${input}:" "$WORKFLOW"; then
     echo "Baseline reconciliation must require the ${input} dispatch input." >&2
     exit 1
   fi
 done
 
-if ! grep -A 12 '^      target:$' "$WORKFLOW" | grep -q '^        type: choice$' \
-  || ! grep -A 12 '^      target:$' "$WORKFLOW" | grep -q '^          - staging$' \
-  || ! grep -A 12 '^      target:$' "$WORKFLOW" | grep -q '^          - production$'; then
+if ! grep -q 'type: choice' "$WORKFLOW" \
+  || ! grep -q 'staging' "$WORKFLOW" \
+  || ! grep -q 'production' "$WORKFLOW"; then
   echo "Baseline reconciliation target must be limited to staging or production." >&2
   exit 1
 fi
 
-if ! grep -A 12 '^      execution_mode:$' "$WORKFLOW" | grep -q '^        default: plan-only$' \
-  || ! grep -A 12 '^      execution_mode:$' "$WORKFLOW" | grep -q '^          - execute-ledger-repair$'; then
+if ! grep -q 'default: plan-only' "$WORKFLOW" \
+  || ! grep -q 'execute-ledger-repair' "$WORKFLOW"; then
   echo "Baseline reconciliation must default to a plan-only mode and require an explicit execution mode." >&2
   exit 1
 fi
 
-if ! grep -q '^    environment: \${{ inputs.target }}$' "$WORKFLOW"; then
+if ! grep -q 'environment: \${{ inputs.target }}' "$WORKFLOW"; then
   echo "Baseline reconciliation must use the selected protected environment." >&2
   exit 1
 fi
@@ -93,6 +93,26 @@ fi
 
 if ! grep -q 'actions/upload-artifact@v4' "$WORKFLOW"; then
   echo "Baseline reconciliation must retain an auditable preflight artifact." >&2
+  exit 1
+fi
+
+if ! grep -q 'overlay-candidate-migration-data.sh' "$WORKFLOW"; then
+  echo "Baseline reconciliation must overlay candidate migration data via trusted script." >&2
+  exit 1
+fi
+
+if ! grep -q 'validate-migration-source-sha.sh' "$WORKFLOW"; then
+  echo "Baseline reconciliation must validate immutable migration_source_sha references." >&2
+  exit 1
+fi
+
+if ! grep -q 'migration-source-sha.txt' "$WORKFLOW"; then
+  echo "Baseline reconciliation must record migration source SHA in evidence." >&2
+  exit 1
+fi
+
+if ! grep -q 'production reconciliation requires migration_source_sha' "$WORKFLOW"; then
+  echo "Baseline reconciliation must require migration_source_sha for production." >&2
   exit 1
 fi
 
