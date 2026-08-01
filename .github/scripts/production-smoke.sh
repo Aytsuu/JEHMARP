@@ -19,6 +19,8 @@ Environment:
   WORKER_VERSION_ID                Optional Worker version ID for version-targeted smoke tests.
                                    Sets Cloudflare-Workers-Version-Overrides using the worker
                                    name from web/wrangler.jsonc (RFC 8941 dictionary format).
+  SMOKE_MAX_ATTEMPTS               Public-route attempts after a Worker deployment (default: 6).
+  SMOKE_RETRY_DELAY_SECONDS        Delay between public-route attempts (default: 5).
 EOF
 }
 
@@ -36,7 +38,7 @@ smoke_setup_version_override "$SCRIPT_DIR"
 echo "Smoke testing ${BASE_URL}"
 
 for path in "/" "/shop" "/contact" "/login"; do
-  status="$(smoke_curl_status "${BASE_URL}${path}" -L --max-redirs 5)"
+  status="$(smoke_curl_status_with_retry 200 "${BASE_URL}${path}" -L --max-redirs 5 || true)"
   echo "${path}: ${status}"
   if [ "${status}" != "200" ]; then
     exit 1

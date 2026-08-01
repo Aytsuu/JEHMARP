@@ -57,6 +57,41 @@ smoke_curl_status() {
   fi
 }
 
+smoke_curl_status_with_retry() {
+  local expected_status="$1"
+  local url="$2"
+  shift 2
+
+  local max_attempts="${SMOKE_MAX_ATTEMPTS:-6}"
+  local retry_delay_seconds="${SMOKE_RETRY_DELAY_SECONDS:-5}"
+  local attempt status
+
+  if ! [[ "$max_attempts" =~ ^[1-9][0-9]*$ ]]; then
+    echo "SMOKE_MAX_ATTEMPTS must be a positive integer." >&2
+    return 1
+  fi
+  if ! [[ "$retry_delay_seconds" =~ ^[0-9]+$ ]]; then
+    echo "SMOKE_RETRY_DELAY_SECONDS must be a non-negative integer." >&2
+    return 1
+  fi
+
+  for attempt in $(seq 1 "$max_attempts"); do
+    status="$(smoke_curl_status "$url" "$@" || true)"
+    if [ "$status" = "$expected_status" ]; then
+      printf '%s' "$status"
+      return 0
+    fi
+
+    if [ "$attempt" -lt "$max_attempts" ]; then
+      echo "${url}: received ${status:-curl-error}; retrying (${attempt}/${max_attempts}) after ${retry_delay_seconds}s." >&2
+      sleep "$retry_delay_seconds"
+    fi
+  done
+
+  printf '%s' "${status:-000}"
+  return 1
+}
+
 smoke_curl_with_cookie_jar() {
   local cookie_jar="$1"
   local url="$2"
