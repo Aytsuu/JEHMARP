@@ -15,30 +15,68 @@ const localDevSupabaseDefaults = {
   secretKey: "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz",
 } as const;
 
-const publicEnvSchema = z.object({
-  PUBLIC_SUPABASE_URL: z.url(),
-  PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
-  PUBLIC_TURNSTILE_SITE_KEY: optionalStringEnv,
-  LOCAL_SUPABASE_URL: optionalStringEnv,
-  LOCAL_SUPABASE_PUBLISHABLE_KEY: optionalStringEnv,
-  LOCAL_SUPABASE_SECRET_KEY: optionalStringEnv,
-  LOCAL_SUPABASE_SERVICE_ROLE_KEY: optionalStringEnv,
-});
-
-const serverEnvSchema = publicEnvSchema
-  .extend({
-    SUPABASE_SECRET_KEY: optionalStringEnv,
-    SUPABASE_SERVICE_ROLE_KEY: optionalStringEnv,
-    TURNSTILE_SECRET_KEY: optionalStringEnv,
-    RESEND_API_KEY: optionalStringEnv,
-    RESELLER_PRICE_LIST_FROM: optionalStringEnv,
-    RESELLER_ADMIN_EMAIL: optionalEmailEnv,
-    UPSTASH_REDIS_REST_URL: optionalStringEnv,
-    UPSTASH_REDIS_REST_TOKEN: optionalStringEnv,
+const publicEnvSchema = z
+  .object({
+    PUBLIC_SUPABASE_URL: optionalStringEnv,
+    PUBLIC_SUPABASE_PUBLISHABLE_KEY: optionalStringEnv,
+    PUBLIC_TURNSTILE_SITE_KEY: optionalStringEnv,
+    LOCAL_SUPABASE_URL: optionalStringEnv,
+    LOCAL_SUPABASE_PUBLISHABLE_KEY: optionalStringEnv,
+    LOCAL_SUPABASE_SECRET_KEY: optionalStringEnv,
+    LOCAL_SUPABASE_SERVICE_ROLE_KEY: optionalStringEnv,
+    DEV: z.boolean().optional(),
+    NODE_ENV: z.string().optional(),
   })
-  .refine((value) => value.SUPABASE_SECRET_KEY ?? value.SUPABASE_SERVICE_ROLE_KEY, {
-    message: "A Supabase server secret key is required",
+  .superRefine((value, context) => {
+    if (shouldUseLocalSupabase(value)) {
+      return;
+    }
+
+    if (!value.PUBLIC_SUPABASE_URL) {
+      context.addIssue({
+        code: "custom",
+        message: "PUBLIC_SUPABASE_URL is required outside development",
+        path: ["PUBLIC_SUPABASE_URL"],
+      });
+    } else if (!z.url().safeParse(value.PUBLIC_SUPABASE_URL).success) {
+      context.addIssue({
+        code: "custom",
+        message: "PUBLIC_SUPABASE_URL must be a valid URL",
+        path: ["PUBLIC_SUPABASE_URL"],
+      });
+    }
+
+    if (!value.PUBLIC_SUPABASE_PUBLISHABLE_KEY) {
+      context.addIssue({
+        code: "custom",
+        message: "PUBLIC_SUPABASE_PUBLISHABLE_KEY is required outside development",
+        path: ["PUBLIC_SUPABASE_PUBLISHABLE_KEY"],
+      });
+    }
   });
+
+const serverEnvSchema = publicEnvSchema.safeExtend({
+  SUPABASE_SECRET_KEY: optionalStringEnv,
+  SUPABASE_SERVICE_ROLE_KEY: optionalStringEnv,
+  TURNSTILE_SECRET_KEY: optionalStringEnv,
+  RESEND_API_KEY: optionalStringEnv,
+  RESELLER_PRICE_LIST_FROM: optionalStringEnv,
+  RESELLER_ADMIN_EMAIL: optionalEmailEnv,
+  UPSTASH_REDIS_REST_URL: optionalStringEnv,
+  UPSTASH_REDIS_REST_TOKEN: optionalStringEnv,
+}).superRefine((value, context) => {
+  if (shouldUseLocalSupabase(value)) {
+    return;
+  }
+
+  if (!value.SUPABASE_SECRET_KEY && !value.SUPABASE_SERVICE_ROLE_KEY) {
+    context.addIssue({
+      code: "custom",
+      message: "A Supabase server secret key is required",
+      path: ["SUPABASE_SECRET_KEY"],
+    });
+  }
+});
 
 export type PublicEnv = {
   supabaseUrl: string;
@@ -65,10 +103,10 @@ export function parsePublicEnv(input: Record<string, unknown>): PublicEnv {
 
   const supabaseUrl = shouldUseLocalSupabase(input)
     ? result.data.LOCAL_SUPABASE_URL ?? localDevSupabaseDefaults.url
-    : result.data.PUBLIC_SUPABASE_URL;
+    : result.data.PUBLIC_SUPABASE_URL ?? "";
   const supabasePublishableKey = shouldUseLocalSupabase(input)
     ? result.data.LOCAL_SUPABASE_PUBLISHABLE_KEY ?? localDevSupabaseDefaults.publishableKey
-    : result.data.PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    : result.data.PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 
   return {
     supabaseUrl,
@@ -93,10 +131,10 @@ export function parseServerEnv(input: Record<string, unknown>): ServerEnv {
   const useLocalSupabase = shouldUseLocalSupabase(input);
   const supabaseUrl = useLocalSupabase
     ? result.data.LOCAL_SUPABASE_URL ?? localDevSupabaseDefaults.url
-    : result.data.PUBLIC_SUPABASE_URL;
+    : result.data.PUBLIC_SUPABASE_URL ?? "";
   const supabasePublishableKey = useLocalSupabase
     ? result.data.LOCAL_SUPABASE_PUBLISHABLE_KEY ?? localDevSupabaseDefaults.publishableKey
-    : result.data.PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    : result.data.PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
   const supabaseServerKey = useLocalSupabase
     ? result.data.LOCAL_SUPABASE_SECRET_KEY
       ?? result.data.LOCAL_SUPABASE_SERVICE_ROLE_KEY
@@ -134,9 +172,10 @@ export function getServerEnv(): ServerEnv {
 }
 
 export function getRuntimeServerEnv(): Record<string, unknown> {
+  // Vite-injected values win over process.env so dev/test stubs and .env.local load correctly.
   return {
-    ...import.meta.env,
     ...getProcessEnv(),
+    ...import.meta.env,
   };
 }
 
@@ -149,5 +188,9 @@ function getProcessEnv(): Record<string, unknown> {
 }
 
 function shouldUseLocalSupabase(input: Record<string, unknown>) {
-  return input.DEV === true || input.NODE_ENV === "development";
+  return (
+    input.DEV === true
+    || input.DEV === "true"
+    || input.NODE_ENV === "development"
+  );
 }
