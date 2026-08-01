@@ -1,0 +1,294 @@
+name: Reconcile Supabase Baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Managed Supabase environment to inspect or reconcile
+        required: true
+        type: choice
+        default: staging
+        options:
+          - staging
+          - production
+      expected_baseline_version:
+        description: Fourteen-digit version of the single baseline migration in this checkout
+        required: true
+        type: string
+      confirmation_token:
+        description: Type I_UNDERSTAND_THIS_IS_A_METADATA_ONLY_RECONCILIATION to acknowledge the plan
+        required: true
+        type: string
+      execution_mode:
+        description: Plan only (default) or execute the already-approved metadata reconciliation
+        required: true
+        type: choice
+        default: plan-only
+        options:
+          - plan-only
+          - execute-ledger-repair
+      execute_confirmation:
+        description: Required only with execute-ledger-repair; type APPLY_METADATA_ONLY
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reconcile-supabase-baseline-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: ${{ inputs.execution_mode }} (${{ inputs.target }})
+    runs-on: ubuntu-latest
+    # `production` retains its normal protection rules. Run production reconciliation
+    # from an allowed ref after staging has been verified.
+    environment: ${{ inputs.target }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate acknowledgement and local baseline shape
+        shell: bash
+        env:
+          BASELINE_VERSION: ${{ inputs.expected_baseline_version }}
+          CONFIRMATION_TOKEN: ${{ inputs.confirmation_token }}
+          EXECUTION_MODE: ${{ inputs.execution_mode }}
+          EXECUTE_CONFIRMATION: ${{ inputs.execute_confirmation }}
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$BASELINE_VERSION" =~ ^[0-9]{14}$ ]]; then
+            echo "expected_baseline_version must be a fourteen-digit migration version." >&2
+            exit 1
+          fi
+
+          if [ "$CONFIRMATION_TOKEN" != "I_UNDERSTAND_THIS_IS_A_METADATA_ONLY_RECONCILIATION" ]; then
+            echo "confirmation_token must acknowledge that this workflow changes migration metadata only." >&2
+            exit 1
+          fi
+
+          if [ "$EXECUTION_MODE" = "execute-ledger-repair" ] \
+            && [ "$EXECUTE_CONFIRMATION" != "APPLY_METADATA_ONLY" ]; then
+            echo "execute-ledger-repair requires execute_confirmation=APPLY_METADATA_ONLY." >&2
+            exit 1
+          fi
+
+          mkdir -p baseline-reconciliation
+          find supabase/migrations -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort \
+            > baseline-reconciliation/local-migration-files.txt
+          sed -nE 's/^([0-9]{14})_.+\.sql$/\1/p' baseline-reconciliation/local-migration-files.txt \
+            > baseline-reconciliation/local-versions.txt
+
+          historical_directory="supabase/_archived_migrations/20260802_checkpoint_prebaseline"
+          if [ ! -d "$historical_directory" ]; then
+            echo "Missing the archived migration checkpoint required for safe ledger reconciliation: $historical_directory" >&2
+            exit 1
+          fi
+
+          find "$historical_directory" -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort \
+            > baseline-reconciliation/archived-migration-files.txt
+          sed -nE 's/^([0-9]{14})_.+\.sql$/\1/p' baseline-reconciliation/archived-migration-files.txt \
+            > baseline-reconciliation/archived-versions.txt
+
+          local_file_count="$(wc -l < baseline-reconciliation/local-migration-files.txt | tr -d ' ')"
+          local_version_count="$(wc -l < baseline-reconciliation/local-versions.txt | tr -d ' ')"
+          archived_file_count="$(wc -l < baseline-reconciliation/archived-migration-files.txt | tr -d ' ')"
+          archived_version_count="$(wc -l < baseline-reconciliation/archived-versions.txt | tr -d ' ')"
+          expected_file="$(grep -E "^${BASELINE_VERSION}_.+\\.sql$" baseline-reconciliation/local-migration-files.txt || true)"
+
+          if [ "$local_file_count" -ne 1 ] || [ "$local_version_count" -ne 1 ] || [ "$expected_file" = "" ]; then
+            echo "The checkout must contain exactly one expected baseline migration file named ${BASELINE_VERSION}_*.sql before reconciliation." >&2
+            echo "Found these local migration files:" >&2
+            cat baseline-reconciliation/local-migration-files.txt >&2
+            exit 1
+          fi
+
+          if [ "$archived_file_count" -eq 0 ] || [ "$archived_file_count" -ne "$archived_version_count" ]; then
+            echo "The archived checkpoint must contain one or more uniquely versioned SQL migrations." >&2
+            cat baseline-reconciliation/archived-migration-files.txt >&2
+            exit 1
+          fi
+
+          printf '%s\n' "$BASELINE_VERSION" > baseline-reconciliation/expected-baseline-version.txt
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.109.1
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      - name: Link selected Supabase project
+        id: supabase_link
+        shell: bash
+        env:
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: bash .github/scripts/supabase-link-retry.sh "$PROJECT_REF"
+
+      - name: Capture migration list before repair
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          supabase migration list --linked --dns-resolver https \
+            | tee baseline-reconciliation/migration-list-before-repair.txt
+
+          # The CLI text table is LOCAL | REMOTE | TIME. Capture only the REMOTE column,
+          # not the local baseline version shown in the same output.
+          awk '{
+            # Use the ASCII separators emitted by the CLI.
+            remote = $0
+            sub(/^[^|]*\|[[:space:]]*/, "", remote)
+            sub(/[[:space:]]*\|.*$/, "", remote)
+            gsub(/[[:space:]]/, "", remote)
+            if (remote ~ /^[0-9]{14}$/) print remote
+          }' baseline-reconciliation/migration-list-before-repair.txt \
+            | sort -u > baseline-reconciliation/remote-versions-before.txt
+
+      - name: Validate migration-ledger preconditions
+        shell: bash
+        env:
+          BASELINE_VERSION: ${{ inputs.expected_baseline_version }}
+          EXECUTION_MODE: ${{ inputs.execution_mode }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+
+          remote_versions="baseline-reconciliation/remote-versions-before.txt"
+          remote_count="$(wc -l < "$remote_versions" | tr -d ' ')"
+
+          if [ "$remote_count" -eq 0 ]; then
+            echo "The remote migration ledger is empty; refusing to reconcile without an existing ledger." >&2
+            exit 1
+          fi
+
+          if grep -Fxq "$BASELINE_VERSION" "$remote_versions"; then
+            echo "The remote ledger already contains the expected baseline version; refusing to repair an ambiguous ledger." >&2
+            exit 1
+          fi
+
+          if ! cmp -s baseline-reconciliation/archived-versions.txt "$remote_versions"; then
+            echo "Remote migration ledger does not exactly match this checkout's archived checkpoint; refusing reconciliation." >&2
+            echo "Only in archived checkpoint:" >&2
+            comm -23 baseline-reconciliation/archived-versions.txt "$remote_versions" >&2 || true
+            echo "Only in remote ledger:" >&2
+            comm -13 baseline-reconciliation/archived-versions.txt "$remote_versions" >&2 || true
+            exit 1
+          fi
+
+          if ! comm -23 baseline-reconciliation/local-versions.txt "$remote_versions" \
+            | grep -Fxq "$BASELINE_VERSION"; then
+            echo "The expected baseline migration file is not a pending local-only version." >&2
+            exit 1
+          fi
+
+          {
+            echo "# Supabase baseline reconciliation preflight"
+            echo
+            echo "- Target: \`$TARGET\`"
+            echo "- Expected baseline version: \`$BASELINE_VERSION\`"
+            echo "- Local migration files: \`1\`"
+            echo "- Historical remote ledger entries: \`$remote_count\`"
+            echo "- Archived checkpoint entries: \`$(wc -l < baseline-reconciliation/archived-versions.txt | tr -d ' ')\`"
+            echo "- Execution mode: \`$EXECUTION_MODE\`"
+            echo
+            echo "The captured remote ledger exactly matches this checkout's archived migration checkpoint and has one pending local baseline."
+            echo "No schema SQL or seed SQL has run. This workflow never runs \`supabase db push\`."
+            echo
+            if [ "$EXECUTION_MODE" = "plan-only" ]; then
+              echo "## Next step"
+              echo
+              echo "Review the attached preflight artifact and complete staging verification."
+              echo "A later, explicitly authorized run may use \`execute-ledger-repair\` with"
+              echo "\`execute_confirmation=APPLY_METADATA_ONLY\`. That mode only removes the historical"
+              echo "remote migration-history records and records the baseline version; it does not execute schema SQL."
+            else
+              echo "## Execution requested"
+              echo
+              echo "The following guarded step will change migration-history metadata only. It will not run schema SQL, seed SQL, or \`supabase db push\`."
+            fi
+          } | tee baseline-reconciliation/preflight-summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Apply approved migration-ledger reconciliation
+        if: inputs.execution_mode == 'execute-ledger-repair' && inputs.execute_confirmation == 'APPLY_METADATA_ONLY'
+        shell: bash
+        env:
+          BASELINE_VERSION: ${{ inputs.expected_baseline_version }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t remote_versions < baseline-reconciliation/remote-versions-before.txt
+          if [ "${#remote_versions[@]}" -eq 0 ]; then
+            echo "No historical remote versions were captured; refusing migration repair." >&2
+            exit 1
+          fi
+
+          if grep -Fxq "$BASELINE_VERSION" baseline-reconciliation/remote-versions-before.txt; then
+            echo "The baseline version already exists remotely; refusing migration repair." >&2
+            exit 1
+          fi
+
+          # Metadata only: remove the historic ledger entries, then record the one
+          # baseline. Do not add a db push command to this workflow.
+          supabase migration repair --status reverted --linked --password "$SUPABASE_DB_PASSWORD" \
+            --dns-resolver https --yes "${remote_versions[@]}"
+          supabase migration repair --status applied --linked --password "$SUPABASE_DB_PASSWORD" \
+            --dns-resolver https --yes "$BASELINE_VERSION"
+
+      - name: Capture migration list after repair
+        if: inputs.execution_mode == 'execute-ledger-repair' && inputs.execute_confirmation == 'APPLY_METADATA_ONLY'
+        shell: bash
+        env:
+          BASELINE_VERSION: ${{ inputs.expected_baseline_version }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          supabase migration list --linked --dns-resolver https \
+            | tee baseline-reconciliation/migration-list-after-repair.txt
+
+          awk '{
+            remote = $0
+            sub(/^[^|]*\|[[:space:]]*/, "", remote)
+            sub(/[[:space:]]*\|.*$/, "", remote)
+            gsub(/[[:space:]]/, "", remote)
+            if (remote ~ /^[0-9]{14}$/) print remote
+          }' baseline-reconciliation/migration-list-after-repair.txt \
+            | sort -u > baseline-reconciliation/remote-versions-after.txt
+
+          if ! grep -Fxq "$BASELINE_VERSION" baseline-reconciliation/remote-versions-after.txt; then
+            echo "The expected baseline version was not recorded remotely after repair." >&2
+            exit 1
+          fi
+
+          if [ "$(wc -l < baseline-reconciliation/remote-versions-after.txt | tr -d ' ')" -ne 1 ]; then
+            echo "Remote migration ledger contains unexpected versions after repair; stop before any deployment." >&2
+            cat baseline-reconciliation/remote-versions-after.txt >&2
+            exit 1
+          fi
+
+          {
+            echo
+            echo "## Metadata reconciliation complete"
+            echo
+            echo "The remote ledger now records only \`$BASELINE_VERSION\`. Verify the attached before/after lists and run the normal remote dry-run before deploying."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-baseline-reconciliation-${{ inputs.target }}-${{ github.run_id }}
+          path: baseline-reconciliation/
+          if-no-files-found: warn
+          retention-days: 30
