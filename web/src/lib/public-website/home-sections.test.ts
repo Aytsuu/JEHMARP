@@ -92,8 +92,14 @@ describe("home page section payloads", () => {
     };
 
     expect(section.type).toBe("product_category_range");
-    expect(Array.isArray(section.content.categories)).toBe(true);
-    expect(section.content.categories?.[0]).toMatchObject({
+    const categories = section.content.categories;
+    expect(Array.isArray(categories)).toBe(true);
+
+    if (!Array.isArray(categories)) {
+      throw new Error("Expected product category content to be an array.");
+    }
+
+    expect(categories[0]).toMatchObject({
       imageSrc: "/images/chicken_breast.png",
     });
   });
