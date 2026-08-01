@@ -1,0 +1,155 @@
+---
+type Props = {
+  ariaLabel: string;
+  defaultTab?: string;
+  clearPageOnChange?: boolean;
+  omitDefaultTabParam?: boolean;
+  class?: string;
+  listClass?: string;
+  panelsClass?: string;
+};
+
+const {
+  ariaLabel,
+  defaultTab,
+  clearPageOnChange = false,
+  omitDefaultTabParam = false,
+  class: className,
+  listClass,
+  panelsClass,
+} = Astro.props;
+---
+
+<div
+  class:list={["ui-tabs", className]}
+  data-ui-tabs
+  data-ui-tabs-aria-label={ariaLabel}
+  {...defaultTab ? { "data-ui-tabs-default": defaultTab } : {}}
+  {...clearPageOnChange ? { "data-ui-tabs-clear-page": "true" } : {}}
+  {...omitDefaultTabParam ? { "data-ui-tabs-omit-default-tab": "true" } : {}}
+>
+  <div
+    class:list={["ui-tabs__list", listClass]}
+    role="tablist"
+    aria-label={ariaLabel}
+  >
+    <slot name="tabs" />
+  </div>
+  <div class:list={["ui-tabs__panels", panelsClass]}>
+    <slot name="panels" />
+  </div>
+</div>
+
+<style>
+  .ui-tabs {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .ui-tabs__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  :global(.ui-tab) {
+    min-height: 2.25rem;
+    margin-bottom: -1px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent !important;
+    color: rgba(17, 24, 39, 0.66);
+    padding: 0.45rem 0.75rem;
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+
+  :global(.ui-tab:hover:not(.is-active)) {
+    color: #111827;
+    background: transparent !important;
+  }
+
+  :global(.ui-tab.is-active) {
+    background: transparent !important;
+    border-bottom-color: #111827;
+    color: #111827;
+  }
+
+  :global(.ui-tabs__list--stretch .ui-tab) {
+    flex: 1;
+  }
+
+  .ui-tabs__panels {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    gap: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .ui-tabs__panels > :global(.ui-tab-panel.is-active) {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  :global(.ui-tab-panel) {
+    display: none;
+    border-radius: 1.25rem;
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    padding: 1.5rem;
+    backdrop-filter: blur(12px);
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  :global(.ui-tab-panel.is-active) {
+    display: flex;
+    flex-direction: column;
+  }
+
+  :global(.ui-tab-panel--document) {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    overflow: hidden;
+  }
+
+  :global(.ui-tab-panel--notes) {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    overflow: visible;
+  }
+
+  :global(.ui-tab-panel--plain) {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    overflow: visible;
+  }
+</style>

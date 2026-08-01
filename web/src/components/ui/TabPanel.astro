@@ -1,0 +1,34 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+type Props = {
+  target: string;
+  active?: boolean;
+  variant?: "default" | "document" | "notes" | "plain";
+} & HTMLAttributes<"section">;
+
+const {
+  target,
+  active = false,
+  variant = "default",
+  class: className,
+  ...rest
+} = Astro.props;
+---
+
+<section
+  role="tabpanel"
+  class:list={[
+    "ui-tab-panel",
+    variant === "document" && "ui-tab-panel--document",
+    variant === "notes" && "ui-tab-panel--notes",
+    variant === "plain" && "ui-tab-panel--plain",
+    active && "is-active",
+    className,
+  ]}
+  data-ui-tab-panel={target}
+  hidden={!active}
+  {...rest}
+>
+  <slot />
+</section>

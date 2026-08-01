@@ -3752,16 +3752,15 @@
     height: 100%;
     width: 100%;
     background: transparent;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: auto;
+    overscroll-behavior: contain;
   }
 
   .dashboard-table-board>table,
   .dashboard-table-board>.dashboard-table {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    height: 100%;
+    display: table;
+    flex: none;
+    height: auto;
     min-height: 0;
     margin: 0;
     overflow: visible;
@@ -3772,29 +3771,57 @@
   }
 
   .dashboard-table-board thead {
-    display: table;
+    display: table-header-group;
     width: var(--dashboard-table-sync-width, max-content);
     table-layout: fixed;
-    flex-shrink: 0;
     box-sizing: border-box;
   }
 
+  .dashboard-table-board thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
   .dashboard-table-board tbody {
-    display: block;
-    flex: 1 1 auto;
-    min-height: 0;
-    max-height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    width: 100%;
+    display: table-row-group;
+    overflow: visible;
+    max-height: none;
+    flex: none;
+    width: auto;
   }
 
   .dashboard-table-board tbody tr {
-    display: table;
-    width: var(--dashboard-table-sync-width, max-content);
-    table-layout: fixed;
+    display: table-row;
+    width: auto;
     background: #ffffff;
+  }
+
+  .dashboard-table-board--record-detail {
+    flex: none;
+    height: auto;
+    max-height: min(70vh, 40rem);
+    border: 1px solid #d1d5db;
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .dashboard-table-board--record-detail>table,
+  .dashboard-table-board--record-detail>.dashboard-table {
+    border-right: 0;
+  }
+
+  .dashboard-table-board--record-detail .agent-customers-table {
+    table-layout: fixed;
+    width: 100%;
+    margin: 0;
+    border: 0;
+  }
+
+  .dashboard-table-board--record-detail .agent-customers-table th,
+  .dashboard-table-board--record-detail .agent-customers-table td {
+    padding: 1.1rem 0.75rem;
+    vertical-align: middle;
   }
 
   .dashboard-interactive-table__footer {
@@ -3974,6 +4001,20 @@
   .agent-order-detail-stat__item dd a {
     color: inherit;
     text-decoration: none;
+  }
+
+  .agent-order-detail-stat__item dd a.agent-order-detail-stat__agent-link {
+    color: var(--color-brand-red);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+    text-transform: none;
+  }
+
+  .agent-order-detail-stat__item dd a.agent-order-detail-stat__agent-link:hover,
+  .agent-order-detail-stat__item dd a.agent-order-detail-stat__agent-link:focus-visible {
+    color: #551313;
+    outline: none;
   }
 
   .agent-order-detail-stat__item dd a:hover {
@@ -4334,6 +4375,41 @@
     font-size: 0.95rem;
     font-weight: 700;
     color: #111827;
+    white-space: nowrap;
+  }
+
+  .agent-order-products-modal__line-controls {
+    display: inline-flex;
+    align-items: stretch;
+    min-height: 2.2rem;
+    border: 1px solid rgba(17, 24, 39, 0.16);
+    border-radius: 0.45rem;
+    background: #ffffff;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .agent-order-products-modal__line-controls .agent-order-products-modal__item-total {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+    border-right: 1px solid rgba(17, 24, 39, 0.12);
+    background: #f9fafb;
+  }
+
+  .agent-order-products-modal__line-controls .agent-order-products-modal__quantity-input {
+    border: 0;
+    border-radius: 0;
+    min-height: 0;
+  }
+
+  .agent-order-products-modal__line-controls .agent-order-products-modal__quantity-value {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.65rem;
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.82rem;
+    font-weight: 600;
     white-space: nowrap;
   }
 
@@ -10570,14 +10646,14 @@
   }
 
   .dashboard-table-board tbody tr.empty-row {
-    display: block;
+    display: table-row;
     width: 100%;
     min-width: 100%;
     background: transparent;
   }
 
   .dashboard-table-board tbody tr.empty-row td.empty-state {
-    display: block;
+    display: table-cell;
     width: 100% !important;
     min-width: 100% !important;
     max-width: none !important;

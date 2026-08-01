@@ -20,6 +20,7 @@ import {
   parseAgentRecordFilters,
   parseAgentRecordTab,
   serializeAgentRecordFilters,
+  type AgentRecordTab,
 } from "@/lib/admin-dashboard/agent-record";
 import {
   buildCustomerInvoiceRows,
@@ -80,6 +81,12 @@ const backLabel = "Back to agents";
 const activeTab = parseAgentRecordTab(Astro.url.searchParams.get("tab"));
 const orderFilters = parseAgentRecordFilters(Astro.url);
 const pagination = parseAdminPagination(Astro.url);
+
+function paginateAgentTabRecords<T>(tab: AgentRecordTab, records: T[]) {
+  const page = activeTab === tab ? pagination.page : 1;
+  return paginateAgentRecords(records, page, pagination.pageSize);
+}
+
 const customerOrders = detailData.customerOrders;
 const promotedCustomerId = agent.promoted_from_customer_id ?? null;
 const linkedCustomer = promotedCustomerId
@@ -113,47 +120,30 @@ const filteredOrders = filterAgentRecordOrderRows(
   buildAgentRecordOrderRows(customerOrders, detailData.agentOrders, agentReturnTo),
   orderFilters,
 );
-const paginatedOrders = paginateAgentRecords(
-  filteredOrders,
-  pagination.page,
-  pagination.pageSize,
-);
+const paginatedOrders = paginateAgentTabRecords("orders", filteredOrders);
 const salesRows = filterCustomerSalesRows(
   buildCustomerSalesRows(customerOrders, agentReturnTo),
   orderFilters,
 );
-const paginatedSales = paginateAgentRecords(
-  salesRows,
-  pagination.page,
-  pagination.pageSize,
-);
+const paginatedSales = paginateAgentTabRecords("sales", salesRows);
 const invoiceRows = filterCustomerInvoiceRows(
   buildCustomerInvoiceRows(customerOrders, agentReturnTo),
   orderFilters.search,
 );
-const paginatedInvoices = paginateAgentRecords(
-  invoiceRows,
-  pagination.page,
-  pagination.pageSize,
-);
+const paginatedInvoices = paginateAgentTabRecords("invoices", invoiceRows);
 const paymentRows = filterCustomerPaymentRows(
   buildCustomerPaymentRows(customerOrders, agentReturnTo),
   orderFilters.search,
 );
-const paginatedPayments = paginateAgentRecords(
-  paymentRows,
-  pagination.page,
-  pagination.pageSize,
-);
+const paginatedPayments = paginateAgentTabRecords("payments", paymentRows);
 
 const assignedCustomerRows = filterAgentAssignedCustomerRows(
   buildAgentAssignedCustomerRows(detailData.assignedCustomers, agentReturnTo),
   orderFilters.search,
 );
-const paginatedAssignedCustomers = paginateAgentRecords(
+const paginatedAssignedCustomers = paginateAgentTabRecords(
+  "customers",
   assignedCustomerRows,
-  pagination.page,
-  pagination.pageSize,
 );
 const previousOrderRows = filterAgentPreviousOrderRows(
   buildAgentPreviousOrderRows(
@@ -168,10 +158,9 @@ const previousOrderRows = filterAgentPreviousOrderRows(
   ),
   orderFilters.search,
 );
-const paginatedPreviousOrders = paginateAgentRecords(
+const paginatedPreviousOrders = paginateAgentTabRecords(
+  "previous-orders",
   previousOrderRows,
-  pagination.page,
-  pagination.pageSize,
 );
 
 const filterQuery = mergeAdminPaginationQuery(

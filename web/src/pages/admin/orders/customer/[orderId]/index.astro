@@ -3,6 +3,9 @@ import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
 import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import Tab from "@/components/ui/Tab.astro";
+import TabPanel from "@/components/ui/TabPanel.astro";
+import Tabs from "@/components/ui/Tabs.astro";
 import {
   formatAdminActionFeedback,
   markAdminOrderReadIfUnread,
@@ -760,103 +763,56 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
       </div>
     </aside>
 
-    <section class="order-detail-main" data-order-detail-tabs>
-      <div class="order-tabs" role="tablist" aria-label="Order detail sections">
-        <button
-          type="button"
-          class:list={[
-            "order-tab",
-            isOrderDetailTabActive("products") && "is-active",
-          ]}
-          data-order-detail-tab-trigger
-          data-tab-target="products"
-          role="tab"
-          aria-selected={isOrderDetailTabActive("products") ? "true" : "false"}
+    <section class="order-detail-main">
+      <Tabs ariaLabel="Order detail sections" class="order-detail-tabs">
+        <Tab
+          slot="tabs"
+          target="products"
+          active={isOrderDetailTabActive("products")}
         >
           Products
-        </button>
-        <button
-          type="button"
-          class:list={[
-            "order-tab",
-            isOrderDetailTabActive("order-slip") && "is-active",
-          ]}
-          data-order-detail-tab-trigger
-          data-tab-target="order-slip"
-          role="tab"
-          aria-selected={isOrderDetailTabActive("order-slip")
-            ? "true"
-            : "false"}
+        </Tab>
+        <Tab
+          slot="tabs"
+          target="order-slip"
+          active={isOrderDetailTabActive("order-slip")}
         >
           Order Slip
-        </button>
-        <button
-          type="button"
-          class:list={[
-            "order-tab",
-            isOrderDetailTabActive("sales-invoice") && "is-active",
-          ]}
-          data-order-detail-tab-trigger
-          data-tab-target="sales-invoice"
-          role="tab"
-          aria-selected={isOrderDetailTabActive("sales-invoice")
-            ? "true"
-            : "false"}
+        </Tab>
+        <Tab
+          slot="tabs"
+          target="sales-invoice"
+          active={isOrderDetailTabActive("sales-invoice")}
         >
           Sales Invoice
-        </button>
-        <button
-          type="button"
-          class:list={[
-            "order-tab",
-            isOrderDetailTabActive("payment-record") && "is-active",
-          ]}
-          data-order-detail-tab-trigger
-          data-tab-target="payment-record"
-          role="tab"
-          aria-selected={isOrderDetailTabActive("payment-record")
-            ? "true"
-            : "false"}
+        </Tab>
+        <Tab
+          slot="tabs"
+          target="payment-record"
+          active={isOrderDetailTabActive("payment-record")}
         >
           Payment Record
-        </button>
-        <button
-          type="button"
-          class:list={[
-            "order-tab",
-            isOrderDetailTabActive("timeline") && "is-active",
-          ]}
-          data-order-detail-tab-trigger
-          data-tab-target="timeline"
-          role="tab"
-          aria-selected={isOrderDetailTabActive("timeline") ? "true" : "false"}
+        </Tab>
+        <Tab
+          slot="tabs"
+          target="timeline"
+          active={isOrderDetailTabActive("timeline")}
         >
           Timeline
-        </button>
-        <button
-          type="button"
-          class:list={[
-            "order-tab",
-            isOrderDetailTabActive("notes") && "is-active",
-          ]}
-          data-order-detail-tab-trigger
-          data-tab-target="notes"
-          role="tab"
-          aria-selected={isOrderDetailTabActive("notes") ? "true" : "false"}
+        </Tab>
+        <Tab
+          slot="tabs"
+          target="notes"
+          active={isOrderDetailTabActive("notes")}
         >
           Notes
-        </button>
-      </div>
+        </Tab>
 
-      <div class="order-tab-panels">
-        <section
-          class:list={[
-            "order-tab-panel",
-            isOrderDetailTabActive("products") && "is-active",
-          ]}
-          data-order-detail-tab-panel="products"
-          role="tabpanel"
-          hidden={!isOrderDetailTabActive("products")}
+        <TabPanel
+          slot="panels"
+          target="products"
+          active={isOrderDetailTabActive("products")}
+          class="order-products-panel-host"
         >
           <div class="order-products-panel" data-order-products-panel>
             <div class="order-products-panel__header">
@@ -915,13 +871,6 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                                 </p>
                               </div>
                               <div class="agent-order-products-modal__item-actions">
-                                <strong
-                                  class="agent-order-products-modal__item-total"
-                                  data-order-product-line-total
-                                  data-unit-price={item.unit_price}
-                                >
-                                  {formatCurrency(itemSubtotal)}
-                                </strong>
                                 {
                                   canEditOrderProducts ? (
                                     <form
@@ -932,6 +881,40 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                                         item.partial_quantity,
                                       )}
                                     >
+                                      <div class="agent-order-products-modal__line-controls">
+                                        <strong
+                                          class="agent-order-products-modal__item-total"
+                                          data-order-product-line-total
+                                          data-unit-price={item.unit_price}
+                                        >
+                                          {formatCurrency(itemSubtotal)}
+                                        </strong>
+                                        <label
+                                          class="sr-only"
+                                          for={`customer-order-product-qty-${item.id}`}
+                                        >
+                                          Quantity for {item.product?.name ?? "item"}
+                                        </label>
+                                        <div class="agent-order-products-modal__quantity-input">
+                                          <input
+                                            id={`customer-order-product-qty-${item.id}`}
+                                            type="number"
+                                            name="quantity"
+                                            min="0.001"
+                                            step="0.001"
+                                            value={item.partial_quantity}
+                                            required
+                                            data-order-product-quantity-input
+                                            data-initial-quantity={item.partial_quantity}
+                                          />
+                                          <span
+                                            class="agent-order-products-modal__quantity-unit"
+                                            aria-hidden="true"
+                                          >
+                                            {unitLabel}
+                                          </span>
+                                        </div>
+                                      </div>
                                       <input
                                         type="hidden"
                                         name="action"
@@ -942,31 +925,6 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                                         name="orderItemId"
                                         value={item.id}
                                       />
-                                      <label
-                                        class="sr-only"
-                                        for={`customer-order-product-qty-${item.id}`}
-                                      >
-                                        Quantity for {item.product?.name ?? "item"}
-                                      </label>
-                                      <div class="agent-order-products-modal__quantity-input">
-                                        <input
-                                          id={`customer-order-product-qty-${item.id}`}
-                                          type="number"
-                                          name="quantity"
-                                          min="0.001"
-                                          step="0.001"
-                                          value={item.partial_quantity}
-                                          required
-                                          data-order-product-quantity-input
-                                          data-initial-quantity={item.partial_quantity}
-                                        />
-                                        <span
-                                          class="agent-order-products-modal__quantity-unit"
-                                          aria-hidden="true"
-                                        >
-                                          {unitLabel}
-                                        </span>
-                                      </div>
                                       <button
                                         type="submit"
                                         data-order-product-quantity-save
@@ -976,9 +934,18 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                                       </button>
                                     </form>
                                   ) : (
-                                    <span class="agent-order-products-modal__quantity-value">
-                                      {item.partial_quantity} {unitLabel}
-                                    </span>
+                                    <div class="agent-order-products-modal__line-controls">
+                                      <strong
+                                        class="agent-order-products-modal__item-total"
+                                        data-order-product-line-total
+                                        data-unit-price={item.unit_price}
+                                      >
+                                        {formatCurrency(itemSubtotal)}
+                                      </strong>
+                                      <span class="agent-order-products-modal__quantity-value">
+                                        {item.partial_quantity} {unitLabel}
+                                      </span>
+                                    </div>
                                   )
                                 }
                                 {
@@ -1144,16 +1111,13 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               }
             </div>
           </div>
-        </section>
+        </TabPanel>
 
-        <section
-          class:list={[
-            "order-tab-panel order-tab-panel--document",
-            isOrderDetailTabActive("order-slip") && "is-active",
-          ]}
-          data-order-detail-tab-panel="order-slip"
-          role="tabpanel"
-          hidden={!isOrderDetailTabActive("order-slip")}
+        <TabPanel
+          slot="panels"
+          target="order-slip"
+          active={isOrderDetailTabActive("order-slip")}
+          variant="document"
         >
           <div
             class="document-preview-body document-preview--pdf-like document-preview--rounded-sm"
@@ -1260,17 +1224,13 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               </div>
             </footer>
           </div>
-        </section>
+        </TabPanel>
 
-        <section
-          class:list={[
-            "order-tab-panel",
-            hasSalesInvoice && "order-tab-panel--document",
-            isOrderDetailTabActive("sales-invoice") && "is-active",
-          ]}
-          data-order-detail-tab-panel="sales-invoice"
-          role="tabpanel"
-          hidden={!isOrderDetailTabActive("sales-invoice")}
+        <TabPanel
+          slot="panels"
+          target="sales-invoice"
+          active={isOrderDetailTabActive("sales-invoice")}
+          variant={hasSalesInvoice ? "document" : "default"}
         >
           {
             !hasSalesInvoice ? (
@@ -1436,16 +1396,12 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               </>
             )
           }
-        </section>
+        </TabPanel>
 
-        <section
-          class:list={[
-            "order-tab-panel",
-            isOrderDetailTabActive("payment-record") && "is-active",
-          ]}
-          data-order-detail-tab-panel="payment-record"
-          role="tabpanel"
-          hidden={!isOrderDetailTabActive("payment-record")}
+        <TabPanel
+          slot="panels"
+          target="payment-record"
+          active={isOrderDetailTabActive("payment-record")}
         >
           <div class="payment-panel">
             <div class="payment-panel__header">
@@ -1734,16 +1690,12 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               )
             }
           </div>
-        </section>
+        </TabPanel>
 
-        <section
-          class:list={[
-            "order-tab-panel",
-            isOrderDetailTabActive("timeline") && "is-active",
-          ]}
-          data-order-detail-tab-panel="timeline"
-          role="tabpanel"
-          hidden={!isOrderDetailTabActive("timeline")}
+        <TabPanel
+          slot="panels"
+          target="timeline"
+          active={isOrderDetailTabActive("timeline")}
         >
           <div class="order-timeline-panel">
             <div class="order-timeline-panel__header">
@@ -1772,16 +1724,14 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               }
             </div>
           </div>
-        </section>
+        </TabPanel>
 
-        <section
-          class:list={[
-            "order-tab-panel order-tab-panel--notes",
-            isOrderDetailTabActive("notes") && "is-active",
-          ]}
-          data-order-detail-tab-panel="notes"
-          role="tabpanel"
-          hidden={!isOrderDetailTabActive("notes")}
+        <TabPanel
+          slot="panels"
+          target="notes"
+          active={isOrderDetailTabActive("notes")}
+          variant="notes"
+          class="order-notes-panel-host"
         >
           <div
             class="order-notes-panel"
@@ -2057,8 +2007,8 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
               }
             </div>
           </div>
-        </section>
-      </div>
+        </TabPanel>
+      </Tabs>
     </section>
   </div>
 </AdminPageFrame>
@@ -3080,86 +3030,9 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     overflow: hidden;
   }
 
-  .order-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  .order-tab {
-    min-height: 2.25rem;
-    margin-bottom: -1px;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    background: transparent !important;
-    color: rgba(17, 24, 39, 0.66);
-    padding: 0.45rem 0.75rem;
-    font: inherit;
-    font-size: 0.875rem;
-    font-weight: 600;
-    letter-spacing: normal;
-    text-transform: none;
-    cursor: pointer;
-    transition:
-      color 0.15s ease,
-      border-color 0.15s ease;
-  }
-
-  .order-tab:hover:not(.is-active) {
-    color: #111827;
-    background: transparent !important;
-  }
-
-  .order-tab.is-active {
-    background: transparent !important;
-    border-bottom-color: #111827;
-    color: #111827;
-  }
-
-  .order-tab-panels {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-    gap: 0;
+  .order-detail-tabs {
     min-height: 0;
-    overflow: hidden;
-  }
-
-  .order-tab-panels > .order-tab-panel.is-active {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-height: 0;
-  }
-
-  .order-tab-panel {
-    display: none;
-    border-radius: 1.25rem;
-    background: rgba(255, 255, 255, 0.82);
-    border: 1px solid rgba(17, 24, 39, 0.08);
-    padding: 1.5rem;
-    backdrop-filter: blur(12px);
-    min-height: 0;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-  }
-
-  .order-tab-panel.is-active {
-    display: flex;
-    flex-direction: column;
-  }
-
-  .order-tab-panel--document {
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    box-shadow: none;
-    backdrop-filter: none;
-    overflow: hidden;
+    height: 100%;
   }
 
   .document-preview-body {
@@ -3477,7 +3350,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     padding: 1.25rem;
   }
 
-  .order-tab-panel--notes {
+  .order-notes-panel-host {
     display: flex;
     flex-direction: column;
     min-height: 0;
@@ -3989,7 +3862,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     }
 
     .order-detail-section,
-    .order-tab-panel {
+    :global(.ui-tab-panel) {
       overflow: visible;
     }
   }
@@ -3997,7 +3870,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
   @media (max-width: 840px) {
     .order-detail-section,
     .order-detail-main,
-    .order-tab-panel,
+    :global(.ui-tab-panel),
     .order-sidebar-header,
     .order-sidebar-main,
     .document-preview {

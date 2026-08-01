@@ -4,12 +4,12 @@ import { initOrderDetailTabs } from "./order-detail-tabs";
 
 function renderTabs() {
   document.body.innerHTML = `
-    <section data-order-detail-tabs>
+    <section data-ui-tabs>
       <div role="tablist">
         <button
           type="button"
-          class="order-tab is-active"
-          data-order-detail-tab-trigger
+          class="ui-tab is-active"
+          data-ui-tab-trigger
           data-tab-target="order-slip"
           role="tab"
           aria-selected="true"
@@ -18,8 +18,8 @@ function renderTabs() {
         </button>
         <button
           type="button"
-          class="order-tab"
-          data-order-detail-tab-trigger
+          class="ui-tab"
+          data-ui-tab-trigger
           data-tab-target="sales-invoice"
           role="tab"
           aria-selected="false"
@@ -28,8 +28,8 @@ function renderTabs() {
         </button>
         <button
           type="button"
-          class="order-tab"
-          data-order-detail-tab-trigger
+          class="ui-tab"
+          data-ui-tab-trigger
           data-tab-target="payment-record"
           role="tab"
           aria-selected="false"
@@ -38,19 +38,19 @@ function renderTabs() {
         </button>
       </div>
       <section
-        class="order-tab-panel is-active"
-        data-order-detail-tab-panel="order-slip"
+        class="ui-tab-panel is-active"
+        data-ui-tab-panel="order-slip"
         role="tabpanel"
       ></section>
       <section
-        class="order-tab-panel"
-        data-order-detail-tab-panel="sales-invoice"
+        class="ui-tab-panel"
+        data-ui-tab-panel="sales-invoice"
         role="tabpanel"
         hidden
       ></section>
       <section
-        class="order-tab-panel"
-        data-order-detail-tab-panel="payment-record"
+        class="ui-tab-panel"
+        data-ui-tab-panel="payment-record"
         role="tabpanel"
         hidden
       ></section>
@@ -60,14 +60,12 @@ function renderTabs() {
 
 function getTrigger(tab: string) {
   return document.querySelector<HTMLElement>(
-    `[data-order-detail-tab-trigger][data-tab-target="${tab}"]`,
+    `[data-ui-tab-trigger][data-tab-target="${tab}"]`,
   )!;
 }
 
 function getPanel(tab: string) {
-  return document.querySelector<HTMLElement>(
-    `[data-order-detail-tab-panel="${tab}"]`,
-  )!;
+  return document.querySelector<HTMLElement>(`[data-ui-tab-panel="${tab}"]`)!;
 }
 
 describe("initOrderDetailTabs", () => {

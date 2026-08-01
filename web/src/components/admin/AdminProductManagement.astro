@@ -1,5 +1,4 @@
 ---
-import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableEmptyState from "@/components/dashboard/DashboardTableEmptyState.astro";
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
@@ -345,14 +344,13 @@ function formatStockStatus(status: string): string {
               <th scope="col">Pricing</th>
               <th scope="col">Commission</th>
               <th scope="col">Status</th>
-              <DashboardTableActionsHeader />
             </tr>
           </thead>
           <tbody>
             {
               data.products.length === 0 ? (
                 <DashboardTableEmptyState
-                  colspan={8}
+                  colspan={7}
                   message="No products match the selected filters."
                 />
               ) : (
@@ -995,8 +993,6 @@ function formatStockStatus(status: string): string {
                         </button>
                       </Popover>
                     </td>
-
-                    <td class="dashboard-table__actions-column"></td>
                   </tr>
                 ))
               )
@@ -1026,7 +1022,6 @@ function formatStockStatus(status: string): string {
             <th scope="col">Pricing</th>
             <th scope="col">Commission</th>
             <th scope="col">Status</th>
-            <DashboardTableActionsHeader />
           </tr>
         </thead>
         <tbody>
@@ -1056,9 +1051,6 @@ function formatStockStatus(status: string): string {
                 </td>
                 <td>
                   <span class="table-skeleton-block" />
-                </td>
-                <td>
-                  <span class="table-skeleton-block table-skeleton-block--short" />
                 </td>
               </tr>
             ))

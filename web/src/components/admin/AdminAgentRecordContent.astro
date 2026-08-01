@@ -2,6 +2,9 @@
 import AdminAgentRecordTabTable from "@/components/admin/AdminAgentRecordTabTable.astro";
 import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordTabTable.astro";
 import MetricTrend from "@/components/ui/MetricTrend.astro";
+import Tab from "@/components/ui/Tab.astro";
+import TabPanel from "@/components/ui/TabPanel.astro";
+import Tabs from "@/components/ui/Tabs.astro";
 import Tooltip from "@/components/ui/Tooltip.astro";
 import AlertDialog from "@/components/ui/AlertDialog.astro";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
@@ -72,7 +75,6 @@ const {
   agent,
   linkedCustomer,
   activeTab,
-  filterQuery,
   orderFilters,
   orderRows,
   ordersPagination,
@@ -119,13 +121,6 @@ const hiddenCommissionCount = Math.max(
   0,
 );
 const kgSoldTrend = performanceQuickStats.kgSoldTrend;
-
-function tabHref(tab: AgentRecordTab) {
-  const params = new URLSearchParams(filterQuery);
-  params.set("tab", tab);
-  params.delete("page");
-  return `${agentBasePath}?${params.toString()}`;
-}
 
 const customerTabTableProps = {
   customerBasePath: agentBasePath,
@@ -668,73 +663,116 @@ const customerTabTableProps = {
     }
   </DashboardModal>
 
-  <div class="customer-record-tabs">
-    <nav class="customer-record-tabs__nav" aria-label="Agent record sections">
-      <a
-        href={tabHref("orders")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "orders" && "is-active",
-        ]}
-      >
-        Orders
-      </a>
-      <a
-        href={tabHref("sales")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "sales" && "is-active",
-        ]}
-      >
-        Sales
-      </a>
-      <a
-        href={tabHref("invoices")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "invoices" && "is-active",
-        ]}
-      >
-        Invoices
-      </a>
-      <a
-        href={tabHref("payments")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "payments" && "is-active",
-        ]}
-      >
-        Payment records
-      </a>
-      <a
-        href={tabHref("customers")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "customers" && "is-active",
-        ]}
-      >
-        Customers
-      </a>
-      {
-        showPreviousOrdersTab && (
-          <a
-            href={tabHref("previous-orders")}
-            class:list={[
-              "customer-record-tabs__link",
-              activeTab === "previous-orders" && "is-active",
-            ]}
-          >
-            Previous orders
-          </a>
-        )
-      }
-    </nav>
+  <Tabs
+    ariaLabel="Agent record sections"
+    defaultTab="orders"
+    clearPageOnChange
+    omitDefaultTabParam
+  >
+    <Tab slot="tabs" target="orders" active={activeTab === "orders"}>Orders</Tab>
+    <Tab slot="tabs" target="sales" active={activeTab === "sales"}>Sales</Tab>
+    <Tab slot="tabs" target="invoices" active={activeTab === "invoices"}>Invoices</Tab>
+    <Tab slot="tabs" target="payments" active={activeTab === "payments"}>
+      Payment records
+    </Tab>
+    <Tab slot="tabs" target="customers" active={activeTab === "customers"}>
+      Customers
+    </Tab>
+    {
+      showPreviousOrdersTab && (
+        <Tab
+          slot="tabs"
+          target="previous-orders"
+          active={activeTab === "previous-orders"}
+        >
+          Previous orders
+        </Tab>
+      )
+    }
+
+    <TabPanel
+      slot="panels"
+      target="orders"
+      active={activeTab === "orders"}
+      variant="plain"
+      aria-label="Agent orders"
+    >
+      <AdminAgentRecordTabTable
+        tab="orders"
+        agentBasePath={agentBasePath}
+        agentReturnTo={agentReturnTo}
+        orderFilters={orderFilters}
+        orderRows={orderRows}
+        ordersPagination={ordersPagination}
+        assignedCustomerRows={assignedCustomerRows}
+        assignedCustomersPagination={assignedCustomersPagination}
+        previousOrderRows={previousOrderRows}
+        previousOrdersPagination={previousOrdersPagination}
+      />
+    </TabPanel>
+
+    <TabPanel
+      slot="panels"
+      target="sales"
+      active={activeTab === "sales"}
+      variant="plain"
+      aria-label="Agent sales"
+    >
+      <AdminCustomerRecordTabTable tab="sales" {...customerTabTableProps} />
+    </TabPanel>
+
+    <TabPanel
+      slot="panels"
+      target="invoices"
+      active={activeTab === "invoices"}
+      variant="plain"
+      aria-label="Agent invoices"
+    >
+      <AdminCustomerRecordTabTable tab="invoices" {...customerTabTableProps} />
+    </TabPanel>
+
+    <TabPanel
+      slot="panels"
+      target="payments"
+      active={activeTab === "payments"}
+      variant="plain"
+      aria-label="Agent payment records"
+    >
+      <AdminCustomerRecordTabTable tab="payments" {...customerTabTableProps} />
+    </TabPanel>
+
+    <TabPanel
+      slot="panels"
+      target="customers"
+      active={activeTab === "customers"}
+      variant="plain"
+      aria-label="Agent customers"
+    >
+      <AdminAgentRecordTabTable
+        tab="customers"
+        agentBasePath={agentBasePath}
+        agentReturnTo={agentReturnTo}
+        orderFilters={orderFilters}
+        orderRows={orderRows}
+        ordersPagination={ordersPagination}
+        assignedCustomerRows={assignedCustomerRows}
+        assignedCustomersPagination={assignedCustomersPagination}
+        previousOrderRows={previousOrderRows}
+        previousOrdersPagination={previousOrdersPagination}
+      />
+    </TabPanel>
 
     {
-      activeTab === "orders" && (
-        <section class="customer-record-tab-panel" aria-label="Agent orders">
+      showPreviousOrdersTab && (
+        <TabPanel
+          slot="panels"
+          target="previous-orders"
+          active={activeTab === "previous-orders"}
+          variant="plain"
+          aria-label="Agent previous orders"
+        >
           <AdminAgentRecordTabTable
-            tab="orders"
+            tab="previous-orders"
             agentBasePath={agentBasePath}
             agentReturnTo={agentReturnTo}
             orderFilters={orderFilters}
@@ -745,48 +783,10 @@ const customerTabTableProps = {
             previousOrderRows={previousOrderRows}
             previousOrdersPagination={previousOrdersPagination}
           />
-        </section>
+        </TabPanel>
       )
     }
-
-    {
-      (activeTab === "sales" ||
-        activeTab === "invoices" ||
-        activeTab === "payments") && (
-        <section
-          class="customer-record-tab-panel"
-          aria-label={`Agent ${activeTab}`}
-        >
-          <AdminCustomerRecordTabTable
-            tab={activeTab}
-            {...customerTabTableProps}
-          />
-        </section>
-      )
-    }
-
-    {
-      (activeTab === "customers" || activeTab === "previous-orders") && (
-        <section
-          class="customer-record-tab-panel"
-          aria-label={`Agent ${activeTab}`}
-        >
-          <AdminAgentRecordTabTable
-            tab={activeTab}
-            agentBasePath={agentBasePath}
-            agentReturnTo={agentReturnTo}
-            orderFilters={orderFilters}
-            orderRows={orderRows}
-            ordersPagination={ordersPagination}
-            assignedCustomerRows={assignedCustomerRows}
-            assignedCustomersPagination={assignedCustomersPagination}
-            previousOrderRows={previousOrderRows}
-            previousOrdersPagination={previousOrdersPagination}
-          />
-        </section>
-      )
-    }
-  </div>
+  </Tabs>
 
   {
     agent.promoted_from_customer_id && (
@@ -1454,32 +1454,6 @@ const customerTabTableProps = {
     .agent-record-quick-stats__row {
       grid-template-columns: 1fr;
     }
-  }
-
-  .customer-record-tabs__nav {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  .customer-record-tabs__link {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.7rem 0.95rem;
-    border-bottom: 2px solid transparent;
-    color: #6b7280;
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .customer-record-tabs__link.is-active {
-    color: #111827;
-    border-bottom-color: var(--color-brand-red);
-  }
-
-  .customer-record-tab-panel {
-    padding-top: 0;
   }
 
   @media (max-width: 960px) {

@@ -3,26 +3,10 @@ import { initAgentCommissionPreview } from "@/lib/client/agent-commission-previe
 import { initDashboardCellPopovers } from "@/lib/client/dashboard-cell-popover";
 import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
 import { initDashboardSheets } from "@/lib/client/dashboard-sheet";
-import type { AgentRecordTab } from "@/lib/admin-dashboard/agent-record";
+import { initRecordPageTabs } from "@/lib/client/record-page-tabs";
 
 function getAgentRecordSection() {
   return document.querySelector<HTMLElement>("[data-agent-record-page]");
-}
-
-function getActiveAgentRecordTab(): AgentRecordTab {
-  const tab = new URLSearchParams(window.location.search).get("tab");
-  if (
-    tab === "sales"
-    || tab === "invoices"
-    || tab === "payments"
-    || tab === "customers"
-    || tab === "previous-orders"
-    || tab === "agent-orders"
-  ) {
-    return tab === "agent-orders" ? "orders" : tab;
-  }
-
-  return "orders";
 }
 
 function initAgentRecordFragmentTables(section: HTMLElement) {
@@ -31,102 +15,80 @@ function initAgentRecordFragmentTables(section: HTMLElement) {
 
   const pagePath = `/admin/agents/${agentId}`;
   const fragmentPath = `${pagePath}/fragment`;
-  const activeTab = getActiveAgentRecordTab();
 
-  if (activeTab === "orders" && document.querySelector("[data-agent-record-orders-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `agent-record-orders-${agentId}-v2`,
-      fragmentPath,
-      pagePath,
+  const tableConfigs = [
+    {
       formSelector: "[data-agent-record-orders-filter-form]",
+      cacheKey: `agent-record-orders-${agentId}-v2`,
       tableShellSelector: "[data-agent-record-orders-table-shell]",
       skeletonTemplateSelector: "[data-agent-record-orders-filter-skeleton]",
-      filterKeys: ["tab", "search", "orderType", "source", "orderStatus", "paymentStatus"],
+      filterKeys: ["tab", "search", "orderType", "source", "orderStatus", "paymentStatus"] as const,
       searchInputSelector: "[data-agent-record-orders-search]",
-      historyStateKey: "agentRecordQuery",
-      updatedEvents: ["agent-record:table-updated"],
-    });
-    return;
-  }
-
-  if (activeTab === "sales" && document.querySelector("[data-customer-record-sales-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `agent-record-sales-${agentId}-v1`,
-      fragmentPath,
-      pagePath,
+    },
+    {
       formSelector: "[data-customer-record-sales-filter-form]",
+      cacheKey: `agent-record-sales-${agentId}-v1`,
       tableShellSelector: "[data-customer-record-sales-table-shell]",
       skeletonTemplateSelector: "[data-customer-record-sales-filter-skeleton]",
-      filterKeys: ["tab", "search", "source"],
+      filterKeys: ["tab", "search", "source"] as const,
       searchInputSelector: "[data-customer-record-sales-search]",
-      historyStateKey: "agentRecordQuery",
-      updatedEvents: ["agent-record:table-updated"],
-    });
-    return;
-  }
-
-  if (activeTab === "invoices" && document.querySelector("[data-customer-record-invoices-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `agent-record-invoices-${agentId}-v1`,
-      fragmentPath,
-      pagePath,
+    },
+    {
       formSelector: "[data-customer-record-invoices-filter-form]",
+      cacheKey: `agent-record-invoices-${agentId}-v1`,
       tableShellSelector: "[data-customer-record-invoices-table-shell]",
       skeletonTemplateSelector: "[data-customer-record-invoices-filter-skeleton]",
-      filterKeys: ["tab", "search"],
+      filterKeys: ["tab", "search"] as const,
       searchInputSelector: "[data-customer-record-invoices-search]",
-      historyStateKey: "agentRecordQuery",
-      updatedEvents: ["agent-record:table-updated"],
-    });
-    return;
-  }
-
-  if (activeTab === "payments" && document.querySelector("[data-customer-record-payments-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `agent-record-payments-${agentId}-v1`,
-      fragmentPath,
-      pagePath,
+    },
+    {
       formSelector: "[data-customer-record-payments-filter-form]",
+      cacheKey: `agent-record-payments-${agentId}-v1`,
       tableShellSelector: "[data-customer-record-payments-table-shell]",
       skeletonTemplateSelector: "[data-customer-record-payments-filter-skeleton]",
-      filterKeys: ["tab", "search"],
+      filterKeys: ["tab", "search"] as const,
       searchInputSelector: "[data-customer-record-payments-search]",
-      historyStateKey: "agentRecordQuery",
-      updatedEvents: ["agent-record:table-updated"],
-    });
-    return;
-  }
-
-  if (activeTab === "customers" && document.querySelector("[data-agent-record-customers-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `agent-record-customers-${agentId}-v1`,
-      fragmentPath,
-      pagePath,
+    },
+    {
       formSelector: "[data-agent-record-customers-filter-form]",
+      cacheKey: `agent-record-customers-${agentId}-v1`,
       tableShellSelector: "[data-agent-record-customers-table-shell]",
       skeletonTemplateSelector: "[data-agent-record-customers-filter-skeleton]",
-      filterKeys: ["tab", "search"],
+      filterKeys: ["tab", "search"] as const,
       searchInputSelector: "[data-agent-record-customers-search]",
-      historyStateKey: "agentRecordQuery",
-      updatedEvents: ["agent-record:table-updated"],
-    });
-    return;
-  }
-
-  if (activeTab === "previous-orders" && document.querySelector("[data-agent-record-previous-orders-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `agent-record-previous-orders-${agentId}-v1`,
-      fragmentPath,
-      pagePath,
+    },
+    {
       formSelector: "[data-agent-record-previous-orders-filter-form]",
+      cacheKey: `agent-record-previous-orders-${agentId}-v1`,
       tableShellSelector: "[data-agent-record-previous-orders-table-shell]",
       skeletonTemplateSelector: "[data-agent-record-previous-orders-filter-skeleton]",
-      filterKeys: ["tab", "search"],
+      filterKeys: ["tab", "search"] as const,
       searchInputSelector: "[data-agent-record-previous-orders-search]",
+    },
+  ];
+
+  tableConfigs.forEach((tableConfig) => {
+    if (!document.querySelector(tableConfig.formSelector)) {
+      return;
+    }
+
+    initDashboardFragmentTable({
+      cacheKey: tableConfig.cacheKey,
+      fragmentPath,
+      pagePath,
+      formSelector: tableConfig.formSelector,
+      tableShellSelector: tableConfig.tableShellSelector,
+      skeletonTemplateSelector: tableConfig.skeletonTemplateSelector,
+      filterKeys: tableConfig.filterKeys,
+      searchInputSelector: tableConfig.searchInputSelector,
       historyStateKey: "agentRecordQuery",
       updatedEvents: ["agent-record:table-updated"],
     });
-  }
+  });
+}
+
+function initAgentRecordTabs() {
+  initRecordPageTabs();
 }
 
 function resetAgentRecordOrdersBulkPdf() {
@@ -143,6 +105,7 @@ export function initAgentRecordPage() {
   initDashboardSheets();
   initDashboardCellPopovers();
   initAgentCommissionPreview(section);
+  initAgentRecordTabs();
   initAgentRecordFragmentTables(section);
 
   if (section.dataset.agentOrdersBulkPdfInitialized !== "true") {

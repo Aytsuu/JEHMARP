@@ -85,7 +85,7 @@ const feedback = formatAgentActionFeedback(Astro.url);
     {pendingOrders.length === 0 ? (
       <p class="empty-state">No pending orders found for this customer.</p>
     ) : (
-      <DashboardTableBoard>
+      <DashboardTableBoard class="dashboard-table-board--record-detail">
         <table class="dashboard-table">
           <thead>
             <tr>
@@ -127,7 +127,7 @@ const feedback = formatAgentActionFeedback(Astro.url);
     {historicalOrders.length === 0 ? (
       <p class="empty-state">No historical or closed orders found for this customer.</p>
     ) : (
-      <DashboardTableBoard>
+      <DashboardTableBoard class="dashboard-table-board--record-detail">
         <table class="dashboard-table">
           <thead>
             <tr>
