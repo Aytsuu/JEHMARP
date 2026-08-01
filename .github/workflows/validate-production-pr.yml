@@ -491,6 +491,15 @@ jobs:
         run: |
           set -euo pipefail
 
+          # This trusted checkout may be an older main revision during the
+          # initial rollout of this validation workflow. Never execute the
+          # candidate checkout's helper with production database credentials.
+          if [ ! -f .github/scripts/validate-migration-phase-metadata.sh ]; then
+            echo "Trusted base does not yet contain the pending-migration metadata helper."
+            echo "Candidate migration metadata was validated in the secret-free PR validation job."
+            exit 0
+          fi
+
           if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
             MIGRATION_REVIEWED="${MIGRATION_REVIEWED}" \
               bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-linked

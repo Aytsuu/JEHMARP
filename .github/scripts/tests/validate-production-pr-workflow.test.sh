@@ -65,6 +65,11 @@ if printf '%s\n' "$dry_run_job" | grep -Eq 'secrets\.(PUBLIC_SUPABASE|SUPABASE_S
   exit 1
 fi
 
+if ! printf '%s\n' "$dry_run_job" | grep -Fq '[ ! -f .github/scripts/validate-migration-phase-metadata.sh ]'; then
+  echo "Production migration dry-run must safely handle a trusted base that predates the metadata helper." >&2
+  exit 1
+fi
+
 for workflow in "$WORKFLOW" "$MIGRATION_SAFETY_WORKFLOW"; do
   if ! grep -q 'path: trusted$' "$workflow" \
     || ! grep -q 'ref: \${{ github.event.pull_request.base.sha }}' "$workflow" \
