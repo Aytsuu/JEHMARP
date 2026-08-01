@@ -31,6 +31,24 @@ if printf '%s\n' "$validation_job" | grep -Eq 'secrets\.(PUBLIC_SUPABASE|SUPABAS
   exit 1
 fi
 
+if ! printf '%s\n' "$validation_job" | grep -q 'STAGING_EVIDENCE_WAIT_ATTEMPTS:' \
+  || ! printf '%s\n' "$validation_job" | grep -q 'STAGING_EVIDENCE_WAIT_INTERVAL_SECONDS:'; then
+  echo "Production PR validation must configure a bounded wait for matching staging evidence." >&2
+  exit 1
+fi
+
+if ! printf '%s\n' "$validation_job" | grep -q "run.status !== 'completed'" \
+  || ! printf '%s\n' "$validation_job" | grep -q 'Waiting .* Deploy Staging workflow run'; then
+  echo "Production PR validation must wait for an active matching staging deployment instead of failing early." >&2
+  exit 1
+fi
+
+if ! printf '%s\n' "$validation_job" | grep -q 'conclusion === .success.' \
+  || ! printf '%s\n' "$validation_job" | grep -q 'completed staging workflow run(s) failed'; then
+  echo "Production PR validation must accept only successful staging evidence and report completed failures." >&2
+  exit 1
+fi
+
 if ! grep -A 12 '^  production-migration-dry-run:$' "$WORKFLOW" | grep -q '^    needs: validate$'; then
   echo "Production migration dry-run must wait for the secret-free validation job." >&2
   exit 1

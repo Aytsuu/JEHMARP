@@ -23,6 +23,10 @@ jobs:
     env:
       MIGRATION_REVIEWED: ${{ contains(github.event.pull_request.labels.*.name, 'migration-reviewed') }}
       CONTRACT_RELEASE: ${{ contains(github.event.pull_request.labels.*.name, 'contract-release') }}
+      # Deploy Staging is triggered by the same dev push and may finish after
+      # the local validation steps. Wait only a bounded time for its evidence.
+      STAGING_EVIDENCE_WAIT_ATTEMPTS: "30"
+      STAGING_EVIDENCE_WAIT_INTERVAL_SECONDS: "20"
 
     steps:
       - name: Checkout
@@ -87,6 +91,14 @@ jobs:
             const core = require('@actions/core');
             const headSha = process.env.HEAD_SHA;
             const { owner, repo } = context.repo;
+            const maxAttempts = Number(process.env.STAGING_EVIDENCE_WAIT_ATTEMPTS);
+            const waitIntervalSeconds = Number(process.env.STAGING_EVIDENCE_WAIT_INTERVAL_SECONDS);
+
+            if (!Number.isInteger(maxAttempts) || maxAttempts < 1 ||
+                !Number.isInteger(waitIntervalSeconds) || waitIntervalSeconds < 1) {
+              core.setFailed('Staging evidence wait configuration must use positive integer attempts and interval seconds.');
+              return;
+            }
 
             const workflows = await github.rest.actions.listRepoWorkflows({ owner, repo });
             const stagingWorkflow = workflows.data.workflows.find(
@@ -98,20 +110,50 @@ jobs:
               return;
             }
 
-            const runs = await github.rest.actions.listWorkflowRuns({
-              owner,
-              repo,
-              workflow_id: stagingWorkflow.id,
-              head_sha: headSha,
-              status: 'completed',
-              per_page: 20,
-            });
+            let successRun;
+            let latestRuns = [];
+            for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+              const runs = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: stagingWorkflow.id,
+                head_sha: headSha,
+                per_page: 100,
+              });
 
-            const successRun = runs.data.workflow_runs.find((run) => run.conclusion === 'success');
+              latestRuns = runs.data.workflow_runs;
+              successRun = latestRuns.find((run) => run.conclusion === 'success');
+              if (successRun) {
+                break;
+              }
+
+              const activeRuns = latestRuns.filter((run) => run.status !== 'completed');
+              if (activeRuns.length > 0 || latestRuns.length === 0) {
+                if (attempt < maxAttempts) {
+                  core.info(
+                    `Waiting ${waitIntervalSeconds}s for active Deploy Staging workflow run ` +
+                      `for commit ${headSha} (${attempt}/${maxAttempts}).`,
+                  );
+                  await new Promise((resolve) => setTimeout(resolve, waitIntervalSeconds * 1000));
+                  continue;
+                }
+                break;
+              }
+
+              const failedRuns = latestRuns
+                .map((run) => `${run.html_url} (${run.conclusion ?? run.status})`)
+                .join(', ');
+              core.setFailed(`Matching completed staging workflow run(s) failed for commit ${headSha}: ${failedRuns}`);
+              return;
+            }
+
             if (!successRun) {
+              const observedRuns = latestRuns.length === 0
+                ? 'No matching Deploy Staging run was observed.'
+                : latestRuns.map((run) => `${run.html_url} (${run.status}/${run.conclusion ?? 'pending'})`).join(', ');
               core.setFailed(
-                `No successful Deploy Staging workflow run found for commit ${headSha}. ` +
-                  'Push the candidate to dev and wait for Deploy Staging to succeed before opening or updating this PR.',
+                `No successful Deploy Staging workflow run found for commit ${headSha} after ` +
+                  `${maxAttempts * waitIntervalSeconds}s. ${observedRuns}`,
               );
               return;
             }
