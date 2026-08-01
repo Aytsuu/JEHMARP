@@ -111,6 +111,23 @@ jobs:
             exit 1
           fi
 
+      - name: Assert Supabase baseline ledger state
+        env:
+          SUPABASE_DNS_RESOLVER: https
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+          BASELINE_LEDGER_TARGET: staging
+        run: |
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            bash .github/scripts/assert-supabase-baseline-ledger-state.sh --linked --target staging
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            bash .github/scripts/assert-supabase-baseline-ledger-state.sh \
+              --db-url "$SUPABASE_DB_POOLER_URL" \
+              --target staging
+          else
+            echo "Cannot assert baseline ledger state without a linked project or SUPABASE_DB_POOLER_URL."
+            exit 1
+          fi
+
       - name: Gate pending migrations for Expand-only auto-push
         env:
           SUPABASE_DNS_RESOLVER: https
