@@ -18,45 +18,90 @@ jobs:
     name: Local migration safety
     runs-on: ubuntu-latest
 
-    env:
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Collect changed migration files
+        id: changed
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_ref="origin/${{ github.base_ref }}"
+          git fetch origin "${{ github.base_ref }}" --depth=1
+          changed_files="$(git diff --name-only "${base_ref}"...HEAD -- supabase/migrations || true)"
+
+          if [ -z "${changed_files}" ]; then
+            echo "has_changed_migrations=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_changed_migrations=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "files<<EOF"
+            echo "${changed_files}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Changed migration files:"
+          echo "${changed_files}"
+
       - name: Scan changed migrations for risky SQL
+        if: steps.changed.outputs.has_changed_migrations == 'true'
         shell: bash
         env:
           MIGRATION_REVIEWED: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'migration-reviewed') }}
         run: |
           set -euo pipefail
 
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_ref="origin/${{ github.base_ref }}"
-            git fetch origin "${{ github.base_ref }}" --depth=1
-            changed_files="$(git diff --name-only "${base_ref}"...HEAD -- supabase/migrations || true)"
-          else
-            changed_files="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations || true)"
+          base_ref="origin/${{ github.base_ref }}"
+          changed_files="${{ steps.changed.outputs.files }}"
+
+          if ! bash .github/scripts/validate-expand-migration-sql.sh --diff-base "${base_ref}"; then
+            {
+              echo "### Expand SQL validation failed"
+              echo ""
+              echo "Migrations with \`migration-phase: expand\` must be additive-only."
+              echo "Use a Contract migration for drops, renames, truncate, delete, cascade, and policy drops."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
 
-          if [ -z "${changed_files}" ]; then
-            echo "No changed migration files."
-            exit 0
-          fi
-
-          echo "Changed migration files:"
-          echo "${changed_files}"
-
-          blocking_pattern='drop[[:space:]]+table|drop[[:space:]]+column|truncate[[:space:]]|delete[[:space:]]+from'
-          review_pattern='alter[[:space:]]+column.*set[[:space:]]+not[[:space:]]+null|drop[[:space:]]+policy|security[[:space:]]+definer|grant[[:space:]]+'
+          blocking_pattern='drop[[:space:]]+(table|column|view|function)|truncate[[:space:]]|delete[[:space:]]+from|rename[[:space:]]+(table|column)|cascade'
+          review_pattern='alter[[:space:]]+column.*set[[:space:]]+not[[:space:]]+null|alter[[:space:]]+column.*(type|set[[:space:]]+data[[:space:]]+type)|drop[[:space:]]+policy|replace[[:space:]]+policy|security[[:space:]]+definer|grant[[:space:]]+'
           destructive_reviewed_marker='migration-safety:[[:space:]]*destructive-reviewed'
+          unbounded_update_pattern='^[[:space:]]*update[[:space:]]+[^;[:space:]]+[[:space:]]+set[[:space:]]+'
 
-          blocking_matches="$(echo "${changed_files}" | xargs grep -Ein "${blocking_pattern}" || true)"
-          review_matches="$(echo "${changed_files}" | xargs grep -Ein "${review_pattern}" || true)"
+          legacy_files=""
+          contract_files=""
+          while IFS= read -r file; do
+            [ -z "${file}" ] && continue
+            if head -n 20 "${file}" | grep -Eiq '^[[:space:]]*--[[:space:]]*migration-phase:[[:space:]]*contract'; then
+              contract_files="${contract_files}${file}"$'\n'
+              continue
+            fi
+            if head -n 20 "${file}" | grep -Eiq '^[[:space:]]*--[[:space:]]*migration-phase:[[:space:]]*expand'; then
+              continue
+            fi
+            legacy_files="${legacy_files}${file}"$'\n'
+          done <<< "${changed_files}"
+
+          blocking_matches=""
+          review_matches=""
+          backfill_matches=""
+          if [ -n "${legacy_files}" ]; then
+            blocking_matches="$(echo "${legacy_files}" | xargs grep -Ein "${blocking_pattern}" || true)"
+            review_matches="$(echo "${legacy_files}" | xargs grep -Ein "${review_pattern}" || true)"
+            backfill_matches="$(echo "${legacy_files}" | xargs grep -Ein "${unbounded_update_pattern}" | grep -Eiv 'where' || true)"
+          fi
+
+          if [ -n "${contract_files}" ]; then
+            review_matches="${review_matches}$(echo "${contract_files}" | xargs grep -Ein "${review_pattern}" || true)"
+            backfill_matches="${backfill_matches}$(echo "${contract_files}" | xargs grep -Ein "${unbounded_update_pattern}" | grep -Eiv 'where' || true)"
+          fi
 
           unreviewed_blocking_matches=""
           if [ -n "${blocking_matches}" ]; then
@@ -71,38 +116,53 @@ jobs:
             done <<< "${blocking_matches}"
           fi
 
-          if [ -n "${review_matches}" ]; then
+          unreviewed_backfill_matches=""
+          if [ -n "${backfill_matches}" ]; then
+            while IFS= read -r match_line; do
+              [ -z "${match_line}" ] && continue
+              file="${match_line%%:*}"
+              if head -n 10 "${file}" | grep -Eiq "${destructive_reviewed_marker}"; then
+                echo "Acknowledged backfill SQL in ${file}"
+                continue
+              fi
+              unreviewed_backfill_matches="${unreviewed_backfill_matches}${match_line}"$'\n'
+            done <<< "${backfill_matches}"
+          fi
+
+          if [ -n "${review_matches}" ] || [ -n "${unreviewed_backfill_matches}" ]; then
             echo "Migration review recommended:"
-            echo "${review_matches}"
+            [ -n "${review_matches}" ] && echo "${review_matches}"
+            [ -n "${unreviewed_backfill_matches}" ] && echo "${unreviewed_backfill_matches}"
             {
               echo "### Migration review recommended"
               echo ""
               echo "The following patterns were found in changed migrations:"
+              echo "- \`alter column ... set not null\` or type changes"
+              echo "- RLS policy replacement (\`drop policy\`, \`replace policy\`)"
               echo "- \`security definer\` functions"
               echo "- \`grant\` statements"
-              echo "- \`alter column ... set not null\`"
-              echo "- \`drop policy\`"
+              echo "- Possible unbounded \`update ... set\` backfills without \`where\`"
               echo ""
-              echo "These are expected for RPC and RLS migrations, but should still be reviewed."
+              echo "These are expected for some RPC and RLS migrations, but should still be reviewed."
               echo "Add the \`migration-reviewed\` label after manual review if you want this noted on the PR."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
 
           if [ -n "${unreviewed_blocking_matches}" ]; then
-            echo "Blocking migration SQL detected:"
+            echo "Blocking migration SQL detected in legacy migrations:"
             echo "${unreviewed_blocking_matches}"
             {
               echo "### Blocking migration SQL detected"
               echo ""
-              echo "Destructive SQL was found in changed migrations:"
-              echo "- \`drop table\`"
-              echo "- \`drop column\`"
+              echo "Destructive SQL was found in legacy migrations without \`migration-phase\` headers:"
+              echo "- \`drop table\`, \`drop column\`, \`drop view\`, \`drop function\`"
+              echo "- \`rename table\` or \`rename column\`"
               echo "- \`truncate\`"
-              echo "- \`delete from\`"
+              echo "- broad \`delete from\`"
+              echo "- \`cascade\`"
               echo ""
-              echo "Review the matched migration SQL manually before merge."
-              echo "Add \`-- migration-safety: destructive-reviewed\` near the top of reviewed migrations,"
-              echo "or add the \`migration-reviewed\` label to this PR after review."
+              echo "Add Expand/Contract metadata to new migrations, or mark reviewed legacy files with"
+              echo "\`-- migration-safety: destructive-reviewed\` near the top after manual review."
             } >> "$GITHUB_STEP_SUMMARY"
 
             if [ "${MIGRATION_REVIEWED}" != "true" ]; then
@@ -111,6 +171,63 @@ jobs:
           elif [ -n "${blocking_matches}" ]; then
             echo "Destructive SQL found only in migrations marked destructive-reviewed."
           fi
+
+      - name: Validate migration phase metadata
+        if: steps.changed.outputs.has_changed_migrations == 'true'
+        shell: bash
+        env:
+          MIGRATION_REVIEWED: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'migration-reviewed') }}
+        run: |
+          set -euo pipefail
+
+          base_ref="origin/${{ github.base_ref }}"
+
+          set +e
+          metadata_output="$(MIGRATION_REVIEWED="${MIGRATION_REVIEWED}" bash .github/scripts/validate-migration-phase-metadata.sh --diff-base "${base_ref}" --require-phase-for-added 2>&1)"
+          metadata_status=$?
+          set -e
+
+          echo "${metadata_output}"
+
+          if echo "${metadata_output}" | grep -q '^WARN:'; then
+            legacy_warnings="$(echo "${metadata_output}" | grep '^WARN:' || true)"
+            {
+              echo "### Migration metadata warnings"
+              echo ""
+              echo "Modified legacy migrations without \`migration-phase\` headers were warned instead of failing:"
+              echo ""
+              echo '```'
+              echo "${legacy_warnings}"
+              echo '```'
+              echo ""
+              echo "Newly added migrations must include complete Expand or Contract metadata."
+              echo "Copy a template from \`supabase/migration-templates/\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "${metadata_status}" -ne 0 ]; then
+            {
+              echo "### Migration metadata validation failed"
+              echo ""
+              echo "Newly added migration files must include complete \`migration-phase\` metadata."
+              echo "Modified migrations with headers must include complete Expand or Contract fields."
+              echo "Contract migrations additionally require compatibility-window, legacy-usage, and backup evidence."
+              echo "Add the \`migration-reviewed\` label after manual review for approved Contract exceptions."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Note staging validation for dev-targeting PRs
+        if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'dev'
+        shell: bash
+        run: |
+          {
+            echo "### Staging validation deferred to merge"
+            echo ""
+            echo "This pull request targets \`dev\`. Remote staging migrations are not applied here."
+            echo "After merge, Deploy Staging on \`dev\` will link the managed staging project,"
+            echo "apply eligible Expand migrations, deploy the staging Worker, and run smoke tests."
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v3
@@ -132,14 +249,32 @@ jobs:
       - name: Run SQL tests
         run: bash supabase/tests/run.sh
 
-      - name: Link production Supabase project for dev to main checks
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
+  production-dry-run:
+    name: Production migration dry-run
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
+    needs: local-migration-safety
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.109.1
+
+      - name: Link production Supabase project
         id: supabase_link
         continue-on-error: true
         run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
 
-      - name: Dry-run production migrations for dev to main checks
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
+      - name: Dry-run production migrations
         env:
           SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
           SUPABASE_DB_PUSH_DRY_RUN: "true"

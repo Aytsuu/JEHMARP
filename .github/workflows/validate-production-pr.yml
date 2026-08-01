@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   pull-requests: read
+  actions: read
 
 concurrency:
   group: validate-production-pr-${{ github.event.pull_request.number }}
@@ -18,6 +19,7 @@ jobs:
     name: Validate dev to main
     if: github.event.pull_request.head.ref == 'dev' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
+    environment: production
 
     env:
       PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
@@ -32,10 +34,14 @@ jobs:
       RESELLER_ADMIN_EMAIL: ${{ secrets.RESELLER_ADMIN_EMAIL }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      MIGRATION_REVIEWED: ${{ contains(github.event.pull_request.labels.*.name, 'migration-reviewed') }}
+      CONTRACT_RELEASE: ${{ contains(github.event.pull_request.labels.*.name, 'contract-release') }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -84,12 +90,301 @@ jobs:
       - name: Run SQL tests
         run: bash supabase/tests/run.sh
 
+      - name: Find successful Deploy Staging run for PR head
+        id: staging_run
+        uses: actions/github-script@v7
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          script: |
+            const core = require('@actions/core');
+            const headSha = process.env.HEAD_SHA;
+            const { owner, repo } = context.repo;
+
+            const workflows = await github.rest.actions.listRepoWorkflows({ owner, repo });
+            const stagingWorkflow = workflows.data.workflows.find(
+              (workflow) => workflow.name === 'Deploy Staging' && workflow.state === 'active',
+            );
+
+            if (!stagingWorkflow) {
+              core.setFailed('Deploy Staging workflow was not found in this repository.');
+              return;
+            }
+
+            const runs = await github.rest.actions.listWorkflowRuns({
+              owner,
+              repo,
+              workflow_id: stagingWorkflow.id,
+              head_sha: headSha,
+              status: 'completed',
+              per_page: 20,
+            });
+
+            const successRun = runs.data.workflow_runs.find((run) => run.conclusion === 'success');
+            if (!successRun) {
+              core.setFailed(
+                `No successful Deploy Staging workflow run found for commit ${headSha}. ` +
+                  'Push the candidate to dev and wait for Deploy Staging to succeed before opening or updating this PR.',
+              );
+              return;
+            }
+
+            core.setOutput('run_id', String(successRun.id));
+            core.setOutput('run_url', successRun.html_url);
+            core.summary.addHeading('Staging evidence');
+            core.summary.addLink('Deploy Staging run', successRun.html_url);
+            core.summary.addRaw(`\nCommit: \`${headSha}\`\n`, true);
+            await core.summary.write();
+
+      - name: Download staging evidence artifact
+        id: staging_artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: staging-evidence
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ steps.staging_run.outputs.run_id }}
+          path: staging-evidence
+
+      - name: Verify staging evidence and migration history
+        shell: bash
+        env:
+          STAGING_EVIDENCE_OPTIONAL: ${{ vars.STAGING_EVIDENCE_OPTIONAL }}
+        run: |
+          set -euo pipefail
+
+          if [ "${{ steps.staging_artifact.outcome }}" != "success" ]; then
+            {
+              echo "### Staging evidence artifact"
+              echo ""
+              echo "Deploy Staging succeeded for this commit, but no \`staging-evidence\` artifact was found."
+              echo "Migration history audit requires a staging deploy that uploads evidence."
+              echo "Re-run Deploy Staging on \`dev\` after the evidence upload step is on the branch."
+              if [ "${STAGING_EVIDENCE_OPTIONAL:-}" = "true" ]; then
+                echo ""
+                echo "STAGING_EVIDENCE_OPTIONAL=true is set; continuing without staging evidence."
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "${STAGING_EVIDENCE_OPTIONAL:-}" = "true" ]; then
+              echo "WARN: staging-evidence artifact missing; STAGING_EVIDENCE_OPTIONAL=true allows bypass."
+              exit 0
+            fi
+
+            echo "staging-evidence artifact is required for production PR validation." >&2
+            exit 1
+          fi
+
+          bash .github/scripts/verify-staging-evidence.sh staging-evidence "${{ github.event.pull_request.head.sha }}"
+
+      - name: Collect migrations changed since main
+        id: changed_migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main --depth=1
+          changed_files="$(git diff --name-only origin/main...HEAD -- supabase/migrations || true)"
+
+          if [ -z "${changed_files}" ]; then
+            echo "has_changed_migrations=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_changed_migrations=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "files<<EOF"
+            echo "${changed_files}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Changed migration files:"
+          echo "${changed_files}"
+
+      - name: Scan changed migrations for high-risk SQL
+        if: steps.changed_migrations.outputs.has_changed_migrations == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! bash .github/scripts/validate-expand-migration-sql.sh --diff-base origin/main; then
+            {
+              echo "### Expand SQL validation failed"
+              echo ""
+              echo "Migrations with \`migration-phase: expand\` must be additive-only."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          changed_files="${{ steps.changed_migrations.outputs.files }}"
+          blocking_pattern='drop[[:space:]]+(table|column|view|function)|truncate[[:space:]]|delete[[:space:]]+from|rename[[:space:]]+(table|column)|cascade'
+          review_pattern='alter[[:space:]]+column.*set[[:space:]]+not[[:space:]]+null|alter[[:space:]]+column.*(type|set[[:space:]]+data[[:space:]]+type)|drop[[:space:]]+policy|replace[[:space:]]+policy|security[[:space:]]+definer|grant[[:space:]]+'
+          destructive_reviewed_marker='migration-safety:[[:space:]]*destructive-reviewed'
+          unbounded_update_pattern='^[[:space:]]*update[[:space:]]+[^;[:space:]]+[[:space:]]+set[[:space:]]+'
+
+          legacy_files=""
+          while IFS= read -r file; do
+            [ -z "${file}" ] && continue
+            if head -n 20 "${file}" | grep -Eiq '^[[:space:]]*--[[:space:]]*migration-phase:[[:space:]]*(expand|contract)'; then
+              continue
+            fi
+            legacy_files="${legacy_files}${file}"$'\n'
+          done <<< "${changed_files}"
+
+          blocking_matches=""
+          if [ -n "${legacy_files}" ]; then
+            blocking_matches="$(echo "${legacy_files}" | xargs grep -Ein "${blocking_pattern}" || true)"
+          fi
+          review_matches="$(echo "${changed_files}" | xargs grep -Ein "${review_pattern}" || true)"
+          backfill_matches="$(echo "${changed_files}" | xargs grep -Ein "${unbounded_update_pattern}" | grep -Eiv 'where' || true)"
+
+          contract_matches=""
+          while IFS= read -r file; do
+            [ -z "${file}" ] && continue
+            if head -n 20 "${file}" | grep -Eiq '^[[:space:]]*--[[:space:]]*migration-phase:[[:space:]]*contract'; then
+              contract_matches="${contract_matches}${file}"$'\n'
+            fi
+          done <<< "${changed_files}"
+
+          high_risk=false
+          unreviewed_blocking_matches=""
+
+          if [ -n "${blocking_matches}" ]; then
+            while IFS= read -r match_line; do
+              [ -z "${match_line}" ] && continue
+              file="${match_line%%:*}"
+              if head -n 10 "${file}" | grep -Eiq "${destructive_reviewed_marker}"; then
+                continue
+              fi
+              high_risk=true
+              unreviewed_blocking_matches="${unreviewed_blocking_matches}${match_line}"$'\n'
+            done <<< "${blocking_matches}"
+          fi
+
+          if [ -n "${review_matches}" ] || [ -n "${backfill_matches}" ]; then
+            high_risk=true
+          fi
+
+          if [ -n "${contract_matches}" ]; then
+            high_risk=true
+            echo "Contract migrations in this promotion:"
+            printf '%s' "${contract_matches}"
+          fi
+
+          {
+            echo "### Migration review policy"
+            echo ""
+            if [ "${high_risk}" = "true" ]; then
+              echo "This promotion includes Contract and/or high-risk migration SQL."
+              echo "Required before merge:"
+              if [ -n "${contract_matches}" ]; then
+                echo "- Add the \`contract-release\` or \`migration-reviewed\` label after manual review."
+                echo "- Contract migrations are **not** auto-applied on \`main\` push; apply them only via \`deploy-contract-release.yml\` after backup evidence and production approval."
+              else
+                echo "- Add the \`migration-reviewed\` label after manual review."
+              fi
+              echo "- Obtain production environment approval when the protected \`production\` environment gate runs."
+            else
+              echo "No Contract or blocking high-risk migration patterns detected in changed files."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${high_risk}" = "true" ]; then
+            review_ok=false
+            if [ "${MIGRATION_REVIEWED}" = "true" ]; then
+              review_ok=true
+            fi
+            if [ -n "${contract_matches}" ] && [ "${CONTRACT_RELEASE}" = "true" ]; then
+              review_ok=true
+            fi
+
+            if [ "${review_ok}" != "true" ]; then
+              if [ -n "${unreviewed_blocking_matches}" ]; then
+                echo "Blocking migration SQL detected without migration-reviewed label:"
+                echo "${unreviewed_blocking_matches}"
+              fi
+              if [ -n "${contract_matches}" ]; then
+                echo "Contract migrations require the contract-release or migration-reviewed label."
+                echo "Contract apply happens only via deploy-contract-release.yml (not automatic on main push)."
+              fi
+              if [ -n "${review_matches}" ] || [ -n "${backfill_matches}" ]; then
+                echo "High-risk migration patterns require the migration-reviewed label."
+              fi
+              exit 1
+            fi
+          fi
+
+      - name: Validate changed migration metadata
+        if: steps.changed_migrations.outputs.has_changed_migrations == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          set +e
+          metadata_output="$(
+            MIGRATION_REVIEWED="${MIGRATION_REVIEWED}" \
+              bash .github/scripts/validate-migration-phase-metadata.sh \
+              --diff-base origin/main \
+              --require-phase-for-added 2>&1
+          )"
+          metadata_status=$?
+          set -e
+
+          echo "${metadata_output}"
+
+          if echo "${metadata_output}" | grep -q '^WARN:'; then
+            {
+              echo "### Migration metadata warnings"
+              echo ""
+              echo "Modified legacy migrations without \`migration-phase\` headers were warned instead of failing."
+              echo "Newly added migrations in this promotion must include complete metadata."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "${metadata_status}" -ne 0 ]; then
+            {
+              echo "### Migration metadata validation failed"
+              echo ""
+              echo "Newly added migration files must include complete \`migration-phase\` metadata."
+              echo "Changed migrations with headers must include complete Expand or Contract fields."
+              echo "Contract migrations additionally require compatibility-window, legacy-usage, and backup evidence."
+              echo "Add the \`contract-release\` or \`migration-reviewed\` label after manual review."
+              echo "Contract apply happens only via \`deploy-contract-release.yml\` (not automatic on main push)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+      - name: Note schema-facing verification scope
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git fetch origin main --depth=1
+          schema_changes="$(git diff --name-only origin/main...HEAD -- supabase web/src/lib || true)"
+
+          {
+            echo "### Schema-facing verification"
+            echo ""
+            if [ -z "${schema_changes}" ]; then
+              echo "No \`supabase/**\` or \`web/src/lib/**\` changes detected; skipped dedicated typegen reminder."
+            else
+              echo "Schema-facing paths changed in this promotion:"
+              echo '```'
+              echo "${schema_changes}"
+              echo '```'
+              echo ""
+              echo "This repository does not yet commit generated Supabase TypeScript types."
+              echo "Reviewers should confirm application types and RPC usage still match the schema."
+              echo "Vitest coverage in this workflow exercises RPC call sites with mocked contracts."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Link production Supabase project
         id: supabase_link
         continue-on-error: true
         run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
 
-      - name: Check pending production migrations
+      - name: Dry-run pending production migrations
         env:
           SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
           SUPABASE_DB_PUSH_DRY_RUN: "true"
@@ -101,8 +396,9 @@ jobs:
           fi
           bash .github/scripts/supabase-db-push-remote.sh
 
-      - name: Show migration status
+      - name: Show production migration status
         env:
+          SUPABASE_DNS_RESOLVER: https
           SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
         run: |
           if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
@@ -111,5 +407,23 @@ jobs:
             supabase migration list --db-url "$SUPABASE_DB_POOLER_URL" --dns-resolver https
           else
             echo "Skipping migration list because Supabase link failed."
+            exit 1
+          fi
+
+      - name: Validate pending production migration metadata
+        env:
+          SUPABASE_DNS_RESOLVER: https
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            MIGRATION_REVIEWED="${MIGRATION_REVIEWED}" \
+              bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-linked
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            MIGRATION_REVIEWED="${MIGRATION_REVIEWED}" \
+              bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-db-url "$SUPABASE_DB_POOLER_URL"
+          else
+            echo "Cannot validate pending production migrations without a linked project or SUPABASE_DB_POOLER_URL."
             exit 1
           fi

@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   migrate-and-deploy:
-    name: Apply migrations and deploy
+    name: Apply migrations and canary deploy
     runs-on: ubuntu-latest
     environment: production
 
@@ -33,6 +33,14 @@ jobs:
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+      SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
+      SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+      SMOKE_AGENT_EMAIL: ${{ secrets.SMOKE_AGENT_EMAIL }}
+      SMOKE_AGENT_PASSWORD: ${{ secrets.SMOKE_AGENT_PASSWORD }}
+      SMOKE_TURNSTILE_RESPONSE: ${{ secrets.SMOKE_TURNSTILE_RESPONSE }}
+      CANARY_OBSERVE_SECONDS: ${{ vars.CANARY_OBSERVE_SECONDS }}
+      CANARY_MAX_ERROR_RATE: ${{ vars.CANARY_MAX_ERROR_RATE }}
 
     steps:
       - name: Checkout
@@ -51,6 +59,107 @@ jobs:
         continue-on-error: true
         run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
 
+      - name: Confirm production migration list
+        env:
+          SUPABASE_DNS_RESOLVER: https
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            supabase migration list --linked --dns-resolver https | tee migration-list-before.txt
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            supabase migration list --db-url "$SUPABASE_DB_POOLER_URL" --dns-resolver https | tee migration-list-before.txt
+          else
+            echo "Cannot confirm migration list without a linked project or SUPABASE_DB_POOLER_URL."
+            exit 1
+          fi
+
+          {
+            echo "### Production migration preflight"
+            echo ""
+            echo "Review migration-list-before.txt for pending remote migrations."
+            echo "For high-risk or Contract releases, confirm backup/recovery evidence is available"
+            echo "via the Backup and Rollback workflow before merging to main."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Detect pending high-risk migrations
+        id: high_risk_pending
+        env:
+          SUPABASE_DNS_RESOLVER: https
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            detection="$(bash .github/scripts/detect-pending-high-risk-migrations.sh --pending-linked)"
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            detection="$(bash .github/scripts/detect-pending-high-risk-migrations.sh --pending-db-url "$SUPABASE_DB_POOLER_URL")"
+          else
+            echo "high_risk=false" | tee high-risk-detection.txt
+            echo "Skipping high-risk detection — Supabase link unavailable." >> high-risk-detection.txt
+            echo "high_risk=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s\n' "$detection" | tee high-risk-detection.txt
+          if head -1 high-risk-detection.txt | grep -q 'high_risk=true'; then
+            echo "high_risk=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "high_risk=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Gate high-risk Expand backup evidence
+        env:
+          REQUIRE_BACKUP_EVIDENCE_FOR_HIGHRISK: ${{ vars.REQUIRE_BACKUP_EVIDENCE_FOR_HIGHRISK || 'false' }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### High-risk pending migrations"
+            echo ""
+            if [ "${{ steps.high_risk_pending.outputs.high_risk }}" = "true" ]; then
+              echo "**High-risk or Contract-phase migrations are pending on production.**"
+              echo ""
+              echo "Expand-phase high-risk migrations on \`main\` push cannot supply \`backup_run_id\` (workflow_dispatch only)."
+              echo "Before merge to \`main\`:"
+              echo "1. Run **Backup and Rollback** (\`backup-production-db\`) with \`restore_rehearsal_verified=true\` after restore rehearsal."
+              echo "2. Record the backup run id for Contract apply via \`deploy-contract-release.yml\`."
+              echo "3. For Expand high-risk DDL, prefer staging rehearsal and production dry-run on the PR."
+              echo ""
+              sed '1d' high-risk-detection.txt || true
+            else
+              echo "No high-risk pending migrations detected for this deploy."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${{ steps.high_risk_pending.outputs.high_risk }}" = "true" ] && [ "$REQUIRE_BACKUP_EVIDENCE_FOR_HIGHRISK" = "true" ]; then
+            echo "REQUIRE_BACKUP_EVIDENCE_FOR_HIGHRISK=true — high-risk pending migrations require backup evidence." >&2
+            echo "Run Backup and Rollback before production deploy, or apply Contract migrations only via deploy-contract-release.yml." >&2
+            exit 1
+          fi
+
+      - name: Run production database advisors
+        if: steps.supabase_link.outcome == 'success'
+        continue-on-error: true
+        run: bash .github/scripts/supabase-advisors-retry.sh
+        timeout-minutes: 2
+
+      - name: Gate pending migrations (Expand-only + strict metadata)
+        env:
+          SUPABASE_DNS_RESOLVER: https
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          set -euo pipefail
+          # Contract migrations must not auto-apply on main. Strict mode rejects incomplete
+          # Contract metadata unless MIGRATION_REVIEWED=true (not set on deploy).
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            bash .github/scripts/validate-migration-phase-metadata.sh --expand-only --pending-linked
+            bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-linked
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            bash .github/scripts/validate-migration-phase-metadata.sh --expand-only --pending-db-url "$SUPABASE_DB_POOLER_URL"
+            bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-db-url "$SUPABASE_DB_POOLER_URL"
+          else
+            echo "Cannot gate pending migrations without a linked project or SUPABASE_DB_POOLER_URL."
+            exit 1
+          fi
+
       - name: Apply pending production migrations
         env:
           SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
@@ -62,7 +171,7 @@ jobs:
           fi
           bash .github/scripts/supabase-db-push-remote.sh
 
-      - name: Show migration status
+      - name: Show migration status after push
         env:
           SUPABASE_DNS_RESOLVER: https
           SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
@@ -95,6 +204,187 @@ jobs:
         working-directory: web
         run: npm run build
 
-      - name: Deploy to Cloudflare Workers
-        working-directory: web
-        run: npx wrangler deploy --env-file .env.production
+      - name: Assert wrangler versions API
+        run: bash .github/scripts/cloudflare-worker-canary.sh assert-versions-api
+
+      - name: Capture prior stable Worker version
+        id: stable_version
+        run: |
+          set -euo pipefail
+          stable_version_id="$(bash .github/scripts/cloudflare-worker-canary.sh stable-version)"
+          echo "stable_version_id=${stable_version_id}" >> "$GITHUB_OUTPUT"
+          echo "Prior stable Worker version: ${stable_version_id}"
+
+      - name: Upload new Worker version
+        id: worker_upload
+        run: |
+          set -euo pipefail
+          new_version_id="$(bash .github/scripts/cloudflare-worker-canary.sh upload --env-file .env.production)"
+          echo "new_version_id=${new_version_id}" >> "$GITHUB_OUTPUT"
+          echo "Uploaded Worker version: ${new_version_id}"
+
+      - name: Resolve production base URL
+        run: |
+          set -euo pipefail
+          PRODUCTION_BASE_URL="$(bash .github/scripts/resolve-production-base-url.sh)"
+          echo "PRODUCTION_BASE_URL=${PRODUCTION_BASE_URL}" >> "$GITHUB_ENV"
+          echo "Using production base URL: ${PRODUCTION_BASE_URL}"
+
+      - name: Deploy canary at 0% (stable 100%)
+        run: |
+          bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
+            "${{ steps.worker_upload.outputs.new_version_id }}" \
+            "${{ steps.stable_version.outputs.stable_version_id }}" \
+            0 100 \
+            "Production canary: upload at 0% traffic"
+
+      - name: Smoke test uploaded version (0% override)
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+          WORKER_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+        run: bash .github/scripts/run-canary-smoke.sh --label "0% version-targeted upload" --auth --version-targeted
+
+      - name: Observe canary health after 0% upload
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+          OBSERVATION_LABEL: after 0% upload
+        run: bash .github/scripts/canary-observe-and-guard.sh
+
+      - name: Promote canary to 5%
+        run: |
+          bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
+            "${{ steps.worker_upload.outputs.new_version_id }}" \
+            "${{ steps.stable_version.outputs.stable_version_id }}" \
+            5 95 \
+            "Production canary: 5% traffic"
+
+      - name: Smoke test after 5% promotion
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+        run: bash .github/scripts/run-canary-smoke.sh --label "5% promotion"
+
+      - name: Observe canary health after 5% promotion
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+          OBSERVATION_LABEL: after 5% promotion
+        run: bash .github/scripts/canary-observe-and-guard.sh
+
+      - name: Promote canary to 25%
+        run: |
+          bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
+            "${{ steps.worker_upload.outputs.new_version_id }}" \
+            "${{ steps.stable_version.outputs.stable_version_id }}" \
+            25 75 \
+            "Production canary: 25% traffic"
+
+      - name: Smoke test after 25% promotion
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+        run: bash .github/scripts/run-canary-smoke.sh --label "25% promotion"
+
+      - name: Observe canary health after 25% promotion
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+          OBSERVATION_LABEL: after 25% promotion
+        run: bash .github/scripts/canary-observe-and-guard.sh
+
+      - name: Promote canary to 50%
+        run: |
+          bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
+            "${{ steps.worker_upload.outputs.new_version_id }}" \
+            "${{ steps.stable_version.outputs.stable_version_id }}" \
+            50 50 \
+            "Production canary: 50% traffic"
+
+      - name: Smoke test after 50% promotion
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+        run: bash .github/scripts/run-canary-smoke.sh --label "50% promotion"
+
+      - name: Observe canary health after 50% promotion
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+          OBSERVATION_LABEL: after 50% promotion
+        run: bash .github/scripts/canary-observe-and-guard.sh
+
+      - name: Verify Cloudflare version affinity (best-effort)
+        env:
+          VERSION_AFFINITY_REQUIRED: ${{ vars.VERSION_AFFINITY_REQUIRED || 'false' }}
+        run: |
+          set -euo pipefail
+          worker_name="$(bash .github/scripts/resolve-worker-name.sh)"
+          set +e
+          bash .github/scripts/verify-version-affinity.sh \
+            --base-url "$PRODUCTION_BASE_URL" \
+            --worker-name "$worker_name" \
+            --version-a "${{ steps.worker_upload.outputs.new_version_id }}" \
+            --version-b "${{ steps.stable_version.outputs.stable_version_id }}"
+          affinity_rc=$?
+          set -e
+          if [ "$affinity_rc" -ne 0 ]; then
+            if [ "$VERSION_AFFINITY_REQUIRED" = "true" ]; then
+              echo "Version affinity verification failed (VERSION_AFFINITY_REQUIRED=true)." >&2
+              exit "$affinity_rc"
+            fi
+            echo "::warning::Version affinity verification did not pass (VERSION_AFFINITY_REQUIRED=false). See step log for operator checklist."
+          fi
+
+      - name: Promote canary to 100%
+        run: |
+          bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
+            "${{ steps.worker_upload.outputs.new_version_id }}" \
+            "${{ steps.stable_version.outputs.stable_version_id }}" \
+            100 0 \
+            "Production canary: 100% traffic"
+
+      - name: Smoke test after full promotion
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+        run: bash .github/scripts/run-canary-smoke.sh --label "100% promotion" --auth
+
+      - name: Observe canary health after 100% promotion
+        env:
+          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
+          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
+          OBSERVATION_LABEL: after 100% promotion
+        run: bash .github/scripts/canary-observe-and-guard.sh
+
+      - name: Write release summary
+        run: |
+          {
+            echo "### Production release"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| New Worker version | \`${{ steps.worker_upload.outputs.new_version_id }}\` |"
+            echo "| Prior stable Worker version (rollback target) | \`${{ steps.stable_version.outputs.stable_version_id }}\` |"
+            echo "| Canary path | 0% → 5% → 25% → 50% → 100% |"
+            echo ""
+            echo "#### Immediate rollback"
+            echo ""
+            echo "Reverse Worker traffic first (do not auto DB down-migrate):"
+            echo ""
+            echo '```bash'
+            echo "bash .github/scripts/cloudflare-worker-canary.sh deploy-split \\"
+            echo "  \"${{ steps.stable_version.outputs.stable_version_id }}\" \\"
+            echo "  \"${{ steps.worker_upload.outputs.new_version_id }}\" \\"
+            echo "  100 0"
+            echo '```'
+            echo ""
+            echo "#### Version affinity during gradual rollout"
+            echo ""
+            echo "Configure a Cloudflare Transform Rule to set \`Cloudflare-Workers-Version-Key\`"
+            echo "from a stable cookie or session identifier so HTML/assets/API requests stay on"
+            echo "the same Worker version during percentage-based rollouts."
+            echo "See: https://developers.cloudflare.com/workers/configuration/versions-and-deployments/gradual-deployments/version-affinity/"
+          } >> "$GITHUB_STEP_SUMMARY"

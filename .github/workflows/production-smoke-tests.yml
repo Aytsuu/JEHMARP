@@ -7,6 +7,11 @@ on:
     types:
       - completed
   workflow_dispatch:
+    inputs:
+      worker_version_id:
+        description: Optional Worker version ID for version-targeted smoke (override header)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -22,6 +27,12 @@ jobs:
       PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      WORKER_VERSION_ID: ${{ inputs.worker_version_id }}
+      SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
+      SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
+      SMOKE_AGENT_EMAIL: ${{ secrets.SMOKE_AGENT_EMAIL }}
+      SMOKE_AGENT_PASSWORD: ${{ secrets.SMOKE_AGENT_PASSWORD }}
+      SMOKE_TURNSTILE_RESPONSE: ${{ secrets.SMOKE_TURNSTILE_RESPONSE }}
 
     steps:
       - name: Checkout
@@ -35,38 +46,10 @@ jobs:
           echo "Using production base URL: ${PRODUCTION_BASE_URL}"
           echo "PRODUCTION_BASE_URL=${PRODUCTION_BASE_URL}" >> "$GITHUB_ENV"
 
-      - name: Check public pages
+      - name: Run production smoke checks
         shell: bash
-        run: |
-          set -euo pipefail
-          for path in "/" "/shop" "/contact" "/login"; do
-            status="$(curl -sS -o /dev/null -w "%{http_code}" -L --max-redirs 5 "${PRODUCTION_BASE_URL}${path}")"
-            echo "${path}: ${status}"
-            if [ "${status}" != "200" ]; then
-              exit 1
-            fi
-          done
+        run: bash .github/scripts/production-smoke.sh
 
-      - name: Check protected pages redirect unauthenticated users
+      - name: Run authenticated production smoke checks
         shell: bash
-        run: |
-          set -euo pipefail
-          for path in "/admin" "/agent"; do
-            status="$(curl -sS -o /dev/null -w "%{http_code}" -L --max-redirs 0 "${PRODUCTION_BASE_URL}${path}" || true)"
-            echo "${path}: ${status}"
-            case "${status}" in
-              301|302|303|307|308) ;;
-              *) exit 1 ;;
-            esac
-          done
-
-      - name: Check invalid API requests are rejected
-        shell: bash
-        run: |
-          set -euo pipefail
-          status="$(curl -sS -o /dev/null -w "%{http_code}" -X POST -F "email=" -F "password=" "${PRODUCTION_BASE_URL}/api/login")"
-          echo "/api/login invalid POST: ${status}"
-          case "${status}" in
-            301|302|303|400|401|403|422) ;;
-            *) exit 1 ;;
-          esac
+        run: bash .github/scripts/authenticated-smoke.sh

@@ -14,6 +14,23 @@ on:
           - export-public-content
           - migration-status
           - rollback-checklist
+      prior_worker_version_id:
+        description: Optional prior stable Worker version ID for rollback checklist
+        required: false
+        type: string
+      forward_repair_note:
+        description: Optional forward-repair migration or runbook reference
+        required: false
+        type: string
+      restore_rehearsal_verified:
+        description: Include restore rehearsal marker in backup artifact (set after restore rehearsal)
+        required: false
+        type: boolean
+        default: false
+      restore_rehearsal_note:
+        description: Optional text describing how restore rehearsal was verified
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -27,6 +44,8 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
     steps:
       - name: Checkout
@@ -48,12 +67,22 @@ jobs:
 
       - name: Backup production database
         if: inputs.operation == 'backup-production-db'
+        env:
+          RESTORE_REHEARSAL_VERIFIED: ${{ inputs.restore_rehearsal_verified }}
+          RESTORE_REHEARSAL_NOTE: ${{ inputs.restore_rehearsal_note }}
         run: |
           {
             echo "### Production database backup"
             echo ""
             echo "This artifact contains production data, including admin dashboard, agent dashboard, auth, storage metadata, and product image objects."
             echo "Store it securely after download and delete local copies when they are no longer needed."
+            echo ""
+            echo "Record this workflow run id (\`${{ github.run_id }}\`) as \`backup_run_id\` when running **Deploy Contract Release**."
+            echo "Contract migration headers should reference this run in \`backup-verified\` (for example \`github-actions-run-${{ github.run_id }}\`)."
+            if [ "$RESTORE_REHEARSAL_VERIFIED" = "true" ]; then
+              echo ""
+              echo "Restore rehearsal marker and notes are included in this artifact."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
           supabase db dump --linked --password "$SUPABASE_DB_PASSWORD" --role-only --file "backups/production-roles-${{ github.run_id }}.sql"
@@ -61,6 +90,28 @@ jobs:
           supabase db dump --linked --password "$SUPABASE_DB_PASSWORD" --data-only --use-copy --schema public,auth,storage --exclude "storage.buckets_vectors" --exclude "storage.vector_indexes" --file "backups/production-data-${{ github.run_id }}.sql"
           mkdir -p "backups/storage"
           supabase storage cp --linked --recursive "ss:///product-images" "backups/storage/product-images"
+
+          if [ "$RESTORE_REHEARSAL_VERIFIED" = "true" ]; then
+            echo "${{ github.run_id }}" > "backups/restore-rehearsal-verified.marker"
+            {
+              echo "# Restore rehearsal evidence"
+              echo ""
+              echo "Backup workflow run id: \`${{ github.run_id }}\`"
+              echo "Recorded at: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo ""
+              echo "## Operator notes"
+              echo ""
+              if [ -n "${RESTORE_REHEARSAL_NOTE:-}" ]; then
+                printf '%s\n' "$RESTORE_REHEARSAL_NOTE"
+              else
+                echo "Document the restore rehearsal performed (target environment, validation queries, row counts)."
+              fi
+              echo ""
+              echo "## Contract release"
+              echo ""
+              echo "Use this run id as \`backup_run_id\` and set \`restore_rehearsal_verified=true\` when dispatching Deploy Contract Release."
+            } > "backups/restore-rehearsal-notes.md"
+          fi
 
       - name: Export dashboard data
         if: inputs.operation == 'export-dashboard-data'
@@ -100,21 +151,64 @@ jobs:
         if: inputs.operation == 'migration-status'
         run: supabase migration list --linked | tee "backups/migration-status-${{ github.run_id }}.txt"
 
+      - name: Capture Worker version listing
+        if: inputs.operation == 'rollback-checklist'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p backups
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "Skipping Worker version listing; Cloudflare credentials not configured."
+            exit 0
+          fi
+          bash .github/scripts/cloudflare-worker-canary.sh deployments-status --json \
+            > "backups/worker-deployments-status-${{ github.run_id }}.json"
+          bash .github/scripts/cloudflare-worker-canary.sh list-versions --json \
+            > "backups/worker-versions-list-${{ github.run_id }}.json"
+
       - name: Create rollback checklist
         if: inputs.operation == 'rollback-checklist'
+        env:
+          PRIOR_WORKER_VERSION_ID: ${{ inputs.prior_worker_version_id }}
+          FORWARD_REPAIR_NOTE: ${{ inputs.forward_repair_note }}
         run: |
           {
             echo "# Production Rollback Checklist"
             echo ""
             echo "Run ID: ${{ github.run_id }}"
             echo ""
-            echo "1. Identify the failed deployment and the last known good deployment."
-            echo "2. Roll back the application through the hosting provider."
-            echo "3. Do not roll back database schema automatically."
-            echo "4. If data or schema repair is required, write and review an explicit SQL repair script."
-            echo "5. Create a fresh production backup before any repair script is executed."
-            echo "6. Verify public pages, login pages, admin redirects, and critical APIs after recovery."
-          } > backups/rollback-checklist-${{ github.run_id }}.md
+            echo "## Contract release inputs"
+            echo ""
+            echo "- Use this run id as \`backup_run_id\` in **Deploy Contract Release** when this backup operation succeeded."
+            echo "- Ensure pending Contract migration headers include matching \`backup-verified\` and completed compatibility-window evidence."
+            echo ""
+            echo "## Immediate application rollback"
+            echo ""
+            echo "1. Identify the failed deployment and the last known good Worker version ID."
+            if [ -n "${PRIOR_WORKER_VERSION_ID:-}" ]; then
+              echo "2. Prior stable Worker version (workflow input): \`${PRIOR_WORKER_VERSION_ID}\`"
+            else
+              echo "2. Prior stable Worker version: capture from Deploy Production release summary or worker-versions-list artifact."
+            fi
+            echo "3. Reverse Worker traffic first using gradual deployment or 100% traffic to the prior stable version."
+            echo "4. Do not automatically roll back database schema or restore a database backup for an application-only rollback."
+            echo ""
+            echo "## Database repair (only if required)"
+            echo ""
+            if [ -n "${FORWARD_REPAIR_NOTE:-}" ]; then
+              echo "- Forward-repair reference: ${FORWARD_REPAIR_NOTE}"
+            else
+              echo "- Forward-repair: document the migration or runbook that repairs schema/data if rollback exposed inconsistency."
+            fi
+            echo "- Write and review an explicit SQL repair script; never assume destructive DDL is reversible."
+            echo "- Create a fresh production backup before executing any repair script."
+            echo ""
+            echo "## Verification"
+            echo ""
+            echo "- Run production smoke tests against the rolled-back Worker version."
+            echo "- Verify public pages, login pages, admin redirects, and critical APIs after recovery."
+            echo "- Review worker-deployments-status and worker-versions-list artifacts when Cloudflare credentials are configured."
+          } > "backups/rollback-checklist-${{ github.run_id }}.md"
 
       - name: Upload operation artifacts
         uses: actions/upload-artifact@v4

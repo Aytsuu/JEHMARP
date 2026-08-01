@@ -1,0 +1,284 @@
+name: Deploy Contract Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_contract_release:
+        description: Type APPLY-CONTRACT to confirm this forward-only Contract release
+        required: true
+        type: string
+      backup_run_id:
+        description: Backup and Rollback workflow run id (backup-production-db) with verified artifact
+        required: true
+        type: string
+      restore_rehearsal_verified:
+        description: Must be true — confirms restore rehearsal was performed (non-bypassable)
+        required: true
+        type: boolean
+        default: false
+      prior_worker_version_id:
+        description: Optional prior stable Worker version ID for rollback reference
+        required: false
+        type: string
+      migration_versions:
+        description: Optional comma-separated pending migration versions to assert (all pending must be Contract)
+        required: false
+        type: string
+      ref:
+        description: Git ref to checkout (default main)
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: contract-release
+  cancel-in-progress: false
+
+jobs:
+  apply-contract-migrations:
+    name: Apply Contract migrations (DB only)
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+
+    steps:
+      - name: Require main branch dispatch
+        run: |
+          set -euo pipefail
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "Deploy Contract Release must be dispatched from the main branch (got ${GITHUB_REF})." >&2
+            exit 1
+          fi
+
+      - name: Require confirmation gate
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.confirm_contract_release }}" != "APPLY-CONTRACT" ]; then
+            echo "Contract release blocked: confirm_contract_release must be exactly APPLY-CONTRACT." >&2
+            exit 1
+          fi
+          echo "Contract release confirmation accepted."
+
+      - name: Require restore rehearsal confirmation
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.restore_rehearsal_verified }}" != "true" ]; then
+            echo "Contract release blocked: restore_rehearsal_verified must be true." >&2
+            echo "Perform and document restore rehearsal before Contract apply." >&2
+            exit 1
+          fi
+          echo "Restore rehearsal confirmation accepted."
+
+      - name: Checkout release ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.109.1
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      - name: Link production Supabase project
+        id: supabase_link
+        continue-on-error: true
+        run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: Download backup workflow artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: backup-production-db-${{ inputs.backup_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ inputs.backup_run_id }}
+          path: backup-evidence
+
+      - name: Verify backup and restore rehearsal evidence
+        run: |
+          set -euo pipefail
+          bash .github/scripts/verify-backup-restore-evidence.sh \
+            --backup-run-id "${{ inputs.backup_run_id }}" \
+            --backup-artifact-dir backup-evidence \
+            --restore-rehearsal-verified true
+
+      - name: Verify Contract release evidence
+        env:
+          SUPABASE_DNS_RESOLVER: https
+        run: |
+          set -euo pipefail
+
+          evidence_args=()
+          if [ -d contract-evidence ]; then
+            evidence_args+=(--evidence-dir contract-evidence)
+          fi
+
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            bash .github/scripts/verify-contract-release-evidence.sh \
+              "${evidence_args[@]}" \
+              --backup-run-id "${{ inputs.backup_run_id }}" \
+              --backup-artifact-dir backup-evidence \
+              --pending-linked
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            bash .github/scripts/verify-contract-release-evidence.sh \
+              "${evidence_args[@]}" \
+              --backup-run-id "${{ inputs.backup_run_id }}" \
+              --backup-artifact-dir backup-evidence \
+              --pending-db-url "$SUPABASE_DB_POOLER_URL"
+          else
+            echo "Cannot verify pending Contract migrations without a linked project or SUPABASE_DB_POOLER_URL." >&2
+            exit 1
+          fi
+
+      - name: Contract lock and advisor preflight
+        env:
+          SUPABASE_DNS_RESOLVER: https
+          CONTRACT_LOCK_PREFLIGHT: ${{ vars.CONTRACT_LOCK_PREFLIGHT || 'true' }}
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            bash .github/scripts/verify-contract-lock-preflight.sh --linked
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            bash .github/scripts/verify-contract-lock-preflight.sh --db-url "$SUPABASE_DB_POOLER_URL"
+          else
+            echo "Cannot run Contract lock preflight without a linked project or SUPABASE_DB_POOLER_URL." >&2
+            exit 1
+          fi
+
+      - name: Validate pending Contract migrations (strict, no label bypass)
+        env:
+          SUPABASE_DNS_RESOLVER: https
+        run: |
+          set -euo pipefail
+          # MIGRATION_REVIEWED is intentionally unset — Contract apply requires complete metadata.
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-linked
+          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
+            bash .github/scripts/validate-migration-phase-metadata.sh --strict --pending-db-url "$SUPABASE_DB_POOLER_URL"
+          else
+            echo "Cannot validate pending migrations without a linked project or SUPABASE_DB_POOLER_URL." >&2
+            exit 1
+          fi
+
+      - name: Assert optional migration version list
+        if: inputs.migration_versions != ''
+        env:
+          SUPABASE_DNS_RESOLVER: https
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra expected_versions <<< "${{ inputs.migration_versions }}"
+          for raw_version in "${expected_versions[@]}"; do
+            version="$(echo "$raw_version" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            [ -z "$version" ] && continue
+            if ! find supabase/migrations -maxdepth 1 -type f -name "${version}_*.sql" | grep -q .; then
+              echo "Requested migration version not found locally: ${version}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Show production migration list before Contract apply
+        env:
+          SUPABASE_DNS_RESOLVER: https
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            supabase migration list --linked --dns-resolver https | tee migration-list-before.txt
+          else
+            supabase migration list --db-url "$SUPABASE_DB_POOLER_URL" --dns-resolver https | tee migration-list-before.txt
+          fi
+
+      - name: Apply pending Contract migrations
+        env:
+          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            export SUPABASE_LINKED=true
+          else
+            export SUPABASE_LINKED=false
+          fi
+          bash .github/scripts/supabase-db-push-remote.sh
+
+      - name: Show migration status after Contract apply
+        env:
+          SUPABASE_DNS_RESOLVER: https
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
+            supabase migration list --linked --dns-resolver https | tee migration-list-after.txt
+          else
+            supabase migration list --db-url "$SUPABASE_DB_POOLER_URL" --dns-resolver https | tee migration-list-after.txt
+          fi
+
+      - name: Write Contract release summary
+        shell: bash
+        env:
+          PRIOR_WORKER_VERSION_ID: ${{ inputs.prior_worker_version_id }}
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+        run: |
+          set -euo pipefail
+
+          forward_repair_lines=""
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            repair="$(sed -n 's/^[[:space:]]*--[[:space:]]*forward-repair:[[:space:]]*//p' "$file" | head -1 | sed 's/[[:space:]]*$//')"
+            if [ -n "$repair" ]; then
+              forward_repair_lines="${forward_repair_lines}- \`${file}\`: ${repair}"$'\n'
+            fi
+          done < <(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -print)
+
+          {
+            echo "### Contract release (database only)"
+            echo ""
+            echo "This workflow applies **Contract-phase** migrations only. It does **not** deploy a Worker."
+            echo "A compatible application version must already be at 100% production traffic before Contract apply."
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Commit | \`${{ github.sha }}\` |"
+            echo "| Ref | \`${{ inputs.ref }}\` |"
+            echo "| Backup run id | \`${BACKUP_RUN_ID}\` |"
+            if [ -n "${PRIOR_WORKER_VERSION_ID:-}" ]; then
+              echo "| Prior stable Worker version (rollback target) | \`${PRIOR_WORKER_VERSION_ID}\` |"
+            else
+              echo "| Prior stable Worker version | capture from latest Deploy Production summary or Backup rollback checklist |"
+            fi
+            echo ""
+            echo "#### Forward repair references"
+            echo ""
+            if [ -n "$forward_repair_lines" ]; then
+              printf '%s' "$forward_repair_lines"
+            else
+              echo "- None recorded in migration headers."
+            fi
+            echo ""
+            echo "#### Immediate rollback"
+            echo ""
+            echo "Reverse Worker traffic first. Database Contract changes are forward-only;"
+            echo "repair with a new migration or documented forward-repair runbook — do not auto-restore backups."
+            echo ""
+            echo "#### Separation from Expand deploy"
+            echo ""
+            echo "- \`deploy-staging.yml\` and \`deploy-production.yml\` block Contract via \`--expand-only\`."
+            echo "- Contract apply is permitted only through this workflow after evidence gates pass."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Contract release evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-release-${{ github.run_id }}
+          path: |
+            migration-list-before.txt
+            migration-list-after.txt
+            backup-evidence
+          if-no-files-found: error
+          retention-days: 30
