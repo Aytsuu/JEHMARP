@@ -56,9 +56,13 @@ if ! grep -q '20260802_checkpoint_prebaseline' "$WORKFLOW" \
   exit 1
 fi
 
-if grep -q "awk -F '│'" "$WORKFLOW" \
-  || ! grep -q "sub(/\^\[\^|\]\*\\|\[\[:space:\]\]\*/, \"\", remote)" "$WORKFLOW"; then
-  echo "Baseline reconciliation must parse the ASCII migration-list columns reliably." >&2
+if grep -q "awk -F '│'" "$WORKFLOW"; then
+  echo "Baseline reconciliation must not parse legacy box-drawing migration-list columns." >&2
+  exit 1
+fi
+
+if ! grep -q 'extract-supabase-remote-migration-versions.sh' "$WORKFLOW"; then
+  echo "Baseline reconciliation must parse remote migration versions via the shared extractor." >&2
   exit 1
 fi
 
