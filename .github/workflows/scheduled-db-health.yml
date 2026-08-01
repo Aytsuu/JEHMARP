@@ -27,6 +27,9 @@ jobs:
         with:
           version: 2.109.1
 
+      - name: Test Supabase advisor retry helper
+        run: bash .github/scripts/tests/supabase-advisors-retry.test.sh
+
       - name: Show Supabase CLI version
         run: supabase --version
 
@@ -37,7 +40,8 @@ jobs:
         run: supabase migration list --linked
 
       - name: Run production advisors
-        run: supabase db advisors --linked --type all --level warn --fail-on error
+        run: bash .github/scripts/supabase-advisors-retry.sh
+        timeout-minutes: 2
 
       - name: Check exposed public tables with RLS disabled
         run: |
