@@ -36,11 +36,13 @@ local_versions="$(
 staging_applied="$(
   awk -F'|' '
     {
-      local_col = $1
-      remote_col = $2
-      gsub(/^[ \t]+|[ \t]+$/, "", local_col)
-      gsub(/^[ \t]+|[ \t]+$/, "", remote_col)
-      if (local_col == "" || local_col == "Local" || local_col ~ /---/) {
+       local_col = $1
+       remote_col = $2
+       gsub(/^[ \t]+|[ \t]+$/, "", local_col)
+       gsub(/^[ \t]+|[ \t]+$/, "", remote_col)
+       gsub(/`/, "", local_col)
+       gsub(/`/, "", remote_col)
+       if (local_col == "" || local_col == "Local" || local_col ~ /---/) {
         next
       }
       if (remote_col != "") {
