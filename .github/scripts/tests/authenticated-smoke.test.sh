@@ -49,6 +49,10 @@ curl() {
   fi
 
   if [[ "$url" == *"/api/login" ]]; then
+    if [[ "$*" != *"Origin: https://example.test"* ]]; then
+      echo "Authenticated smoke login did not send a same-origin Origin header." >&2
+      return 98
+    fi
     printf '302|https://example.test/dashboard'
     return 0
   fi

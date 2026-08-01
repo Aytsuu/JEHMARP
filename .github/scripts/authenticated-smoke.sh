@@ -60,6 +60,7 @@ login_dashboard_user() {
     -X POST
     -F "email=${email}"
     -F "password=${password}"
+    -H "Origin: ${BASE_URL}"
     -o /dev/null
     -w "%{http_code}|%{redirect_url}"
     --max-redirs 0
