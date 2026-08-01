@@ -212,26 +212,39 @@ jobs:
           set -euo pipefail
 
           git fetch origin main --depth=1
-          changed_files="$(git diff --name-only origin/main...HEAD -- supabase/migrations || true)"
+          audit_files="$(bash .github/scripts/list-diff-migration-files.sh --diff-base origin/main --mode all || true)"
+          current_files="$(bash .github/scripts/list-diff-migration-files.sh --diff-base origin/main --mode current || true)"
 
-          if [ -z "${changed_files}" ]; then
+          if [ -z "${audit_files}" ]; then
             echo "has_changed_migrations=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           echo "has_changed_migrations=true" >> "$GITHUB_OUTPUT"
           {
-            echo "files<<EOF"
-            echo "${changed_files}"
+            echo "audit_files<<EOF"
+            echo "${audit_files}"
+            echo "EOF"
+            echo "current_files<<EOF"
+            echo "${current_files}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Changed migration files:"
-          echo "${changed_files}"
+          echo "Migration audit paths (all statuses):"
+          echo "${audit_files}"
+          if [ -n "${current_files}" ]; then
+            echo "Current scanable migration files:"
+            echo "${current_files}"
+          else
+            echo "No current scanable migration files (deletions-only change)."
+          fi
 
       - name: Scan changed migrations for high-risk SQL
         if: steps.changed_migrations.outputs.has_changed_migrations == 'true'
         shell: bash
+        env:
+          MIGRATION_REVIEWED: ${{ contains(github.event.pull_request.labels.*.name, 'migration-reviewed') }}
+          CONTRACT_RELEASE: ${{ contains(github.event.pull_request.labels.*.name, 'contract-release') }}
         run: |
           set -euo pipefail
 
@@ -244,103 +257,9 @@ jobs:
             exit 1
           fi
 
-          changed_files="${{ steps.changed_migrations.outputs.files }}"
-          blocking_pattern='drop[[:space:]]+(table|column|view|function)|truncate[[:space:]]|delete[[:space:]]+from|rename[[:space:]]+(table|column)|cascade'
-          review_pattern='alter[[:space:]]+column.*set[[:space:]]+not[[:space:]]+null|alter[[:space:]]+column.*(type|set[[:space:]]+data[[:space:]]+type)|drop[[:space:]]+policy|replace[[:space:]]+policy|security[[:space:]]+definer|grant[[:space:]]+'
-          destructive_reviewed_marker='migration-safety:[[:space:]]*destructive-reviewed'
-          unbounded_update_pattern='^[[:space:]]*update[[:space:]]+[^;[:space:]]+[[:space:]]+set[[:space:]]+'
-
-          legacy_files=""
-          while IFS= read -r file; do
-            [ -z "${file}" ] && continue
-            if head -n 20 "${file}" | grep -Eiq '^[[:space:]]*--[[:space:]]*migration-phase:[[:space:]]*(expand|contract)'; then
-              continue
-            fi
-            legacy_files="${legacy_files}${file}"$'\n'
-          done <<< "${changed_files}"
-
-          blocking_matches=""
-          if [ -n "${legacy_files}" ]; then
-            blocking_matches="$(echo "${legacy_files}" | xargs grep -Ein "${blocking_pattern}" || true)"
-          fi
-          review_matches="$(echo "${changed_files}" | xargs grep -Ein "${review_pattern}" || true)"
-          backfill_matches="$(echo "${changed_files}" | xargs grep -Ein "${unbounded_update_pattern}" | grep -Eiv 'where' || true)"
-
-          contract_matches=""
-          while IFS= read -r file; do
-            [ -z "${file}" ] && continue
-            if head -n 20 "${file}" | grep -Eiq '^[[:space:]]*--[[:space:]]*migration-phase:[[:space:]]*contract'; then
-              contract_matches="${contract_matches}${file}"$'\n'
-            fi
-          done <<< "${changed_files}"
-
-          high_risk=false
-          unreviewed_blocking_matches=""
-
-          if [ -n "${blocking_matches}" ]; then
-            while IFS= read -r match_line; do
-              [ -z "${match_line}" ] && continue
-              file="${match_line%%:*}"
-              if head -n 10 "${file}" | grep -Eiq "${destructive_reviewed_marker}"; then
-                continue
-              fi
-              high_risk=true
-              unreviewed_blocking_matches="${unreviewed_blocking_matches}${match_line}"$'\n'
-            done <<< "${blocking_matches}"
-          fi
-
-          if [ -n "${review_matches}" ] || [ -n "${backfill_matches}" ]; then
-            high_risk=true
-          fi
-
-          if [ -n "${contract_matches}" ]; then
-            high_risk=true
-            echo "Contract migrations in this promotion:"
-            printf '%s' "${contract_matches}"
-          fi
-
-          {
-            echo "### Migration review policy"
-            echo ""
-            if [ "${high_risk}" = "true" ]; then
-              echo "This promotion includes Contract and/or high-risk migration SQL."
-              echo "Required before merge:"
-              if [ -n "${contract_matches}" ]; then
-                echo "- Add the \`contract-release\` or \`migration-reviewed\` label after manual review."
-                echo "- Contract migrations are **not** auto-applied on \`main\` push; apply them only via \`deploy-contract-release.yml\` after backup evidence and production approval."
-              else
-                echo "- Add the \`migration-reviewed\` label after manual review."
-              fi
-              echo "- Obtain production environment approval when the protected \`production\` environment gate runs."
-            else
-              echo "No Contract or blocking high-risk migration patterns detected in changed files."
-            fi
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          if [ "${high_risk}" = "true" ]; then
-            review_ok=false
-            if [ "${MIGRATION_REVIEWED}" = "true" ]; then
-              review_ok=true
-            fi
-            if [ -n "${contract_matches}" ] && [ "${CONTRACT_RELEASE}" = "true" ]; then
-              review_ok=true
-            fi
-
-            if [ "${review_ok}" != "true" ]; then
-              if [ -n "${unreviewed_blocking_matches}" ]; then
-                echo "Blocking migration SQL detected without migration-reviewed label:"
-                echo "${unreviewed_blocking_matches}"
-              fi
-              if [ -n "${contract_matches}" ]; then
-                echo "Contract migrations require the contract-release or migration-reviewed label."
-                echo "Contract apply happens only via deploy-contract-release.yml (not automatic on main push)."
-              fi
-              if [ -n "${review_matches}" ] || [ -n "${backfill_matches}" ]; then
-                echo "High-risk migration patterns require the migration-reviewed label."
-              fi
-              exit 1
-            fi
-          fi
+          bash .github/scripts/scan-changed-migrations-high-risk.sh \
+            --diff-base origin/main \
+            --policy production-pr
 
       - name: Validate changed migration metadata
         if: steps.changed_migrations.outputs.has_changed_migrations == 'true'

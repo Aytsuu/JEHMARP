@@ -2,6 +2,9 @@
 set -euo pipefail
 
 REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=migration-diff-lib.sh
+source "${SCRIPT_DIR}/migration-diff-lib.sh"
 MIGRATIONS_DIR="${REPOSITORY_ROOT}/supabase/migrations"
 
 DIFF_BASE=""
@@ -66,22 +69,16 @@ get_header_value() {
 }
 
 collect_diff_base_files() {
-  local changed_files
+  local path
 
-  if ! git -C "$REPOSITORY_ROOT" rev-parse --verify "${DIFF_BASE}" >/dev/null 2>&1; then
-    echo "Git ref not found: ${DIFF_BASE}" >&2
+  if ! migration_diff_lib_assert_git_ref "$REPOSITORY_ROOT" "$DIFF_BASE"; then
     return 1
   fi
 
-  changed_files="$(git -C "$REPOSITORY_ROOT" diff --name-only "${DIFF_BASE}"...HEAD -- supabase/migrations || true)"
-  if [ -z "$changed_files" ]; then
-    return 0
-  fi
-
-  while IFS= read -r file; do
-    [ -z "$file" ] && continue
-    EXPLICIT_FILES+=("${REPOSITORY_ROOT}/${file}")
-  done <<< "$changed_files"
+  while IFS= read -r path; do
+    [ -z "$path" ] && continue
+    EXPLICIT_FILES+=("${REPOSITORY_ROOT}/${path}")
+  done < <(migration_diff_lib_emit_current_scanable_paths "$REPOSITORY_ROOT" "$DIFF_BASE")
 }
 
 if [ -n "$DIFF_BASE" ]; then

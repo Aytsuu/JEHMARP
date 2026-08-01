@@ -110,4 +110,21 @@ if ! grep -q "github.event.pull_request.head.repo.full_name == github.repository
   exit 1
 fi
 
+for workflow in "$WORKFLOW" "$MIGRATION_SAFETY_WORKFLOW"; do
+  if ! grep -q 'list-diff-migration-files.sh' "$workflow"; then
+    echo "Migration workflows must derive current scanable files via list-diff-migration-files.sh." >&2
+    exit 1
+  fi
+
+  if ! grep -q 'scan-changed-migrations-high-risk.sh' "$workflow"; then
+    echo "Migration workflows must scan high-risk SQL via scan-changed-migrations-high-risk.sh." >&2
+    exit 1
+  fi
+
+  if grep -q 'xargs grep -Ein' "$workflow"; then
+    echo "Workflow must not inline xargs grep migration scans on unfiltered diff paths." >&2
+    exit 1
+  fi
+done
+
 echo "validate-production-pr workflow tests passed."

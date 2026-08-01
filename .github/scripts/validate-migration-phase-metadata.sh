@@ -2,6 +2,11 @@
 set -euo pipefail
 
 REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=migration-diff-lib.sh
+source "${SCRIPT_DIR}/migration-diff-lib.sh"
+# shellcheck source=migration-baseline-compaction.sh
+source "${SCRIPT_DIR}/migration-baseline-compaction.sh"
 MIGRATIONS_DIR="${REPOSITORY_ROOT}/supabase/migrations"
 
 STRICT_MODE=false
@@ -193,30 +198,22 @@ mark_added_file() {
 }
 
 collect_diff_base_files() {
-  local changed_files
-  local added_files
+  local path
 
-  if ! git -C "$REPOSITORY_ROOT" rev-parse --verify "${DIFF_BASE}" >/dev/null 2>&1; then
-    echo "Git ref not found: ${DIFF_BASE}" >&2
+  if ! migration_diff_lib_assert_git_ref "$REPOSITORY_ROOT" "$DIFF_BASE"; then
     return 1
   fi
 
-  changed_files="$(git -C "$REPOSITORY_ROOT" diff --name-only "${DIFF_BASE}"...HEAD -- supabase/migrations || true)"
-  if [ -z "$changed_files" ]; then
-    return 0
-  fi
-
-  while IFS= read -r file; do
-    [ -z "$file" ] && continue
-    EXPLICIT_FILES+=("${REPOSITORY_ROOT}/${file}")
-  done <<< "$changed_files"
+  while IFS= read -r path; do
+    [ -z "$path" ] && continue
+    EXPLICIT_FILES+=("${REPOSITORY_ROOT}/${path}")
+  done < <(migration_diff_lib_emit_current_scanable_paths "$REPOSITORY_ROOT" "$DIFF_BASE")
 
   if [ "$REQUIRE_PHASE_FOR_ADDED" = true ]; then
-    added_files="$(git -C "$REPOSITORY_ROOT" diff --diff-filter=A --name-only "${DIFF_BASE}"...HEAD -- supabase/migrations || true)"
-    while IFS= read -r file; do
-      [ -z "$file" ] && continue
-      mark_added_file "$file"
-    done <<< "$added_files"
+    while IFS= read -r path; do
+      [ -z "$path" ] && continue
+      mark_added_file "$path"
+    done < <(migration_diff_lib_emit_added_paths "$REPOSITORY_ROOT" "$DIFF_BASE")
   fi
 }
 
@@ -369,6 +366,13 @@ validate_require_phase_if_present_file() {
 validate_require_phase_for_added_file() {
   local file="$1"
   local phase
+  local rel_path
+
+  rel_path="${file#"${REPOSITORY_ROOT}/"}"
+  if migration_baseline_compaction_is_verified_file "$REPOSITORY_ROOT" "$rel_path"; then
+    echo "INFO: ${file} is a verified history-compaction baseline; expand/contract metadata is not required."
+    return 0
+  fi
 
   phase="$(get_header_value "$file" "migration-phase")"
   if [ -z "$phase" ]; then

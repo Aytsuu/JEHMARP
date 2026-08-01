@@ -1,4 +1,7 @@
 --
+-- migration-type: history-compaction-baseline
+-- compaction-checkpoint: 20260802_checkpoint_prebaseline
+--
 -- PostgreSQL database dump
 --
 

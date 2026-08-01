@@ -175,6 +175,19 @@ if bash "$SCRIPT_PATH" --require-phase-for-added --added-files "${FIXTURE_DIR}/n
   exit 1
 fi
 
+# shellcheck source=../migration-baseline-compaction.sh
+source "${REPOSITORY_ROOT}/.github/scripts/migration-baseline-compaction.sh"
+
+if migration_baseline_compaction_checkout_shape_ok "$REPOSITORY_ROOT"; then
+  real_baseline="$(find "${resolved_root}/supabase/migrations" -maxdepth 1 -type f -name '20260802000000_*.sql' -print -quit)"
+  if [ -n "${real_baseline}" ]; then
+    if ! bash "$SCRIPT_PATH" --require-phase-for-added --added-files "${real_baseline}" --files "${real_baseline}"; then
+      echo "Real verified compaction baseline should pass require-phase-for-added." >&2
+      exit 1
+    fi
+  fi
+fi
+
 if ! bash "$SCRIPT_PATH" --require-phase-for-added --added-files "${FIXTURE_DIR}/new-expand-complete.sql" --require-phase-if-present --files "${FIXTURE_DIR}/legacy-no-phase.sql" "${FIXTURE_DIR}/new-expand-complete.sql"; then
   echo "Expected modified legacy warn + complete added file to pass." >&2
   exit 1
