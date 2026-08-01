@@ -5833,6 +5833,20 @@
     color: var(--color-brand-red);
   }
 
+  .category-range-card__image-container .admin-content-editable {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .category-range-card__image-container .admin-content-editable__surface,
+  .category-range-card__image-container .admin-content-editable__trigger,
+  .category-range-card__image-container .admin-content-editable__overlay {
+    border-radius: 0;
+    height: 100%;
+  }
+
   @media (min-width: 40rem) {
 
     .category-range-card__image-container,

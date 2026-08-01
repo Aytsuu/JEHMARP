@@ -4414,6 +4414,7 @@ describe("executeAdminAction", () => {
       sectionId,
       imageFile: null,
       slideIndex: 1,
+      categoryIndex: null,
       slideAction: "delete",
       slideSrc: "/images/hero_carousel_2.jpg",
       slideImageFiles: [],

@@ -15,6 +15,7 @@ type Props = {
   value: string;
   multiline?: boolean;
   required?: boolean;
+  categoryIndex?: number;
   class?: string;
 };
 
@@ -26,6 +27,7 @@ const {
   value,
   multiline = false,
   required = true,
+  categoryIndex,
   class: className,
 } = Astro.props;
 
@@ -43,6 +45,7 @@ const label =
       data-page-section-editable
       data-section-id={section.id}
       data-field-key={fieldKey}
+      {...categoryIndex !== undefined ? { "data-category-index": String(categoryIndex) } : {}}
     >
       <div class="admin-content-editable__surface">
         <slot>{value}</slot>
@@ -70,6 +73,11 @@ const label =
         <input type="hidden" name="status" value={section.status} />
         <input type="hidden" name="returnPath" value={contentEditing.returnPath} />
         <input type="hidden" name="contentField" value={fieldKey} />
+        {
+          categoryIndex !== undefined ? (
+            <input type="hidden" name="categoryIndex" value={categoryIndex} />
+          ) : null
+        }
         <input
           type="hidden"
           name="currentContent"

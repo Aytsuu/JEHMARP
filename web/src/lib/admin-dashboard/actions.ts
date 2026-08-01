@@ -42,6 +42,11 @@ import {
   parseFaqItemsEditorPayload,
 } from "@/lib/public-website/home-faq";
 import {
+  normalizeProductCategories,
+  updateProductCategoryField,
+  updateProductCategoryImage,
+} from "@/lib/public-website/home-product-categories";
+import {
   addHeroSlide,
   collectRemovedHeroSlideSrcs,
   deleteHeroSlide,
@@ -166,6 +171,7 @@ export type AdminAction =
       sectionId: string;
       imageFile: ProductImageFile | null;
       slideIndex: number | null;
+      categoryIndex: number | null;
       slideAction: "add" | "delete" | null;
       slideSrc: string | null;
       slideImageFiles: ProductImageFile[];
@@ -1068,6 +1074,7 @@ function parseAdminActionFormDataOrThrow(
         | "delete"
         | undefined;
       const slideIndex = optionalNonNegativeInteger(formData, "slideIndex");
+      const categoryIndex = optionalNonNegativeInteger(formData, "categoryIndex");
       const slideSrc = optionalString(formData, "slideSrc");
       const slideImageFiles = optionalSlideImageFiles(formData);
       const slideNewImageIndexes = parseSlideNewImageIndexes(formData);
@@ -1118,6 +1125,21 @@ function parseAdminActionFormDataOrThrow(
           }
 
           content = updateHeroSlideAlt(currentContent, slideIndex, contentValue);
+        } else if (
+          contentField &&
+          categoryIndex !== null &&
+          sectionType === "product_category_range"
+        ) {
+          if (typeof contentValue !== "string") {
+            throw new Error("Content value is required.");
+          }
+
+          content = updateProductCategoryField(
+            currentContent,
+            categoryIndex,
+            contentField,
+            contentValue,
+          );
         } else if (contentField) {
           if (sectionType === "contact_details" && isLockedContactDetailsField(contentField)) {
             throw new Error("Contact email and phone are managed in Settings.");
@@ -1145,6 +1167,7 @@ function parseAdminActionFormDataOrThrow(
         sectionId: requiredUuid(formData, "sectionId"),
         imageFile,
         slideIndex,
+        categoryIndex,
         slideAction: slideAction ?? null,
         slideSrc: slideSrc ?? null,
         slideImageFiles,
@@ -3981,6 +4004,22 @@ async function executePageSectionSave(
       if (updatedSlide.previousSrc) {
         cleanupPaths.add(updatedSlide.previousSrc);
       }
+    } else if (action.imageFile && action.categoryIndex !== null) {
+      uploadedImagePath = await uploadPageSectionImage(
+        createSupabaseAdminClient(),
+        action.imageFile,
+        `${action.payload.type}-category`,
+      );
+      const updatedCategory = updateProductCategoryImage(
+        content,
+        action.categoryIndex,
+        uploadedImagePath,
+      );
+      content = updatedCategory.content;
+
+      if (updatedCategory.previousSrc) {
+        cleanupPaths.add(updatedCategory.previousSrc);
+      }
     } else if (action.imageFile) {
       uploadedImagePath = await uploadPageSectionImage(
         createSupabaseAdminClient(),
@@ -4002,6 +4041,15 @@ async function executePageSectionSave(
         heading: getFaqHeading(content),
         description: getFaqDescription(content),
         items: parseFaqItemsEditorPayload(JSON.stringify(content.items ?? [])),
+      };
+    }
+
+    if (action.payload.type === "product_category_range") {
+      const normalized = normalizeProductCategories(content);
+      content = {
+        heading: normalized.heading,
+        subtitle: normalized.subtitle,
+        categories: normalized.categories,
       };
     }
 
