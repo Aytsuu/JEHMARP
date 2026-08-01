@@ -131,13 +131,9 @@ write_remote_versions_file() {
   local list_output="$1"
   local output_file="$2"
 
-  awk '{
-    remote = $0
-    sub(/^[^|]*\|[[:space:]]*/, "", remote)
-    sub(/[[:space:]]*\|.*$/, "", remote)
-    gsub(/[[:space:]]/, "", remote)
-    if (remote ~ /^[0-9]{14}$/) print remote
-  }' <<< "$list_output" | sort -u > "$output_file"
+  printf '%s\n' "$list_output" \
+    | bash "${REPOSITORY_ROOT}/.github/scripts/extract-supabase-remote-migration-versions.sh" \
+    | sort -u > "$output_file"
 }
 
 print_reconciliation_instruction() {

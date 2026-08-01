@@ -144,14 +144,8 @@ jobs:
 
           # The CLI text table is LOCAL | REMOTE | TIME. Capture only the REMOTE column,
           # not the local baseline version shown in the same output.
-          awk '{
-            # Use the ASCII separators emitted by the CLI.
-            remote = $0
-            sub(/^[^|]*\|[[:space:]]*/, "", remote)
-            sub(/[[:space:]]*\|.*$/, "", remote)
-            gsub(/[[:space:]]/, "", remote)
-            if (remote ~ /^[0-9]{14}$/) print remote
-          }' baseline-reconciliation/migration-list-before-repair.txt \
+          bash .github/scripts/extract-supabase-remote-migration-versions.sh \
+            baseline-reconciliation/migration-list-before-repair.txt \
             | sort -u > baseline-reconciliation/remote-versions-before.txt
 
       - name: Validate migration-ledger preconditions
@@ -257,13 +251,8 @@ jobs:
           supabase migration list --linked --dns-resolver https \
             | tee baseline-reconciliation/migration-list-after-repair.txt
 
-          awk '{
-            remote = $0
-            sub(/^[^|]*\|[[:space:]]*/, "", remote)
-            sub(/[[:space:]]*\|.*$/, "", remote)
-            gsub(/[[:space:]]/, "", remote)
-            if (remote ~ /^[0-9]{14}$/) print remote
-          }' baseline-reconciliation/migration-list-after-repair.txt \
+          bash .github/scripts/extract-supabase-remote-migration-versions.sh \
+            baseline-reconciliation/migration-list-after-repair.txt \
             | sort -u > baseline-reconciliation/remote-versions-after.txt
 
           if ! grep -Fxq "$BASELINE_VERSION" baseline-reconciliation/remote-versions-after.txt; then

@@ -27,7 +27,7 @@ write_migration_list_fixture() {
     printf '%s\n' "      Local          | Remote         | Time (UTC)"
     printf '%s\n' "  ------------------|----------------|---------------------"
     while [ "$#" -gt 0 ]; do
-      printf '  %18s | %14s | 2026-08-01 00:00:00\n' "$1" "$1"
+      printf '   %18s | `%14s` | `%s`\n' "$1" "$1" "2026-08-01 00:00:00"
       shift
     done
   } > "$output_file"
