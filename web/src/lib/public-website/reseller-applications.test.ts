@@ -50,6 +50,7 @@ describe("parseResellerApplicationFormData", () => {
 
 describe("submitResellerApplication", () => {
   it("invokes the protected reseller application function with server credentials and client metadata", async () => {
+    vi.stubEnv("DEV", false);
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
@@ -118,6 +119,7 @@ describe("submitResellerApplication", () => {
   });
 
   it("retries reseller price list delivery from the web app when the edge function did not send email", async () => {
+    vi.stubEnv("DEV", false);
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
