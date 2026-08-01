@@ -10,6 +10,7 @@ SMOKE_ADMIN_PASSWORD="${SMOKE_ADMIN_PASSWORD:-}"
 SMOKE_AGENT_EMAIL="${SMOKE_AGENT_EMAIL:-}"
 SMOKE_AGENT_PASSWORD="${SMOKE_AGENT_PASSWORD:-}"
 AUTH_SMOKE_OPTIONAL="${AUTH_SMOKE_OPTIONAL:-false}"
+AUTH_SMOKE_ROLE="${AUTH_SMOKE_ROLE:-all}"
 SMOKE_TURNSTILE_RESPONSE="${SMOKE_TURNSTILE_RESPONSE:-}"
 
 usage() {
@@ -21,7 +22,10 @@ STAGING_BASE_URL).
 
 Environment:
   SMOKE_ADMIN_EMAIL / SMOKE_ADMIN_PASSWORD   Admin dashboard smoke credentials.
-  SMOKE_AGENT_EMAIL / SMOKE_AGENT_PASSWORD   Agent dashboard smoke credentials.
+  SMOKE_AGENT_EMAIL / SMOKE_AGENT_PASSWORD   Agent dashboard smoke credentials when
+                                             AUTH_SMOKE_ROLE=all (the default).
+  AUTH_SMOKE_ROLE=admin|all                  Dashboard role coverage. Use admin for
+                                             staging-only admin smoke coverage.
   AUTH_SMOKE_OPTIONAL=true                   Skip with warning when credentials are missing.
   SMOKE_TURNSTILE_RESPONSE                   Optional Turnstile token for /api/login when
                                              the target environment enables Turnstile.
@@ -31,8 +35,16 @@ EOF
 }
 
 missing_smoke_credentials() {
-  [ -z "$SMOKE_ADMIN_EMAIL" ] || [ -z "$SMOKE_ADMIN_PASSWORD" ] \
-    || [ -z "$SMOKE_AGENT_EMAIL" ] || [ -z "$SMOKE_AGENT_PASSWORD" ]
+  if [ -z "$SMOKE_ADMIN_EMAIL" ] || [ -z "$SMOKE_ADMIN_PASSWORD" ]; then
+    return 0
+  fi
+
+  if [ "$AUTH_SMOKE_ROLE" = "all" ] \
+    && { [ -z "$SMOKE_AGENT_EMAIL" ] || [ -z "$SMOKE_AGENT_PASSWORD" ]; }; then
+    return 0
+  fi
+
+  return 1
 }
 
 login_dashboard_user() {
@@ -151,13 +163,26 @@ fi
 
 smoke_setup_version_override "$SCRIPT_DIR"
 
+case "$AUTH_SMOKE_ROLE" in
+  admin|all)
+    ;;
+  *)
+    echo "AUTH_SMOKE_ROLE must be admin or all, got: ${AUTH_SMOKE_ROLE}" >&2
+    exit 1
+    ;;
+esac
+
 if missing_smoke_credentials; then
   if [ "$AUTH_SMOKE_OPTIONAL" = "true" ]; then
     echo "AUTH_SMOKE_OPTIONAL=true and smoke credentials are missing; skipping authenticated smoke checks."
     exit 0
   fi
 
-  echo "Authenticated smoke credentials are required (SMOKE_ADMIN_* and SMOKE_AGENT_*)." >&2
+  if [ "$AUTH_SMOKE_ROLE" = "admin" ]; then
+    echo "Authenticated admin smoke credentials are required (SMOKE_ADMIN_*)." >&2
+  else
+    echo "Authenticated smoke credentials are required (SMOKE_ADMIN_* and SMOKE_AGENT_*)." >&2
+  fi
   echo "Set AUTH_SMOKE_OPTIONAL=true only for environments still provisioning smoke users." >&2
   exit 1
 fi
@@ -165,8 +190,7 @@ fi
 echo "Authenticated smoke testing ${BASE_URL}"
 
 admin_jar="$(mktemp)"
-agent_jar="$(mktemp)"
-trap 'rm -f "$admin_jar" "$agent_jar"' EXIT
+trap 'rm -f "$admin_jar"' EXIT
 
 turnstile_token="$SMOKE_TURNSTILE_RESPONSE"
 if [ -z "$turnstile_token" ]; then
@@ -176,25 +200,30 @@ fi
 admin_login_result="$(login_dashboard_user "$SMOKE_ADMIN_EMAIL" "$SMOKE_ADMIN_PASSWORD" "$admin_jar" "$turnstile_token")"
 assert_login_succeeded "admin" "$admin_login_result"
 
-agent_login_result="$(login_dashboard_user "$SMOKE_AGENT_EMAIL" "$SMOKE_AGENT_PASSWORD" "$agent_jar" "$turnstile_token")"
-assert_login_succeeded "agent" "$agent_login_result"
-
 admin_home_status="$(smoke_curl_with_cookie_jar "$admin_jar" "${BASE_URL}/admin" -L --max-redirs 5)"
 assert_status "/admin (admin session)" "200" "$admin_home_status"
-
-agent_home_status="$(smoke_curl_with_cookie_jar "$agent_jar" "${BASE_URL}/agent" -L --max-redirs 5)"
-assert_status "/agent (agent session)" "200" "$agent_home_status"
-
-admin_cross_status="$(smoke_curl_with_cookie_jar "$agent_jar" "${BASE_URL}/admin" -L --max-redirs 0 || true)"
-assert_status_in "/admin (agent session)" "$admin_cross_status" 301 302 303 307 308
-
-agent_cross_status="$(smoke_curl_with_cookie_jar "$admin_jar" "${BASE_URL}/agent" -L --max-redirs 0 || true)"
-assert_status_in "/agent (admin session)" "$agent_cross_status" 301 302 303 307 308
 
 admin_api_status="$(fetch_json_status "$admin_jar" "/admin/dashboard-summary.json")"
 assert_status "/admin/dashboard-summary.json (admin session)" "200" "$admin_api_status"
 
-agent_api_status="$(fetch_json_status "$agent_jar" "/admin/dashboard-summary.json")"
-assert_status "/admin/dashboard-summary.json (agent session)" "403" "$agent_api_status"
+if [ "$AUTH_SMOKE_ROLE" = "all" ]; then
+  agent_jar="$(mktemp)"
+  trap 'rm -f "$admin_jar" "$agent_jar"' EXIT
 
-echo "Authenticated smoke checks passed."
+  agent_login_result="$(login_dashboard_user "$SMOKE_AGENT_EMAIL" "$SMOKE_AGENT_PASSWORD" "$agent_jar" "$turnstile_token")"
+  assert_login_succeeded "agent" "$agent_login_result"
+
+  agent_home_status="$(smoke_curl_with_cookie_jar "$agent_jar" "${BASE_URL}/agent" -L --max-redirs 5)"
+  assert_status "/agent (agent session)" "200" "$agent_home_status"
+
+  admin_cross_status="$(smoke_curl_with_cookie_jar "$agent_jar" "${BASE_URL}/admin" -L --max-redirs 0 || true)"
+  assert_status_in "/admin (agent session)" "$admin_cross_status" 301 302 303 307 308
+
+  agent_cross_status="$(smoke_curl_with_cookie_jar "$admin_jar" "${BASE_URL}/agent" -L --max-redirs 0 || true)"
+  assert_status_in "/agent (admin session)" "$agent_cross_status" 301 302 303 307 308
+
+  agent_api_status="$(fetch_json_status "$agent_jar" "/admin/dashboard-summary.json")"
+  assert_status "/admin/dashboard-summary.json (agent session)" "403" "$agent_api_status"
+fi
+
+echo "Authenticated ${AUTH_SMOKE_ROLE} smoke checks passed."

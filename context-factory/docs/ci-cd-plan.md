@@ -83,11 +83,14 @@ requires reviewers; staging may use lighter approval.
 | `STAGING_BASE_URL` | Yes (after first deploy) | No | Public staging origin, e.g. `https://jehmarp-staging.<account>.workers.dev`. |
 | `PRODUCTION_BASE_URL` | No | Yes | Public production origin used by smoke and canary guard probes. |
 | `SMOKE_ADMIN_EMAIL` / `SMOKE_ADMIN_PASSWORD` | Yes | Yes | Dedicated admin dashboard user for authenticated smoke tests. |
-| `SMOKE_AGENT_EMAIL` / `SMOKE_AGENT_PASSWORD` | Yes | Yes | Dedicated agent dashboard user for authenticated smoke tests. |
+| `SMOKE_AGENT_EMAIL` / `SMOKE_AGENT_PASSWORD` | No | Yes | Dedicated agent dashboard user for the full production authenticated smoke suite. |
 | `SMOKE_TURNSTILE_RESPONSE` | Optional | Optional | Turnstile response token for `/api/login` when Turnstile is enabled. Use Cloudflare test keys or a solved token. |
 
-Staging deploy sets `AUTH_SMOKE_OPTIONAL=true` until smoke users exist. Production
-deploy and `production-smoke-tests.yml` fail closed when smoke credentials are missing.
+Staging deploy sets `AUTH_SMOKE_ROLE=admin` and `AUTH_SMOKE_OPTIONAL=true`: it exercises
+the admin login, `/admin`, and its dashboard-summary endpoint, but skips the suite if its
+admin smoke user is not yet provisioned. Agent credentials are deliberately not exposed to
+the staging job. Production deploy and `production-smoke-tests.yml` retain the default
+`AUTH_SMOKE_ROLE=all` suite and fail closed when either role's credentials are missing.
 
 ### Canary guard variables (production environment)
 

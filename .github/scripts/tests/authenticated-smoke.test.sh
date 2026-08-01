@@ -38,6 +38,40 @@ else
   exit 1
 fi
 
+# A staging deployment currently verifies only the admin dashboard. It must not
+# require agent credentials or make agent-route requests in that scoped mode.
+curl() {
+  local url="${!#}"
+
+  if [[ "$url" == *"/agent"* ]]; then
+    echo "Admin-only smoke unexpectedly requested an agent route: ${url}" >&2
+    return 99
+  fi
+
+  if [[ "$url" == *"/api/login" ]]; then
+    printf '302|https://example.test/dashboard'
+    return 0
+  fi
+
+  printf '200'
+}
+export -f curl
+
+if ! BASE_URL="https://example.test" \
+  AUTH_SMOKE_ROLE=admin \
+  SMOKE_ADMIN_EMAIL="admin@example.test" \
+  SMOKE_ADMIN_PASSWORD="admin-password" \
+  bash "$AUTH_SCRIPT" >/tmp/auth-smoke-admin-only.out 2>&1; then
+  cat /tmp/auth-smoke-admin-only.out >&2
+  echo "Expected admin-only authenticated smoke to pass without agent credentials." >&2
+  exit 1
+fi
+
+if ! grep -q "Authenticated admin smoke checks passed" /tmp/auth-smoke-admin-only.out; then
+  echo "Expected admin-only authenticated smoke success message." >&2
+  exit 1
+fi
+
 allowed=$((20 * 5 / 100))
 
 if [ "$allowed" != "1" ]; then

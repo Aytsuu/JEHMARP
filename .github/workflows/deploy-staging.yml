@@ -37,10 +37,9 @@ jobs:
       STAGING_SESSION_KV_ID: ${{ secrets.STAGING_SESSION_KV_ID }}
       SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
       SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
-      SMOKE_AGENT_EMAIL: ${{ secrets.SMOKE_AGENT_EMAIL }}
-      SMOKE_AGENT_PASSWORD: ${{ secrets.SMOKE_AGENT_PASSWORD }}
       SMOKE_TURNSTILE_RESPONSE: ${{ secrets.SMOKE_TURNSTILE_RESPONSE }}
       AUTH_SMOKE_OPTIONAL: "true"
+      AUTH_SMOKE_ROLE: admin
 
     steps:
       - name: Checkout
