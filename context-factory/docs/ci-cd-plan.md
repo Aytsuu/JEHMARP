@@ -574,6 +574,33 @@ Staging is the integration gate.
 If `gh api` fails (missing admin rights), the script prints the error; configure environments
 and rulesets manually in GitHub Settings → Environments / Rules.
 
+## Exceptional Migration-Ledger Baseline Cutover
+
+Normal releases must append a new migration; they must never edit or remove a
+migration that has reached a managed Supabase project. The one exception is a
+deliberately planned history-compaction checkpoint. This repository keeps the
+pre-cutover SQL files under
+`supabase/_archived_migrations/20260802_checkpoint_prebaseline/`, applies one
+replacement baseline at
+`supabase/migrations/20260802000000_baseline_schema.sql`, and keeps only
+landing-page content in `supabase/seeds/seed_landing_pages.sql`.
+
+The manual `Reconcile Supabase Baseline` workflow is the staging-first
+reconciliation control. Its default `plan-only` mode reads the selected linked
+project's migration ledger and uploads the evidence. It refuses to proceed
+unless that remote ledger exactly matches the archived checkpoint and the
+checkout has exactly the expected single baseline migration. It never runs
+`supabase db push`, seed SQL, or schema SQL.
+
+Only after reviewing a successful staging preflight may an operator select
+`execute-ledger-repair`, supply both acknowledgement strings, and pass staging
+verification. That guarded path changes only Supabase migration-history
+metadata: it replaces the recorded historical versions with the recorded
+baseline version. Production remains protected by its `production` GitHub
+Environment and must be reconciled separately after staging evidence is
+reviewed. Do not run the workflow against a ledger that has a hotfix or any
+other mismatch; resolve the drift first.
+
 ## Operational Guardrails
 
 - Keep `supabase/setup-cli@v3` pinned to `2.109.1` until the repository and
@@ -599,6 +626,7 @@ and rulesets manually in GitHub Settings → Environments / Rules.
     validate-production-pr.yml
     deploy-production.yml
     deploy-contract-release.yml
+    reconcile-supabase-baseline.yml
     supabase-migration-safety.yml
     production-smoke-tests.yml
     scheduled-db-health.yml
@@ -616,6 +644,8 @@ and rulesets manually in GitHub Settings → Environments / Rules.
     verify-version-affinity.sh
     detect-pending-high-risk-migrations.sh
     configure-github-protections.sh
+  scripts/tests/
+    reconcile-supabase-baseline-workflow.test.sh
 ```
 
 ## Implementation Sequence
