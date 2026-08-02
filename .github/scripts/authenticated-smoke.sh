@@ -12,6 +12,9 @@ SMOKE_AGENT_PASSWORD="${SMOKE_AGENT_PASSWORD:-}"
 AUTH_SMOKE_OPTIONAL="${AUTH_SMOKE_OPTIONAL:-false}"
 AUTH_SMOKE_ROLE="${AUTH_SMOKE_ROLE:-all}"
 SMOKE_TURNSTILE_RESPONSE="${SMOKE_TURNSTILE_RESPONSE:-}"
+AUTH_SMOKE_TURNSTILE_MODE="${AUTH_SMOKE_TURNSTILE_MODE:-test}"
+AUTH_SMOKE_TARGET_ENV="${AUTH_SMOKE_TARGET_ENV:-}"
+TURNSTILE_TEST_RESPONSE="1x0000000000000000000000000000000AA"
 
 usage() {
   cat <<'EOF'
@@ -24,11 +27,19 @@ Environment:
   SMOKE_ADMIN_EMAIL / SMOKE_ADMIN_PASSWORD   Admin dashboard smoke credentials.
   SMOKE_AGENT_EMAIL / SMOKE_AGENT_PASSWORD   Agent dashboard smoke credentials when
                                              AUTH_SMOKE_ROLE=all (the default).
-  AUTH_SMOKE_ROLE=admin|all                  Dashboard role coverage. Use admin for
+  AUTH_SMOKE_ROLE=admin|all                  Dashboard role coverage. Use admin fo
                                              staging-only admin smoke coverage.
   AUTH_SMOKE_OPTIONAL=true                   Skip with warning when credentials are missing.
-  SMOKE_TURNSTILE_RESPONSE                   Optional Turnstile token for /api/login when
-                                             the target environment enables Turnstile.
+  AUTH_SMOKE_TURNSTILE_MODE=test|real-browse
+                                             test uses Cloudflare's documented test response only
+                                             for non-production targets (staging/local). real-browse
+                                             refuses curl-based login and directs operators to the
+                                             production manual authentication gate.
+  AUTH_SMOKE_TARGET_ENV=staging|local|production
+                                             Required for test mode. Production rejects automated
+                                             curl login with test Turnstile responses.
+  SMOKE_TURNSTILE_RESPONSE                   Optional Turnstile token override for test mode in
+                                             non-production targets configured with test keys.
   BASE_URL / PRODUCTION_BASE_URL / STAGING_BASE_URL
   WORKER_VERSION_ID                          Optional Worker version override header.
 EOF
@@ -45,6 +56,61 @@ missing_smoke_credentials() {
   fi
 
   return 1
+}
+
+is_turnstile_test_response() {
+  [ "${1:-}" = "$TURNSTILE_TEST_RESPONSE" ]
+}
+
+resolve_turnstile_token() {
+  local token="${SMOKE_TURNSTILE_RESPONSE:-}"
+
+  case "$AUTH_SMOKE_TURNSTILE_MODE" in
+    real-browser)
+      echo "Authenticated smoke cannot solve production Turnstile challenges via curl." >&2
+      echo "Complete manual real-browser verification at the production canary auth gate." >&2
+      echo "Verify /dashboard, /admin, and /admin/dashboard-summary.json after logging in through /login." >&2
+      exit 1
+      ;;
+    test)
+      ;;
+    *)
+      echo "AUTH_SMOKE_TURNSTILE_MODE must be test or real-browser, got: ${AUTH_SMOKE_TURNSTILE_MODE}" >&2
+      exit 1
+      ;;
+  esac
+
+  case "$AUTH_SMOKE_TARGET_ENV" in
+    staging|local)
+      ;;
+    production)
+      echo "Production targets cannot run automated curl authenticated smoke." >&2
+      echo "Cloudflare test Turnstile responses are rejected by production Siteverify." >&2
+      echo "Use the protected manual production authentication gate during canary deploy." >&2
+      exit 1
+      ;;
+    "")
+      echo "AUTH_SMOKE_TARGET_ENV is required for authenticated smoke (staging, local, or production)." >&2
+      exit 1
+      ;;
+    *)
+      echo "AUTH_SMOKE_TARGET_ENV must be staging, local, or production, got: ${AUTH_SMOKE_TARGET_ENV}" >&2
+      exit 1
+      ;;
+  esac
+
+  if [ -z "$token" ]; then
+    token="$TURNSTILE_TEST_RESPONSE"
+  fi
+
+  if is_turnstile_test_response "$token"; then
+    printf '%s' "$token"
+    return 0
+  fi
+
+  echo "Only Cloudflare's documented test Turnstile response is supported in test mode." >&2
+  echo "Do not store solved production Turnstile tokens in GitHub secrets." >&2
+  exit 1
 }
 
 login_dashboard_user() {
@@ -193,10 +259,7 @@ echo "Authenticated smoke testing ${BASE_URL}"
 admin_jar="$(mktemp)"
 trap 'rm -f "$admin_jar"' EXIT
 
-turnstile_token="$SMOKE_TURNSTILE_RESPONSE"
-if [ -z "$turnstile_token" ]; then
-  turnstile_token="1x0000000000000000000000000000000AA"
-fi
+turnstile_token="$(resolve_turnstile_token)"
 
 admin_login_result="$(login_dashboard_user "$SMOKE_ADMIN_EMAIL" "$SMOKE_ADMIN_PASSWORD" "$admin_jar" "$turnstile_token")"
 assert_login_succeeded "admin" "$admin_login_result"

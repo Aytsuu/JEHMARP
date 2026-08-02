@@ -40,6 +40,8 @@ jobs:
       SMOKE_TURNSTILE_RESPONSE: ${{ secrets.SMOKE_TURNSTILE_RESPONSE }}
       AUTH_SMOKE_OPTIONAL: "true"
       AUTH_SMOKE_ROLE: admin
+      AUTH_SMOKE_TARGET_ENV: staging
+      AUTH_SMOKE_TURNSTILE_MODE: test
 
     steps:
       - name: Checkout

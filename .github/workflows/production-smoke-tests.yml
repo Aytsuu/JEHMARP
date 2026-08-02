@@ -28,11 +28,6 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       WORKER_VERSION_ID: ${{ inputs.worker_version_id }}
-      SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
-      SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
-      SMOKE_AGENT_EMAIL: ${{ secrets.SMOKE_AGENT_EMAIL }}
-      SMOKE_AGENT_PASSWORD: ${{ secrets.SMOKE_AGENT_PASSWORD }}
-      SMOKE_TURNSTILE_RESPONSE: ${{ secrets.SMOKE_TURNSTILE_RESPONSE }}
 
     steps:
       - name: Checkout
@@ -49,7 +44,3 @@ jobs:
       - name: Run production smoke checks
         shell: bash
         run: bash .github/scripts/production-smoke.sh
-
-      - name: Run authenticated production smoke checks
-        shell: bash
-        run: bash .github/scripts/authenticated-smoke.sh
