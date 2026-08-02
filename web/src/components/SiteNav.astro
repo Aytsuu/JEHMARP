@@ -50,7 +50,8 @@ const brandText = platformSettings.businessProfile.tradeName || "JEHMARP";
 const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPath);
 ---
 
-<header class="site-nav">
+<header class="site-nav" data-site-nav-smart-scroll={disableSmartScroll ? undefined : ""}>
+  <div class="site-nav__surface">
   <div class="site-nav__announcement">
     <div class="site-nav__announcement-inner">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="site-nav__announcement-icon"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
@@ -110,6 +111,7 @@ const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPat
       }
     </ul>
   </nav>
+  </div>
 </header>
 
 <div
@@ -165,11 +167,11 @@ const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPat
 
 <script>
   import { initSiteNavMobileMenu } from "@/lib/client/site-nav-mobile-menu";
-  import { initPublicSiteHeaderHeight } from "@/lib/client/public-site-header-height";
+  import { initSiteNavSmartScroll } from "@/lib/client/site-nav-smart-scroll";
 
   function initSiteNav() {
     initSiteNavMobileMenu();
-    initPublicSiteHeaderHeight();
+    initSiteNavSmartScroll();
   }
 
   document.addEventListener("DOMContentLoaded", initSiteNav);
@@ -182,48 +184,3 @@ const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPat
     initSiteNav();
   }
 </script>
-
-{!disableSmartScroll && (
-  <script>
-    function initSmartNavbar() {
-      const navbar = document.querySelector<HTMLElement>(".site-nav");
-      if (!navbar) return;
-
-      let lastScrollTop = 0;
-      let navbarHeight = navbar.getBoundingClientRect().height;
-
-      window.addEventListener("resize", () => {
-        navbarHeight = navbar.getBoundingClientRect().height;
-        document.documentElement.style.setProperty(
-          "--public-site-header-height",
-          `${navbar.offsetHeight}px`,
-        );
-      });
-
-      window.addEventListener("scroll", () => {
-        const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
-        if (scrollTop <= 0) {
-          navbar.classList.remove("site-nav--hidden");
-          lastScrollTop = scrollTop;
-          return;
-        }
-
-        if (scrollTop > lastScrollTop && scrollTop > navbarHeight) {
-          navbar.classList.add("site-nav--hidden");
-        } else if (scrollTop < lastScrollTop) {
-          navbar.classList.remove("site-nav--hidden");
-        }
-
-        lastScrollTop = scrollTop;
-      }, { passive: true });
-    }
-
-    document.addEventListener("DOMContentLoaded", initSmartNavbar);
-    document.addEventListener("astro:after-swap", initSmartNavbar);
-
-    if (document.readyState === "complete" || document.readyState === "interactive") {
-      initSmartNavbar();
-    }
-  </script>
-)}

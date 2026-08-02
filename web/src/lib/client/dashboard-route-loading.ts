@@ -7,25 +7,48 @@ import { shouldHandleDashboardNavClick } from "@/lib/client/dashboard-nav";
 
 let skeletonTimer: number | undefined;
 let pendingRouteTransition: ViewTransition | null = null;
+let activeShellMain: HTMLElement | null = null;
+let activeShellLoadingClass: string | null = null;
 
 function getRouteSkeleton() {
   return document.querySelector<HTMLElement>("[data-dashboard-route-skeleton]");
 }
 
-function getDashboardMain() {
-  return document.querySelector<HTMLElement>(".dashboard-main");
+function resolveDashboardShellMain() {
+  const dashboardMain = document.querySelector<HTMLElement>(".dashboard-main");
+  if (dashboardMain) {
+    return {
+      element: dashboardMain,
+      loadingClass: "dashboard-main--loading",
+    };
+  }
+
+  const contentMain = document.querySelector<HTMLElement>(
+    ".admin-content-dashboard-main",
+  );
+  if (contentMain) {
+    return {
+      element: contentMain,
+      loadingClass: "admin-content-dashboard-main--loading",
+    };
+  }
+
+  return null;
 }
 
 function showRouteSkeleton() {
   if (isAgentMobileRoute()) return;
 
   const skeleton = getRouteSkeleton();
-  const main = getDashboardMain();
-  if (!skeleton || !main) return;
+  const shellMain = resolveDashboardShellMain();
+  if (!skeleton || !shellMain) return;
+
+  activeShellMain = shellMain.element;
+  activeShellLoadingClass = shellMain.loadingClass;
 
   skeleton.hidden = false;
   skeleton.setAttribute("aria-hidden", "false");
-  main.classList.add("dashboard-main--loading");
+  shellMain.element.classList.add(shellMain.loadingClass);
   document.body.classList.add("dashboard-route-loading");
 }
 
@@ -36,12 +59,24 @@ function hideRouteSkeleton() {
   }
 
   const skeleton = getRouteSkeleton();
-  const main = getDashboardMain();
-  if (!skeleton || !main) return;
+  if (skeleton) {
+    skeleton.hidden = true;
+    skeleton.setAttribute("aria-hidden", "true");
+  }
 
-  skeleton.hidden = true;
-  skeleton.setAttribute("aria-hidden", "true");
-  main.classList.remove("dashboard-main--loading");
+  if (activeShellMain && activeShellLoadingClass) {
+    activeShellMain.classList.remove(activeShellLoadingClass);
+  } else {
+    document
+      .querySelector(".dashboard-main")
+      ?.classList.remove("dashboard-main--loading");
+    document
+      .querySelector(".admin-content-dashboard-main")
+      ?.classList.remove("admin-content-dashboard-main--loading");
+  }
+
+  activeShellMain = null;
+  activeShellLoadingClass = null;
   document.body.classList.remove("dashboard-route-loading");
 }
 

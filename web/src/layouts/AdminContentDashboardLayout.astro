@@ -68,6 +68,28 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
       <DashboardSidebar navLabel={navLabel} sidebarUnreadBadges={sidebarUnreadBadges} />
       <main class="admin-content-dashboard-main">
         <div
+          class="dashboard-route-skeleton"
+          data-dashboard-route-skeleton
+          hidden
+          aria-hidden="true"
+          aria-busy="true"
+          aria-label="Loading page"
+        >
+          <div class="dashboard-route-skeleton__panel">
+            <span class="table-skeleton-block table-skeleton-block--short dashboard-route-skeleton__title"></span>
+            <span class="table-skeleton-block dashboard-route-skeleton__intro"></span>
+            <div class="dashboard-route-skeleton__cards" aria-hidden="true">
+              <span class="dashboard-route-skeleton__card"></span>
+              <span class="dashboard-route-skeleton__card"></span>
+              <span class="dashboard-route-skeleton__card"></span>
+              <span class="dashboard-route-skeleton__card"></span>
+            </div>
+            <span class="table-skeleton-block table-skeleton-block--wide dashboard-route-skeleton__block"></span>
+            <span class="table-skeleton-block dashboard-route-skeleton__block"></span>
+            <span class="table-skeleton-block table-skeleton-block--short dashboard-route-skeleton__block"></span>
+          </div>
+        </div>
+        <div
           class="admin-content-dashboard-main__content"
           transition:name={dashboardPageTransitionName}
           transition:animate="none"
@@ -106,6 +128,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
       import { initDashboardDetailLinkPrefetchOptOut } from "@/lib/client/dashboard-prefetch";
       import { initDashboardCellPopovers } from "@/lib/client/dashboard-cell-popover";
       import { initPageSectionContentEditors } from "@/lib/client/page-section-content-editor";
+      import { initSiteNavSmartScroll } from "@/lib/client/site-nav-smart-scroll";
 
       function initAdminContentDashboardFeatures() {
         initDashboardDetailLinkPrefetchOptOut();
@@ -116,6 +139,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         initDashboardAlertDialogs();
         initDashboardCellPopovers();
         initPageSectionContentEditors();
+        initSiteNavSmartScroll();
       }
 
       document.addEventListener("DOMContentLoaded", initAdminContentDashboardFeatures);
@@ -149,18 +173,23 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
     min-width: 0;
     min-height: 0;
     height: 100%;
-    overflow-x: hidden;
-    overflow-y: auto;
-    overscroll-behavior: contain;
+    overflow: hidden;
     padding: 0;
+    position: relative;
+  }
+
+  .admin-content-dashboard-main--loading .admin-content-dashboard-main__content {
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .admin-content-dashboard-main__content {
     display: flex;
-    flex: 1 0 auto;
+    flex: 1 1 0;
     flex-direction: column;
     min-width: 0;
-    min-height: min-content;
-    overflow: visible;
+    min-height: 0;
+    height: 0;
+    overflow: hidden;
   }
 </style>

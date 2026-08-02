@@ -11,11 +11,12 @@ const { activePath = "/", previewRoot } = Astro.props;
 ---
 
 <div class="public-site-preview public-body" data-public-site-preview>
-  <SiteNav
-    activePath={activePath}
-    disableSmartScroll={true}
-    previewRoot={previewRoot}
-  />
+  <div class="public-site-preview__nav-anchor">
+    <SiteNav
+      activePath={activePath}
+      previewRoot={previewRoot}
+    />
+  </div>
   <main class="public-site-preview__main">
     <slot />
   </main>
