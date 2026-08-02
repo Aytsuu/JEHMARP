@@ -49,6 +49,25 @@ wrangler_cmd() {
   )
 }
 
+resolve_worker_name() {
+  bash "${REPOSITORY_ROOT}/.github/scripts/resolve-worker-name.sh"
+}
+
+run_wrangler_json_to_file() {
+  local output_file="$1"
+  local error_file="$2"
+  shift 2
+
+  : >"$output_file"
+  : >"$error_file"
+
+  if wrangler_cmd "$@" >"$output_file" 2>"$error_file"; then
+    return 0
+  fi
+
+  return 1
+}
+
 parse_wrangler_semver() {
   local raw="$1"
   raw="${raw#v}"
@@ -159,19 +178,46 @@ upload_version() {
 }
 
 parse_deployments_status_json() {
-  python3 - <<'PY'
+  local input_path="${1:--}"
+
+  python3 - "$input_path" <<'PY'
 import json
 import sys
+from pathlib import Path
 
-payload = json.load(sys.stdin)
+def load_payload(path: str):
+    if path == "-":
+        raw = sys.stdin.read()
+    else:
+        raw = Path(path).read_text(encoding="utf-8")
+
+    raw = raw.strip()
+    if not raw:
+        raise SystemExit("Wrangler deployments status returned empty output.")
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict) and payload.get("versions"):
+                return payload
+        raise SystemExit("Unable to parse deployments status JSON from wrangler output.")
+
+payload = load_payload(sys.argv[1])
 versions = payload.get("versions") or []
 
 if not versions:
     raise SystemExit("No versions found in active deployment.")
 
-# Prefer the version receiving the highest traffic share as the current stable baseline.
 stable = max(versions, key=lambda item: int(item.get("percentage") or 0))
-version_id = stable.get("version_id")
+version_id = stable.get("version_id") or stable.get("id")
 if not version_id:
     raise SystemExit("Active deployment is missing version_id.")
 
@@ -179,9 +225,96 @@ print(version_id)
 PY
 }
 
+parse_latest_version_from_list_json() {
+  local input_path="${1:--}"
+
+  python3 - "$input_path" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+def load_versions(path: str):
+    if path == "-":
+        raw = sys.stdin.read()
+    else:
+        raw = Path(path).read_text(encoding="utf-8")
+
+    raw = raw.strip()
+    if not raw:
+        raise SystemExit("Wrangler versions list returned empty output.")
+
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        versions = []
+        for line in raw.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(item, list):
+                versions.extend(item)
+            elif isinstance(item, dict) and (item.get("id") or item.get("version_id")):
+                versions.append(item)
+        payload = versions
+
+    if not isinstance(payload, list) or not payload:
+        raise SystemExit("No Worker versions were returned by wrangler versions list.")
+
+    return payload
+
+versions = load_versions(sys.argv[1])
+
+def created_on(item):
+    metadata = item.get("metadata") or {}
+    return metadata.get("created_on") or ""
+
+latest = max(versions, key=created_on)
+version_id = latest.get("id") or latest.get("version_id")
+if not version_id:
+    raise SystemExit("Latest Worker version is missing an id.")
+
+print(version_id)
+PY
+}
+
 stable_version() {
+  local worker_name
+  local output_file
+  local error_file
+
   assert_versions_api
-  wrangler_cmd deployments status --json | parse_deployments_status_json
+  worker_name="$(resolve_worker_name)"
+  output_file="$(mktemp)"
+  error_file="$(mktemp)"
+  trap 'rm -f "$output_file" "$error_file"' RETURN
+
+  if run_wrangler_json_to_file "$output_file" "$error_file" deployments status --name "$worker_name" --json \
+    && [ -s "$output_file" ]; then
+    if parse_deployments_status_json "$output_file"; then
+      return 0
+    fi
+  fi
+
+  if [ -s "$error_file" ]; then
+    echo "deployments status unavailable; falling back to versions list." >&2
+    sed 's/^/  /' "$error_file" >&2 || true
+  fi
+
+  if ! run_wrangler_json_to_file "$output_file" "$error_file" versions list --name "$worker_name" --json \
+    || [ ! -s "$output_file" ]; then
+    echo "Unable to determine the current stable Worker version for ${worker_name}." >&2
+    if [ -s "$error_file" ]; then
+      cat "$error_file" >&2
+    fi
+    echo "Ensure the production Worker has at least one uploaded version before canary deploy." >&2
+    exit 1
+  fi
+
+  parse_latest_version_from_list_json "$output_file"
 }
 
 validate_percentage_pair() {
@@ -224,24 +357,32 @@ deploy_split() {
 
 deployments_status() {
   assert_versions_api
+  local worker_name
+  worker_name="$(resolve_worker_name)"
   if [ "${1:-}" = "--json" ]; then
-    wrangler_cmd deployments status --json
+    wrangler_cmd deployments status --name "$worker_name" --json
   else
-    wrangler_cmd deployments status
+    wrangler_cmd deployments status --name "$worker_name"
   fi
 }
 
 list_versions() {
   assert_versions_api
+  local worker_name
+  worker_name="$(resolve_worker_name)"
   if [ "${1:-}" = "--json" ]; then
-    wrangler_cmd versions list --json
+    wrangler_cmd versions list --name "$worker_name" --json
   else
-    wrangler_cmd versions list
+    wrangler_cmd versions list --name "$worker_name"
   fi
 }
 
 command="${1:-}"
 shift || true
+
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 case "$command" in
   assert-versions-api)

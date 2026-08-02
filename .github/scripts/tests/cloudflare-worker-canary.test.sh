@@ -12,6 +12,46 @@ write_fixture() {
   printf '%s' "$content" > "${FIXTURE_DIR}/${name}"
 }
 
+write_fixture "deployment-status.json" \
+  '{
+  "created_on": "2026-08-02T00:00:00.000Z",
+  "versions": [
+    { "version_id": "11111111-1111-1111-1111-111111111111", "percentage": 100 }
+  ]
+}'
+
+write_fixture "versions-list.json" \
+  '[
+  {
+    "id": "22222222-2222-2222-2222-222222222222",
+    "metadata": { "created_on": "2026-08-01T00:00:00.000Z" }
+  },
+  {
+    "id": "33333333-3333-3333-3333-333333333333",
+    "metadata": { "created_on": "2026-08-02T00:00:00.000Z" }
+  }
+]'
+
+deployment_stable="$(
+  # shellcheck source=/dev/null
+  source "${CANARY_SCRIPT}"
+  parse_deployments_status_json "${FIXTURE_DIR}/deployment-status.json"
+)"
+if [ "$deployment_stable" != "11111111-1111-1111-1111-111111111111" ]; then
+  echo "Unexpected deployment status stable version: ${deployment_stable}" >&2
+  exit 1
+fi
+
+list_stable="$(
+  # shellcheck source=/dev/null
+  source "${CANARY_SCRIPT}"
+  parse_latest_version_from_list_json "${FIXTURE_DIR}/versions-list.json"
+)"
+if [ "$list_stable" != "33333333-3333-3333-3333-333333333333" ]; then
+  echo "Unexpected versions list stable version: ${list_stable}" >&2
+  exit 1
+fi
+
 write_fixture "version-upload.ndjson" \
   '{"type":"version-upload","version":1,"worker_name":"jehmarp","version_id":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"}'
 
