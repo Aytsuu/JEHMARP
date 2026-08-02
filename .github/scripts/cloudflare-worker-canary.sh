@@ -3,6 +3,7 @@ set -euo pipefail
 
 REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 WEB_DIR="${REPOSITORY_ROOT}/web"
+CONTROL_PLANE_DIR="${CONTROL_PLANE_DIR:-${REPOSITORY_ROOT}}"
 SCRIPT_NAME="$(basename "$0")"
 
 usage() {
@@ -37,16 +38,45 @@ require_cloudflare_auth() {
   fi
 }
 
-wrangler_cmd() {
+invoke_wrangler() {
+  local working_dir="$1"
+  shift
+
+  if [ -n "${CANARY_WRANGLER_BIN:-}" ]; then
+    CANARY_WRANGLER_INVOCATION_CWD="$working_dir"
+    (
+      cd "$working_dir"
+      "$CANARY_WRANGLER_BIN" "$@"
+    )
+    return $?
+  fi
+
+  (
+    cd "$working_dir"
+    if [ "$working_dir" = "$WEB_DIR" ]; then
+      npx wrangler "$@"
+    else
+      npm --prefix "$WEB_DIR" exec -- wrangler "$@"
+    fi
+  )
+}
+
+wrangler_build_cmd() {
   require_cloudflare_auth
   if [ "${WRANGLER_ENV:-}" = "staging" ]; then
     echo "Canary helpers must target production only; do not set WRANGLER_ENV=staging." >&2
     exit 1
   fi
-  (
-    cd "$WEB_DIR"
-    npx wrangler "$@"
-  )
+  invoke_wrangler "$WEB_DIR" "$@"
+}
+
+wrangler_control_plane_cmd() {
+  require_cloudflare_auth
+  if [ "${WRANGLER_ENV:-}" = "staging" ]; then
+    echo "Canary helpers must target production only; do not set WRANGLER_ENV=staging." >&2
+    exit 1
+  fi
+  invoke_wrangler "$CONTROL_PLANE_DIR" "$@"
 }
 
 resolve_worker_name() {
@@ -54,16 +84,30 @@ resolve_worker_name() {
 }
 
 run_wrangler_json_to_file() {
-  local output_file="$1"
-  local error_file="$2"
-  shift 2
+  local invoker="$1"
+  local output_file="$2"
+  local error_file="$3"
+  shift 3
 
   : >"$output_file"
   : >"$error_file"
 
-  if wrangler_cmd "$@" >"$output_file" 2>"$error_file"; then
-    return 0
-  fi
+  case "$invoker" in
+    build)
+      if wrangler_build_cmd "$@" >"$output_file" 2>"$error_file"; then
+        return 0
+      fi
+      ;;
+    control-plane)
+      if wrangler_control_plane_cmd "$@" >"$output_file" 2>"$error_file"; then
+        return 0
+      fi
+      ;;
+    *)
+      echo "Unknown wrangler invoker: ${invoker}" >&2
+      exit 1
+      ;;
+  esac
 
   return 1
 }
@@ -89,12 +133,12 @@ print("yes" if parts(left) >= parts(right) else "no")
 PY
 }
 
-assert_versions_api() {
+assert_wrangler_min_version() {
   local min_version="${WRANGLER_MIN_VERSION:-4.0.0}"
   local wrangler_version
 
-  if ! wrangler_version="$(cd "$WEB_DIR" && npx wrangler --version 2>/dev/null | head -1)"; then
-    echo "Unable to run wrangler --version from ${WEB_DIR}." >&2
+  if ! wrangler_version="$(wrangler_control_plane_cmd --version 2>/dev/null | head -1)"; then
+    echo "Unable to run wrangler --version from the control-plane context." >&2
     exit 1
   fi
 
@@ -105,18 +149,28 @@ assert_versions_api() {
     exit 1
   fi
 
-  if ! wrangler_cmd versions upload --help >/dev/null 2>&1; then
+  echo "wrangler ${wrangler_version} supports versions upload/deploy." >&2
+}
+
+assert_control_plane_versions_api() {
+  assert_wrangler_min_version
+
+  if ! wrangler_control_plane_cmd versions deploy --help >/dev/null 2>&1; then
+    echo "Installed wrangler lacks 'versions deploy'. Canary promotion is not available." >&2
+    exit 1
+  fi
+}
+
+assert_versions_api() {
+  assert_wrangler_min_version
+
+  if ! wrangler_build_cmd versions upload --help >/dev/null 2>&1; then
     echo "Installed wrangler lacks 'versions upload'. Canary deploy is not available." >&2
     echo "Fallback: manual 'wrangler deploy' after review (not automated in CI)." >&2
     exit 1
   fi
 
-  if ! wrangler_cmd versions deploy --help >/dev/null 2>&1; then
-    echo "Installed wrangler lacks 'versions deploy'. Canary promotion is not available." >&2
-    exit 1
-  fi
-
-  echo "wrangler ${wrangler_version} supports versions upload/deploy." >&2
+  assert_control_plane_versions_api
 }
 
 assert_worker_version_id() {
@@ -193,9 +247,9 @@ upload_version() {
       echo "Env file not found: ${env_file}" >&2
       exit 1
     fi
-    WRANGLER_OUTPUT_FILE_PATH="$output_file" wrangler_cmd versions upload --env-file "$env_file" >&2
+    WRANGLER_OUTPUT_FILE_PATH="$output_file" wrangler_build_cmd versions upload --env-file "$env_file" >&2
   else
-    WRANGLER_OUTPUT_FILE_PATH="$output_file" wrangler_cmd versions upload >&2
+    WRANGLER_OUTPUT_FILE_PATH="$output_file" wrangler_build_cmd versions upload >&2
   fi
 
   emit_worker_version_id "$(parse_wrangler_output_version_id "$output_file")"
@@ -310,13 +364,13 @@ stable_version() {
   local output_file
   local error_file
 
-  assert_versions_api
+  assert_control_plane_versions_api
   worker_name="$(resolve_worker_name)"
   output_file="$(mktemp)"
   error_file="$(mktemp)"
   trap 'rm -f "$output_file" "$error_file"' RETURN
 
-  if run_wrangler_json_to_file "$output_file" "$error_file" deployments status --name "$worker_name" --json \
+  if run_wrangler_json_to_file control-plane "$output_file" "$error_file" deployments status --name "$worker_name" --json \
     && [ -s "$output_file" ]; then
     if version_id="$(parse_deployments_status_json "$output_file")"; then
       emit_worker_version_id "$version_id"
@@ -329,7 +383,7 @@ stable_version() {
     sed 's/^/  /' "$error_file" >&2 || true
   fi
 
-  if ! run_wrangler_json_to_file "$output_file" "$error_file" versions list --name "$worker_name" --json \
+  if ! run_wrangler_json_to_file control-plane "$output_file" "$error_file" versions list --name "$worker_name" --json \
     || [ ! -s "$output_file" ]; then
     echo "Unable to determine the current stable Worker version for ${worker_name}." >&2
     if [ -s "$error_file" ]; then
@@ -364,7 +418,7 @@ deploy_split() {
   local stable_pct="$4"
   local message="${5:-Production canary promotion via ${SCRIPT_NAME}}"
 
-  assert_versions_api
+  assert_control_plane_versions_api
   validate_percentage_pair "$new_pct" "$stable_pct"
   assert_worker_version_id "$new_version_id"
   assert_worker_version_id "$stable_version_id"
@@ -374,33 +428,37 @@ deploy_split() {
     exit 1
   fi
 
+  local worker_name
+  worker_name="$(resolve_worker_name)"
+
   echo "Deploying traffic split: new=${new_version_id}@${new_pct}% stable=${stable_version_id}@${stable_pct}%" >&2
-  wrangler_cmd versions deploy \
+  wrangler_control_plane_cmd versions deploy \
     "${new_version_id}@${new_pct}" \
     "${stable_version_id}@${stable_pct}" \
+    --name "$worker_name" \
     --message "$message" \
     --yes
 }
 
 deployments_status() {
-  assert_versions_api
+  assert_control_plane_versions_api
   local worker_name
   worker_name="$(resolve_worker_name)"
   if [ "${1:-}" = "--json" ]; then
-    wrangler_cmd deployments status --name "$worker_name" --json
+    wrangler_control_plane_cmd deployments status --name "$worker_name" --json
   else
-    wrangler_cmd deployments status --name "$worker_name"
+    wrangler_control_plane_cmd deployments status --name "$worker_name"
   fi
 }
 
 list_versions() {
-  assert_versions_api
+  assert_control_plane_versions_api
   local worker_name
   worker_name="$(resolve_worker_name)"
   if [ "${1:-}" = "--json" ]; then
-    wrangler_cmd versions list --name "$worker_name" --json
+    wrangler_control_plane_cmd versions list --name "$worker_name" --json
   else
-    wrangler_cmd versions list --name "$worker_name"
+    wrangler_control_plane_cmd versions list --name "$worker_name"
   fi
 }
 

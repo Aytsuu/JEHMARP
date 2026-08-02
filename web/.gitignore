@@ -23,3 +23,6 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# Astro/Wrangler deploy redirect state (generated during build; points at ignored dist/)
+.wrangler/deploy/
