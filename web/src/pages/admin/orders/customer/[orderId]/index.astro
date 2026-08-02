@@ -764,7 +764,12 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
     </aside>
 
     <section class="order-detail-main">
-      <Tabs ariaLabel="Order detail sections" class="order-detail-tabs">
+      <Tabs
+        ariaLabel="Order detail sections"
+        class="order-detail-tabs"
+        listClass="order-detail-tabs__list"
+        panelsClass="order-detail-tabs__panels"
+      >
         <Tab
           slot="tabs"
           target="products"
@@ -1118,6 +1123,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
           target="order-slip"
           active={isOrderDetailTabActive("order-slip")}
           variant="document"
+          class="order-document-tab-panel"
         >
           <div
             class="document-preview-body document-preview--pdf-like document-preview--rounded-sm"
@@ -1231,6 +1237,7 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
           target="sales-invoice"
           active={isOrderDetailTabActive("sales-invoice")}
           variant={hasSalesInvoice ? "document" : "default"}
+          class:list={[hasSalesInvoice && "order-document-tab-panel"]}
         >
           {
             !hasSalesInvoice ? (
@@ -3019,9 +3026,8 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
   }
 
   .order-detail-main {
-    display: grid;
-    grid-template-rows: auto minmax(0, 1fr);
-    gap: 0;
+    display: flex;
+    flex-direction: column;
     align-self: stretch;
     min-height: 0;
     height: 100%;
@@ -3031,13 +3037,58 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
   }
 
   .order-detail-tabs {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
     min-height: 0;
     height: 100%;
   }
 
-  .document-preview-body {
+  .order-detail-tabs :global(.order-detail-tabs__list) {
+    flex-shrink: 0;
+  }
+
+  .order-detail-tabs :global(.order-detail-tabs__panels.ui-tabs__panels) {
+    display: flex;
     flex: 1;
+    flex-direction: column;
     min-height: 0;
+    overflow: hidden;
+  }
+
+  .order-detail-tabs :global(.ui-tab-panel.is-active:not(.ui-tab-panel--document)) {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .order-detail-tabs :global(.order-document-tab-panel.ui-tab-panel--document.is-active) {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .order-detail-tabs
+    :global(
+      .order-document-tab-panel.ui-tab-panel--document.is-active
+        .document-preview-body.document-preview--pdf-like
+    ) {
+    flex: 1 1 0;
+    min-height: 0;
+    height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .document-preview-body {
     width: 100%;
   }
 
@@ -3839,11 +3890,6 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
       overflow: visible;
     }
 
-    .order-detail-main {
-      padding-top: 1.25rem;
-      overflow: visible;
-    }
-
     .order-detail-sidebar {
       overflow: visible;
     }
@@ -3861,9 +3907,30 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
       overflow: visible;
     }
 
+    .order-detail-main {
+      padding: 1.25rem;
+      overflow: visible;
+    }
+
+    .order-detail-tabs :global(.order-detail-tabs__panels.ui-tabs__panels) {
+      overflow: visible;
+    }
+
+    .order-detail-tabs
+      :global(
+        .order-document-tab-panel.ui-tab-panel--document.is-active
+          .document-preview-body.document-preview--pdf-like
+      ) {
+      height: auto;
+      max-height: min(70vh, 100%);
+      overflow-y: auto;
+    }
+
     .order-detail-section,
     :global(.ui-tab-panel) {
       overflow: visible;
+      max-height: none;
+      height: auto;
     }
   }
 

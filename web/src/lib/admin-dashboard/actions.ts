@@ -3888,7 +3888,12 @@ async function uploadManagedImage(
     });
 
   if (error || !data?.path) {
-    throw new Error("Unable to upload image.");
+    const detail = error?.message ? ` ${error.message}` : "";
+    throw new Error(
+      import.meta.env.DEV
+        ? `Unable to upload image.${detail}`
+        : "Unable to upload image.",
+    );
   }
 
   return data.path;

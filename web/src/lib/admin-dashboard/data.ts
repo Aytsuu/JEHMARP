@@ -664,10 +664,9 @@ export type AdminProductManagementData = Pick<
 
 export type AdminOrderManagementData = Pick<
   AdminDashboardData,
-  "agents" | "customers" | "agentOrders" | "orders" | "products"
+  "agents" | "products"
 > & {
   orderRows: AdminOrderTableRow[];
-  customerBalances: Record<string, number>;
   pagination: AdminPaginatedResult<AdminOrderTableRow>["pagination"];
 };
 
@@ -807,23 +806,16 @@ export async function loadAdminOrderManagementData(
   pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminOrderManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [products, agents, customers, orderRows, orders, customerBalances] = await Promise.all([
+  const [products, agents, orderRows] = await Promise.all([
     loadProducts(supabase),
     loadAgents(supabase),
-    loadCustomers(supabase),
     loadPaginatedAdminOrderRows(supabase, orderFilters, pagination),
-    loadOrders(supabase, 50),
-    loadCustomerOutstandingBalances(supabase),
   ]);
 
   return {
     products,
     agents,
-    customers,
-    agentOrders: [],
-    orders,
     orderRows: orderRows.records,
-    customerBalances,
     pagination: orderRows.pagination,
   };
 }

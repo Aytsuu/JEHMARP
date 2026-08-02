@@ -249,6 +249,8 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
       import { initOrderPaymentFormToggle } from "@/lib/client/order-payment-form";
       import { initOrderStatusAutoSave } from "@/lib/client/order-status-auto-save";
       import { initTableActionMenus } from "@/lib/client/table-action-menu";
+      import { initAdminOrderBulkPdf } from "@/lib/client/admin-order-bulk-pdf";
+      import { initAdminOrdersFragmentTable } from "@/lib/client/admin-orders-fragment-table";
       import { clearDashboardFragmentCaches } from "@/lib/client/dashboard-fragment-cache";
       import { initFormSubmissionState } from "@/lib/client/form-submission-state";
       import { clearSystemIssueRetryState } from "@/lib/client/system-issue-retry";
@@ -832,6 +834,8 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         initOrderPaymentFormToggle();
         initOrderStatusAutoSave();
         initTableActionMenus();
+        initAdminOrdersFragmentTable();
+        initAdminOrderBulkPdf();
       }
 
       document.addEventListener("DOMContentLoaded", initDashboardFeatures);
@@ -842,6 +846,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         () => {
           initInteractiveTables();
           initDashboardTableBoardAlignment();
+          initDigitsOnlyInputs();
         },
       );
       window.addEventListener("resize", () => {

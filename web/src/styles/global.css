@@ -9286,7 +9286,11 @@
     position: relative;
   }
 
-  .order-customer-picker input {
+  .order-customer-picker[data-open="true"] {
+    z-index: 40;
+  }
+
+  .order-customer-picker input:not(.table-pagination__page-input) {
     padding-right: 3rem !important;
   }
 
@@ -9327,16 +9331,36 @@
     top: calc(100% + 0.4rem);
     left: 0;
     right: 0;
-    z-index: 20;
+    z-index: 41;
     border-radius: 0.75rem;
     background: #2e2e2e;
     overflow: hidden;
+    isolation: isolate;
   }
 
   .order-customer-picker__options {
     display: grid;
     max-height: 16rem;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.42) transparent;
+  }
+
+  .order-customer-picker__options::-webkit-scrollbar {
+    width: 0.5rem;
+  }
+
+  .order-customer-picker__options::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .order-customer-picker__options::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.42);
+  }
+
+  .order-customer-picker__options::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.58);
   }
 
   .order-customer-picker__skeleton {
@@ -9355,13 +9379,16 @@
   }
 
   .order-customer-picker__option {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
     width: 100%;
     padding: 0.9rem 1rem;
     border: 0;
     border-radius: 0;
     background: transparent !important;
-    color: rgba(255, 255, 255, 0.88) !important;
+    color: #ffffff !important;
     text-align: left;
     text-transform: none !important;
     letter-spacing: normal !important;
@@ -9370,9 +9397,38 @@
     line-height: 1.42;
   }
 
+  .order-customer-picker__option-name,
+  .order-customer-picker__option-type {
+    color: #ffffff !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+  }
+
+  .order-customer-picker__option-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 400 !important;
+  }
+
+  .order-customer-picker__option-type {
+    flex: 0 0 auto;
+    font-size: 0.78rem !important;
+    font-weight: 400 !important;
+    opacity: 0.72;
+    white-space: nowrap;
+  }
+
   .order-customer-picker__option:hover {
     background: rgba(255, 255, 255, 0.08) !important;
-    color: rgba(255, 255, 255, 0.88) !important;
+    color: #ffffff !important;
+  }
+
+  .order-customer-picker__option:hover .order-customer-picker__option-name,
+  .order-customer-picker__option:hover .order-customer-picker__option-type {
+    color: #ffffff !important;
   }
 
   .order-customer-picker__option+.order-customer-picker__option {
@@ -9382,10 +9438,127 @@
   .order-customer-picker__empty {
     margin: 0;
     padding: 0.9rem 1rem;
-    color: rgba(255, 255, 255, 0.88);
+    color: #ffffff !important;
     font-size: 0.9rem;
     font-weight: 400;
     line-height: 1.42;
+    text-transform: none;
+  }
+
+  .order-customer-picker__summary {
+    margin: 0;
+    padding: 0.75rem 1rem 0.35rem;
+    color: #ffffff !important;
+    font-size: 0.78rem;
+    font-weight: 500 !important;
+    line-height: 1.45;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .order-customer-picker__footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.65rem 0.85rem 0.8rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    position: relative;
+    z-index: 1;
+  }
+
+  .order-customer-picker__footer .table-pagination {
+    margin-top: 0;
+    width: auto;
+    flex: 0 0 auto;
+  }
+
+  .order-customer-picker__footer .table-pagination__controls--merged {
+    width: auto;
+    justify-content: flex-end;
+  }
+
+  .order-customer-picker__footer .table-pagination__record-count {
+    margin-inline-start: 0;
+    color: #ffffff !important;
+    font-size: 0.85rem;
+    font-weight: 500 !important;
+    white-space: nowrap;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .order-customer-picker__footer .table-pagination__page-editor {
+    flex: 0 0 auto;
+    gap: 0.55rem;
+    color: #ffffff !important;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .order-customer-picker__footer .table-pagination__page-label,
+  .order-customer-picker__footer .table-pagination__page-total,
+  .order-customer-picker__footer .table-pagination__page-total [data-customer-picker-total] {
+    color: #ffffff !important;
+    font-size: 0.85rem;
+    font-weight: 500 !important;
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .drawer-sheet__body .order-create-form .order-customer-picker__footer .table-pagination__page-input,
+  .field-row .order-customer-picker__footer .table-pagination__page-input,
+  .order-customer-picker__footer .table-pagination__page-input {
+    width: 2.5rem !important;
+    min-width: 2.5rem !important;
+    max-width: 2.5rem !important;
+    height: 2rem !important;
+    min-height: 2rem !important;
+    max-height: 2rem !important;
+    flex: 0 0 2.5rem !important;
+    padding: 0 !important;
+    box-sizing: border-box;
+    border-radius: 0.375rem;
+    font-size: 0.78rem;
+    font-weight: 500 !important;
+    line-height: 1;
+    text-align: center;
+    color: #ffffff !important;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.25);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  .order-customer-picker__footer .table-pagination__page-input:focus {
+    border-color: rgba(255, 255, 255, 0.45);
+    box-shadow: none;
+  }
+
+  .order-customer-picker__footer .table-pagination__arrow.btn-secondary {
+    min-width: 2rem;
+    min-height: 2rem;
+    padding: 0.35rem;
+    border: none;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: #ffffff;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 600;
+    cursor: pointer;
+    pointer-events: auto;
+  }
+
+  .order-customer-picker__footer .table-pagination__arrow.btn-secondary:hover:not(:disabled) {
+    background: transparent;
+    color: #ffffff;
+    border: none;
+  }
+
+  .order-customer-picker__footer .table-pagination__arrow.btn-secondary:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   .order-create-form [data-new-customer-fields][data-disabled="true"] {
@@ -10956,9 +11129,7 @@
 
   .document-preview--pdf-like.document-preview-body {
     position: relative;
-    height: auto;
     min-height: 0;
-    overflow-y: auto;
     overflow-x: hidden;
     padding: 2.75rem 2.5rem 1rem;
     border: 1px solid #d7d7d7;
@@ -10968,11 +11139,9 @@
     color: #111111;
   }
 
-  .document-preview--pdf-like {
+  .document-preview--pdf-like:not(.document-preview-body) {
     position: relative;
-    height: 100%;
     min-height: 0;
-    overflow: auto;
     padding: 2.75rem 2.5rem;
     padding-bottom: 6.5rem;
     border: 1px solid #d7d7d7;
