@@ -2,7 +2,7 @@
 # Shared helpers for production and authenticated smoke scripts.
 
 smoke_repository_root() {
-  local script_dir
+  local script_di
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   cd "${script_dir}/../.." && pwd
 }
@@ -46,15 +46,35 @@ smoke_setup_version_override() {
   echo "Override header: ${VERSION_OVERRIDE_HEADER}"
 }
 
+smoke_has_cloudflare_access_credentials() {
+  [ -n "${CF_ACCESS_CLIENT_ID:-}" ] && [ -n "${CF_ACCESS_CLIENT_SECRET:-}" ]
+}
+
+is_cloudflare_access_redirect_url() {
+  local url="${1:-}"
+  [[ "$url" == *"cloudflareaccess.com"* ]] || [[ "$url" == *"/cdn-cgi/access/login"* ]]
+}
+
+smoke_append_common_curl_headers() {
+  local -n _curl_args=$1
+
+  if [ -n "${VERSION_OVERRIDE_HEADER:-}" ]; then
+    _curl_args+=(-H "$VERSION_OVERRIDE_HEADER")
+  fi
+
+  if smoke_has_cloudflare_access_credentials; then
+    _curl_args+=(-H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}")
+    _curl_args+=(-H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}")
+  fi
+}
+
 smoke_curl_status() {
   local url="$1"
   shift
 
-  if [ -n "${VERSION_OVERRIDE_HEADER:-}" ]; then
-    curl -sS -o /dev/null -w "%{http_code}" -H "$VERSION_OVERRIDE_HEADER" "$@" "$url"
-  else
-    curl -sS -o /dev/null -w "%{http_code}" "$@" "$url"
-  fi
+  local curl_args=()
+  smoke_append_common_curl_headers curl_args
+  curl -sS -o /dev/null -w "%{http_code}" "${curl_args[@]}" "$@" "$url"
 }
 
 smoke_curl_status_with_retry() {
@@ -105,9 +125,7 @@ smoke_curl_with_cookie_jar() {
     -w "%{http_code}"
   )
 
-  if [ -n "${VERSION_OVERRIDE_HEADER:-}" ]; then
-    curl_args+=(-H "$VERSION_OVERRIDE_HEADER")
-  fi
+  smoke_append_common_curl_headers curl_args
 
   curl "${curl_args[@]}" "$@" "$url"
 }

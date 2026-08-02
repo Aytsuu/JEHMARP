@@ -116,6 +116,28 @@ if BASE_URL="https://example.test" \
   exit 1
 fi
 
+if ! is_cloudflare_access_redirect_url "https://aytsuu.cloudflareaccess.com/cdn-cgi/access/login/staging.example"; then
+  echo "Expected Cloudflare Access redirect URL detection." >&2
+  exit 1
+fi
+
+if (
+  # shellcheck source=/dev/null
+  source "$AUTH_SCRIPT"
+  assert_login_succeeded "admin" "302|https://aytsuu.cloudflareaccess.com/cdn-cgi/access/login/staging.example"
+) >/tmp/auth-smoke-access-assert.out 2>&1; then
+  echo "Expected Cloudflare Access login redirect to fail assert_login_succeeded." >&2
+  cat /tmp/auth-smoke-access-assert.out >&2
+  exit 1
+fi
+
+if ! grep -Fq 'Cloudflare Access' /tmp/auth-smoke-access-assert.out \
+  || ! grep -Fq 'CF_ACCESS_CLIENT_ID' /tmp/auth-smoke-access-assert.out; then
+  echo "Expected Cloudflare Access remediation message." >&2
+  cat /tmp/auth-smoke-access-assert.out >&2
+  exit 1
+fi
+
 allowed=$((20 * 5 / 100))
 
 if [ "$allowed" != "1" ]; then

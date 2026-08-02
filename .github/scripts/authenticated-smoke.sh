@@ -41,6 +41,10 @@ Environment:
   SMOKE_TURNSTILE_RESPONSE                   Optional Turnstile token override for test mode in
                                              non-production targets configured with test keys.
   BASE_URL / PRODUCTION_BASE_URL / STAGING_BASE_URL
+  CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET
+                                             Optional Cloudflare Access service token fo
+                                             staging targets behind Zero Trust. Required fo
+                                             automated curl smoke when Access protects the origin.
   WORKER_VERSION_ID                          Optional Worker version override header.
 EOF
 }
@@ -136,9 +140,7 @@ login_dashboard_user() {
     curl_args+=(-F "cf-turnstile-response=${turnstile_token}")
   fi
 
-  if [ -n "${VERSION_OVERRIDE_HEADER:-}" ]; then
-    curl_args+=(-H "$VERSION_OVERRIDE_HEADER")
-  fi
+  smoke_append_common_curl_headers curl_args
 
   curl "${curl_args[@]}" "$login_url"
 }
@@ -154,6 +156,16 @@ assert_login_succeeded() {
 
   case "${status}" in
     301|302|303|307|308)
+      if is_cloudflare_access_redirect_url "$redirect_url"; then
+        echo "${role_label} login was intercepted by Cloudflare Access." >&2
+        if ! smoke_has_cloudflare_access_credentials; then
+          echo "Set CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET (service token) in the staging environment for CI smoke." >&2
+          echo "Create the token in Cloudflare One → Access → Service Auth for the staging application." >&2
+        else
+          echo "Verify the service token is authorized for this staging hostname." >&2
+        fi
+        return 1
+      fi
       if [[ "$redirect_url" != *"/dashboard"* ]]; then
         echo "${role_label} login did not redirect to /dashboard." >&2
         return 1
@@ -212,12 +224,14 @@ fetch_json_status() {
     -H "Accept: application/json"
   )
 
-  if [ -n "${VERSION_OVERRIDE_HEADER:-}" ]; then
-    curl_args+=(-H "$VERSION_OVERRIDE_HEADER")
-  fi
+  smoke_append_common_curl_headers curl_args
 
   curl "${curl_args[@]}" "${BASE_URL}${path}"
 }
+
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
   usage
