@@ -95,13 +95,15 @@ with production-validation credentials.
 | `PRODUCTION_BASE_URL` | No | Yes | Public production origin used by smoke and canary guard probes. |
 | `SMOKE_ADMIN_EMAIL` / `SMOKE_ADMIN_PASSWORD` | Yes | Yes | Dedicated admin dashboard user for authenticated smoke tests. |
 | `SMOKE_AGENT_EMAIL` / `SMOKE_AGENT_PASSWORD` | No | Yes | Dedicated agent dashboard user for the full production authenticated smoke suite. |
-| `SMOKE_TURNSTILE_RESPONSE` | Optional | Optional | Turnstile response token for `/api/login` when Turnstile is enabled. Use Cloudflare test keys or a solved token. |
+| `SMOKE_TURNSTILE_RESPONSE` | Optional | No | Not used in production CI. Staging/local automated smoke uses Cloudflare test keys with the documented test response via `AUTH_SMOKE_TURNSTILE_MODE=test`. |
 
-Staging deploy sets `AUTH_SMOKE_ROLE=admin` and `AUTH_SMOKE_OPTIONAL=true`: it exercises
+Staging deploy sets `AUTH_SMOKE_ROLE=admin`, `AUTH_SMOKE_OPTIONAL=true`,
+`AUTH_SMOKE_TARGET_ENV=staging`, and `AUTH_SMOKE_TURNSTILE_MODE=test`: it exercises
 the admin login, `/admin`, and its dashboard-summary endpoint, but skips the suite if its
 admin smoke user is not yet provisioned. Agent credentials are deliberately not exposed to
-the staging job. Production deploy and `production-smoke-tests.yml` retain the default
-`AUTH_SMOKE_ROLE=all` suite and fail closed when either role's credentials are missing.
+the staging job. Production deploy uses public-only automated canary smoke plus a
+protected `production-canary-auth` manual real-browser gate after the 5% promotion.
+Production never runs curl authenticated smoke with test Turnstile responses.
 
 ### Canary guard variables (production environment)
 
@@ -219,14 +221,16 @@ observable, reversible application rollout.
 4. Recheck migration status and run post-migration database assertions.
 5. Build the Worker with production environment values.
 6. Upload a new Worker version with `wrangler versions upload`.
-7. Deploy it initially at 0% traffic and run version-targeted public **and**
-   authenticated smoke tests (`.github/scripts/run-canary-smoke.sh --auth
+7. Deploy it initially at 0% traffic and run version-targeted **public-only**
+   smoke tests (`.github/scripts/run-canary-smoke.sh --public-only
    --version-targeted`).
-8. Promote gradually: 5% → 25% → 50% → 100%. After each promotion run public
-   smoke tests, then `canary-observe-and-guard.sh` (HTTP probe failure-rate
-   guard with automatic `stable@100%` rollback). Authenticated smoke runs again
-   at 100%. Smoke failures also trigger automatic rollback via
-   `run-canary-smoke.sh`.
+8. Promote gradually: 5% → manual real-browser authentication gate
+   (`production-canary-auth`) → 25% → 50% → 100%. After each automated promotion
+   run public smoke tests, then `canary-observe-and-guard.sh` (HTTP probe
+   failure-rate guard with automatic `stable@100%` rollback). The manual gate
+   records operator attestation for `/dashboard`, `/admin`, and
+   `/admin/dashboard-summary.json` after a real browser login through `/login`.
+   Smoke failures trigger automatic rollback via `run-canary-smoke.sh`.
 9. Use Cloudflare version affinity during the gradual rollout so a user is not
    served HTML/assets or requests from inconsistent Worker versions.
 10. Retain the prior stable Worker version and record its version ID in the

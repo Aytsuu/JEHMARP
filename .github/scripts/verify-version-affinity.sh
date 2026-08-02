@@ -141,7 +141,7 @@ Rules are required on a custom zone route (not \`*.workers.dev\`).
 
    \`http.cookie contains "${AFFINITY_COOKIE_NAME}"\`
 
-4. **Operation**: Set dynamic header
+4. **Operation**: Set dynamic heade
    - Header name: \`Cloudflare-Workers-Version-Key\`
    - Value: \`http.request.cookies["${AFFINITY_COOKIE_NAME}"][0]\`
 

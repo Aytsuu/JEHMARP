@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  migrate-and-deploy:
-    name: Apply migrations and canary deploy
+  migrate-and-canary-5:
+    name: Migrate and canary through 5%
     runs-on: ubuntu-latest
     environment: production
 
@@ -34,11 +34,6 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
-      SMOKE_ADMIN_EMAIL: ${{ secrets.SMOKE_ADMIN_EMAIL }}
-      SMOKE_ADMIN_PASSWORD: ${{ secrets.SMOKE_ADMIN_PASSWORD }}
-      SMOKE_AGENT_EMAIL: ${{ secrets.SMOKE_AGENT_EMAIL }}
-      SMOKE_AGENT_PASSWORD: ${{ secrets.SMOKE_AGENT_PASSWORD }}
-      SMOKE_TURNSTILE_RESPONSE: ${{ secrets.SMOKE_TURNSTILE_RESPONSE }}
       CANARY_OBSERVE_SECONDS: ${{ vars.CANARY_OBSERVE_SECONDS }}
       CANARY_MAX_ERROR_RATE: ${{ vars.CANARY_MAX_ERROR_RATE }}
 
@@ -251,7 +246,7 @@ jobs:
           NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
           STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
           WORKER_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
-        run: bash .github/scripts/run-canary-smoke.sh --label "0% version-targeted upload" --auth --version-targeted
+        run: bash .github/scripts/run-canary-smoke.sh --label "0% version-targeted upload" --public-only --version-targeted
 
       - name: Observe canary health after 0% upload
         env:
@@ -272,7 +267,7 @@ jobs:
         env:
           NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
           STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
-        run: bash .github/scripts/run-canary-smoke.sh --label "5% promotion"
+        run: bash .github/scripts/run-canary-smoke.sh --label "5% promotion" --public-only
 
       - name: Observe canary health after 5% promotion
         env:
@@ -281,45 +276,148 @@ jobs:
           OBSERVATION_LABEL: after 5% promotion
         run: bash .github/scripts/canary-observe-and-guard.sh
 
+    outputs:
+      new_version_id: ${{ steps.worker_upload.outputs.new_version_id }}
+      stable_version_id: ${{ steps.stable_version.outputs.stable_version_id }}
+
+  manual-production-auth:
+    name: Manual production authentication gate
+    needs: migrate-and-canary-5
+    runs-on: ubuntu-latest
+    environment: production-canary-auth
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEW_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.new_version_id }}
+      STABLE_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.stable_version_id }}
+      WORKER_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.new_version_id }}
+      RUN_ID: ${{ github.run_id }}
+      CANARY_STAGE: after-5-percent
+      MANUAL_AUTH_ATTESTATION_RESULT: passed
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Record manual production authentication attestation
+        run: bash .github/scripts/manual-production-auth-gate.sh record
+
+  rollback-on-manual-auth-failure:
+    name: Roll back canary after manual auth gate failure
+    needs:
+      - migrate-and-canary-5
+      - manual-production-auth
+    if: ${{ always() && needs.migrate-and-canary-5.result == 'success' && needs.manual-production-auth.result != 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEW_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.new_version_id }}
+      STABLE_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.stable_version_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Roll back Worker traffic to stable version
+        run: bash .github/scripts/canary-rollback.sh "Manual production authentication gate was not approved."
+
+  canary-promote-remainder:
+    name: Promote canary through 100%
+    needs:
+      - migrate-and-canary-5
+      - manual-production-auth
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
+      PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PRODUCTION_BASE_URL: ${{ secrets.PRODUCTION_BASE_URL }}
+      CANARY_OBSERVE_SECONDS: ${{ vars.CANARY_OBSERVE_SECONDS }}
+      CANARY_MAX_ERROR_RATE: ${{ vars.CANARY_MAX_ERROR_RATE }}
+      NEW_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.new_version_id }}
+      STABLE_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.stable_version_id }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Resolve production base URL
+        run: |
+          set -euo pipefail
+          PRODUCTION_BASE_URL="$(bash .github/scripts/resolve-production-base-url.sh)"
+          echo "PRODUCTION_BASE_URL=${PRODUCTION_BASE_URL}" >> "$GITHUB_ENV"
+          echo "Using production base URL: ${PRODUCTION_BASE_URL}"
+
       - name: Promote canary to 25%
         run: |
           bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
-            "${{ steps.worker_upload.outputs.new_version_id }}" \
-            "${{ steps.stable_version.outputs.stable_version_id }}" \
+            "$NEW_VERSION_ID" \
+            "$STABLE_VERSION_ID" \
             25 75 \
             "Production canary: 25% traffic"
 
       - name: Smoke test after 25% promotion
-        env:
-          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
-          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
-        run: bash .github/scripts/run-canary-smoke.sh --label "25% promotion"
+        run: bash .github/scripts/run-canary-smoke.sh --label "25% promotion" --public-only
 
       - name: Observe canary health after 25% promotion
         env:
-          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
-          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
           OBSERVATION_LABEL: after 25% promotion
         run: bash .github/scripts/canary-observe-and-guard.sh
 
       - name: Promote canary to 50%
         run: |
           bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
-            "${{ steps.worker_upload.outputs.new_version_id }}" \
-            "${{ steps.stable_version.outputs.stable_version_id }}" \
+            "$NEW_VERSION_ID" \
+            "$STABLE_VERSION_ID" \
             50 50 \
             "Production canary: 50% traffic"
 
       - name: Smoke test after 50% promotion
-        env:
-          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
-          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
-        run: bash .github/scripts/run-canary-smoke.sh --label "50% promotion"
+        run: bash .github/scripts/run-canary-smoke.sh --label "50% promotion" --public-only
 
       - name: Observe canary health after 50% promotion
         env:
-          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
-          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
           OBSERVATION_LABEL: after 50% promotion
         run: bash .github/scripts/canary-observe-and-guard.sh
 
@@ -333,8 +431,8 @@ jobs:
           bash .github/scripts/verify-version-affinity.sh \
             --base-url "$PRODUCTION_BASE_URL" \
             --worker-name "$worker_name" \
-            --version-a "${{ steps.worker_upload.outputs.new_version_id }}" \
-            --version-b "${{ steps.stable_version.outputs.stable_version_id }}"
+            --version-a "$NEW_VERSION_ID" \
+            --version-b "$STABLE_VERSION_ID"
           affinity_rc=$?
           set -e
           if [ "$affinity_rc" -ne 0 ]; then
@@ -348,21 +446,16 @@ jobs:
       - name: Promote canary to 100%
         run: |
           bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
-            "${{ steps.worker_upload.outputs.new_version_id }}" \
-            "${{ steps.stable_version.outputs.stable_version_id }}" \
+            "$NEW_VERSION_ID" \
+            "$STABLE_VERSION_ID" \
             100 0 \
             "Production canary: 100% traffic"
 
       - name: Smoke test after full promotion
-        env:
-          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
-          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
-        run: bash .github/scripts/run-canary-smoke.sh --label "100% promotion" --auth
+        run: bash .github/scripts/run-canary-smoke.sh --label "100% promotion" --public-only
 
       - name: Observe canary health after 100% promotion
         env:
-          NEW_VERSION_ID: ${{ steps.worker_upload.outputs.new_version_id }}
-          STABLE_VERSION_ID: ${{ steps.stable_version.outputs.stable_version_id }}
           OBSERVATION_LABEL: after 100% promotion
         run: bash .github/scripts/canary-observe-and-guard.sh
 
@@ -374,9 +467,10 @@ jobs:
             echo "| Field | Value |"
             echo "| --- | --- |"
             echo "| Commit | \`${{ github.sha }}\` |"
-            echo "| New Worker version | \`${{ steps.worker_upload.outputs.new_version_id }}\` |"
-            echo "| Prior stable Worker version (rollback target) | \`${{ steps.stable_version.outputs.stable_version_id }}\` |"
-            echo "| Canary path | 0% → 5% → 25% → 50% → 100% |"
+            echo "| New Worker version | \`${NEW_VERSION_ID}\` |"
+            echo "| Prior stable Worker version (rollback target) | \`${STABLE_VERSION_ID}\` |"
+            echo "| Canary path | 0% → 5% → manual auth gate → 25% → 50% → 100% |"
+            echo "| Manual auth gate | after 5% promotion (\`production-canary-auth\`) |"
             echo ""
             echo "#### Immediate rollback"
             echo ""
@@ -384,8 +478,8 @@ jobs:
             echo ""
             echo '```bash'
             echo "bash .github/scripts/cloudflare-worker-canary.sh deploy-split \\"
-            echo "  \"${{ steps.stable_version.outputs.stable_version_id }}\" \\"
-            echo "  \"${{ steps.worker_upload.outputs.new_version_id }}\" \\"
+            echo "  \"${STABLE_VERSION_ID}\" \\"
+            echo "  \"${NEW_VERSION_ID}\" \\"
             echo "  100 0"
             echo '```'
             echo ""

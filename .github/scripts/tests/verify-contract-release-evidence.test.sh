@@ -18,7 +18,7 @@ write_fixture "contract-ready.sql" \
 -- lock-impact: high
 -- backfill: completed
 -- compatible-with: worker >= 2026.08.0
--- forward-repair: runbook/contract-repair
+-- forward-repair: runbook/contract-repai
 -- compatibility-window-complete: 2026-07-01
 -- legacy-usage-confirmed-zero: dashboard/zero-legacy
 -- backup-verified: github-actions-run-999001
@@ -31,7 +31,7 @@ write_fixture "contract-future-window.sql" \
 -- lock-impact: high
 -- backfill: completed
 -- compatible-with: worker >= 2026.08.0
--- forward-repair: runbook/contract-repair
+-- forward-repair: runbook/contract-repai
 -- compatibility-window-complete: 2099-01-01
 -- legacy-usage-confirmed-zero: dashboard/zero-legacy
 -- backup-verified: github-actions-run-999001
@@ -44,7 +44,7 @@ write_fixture "expand-pending.sql" \
 -- lock-impact: low
 -- backfill: none
 -- compatible-with: worker >= 2026.08.0
--- forward-repair: runbook/expand-repair
+-- forward-repair: runbook/expand-repai
 select 1;
 "
 
@@ -89,7 +89,7 @@ write_fixture "contract-bad-backup-ref.sql" \
 -- lock-impact: high
 -- backfill: completed
 -- compatible-with: worker >= 2026.08.0
--- forward-repair: runbook/contract-repair
+-- forward-repair: runbook/contract-repai
 -- compatibility-window-complete: 2026-07-01
 -- legacy-usage-confirmed-zero: dashboard/zero-legacy
 -- backup-verified: backup/other-run

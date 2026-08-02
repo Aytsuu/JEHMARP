@@ -78,7 +78,7 @@ baseline_compaction_collect_versions_from_sql_dir() {
 baseline_compaction_validate_checkpoint_directory() {
   local checkpoint_dir="$1"
   local archived_versions_path="$2"
-  local tmp_dir
+  local tmp_di
   local checkpoint_versions_file
   local archived_count
   local checkpoint_count
