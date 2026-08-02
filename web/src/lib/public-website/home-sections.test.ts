@@ -66,4 +66,41 @@ describe("home page section payloads", () => {
     expect(Array.isArray(section.content.items)).toBe(true);
     expect(section.content.items).toHaveLength(1);
   });
+
+  it("supports product category range section content", () => {
+    const section: PublicPageSectionRecord = {
+      id: "home-product-categories",
+      page_id: "home-page",
+      type: "product_category_range",
+      sort_order: 7,
+      status: "published",
+      content: {
+        heading: "Our Product Range",
+        subtitle: "Fresh categories available daily.",
+        categories: [
+          {
+            key: "chicken",
+            tag: "Fresh & Local Cut",
+            title: "Chicken",
+            description: "Prime chicken cuts.",
+            imageSrc: "/images/chicken_breast.png",
+            imageAlt: "Fresh Chicken Cuts",
+            shopCategory: "chicken",
+          },
+        ],
+      },
+    };
+
+    expect(section.type).toBe("product_category_range");
+    const categories = section.content.categories;
+    expect(Array.isArray(categories)).toBe(true);
+
+    if (!Array.isArray(categories)) {
+      throw new Error("Expected product category content to be an array.");
+    }
+
+    expect(categories[0]).toMatchObject({
+      imageSrc: "/images/chicken_breast.png",
+    });
+  });
 });

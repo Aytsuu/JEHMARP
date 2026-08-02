@@ -12,6 +12,7 @@ type Props = {
   displaySrc: string;
   imageClass?: string;
   popoverTitle?: string;
+  categoryIndex?: number;
   class?: string;
 };
 
@@ -22,6 +23,7 @@ const {
   displaySrc,
   imageClass,
   popoverTitle = "Replace Image",
+  categoryIndex,
   class: className,
 } = Astro.props;
 ---
@@ -32,6 +34,7 @@ const {
       class:list={["admin-content-editable", "admin-content-editable--image", className]}
       data-page-section-image-editable
       data-section-id={section.id}
+      {...categoryIndex !== undefined ? { "data-category-index": String(categoryIndex) } : {}}
     >
       <div class="admin-content-editable__surface">
         <img src={displaySrc} alt={imageAlt} class={imageClass} loading="lazy" decoding="async" />
@@ -59,6 +62,11 @@ const {
         <input type="hidden" name="sortOrder" value={section.sort_order} />
         <input type="hidden" name="status" value={section.status} />
         <input type="hidden" name="returnPath" value={contentEditing.returnPath} />
+        {
+          categoryIndex !== undefined ? (
+            <input type="hidden" name="categoryIndex" value={categoryIndex} />
+          ) : null
+        }
         <input
           type="hidden"
           name="currentContent"

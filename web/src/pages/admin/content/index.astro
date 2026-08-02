@@ -2,6 +2,7 @@
 import AdminContentPageLayout from "@/components/admin/AdminContentPageLayout.astro";
 import AdminContentWorkspace from "@/components/admin/AdminContentWorkspace.astro";
 import { loadAdminContentPreviewPage } from "@/lib/admin-dashboard/content-preview-page";
+import { ensureHomeAdminContentSections } from "@/lib/admin-dashboard/home-content-sections";
 import {
   getFeaturedPublicProducts,
   getPublicPageContent,
@@ -16,7 +17,9 @@ if (!preview.ready) {
 }
 
 const [homePreview, featuredProducts] = await Promise.all([
-  getPublicPageContent(Astro, "home", { bypassCache: true }),
+  ensureHomeAdminContentSections(
+    await getPublicPageContent(Astro, "home", { bypassCache: true }),
+  ),
   getFeaturedPublicProducts(Astro, 4),
 ]);
 ---

@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+AUTH_SCRIPT="${REPOSITORY_ROOT}/.github/scripts/authenticated-smoke.sh"
+SMOKE_LIB="${REPOSITORY_ROOT}/.github/scripts/smoke-lib.sh"
+
+# shellcheck source=/dev/null
+source "$SMOKE_LIB"
+
+header="$(smoke_build_version_override_header "jehmarp" "test-version-id")"
+expected='Cloudflare-Workers-Version-Overrides: jehmarp="test-version-id"'
+
+if [ "$header" != "$expected" ]; then
+  echo "Unexpected header: ${header}" >&2
+  exit 1
+fi
+
+if bash -n "$AUTH_SCRIPT"; then
+  :
+else
+  echo "authenticated-smoke.sh failed bash -n." >&2
+  exit 1
+fi
+
+if BASE_URL="https://example.test" bash "$AUTH_SCRIPT" 2>/dev/null; then
+  echo "Expected authenticated smoke to fail without credentials." >&2
+  exit 1
+fi
+
+if BASE_URL="https://example.test" AUTH_SMOKE_OPTIONAL=true bash "$AUTH_SCRIPT" >/tmp/auth-smoke-optional.out 2>&1; then
+  if ! grep -q "skipping authenticated smoke" /tmp/auth-smoke-optional.out; then
+    echo "Expected optional skip warning." >&2
+    exit 1
+  fi
+else
+  echo "Expected AUTH_SMOKE_OPTIONAL=true to exit 0 without credentials." >&2
+  exit 1
+fi
+
+# A staging deployment currently verifies only the admin dashboard. It must not
+# require agent credentials or make agent-route requests in that scoped mode.
+curl() {
+  local url="${!#}"
+
+  if [[ "$url" == *"/agent"* ]]; then
+    echo "Admin-only smoke unexpectedly requested an agent route: ${url}" >&2
+    return 99
+  fi
+
+  if [[ "$url" == *"/api/login" ]]; then
+    if [[ "$*" != *"Origin: https://example.test"* ]]; then
+      echo "Authenticated smoke login did not send a same-origin Origin header." >&2
+      return 98
+    fi
+    printf '302|https://example.test/dashboard'
+    return 0
+  fi
+
+  printf '200'
+}
+export -f curl
+
+if ! BASE_URL="https://example.test" \
+  AUTH_SMOKE_ROLE=admin \
+  SMOKE_ADMIN_EMAIL="admin@example.test" \
+  SMOKE_ADMIN_PASSWORD="admin-password" \
+  bash "$AUTH_SCRIPT" >/tmp/auth-smoke-admin-only.out 2>&1; then
+  cat /tmp/auth-smoke-admin-only.out >&2
+  echo "Expected admin-only authenticated smoke to pass without agent credentials." >&2
+  exit 1
+fi
+
+if ! grep -q "Authenticated admin smoke checks passed" /tmp/auth-smoke-admin-only.out; then
+  echo "Expected admin-only authenticated smoke success message." >&2
+  exit 1
+fi
+
+allowed=$((20 * 5 / 100))
+
+if [ "$allowed" != "1" ]; then
+  echo "Unexpected allowed failure threshold: ${allowed}" >&2
+  exit 1
+fi
+
+echo "authenticated-smoke helper tests passed."

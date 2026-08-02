@@ -22,21 +22,48 @@ Key foundation folders:
 
 ## Environment
 
-Copy `.env.example` to `.env`.
+Environment templates live in `web/`:
 
-Required variables:
+| File | Copy to | Use |
+| :-- | :-- | :-- |
+| `.env.local.example` | `.env` or `.env.local` | Local development (`npm run dev`) |
+| `.env.staging.example` | `.env.staging` | Staging Worker (`wrangler deploy --env staging`) |
+| `.env.production.example` | `.env.production` | Production Worker (`wrangler deploy`) |
+
+Staging / production (upload entire file to GitHub Environment secrets):
+
+```bash
+cp .env.staging.example .env.staging
+# fill staging values, then:
+gh secret set --env staging -f .env.staging
+
+cp .env.production.example .env.production
+# fill production values, then:
+gh secret set --env production -f .env.production
+```
+
+Each example file includes Worker runtime variables **and** CI secrets (Supabase CLI, Cloudflare, smoke users, staging KV). See `.env.example` for the full checklist and production Environment variables (`CANARY_*`, etc.) that are set with `gh variable set`, not `gh secret set -f`.
+
+In development, the app prefers `LOCAL_SUPABASE_*` and defaults to the local CLI stack at `http://127.0.0.1:54321` unless you override them. That keeps `npm run dev` off production even when hosted `PUBLIC_SUPABASE_*` values are present in `.env`.
+
+Required application variables (staging / production Worker; optional hosted reference locally):
 
 ```text
 PUBLIC_SUPABASE_URL=
 PUBLIC_SUPABASE_PUBLISHABLE_KEY=
 SUPABASE_SECRET_KEY=
-LOCAL_SUPABASE_URL=
-LOCAL_SUPABASE_PUBLISHABLE_KEY=
-LOCAL_SUPABASE_SECRET_KEY=
 PUBLIC_TURNSTILE_SITE_KEY=
 TURNSTILE_SECRET_KEY=
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
+```
+
+Local-only overrides:
+
+```text
+LOCAL_SUPABASE_URL=
+LOCAL_SUPABASE_PUBLISHABLE_KEY=
+LOCAL_SUPABASE_SECRET_KEY=
 ```
 
 Conditionally required variables:
@@ -50,8 +77,6 @@ RESELLER_ADMIN_EMAIL=
 Use the conditional variables when the reseller application email workflow is enabled.
 
 Keep all server-only values in non-public variables. Only `PUBLIC_*` values belong in browser-exposed configuration.
-
-In development, the app prefers the local Supabase stack automatically and will use the local CLI defaults at `http://127.0.0.1:55421` unless you override them with `LOCAL_SUPABASE_*`. That prevents `npm run dev` from pointing at production even when `.env` still contains hosted project credentials.
 
 ## Local Supabase Data
 

@@ -30,28 +30,44 @@ function getCurrentContentInput(form: HTMLFormElement) {
   return form.querySelector<HTMLInputElement>('input[name="currentContent"]');
 }
 
+function getCategoryIndex(form: HTMLFormElement): string | null {
+  return form.querySelector<HTMLInputElement>('input[name="categoryIndex"]')?.value?.trim() ?? null;
+}
+
 function findTextEditableWrapper(form: HTMLFormElement): HTMLElement | null {
   const sectionId = form.querySelector<HTMLInputElement>('input[name="sectionId"]')?.value?.trim();
   const fieldKey = form.querySelector<HTMLInputElement>('input[name="contentField"]')?.value?.trim();
+  const categoryIndex = getCategoryIndex(form);
 
   if (!sectionId || !fieldKey) {
     return null;
   }
 
+  const categorySelector =
+    categoryIndex !== null
+      ? `[data-category-index="${categoryIndex}"]`
+      : ":not([data-category-index])";
+
   return document.querySelector<HTMLElement>(
-    `[data-page-section-editable][data-section-id="${sectionId}"][data-field-key="${fieldKey}"]`,
+    `[data-page-section-editable][data-section-id="${sectionId}"][data-field-key="${fieldKey}"]${categorySelector}`,
   );
 }
 
 function findImageEditableWrapper(form: HTMLFormElement): HTMLElement | null {
   const sectionId = form.querySelector<HTMLInputElement>('input[name="sectionId"]')?.value?.trim();
+  const categoryIndex = getCategoryIndex(form);
 
   if (!sectionId) {
     return null;
   }
 
+  const categorySelector =
+    categoryIndex !== null
+      ? `[data-category-index="${categoryIndex}"]`
+      : ":not([data-category-index])";
+
   return document.querySelector<HTMLElement>(
-    `[data-page-section-image-editable][data-section-id="${sectionId}"]`,
+    `[data-page-section-image-editable][data-section-id="${sectionId}"]${categorySelector}`,
   );
 }
 
@@ -91,7 +107,18 @@ export function syncPageSectionTextPreview(wrapper: HTMLElement, value: string) 
 }
 
 function syncPageSectionImagePreview(wrapper: HTMLElement, content: Record<string, unknown>) {
-  const imageSrc = content.imageSrc;
+  const categoryIndex = wrapper.dataset.categoryIndex;
+  let imageSrc: unknown = content.imageSrc;
+
+  if (categoryIndex !== undefined) {
+    const categories = Array.isArray(content.categories) ? content.categories : [];
+    const category = categories[Number(categoryIndex)];
+    imageSrc =
+      category && typeof category === "object"
+        ? (category as Record<string, unknown>).imageSrc
+        : undefined;
+  }
+
   if (typeof imageSrc !== "string" || imageSrc.trim().length === 0) {
     return;
   }
@@ -226,9 +253,20 @@ function applyOptimisticPreview(form: HTMLFormElement, formData: FormData) {
 
 function syncPreviewFromSectionContent(form: HTMLFormElement, content: Record<string, unknown>) {
   const fieldKey = form.querySelector<HTMLInputElement>('input[name="contentField"]')?.value?.trim();
+  const categoryIndex = getCategoryIndex(form);
 
   if (fieldKey) {
-    const value = content[fieldKey];
+    let value: unknown = content[fieldKey];
+
+    if (categoryIndex !== null) {
+      const categories = Array.isArray(content.categories) ? content.categories : [];
+      const category = categories[Number(categoryIndex)];
+      value =
+        category && typeof category === "object"
+          ? (category as Record<string, unknown>)[fieldKey]
+          : undefined;
+    }
+
     const wrapper = findTextEditableWrapper(form);
     if (wrapper && typeof value === "string") {
       syncPageSectionTextPreview(wrapper, value);

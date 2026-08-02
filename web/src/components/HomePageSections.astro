@@ -10,6 +10,10 @@ import type {
 } from "@/lib/public-website/content";
 import type { AdminContentEditingContext } from "@/lib/public-website/admin-content-editing";
 import { getAboutSectionImage, getWhyChooseSectionImage } from "@/lib/public-website/home-section-image";
+import {
+  getProductCategoryImage,
+  normalizeProductCategories,
+} from "@/lib/public-website/home-product-categories";
 import { normalizeTaglineItems } from "@/lib/public-website/home-taglines";
 import {
   getFaqDescription,
@@ -42,6 +46,9 @@ const shopInfoSource = sections.find(
   (section) => section.type === "images_gallery",
 );
 const whyChoose = sections.find((section) => section.type === "why_choose");
+const productCategoryRange = sections.find(
+  (section) => section.type === "product_category_range",
+);
 const faq = sections.find((section) => section.type === "faq");
 
 const aboutHeading = stringValue(about?.content.heading) ?? "The Meatshop";
@@ -49,6 +56,7 @@ const aboutSummary = stringValue(about?.content.summary);
 const aboutBody = stringValue(about?.content.body);
 const aboutImage = getAboutSectionImage(about?.content);
 const whyChooseImage = getWhyChooseSectionImage(whyChoose?.content);
+const productCategoryContent = normalizeProductCategories(productCategoryRange?.content);
 const whyChooseHeading =
   stringValue(whyChoose?.content.heading) ?? "Why Choose JEHMARP";
 const missionText = stringValue(missionVisionCoreValues?.content.mission) ?? "";
@@ -406,90 +414,140 @@ const featuredProductsList =
     <div class="home-container">
       <section aria-labelledby="home-category-range">
         <div class="category-range__header">
-          <h2 id="home-category-range" class="category-range__title">
-            Our Product Range
-          </h2>
-          <p class="category-range__subtitle">
-            At JEHMARP, we have a wide variety of options to suit different
-            cooking styles and preferences. Our collection includes:
-          </p>
+          {
+            contentEditing && productCategoryRange ? (
+              <AdminContentEditable
+                contentEditing={contentEditing}
+                section={productCategoryRange}
+                fieldKey="heading"
+                fieldLabel="Product range heading"
+                value={productCategoryContent.heading}
+              >
+                <h2 id="home-category-range" class="category-range__title">
+                  {productCategoryContent.heading}
+                </h2>
+              </AdminContentEditable>
+            ) : (
+              <h2 id="home-category-range" class="category-range__title">
+                {productCategoryContent.heading}
+              </h2>
+            )
+          }
+          {
+            contentEditing && productCategoryRange ? (
+              <AdminContentEditable
+                contentEditing={contentEditing}
+                section={productCategoryRange}
+                fieldKey="subtitle"
+                fieldLabel="Product range subtitle"
+                value={productCategoryContent.subtitle}
+                multiline
+              >
+                <p class="category-range__subtitle">
+                  {productCategoryContent.subtitle}
+                </p>
+              </AdminContentEditable>
+            ) : (
+              <p class="category-range__subtitle">
+                {productCategoryContent.subtitle}
+              </p>
+            )
+          }
         </div>
 
         <div class="category-range__grid">
-          <article class="category-range-card category-range-card--chicken">
-            <div class="category-range-card__image-container">
-              <img
-                src="/images/chicken_breast.png"
-                alt="Fresh Chicken Cuts"
-                class="category-range-card__image"
-                loading="lazy"
-              />
-            </div>
-            <div class="category-range-card__body">
-              <span class="category-range-card__tag">Fresh & Local Cut</span>
-              <h3 class="category-range-card__title">Chicken</h3>
-              <p class="category-range-card__desc">
-                From fresh whole chicken to prime cuts, ideal for daily family
-                meals.
-              </p>
-              <a
-                href={linkHref("/shop?category=chicken")}
-                class="category-range-card__button"
-              >
-                Show more
-              </a>
-            </div>
-          </article>
+          {
+            productCategoryContent.categories.map((category, categoryIndex) => {
+              const categoryImage = getProductCategoryImage(category);
 
-          <article class="category-range-card category-range-card--pork">
-            <div class="category-range-card__image-container">
-              <img
-                src="/images/pork_belly.png"
-                alt="Premium Pork Cuts"
-                class="category-range-card__image"
-                loading="lazy"
-              />
-            </div>
-            <div class="category-range-card__body">
-              <span class="category-range-card__tag">Premium Choice Cut</span>
-              <h3 class="category-range-card__title">Pork</h3>
-              <p class="category-range-card__desc">
-                Juicy belly, chops, and ground pork carefully prepared for any
-                recipe.
-              </p>
-              <a
-                href={linkHref("/shop?category=pork")}
-                class="category-range-card__button"
-              >
-                Show more
-              </a>
-            </div>
-          </article>
-
-          <article class="category-range-card category-range-card--egg">
-            <div class="category-range-card__image-container">
-              <img
-                src="/images/fresh_eggs.png"
-                alt="Farm Fresh Eggs"
-                class="category-range-card__image"
-                loading="lazy"
-              />
-            </div>
-            <div class="category-range-card__body">
-              <span class="category-range-card__tag">Farm Fresh Daily</span>
-              <h3 class="category-range-card__title">Egg</h3>
-              <p class="category-range-card__desc">
-                Nutrient-rich, farm-fresh eggs gathered daily for top quality &
-                taste.
-              </p>
-              <a
-                href={linkHref("/shop?category=egg")}
-                class="category-range-card__button"
-              >
-                Show more
-              </a>
-            </div>
-          </article>
+              return (
+                <article
+                  class={`category-range-card category-range-card--${category.key}`}
+                >
+                  <div class="category-range-card__image-container">
+                    {
+                      contentEditing && productCategoryRange ? (
+                        <AdminContentEditableImage
+                          contentEditing={contentEditing}
+                          section={productCategoryRange}
+                          imageSrc={categoryImage.imageSrc}
+                          imageAlt={categoryImage.imageAlt}
+                          displaySrc={categoryImage.displaySrc}
+                          imageClass="category-range-card__image"
+                          popoverTitle={`Replace ${category.title} image`}
+                          categoryIndex={categoryIndex}
+                        />
+                      ) : (
+                        <img
+                          src={categoryImage.displaySrc}
+                          alt={categoryImage.imageAlt}
+                          class="category-range-card__image"
+                          loading="lazy"
+                        />
+                      )
+                    }
+                  </div>
+                  <div class="category-range-card__body">
+                    {
+                      contentEditing && productCategoryRange ? (
+                        <AdminContentEditable
+                          contentEditing={contentEditing}
+                          section={productCategoryRange}
+                          fieldKey="tag"
+                          fieldLabel={`${category.title} tag`}
+                          value={category.tag}
+                          categoryIndex={categoryIndex}
+                        >
+                          <span class="category-range-card__tag">{category.tag}</span>
+                        </AdminContentEditable>
+                      ) : (
+                        <span class="category-range-card__tag">{category.tag}</span>
+                      )
+                    }
+                    {
+                      contentEditing && productCategoryRange ? (
+                        <AdminContentEditable
+                          contentEditing={contentEditing}
+                          section={productCategoryRange}
+                          fieldKey="title"
+                          fieldLabel={`${category.title} title`}
+                          value={category.title}
+                          categoryIndex={categoryIndex}
+                        >
+                          <h3 class="category-range-card__title">{category.title}</h3>
+                        </AdminContentEditable>
+                      ) : (
+                        <h3 class="category-range-card__title">{category.title}</h3>
+                      )
+                    }
+                    {
+                      contentEditing && productCategoryRange ? (
+                        <AdminContentEditable
+                          contentEditing={contentEditing}
+                          section={productCategoryRange}
+                          fieldKey="description"
+                          fieldLabel={`${category.title} description`}
+                          value={category.description}
+                          multiline
+                          categoryIndex={categoryIndex}
+                        >
+                          <p class="category-range-card__desc">{category.description}</p>
+                        </AdminContentEditable>
+                      ) : (
+                        <p class="category-range-card__desc">{category.description}</p>
+                      )
+                    }
+                    <a
+                      href={linkHref(`/shop?category=${category.shopCategory}`)}
+                      class="category-range-card__button"
+                    >
+                      Show more
+                    </a>
+                  </div>
+                </article>
+              );
+            })
+          }
         </div>
       </section>
     </div>

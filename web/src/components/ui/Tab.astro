@@ -1,0 +1,28 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+type Props = {
+  target: string;
+  active?: boolean;
+} & HTMLAttributes<"button">;
+
+const {
+  target,
+  active = false,
+  class: className,
+  type = "button",
+  ...rest
+} = Astro.props;
+---
+
+<button
+  type={type}
+  role="tab"
+  class:list={["ui-tab", active && "is-active", className]}
+  data-ui-tab-trigger
+  data-tab-target={target}
+  aria-selected={active ? "true" : "false"}
+  {...rest}
+>
+  <slot />
+</button>

@@ -1,9 +1,13 @@
 ---
 import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
 import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
+import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Tab from "@/components/ui/Tab.astro";
+import TabPanel from "@/components/ui/TabPanel.astro";
+import Tabs from "@/components/ui/Tabs.astro";
 import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
 import {
@@ -213,10 +217,7 @@ const timelineItems = [
     />
   </div>
 
-  <div
-    class="agent-record-content flex max-w-full flex-col gap-4 md:gap-8"
-    data-order-detail-tabs
-  >
+  <div class="agent-record-content flex max-w-full flex-col gap-4 md:gap-8">
     <div class="grid grid-cols-1 gap-3 md:gap-4">
       <div class="detail-field">
         <AgentOrderCalculationSummary
@@ -297,54 +298,39 @@ const timelineItems = [
       </div>
     </div>
 
-    <div
-      class="agent-order-tabs flex border-b border-gray-200 md:hidden"
-      role="tablist"
-      aria-label="Order detail sections"
+    <Tabs
+      ariaLabel="Order detail sections"
+      listClass="ui-tabs__list--stretch md:hidden"
+      panelsClass="agent-order-tab-panels flex flex-col gap-8"
     >
-      <button
-        type="button"
-        class:list={["agent-order-tab", isOrderDetailTabActive("products") && "is-active"]}
-        data-order-detail-tab-trigger
-        data-tab-target="products"
-        role="tab"
-        aria-selected={isOrderDetailTabActive("products") ? "true" : "false"}
+      <Tab
+        slot="tabs"
+        target="products"
+        active={isOrderDetailTabActive("products")}
       >
         Products ({productCount})
-      </button>
-      <button
-        type="button"
-        class:list={[
-          "agent-order-tab",
-          isOrderDetailTabActive("payment-record") && "is-active",
-        ]}
-        data-order-detail-tab-trigger
-        data-tab-target="payment-record"
-        role="tab"
-        aria-selected={isOrderDetailTabActive("payment-record") ? "true" : "false"}
+      </Tab>
+      <Tab
+        slot="tabs"
+        target="payment-record"
+        active={isOrderDetailTabActive("payment-record")}
       >
         Payment
-      </button>
-      <button
-        type="button"
-        class:list={["agent-order-tab", isOrderDetailTabActive("timeline") && "is-active"]}
-        data-order-detail-tab-trigger
-        data-tab-target="timeline"
-        role="tab"
-        aria-selected={isOrderDetailTabActive("timeline") ? "true" : "false"}
+      </Tab>
+      <Tab
+        slot="tabs"
+        target="timeline"
+        active={isOrderDetailTabActive("timeline")}
       >
         Timeline
-      </button>
-    </div>
+      </Tab>
 
-    <div class="agent-order-tab-panels flex flex-col gap-8">
-      <section
-        class:list={[
-          "record-section agent-order-tab-panel",
-          isOrderDetailTabActive("products") && "is-active",
-        ]}
-        data-order-detail-tab-panel="products"
-        hidden={!isOrderDetailTabActive("products")}
+      <TabPanel
+        slot="panels"
+        target="products"
+        active={isOrderDetailTabActive("products")}
+        variant="plain"
+        class="record-section agent-order-tab-panel"
         aria-label={`Products (${productCount})`}
       >
         <h2 class="record-section__title">Products</h2>
@@ -417,8 +403,8 @@ const timelineItems = [
                 }
               </div>
 
-              <div class="order-record-table-wrap hidden md:block">
-                <table class="agent-customers-table agent-order-products-table">
+              <DashboardTableBoard class="dashboard-table-board--record-detail hidden md:flex">
+                <table class="agent-customers-table agent-order-products-table dashboard-table">
                   <thead>
                     <tr>
                       <DashboardTableNumberHeader />
@@ -472,19 +458,18 @@ const timelineItems = [
                     }
                   </tbody>
                 </table>
-              </div>
+              </DashboardTableBoard>
             </>
           )
         }
-      </section>
+      </TabPanel>
 
-      <section
-        class:list={[
-          "record-section agent-order-tab-panel",
-          isOrderDetailTabActive("payment-record") && "is-active",
-        ]}
-        data-order-detail-tab-panel="payment-record"
-        hidden={!isOrderDetailTabActive("payment-record")}
+      <TabPanel
+        slot="panels"
+        target="payment-record"
+        active={isOrderDetailTabActive("payment-record")}
+        variant="plain"
+        class="record-section agent-order-tab-panel"
         aria-label="Payment record"
       >
         <h2 class="record-section__title">Payment record</h2>
@@ -629,15 +614,14 @@ const timelineItems = [
             </ul>
           )
         }
-      </section>
+      </TabPanel>
 
-      <section
-        class:list={[
-          "record-section agent-order-tab-panel",
-          isOrderDetailTabActive("timeline") && "is-active",
-        ]}
-        data-order-detail-tab-panel="timeline"
-        hidden={!isOrderDetailTabActive("timeline")}
+      <TabPanel
+        slot="panels"
+        target="timeline"
+        active={isOrderDetailTabActive("timeline")}
+        variant="plain"
+        class="record-section agent-order-tab-panel"
         aria-label="Order timeline"
       >
         <h2 class="record-section__title">Timeline</h2>
@@ -660,8 +644,8 @@ const timelineItems = [
             </ul>
           )
         }
-      </section>
-    </div>
+      </TabPanel>
+    </Tabs>
   </div>
 </AgentRecordPageLayout>
 
@@ -807,27 +791,6 @@ const timelineItems = [
     color: #111827;
   }
 
-  .agent-order-tab {
-    flex: 1;
-    min-height: 2.5rem;
-    margin-bottom: -1px;
-    border: 0;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    background: transparent;
-    color: #6b7280;
-    padding: 0.55rem 0.75rem;
-    font: inherit;
-    font-size: 0.88rem;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .agent-order-tab.is-active {
-    border-bottom-color: var(--color-brand-red);
-    color: var(--color-brand-red);
-  }
-
   .agent-order-tab-panel[hidden] {
     display: none;
   }
@@ -840,17 +803,9 @@ const timelineItems = [
     white-space: nowrap;
   }
 
-  .order-record-table-wrap {
-    overflow-x: auto;
-    border: 1px solid #d1d5db;
-    border-radius: 0.75rem;
-  }
-
   .agent-customers-table {
     table-layout: fixed;
     width: 100%;
-    margin: 0;
-    border: 0;
   }
 
   .agent-customers-table th,

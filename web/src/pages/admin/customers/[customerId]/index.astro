@@ -21,6 +21,7 @@ import {
   filterCustomerSalesRows,
   paginateCustomerRecords,
   parseCustomerRecordTab,
+  type CustomerRecordTab,
 } from "@/lib/admin-dashboard/customer-record";
 import {
   agentHasDistributionOrders,
@@ -72,6 +73,12 @@ if (customerId) {
 const activeTab = parseCustomerRecordTab(Astro.url.searchParams.get("tab"));
 const orderFilters = parseAdminOrderFilters(Astro.url);
 const pagination = parseAdminPagination(Astro.url);
+
+function paginateCustomerTabRecords<T>(tab: CustomerRecordTab, records: T[]) {
+  const page = activeTab === tab ? pagination.page : 1;
+  return paginateCustomerRecords(records, page, pagination.pageSize);
+}
+
 const customerOrders = data.orders.filter(
   (order) => order.customer_id === customerId,
 );
@@ -114,38 +121,22 @@ const processingReceivableTotal =
 const estimatedInvoiceTotal = customerEstimatedInvoiceTotal(customerOrders);
 const receivableSegments = buildCustomerReceivableSegments(customerOrders);
 const filteredOrders = filterCustomerOrders(customerOrders, orderFilters);
-const paginatedOrders = paginateCustomerRecords(
-  filteredOrders,
-  pagination.page,
-  pagination.pageSize,
-);
+const paginatedOrders = paginateCustomerTabRecords("orders", filteredOrders);
 const salesRows = filterCustomerSalesRows(
   buildCustomerSalesRows(customerOrders, customerReturnTo),
   orderFilters,
 );
-const paginatedSales = paginateCustomerRecords(
-  salesRows,
-  pagination.page,
-  pagination.pageSize,
-);
+const paginatedSales = paginateCustomerTabRecords("sales", salesRows);
 const invoiceRows = filterCustomerInvoiceRows(
   buildCustomerInvoiceRows(customerOrders, customerReturnTo),
   orderFilters.search,
 );
-const paginatedInvoices = paginateCustomerRecords(
-  invoiceRows,
-  pagination.page,
-  pagination.pageSize,
-);
+const paginatedInvoices = paginateCustomerTabRecords("invoices", invoiceRows);
 const paymentRows = filterCustomerPaymentRows(
   buildCustomerPaymentRows(customerOrders, customerReturnTo),
   orderFilters.search,
 );
-const paginatedPayments = paginateCustomerRecords(
-  paymentRows,
-  pagination.page,
-  pagination.pageSize,
-);
+const paginatedPayments = paginateCustomerTabRecords("payments", paymentRows);
 const filterQuery = mergeAdminPaginationQuery(
   serializeAdminOrderFilters(orderFilters),
   pagination,

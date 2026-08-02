@@ -3,6 +3,9 @@ import AdminCustomerRecordTabTable from "@/components/admin/AdminCustomerRecordT
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import AlertDialog from "@/components/ui/AlertDialog.astro";
 import Sheet from "@/components/ui/Sheet.astro";
+import Tab from "@/components/ui/Tab.astro";
+import TabPanel from "@/components/ui/TabPanel.astro";
+import Tabs from "@/components/ui/Tabs.astro";
 import type {
   AdminAgent,
   AdminCustomer,
@@ -68,7 +71,6 @@ const {
   isPromotedCustomer,
   hasAgentDistributionOrders,
   activeTab,
-  filterQuery,
   orderFilters,
   orderRows,
   ordersPagination,
@@ -98,12 +100,6 @@ const receivableBarTotal = receivableSegments.reduce(
 );
 const customerBasePath = `/admin/customers/${customer.id}`;
 
-function tabHref(tab: CustomerRecordTab) {
-  const params = new URLSearchParams(filterQuery);
-  params.set("tab", tab);
-  params.delete("page");
-  return `${customerBasePath}?${params.toString()}`;
-}
 ---
 
 <div
@@ -403,140 +399,112 @@ function tabHref(tab: CustomerRecordTab) {
     </ul>
   </section>
 
-  <div class="customer-record-tabs">
-    <nav
-      class="customer-record-tabs__nav"
-      aria-label="Customer record sections"
+  <Tabs
+    ariaLabel="Customer record sections"
+    defaultTab="orders"
+    clearPageOnChange
+    omitDefaultTabParam
+  >
+    <Tab slot="tabs" target="orders" active={activeTab === "orders"}>Orders</Tab>
+    <Tab slot="tabs" target="sales" active={activeTab === "sales"}>Sales</Tab>
+    <Tab slot="tabs" target="invoices" active={activeTab === "invoices"}>Invoices</Tab>
+    <Tab slot="tabs" target="payments" active={activeTab === "payments"}>
+      Payment records
+    </Tab>
+
+    <TabPanel
+      slot="panels"
+      target="orders"
+      active={activeTab === "orders"}
+      variant="plain"
+      aria-label="Customer orders"
     >
-      <a
-        href={tabHref("orders")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "orders" && "is-active",
-        ]}
-      >
-        Orders
-      </a>
-      <a
-        href={tabHref("sales")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "sales" && "is-active",
-        ]}
-      >
-        Sales
-      </a>
-      <a
-        href={tabHref("invoices")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "invoices" && "is-active",
-        ]}
-      >
-        Invoices
-      </a>
-      <a
-        href={tabHref("payments")}
-        class:list={[
-          "customer-record-tabs__link",
-          activeTab === "payments" && "is-active",
-        ]}
-      >
-        Payment records
-      </a>
-    </nav>
+      <AdminCustomerRecordTabTable
+        tab="orders"
+        customerBasePath={customerBasePath}
+        customerReturnTo={customerReturnTo}
+        orderFilters={orderFilters}
+        orderRows={orderRows}
+        ordersPagination={ordersPagination}
+        salesRows={salesRows}
+        salesPagination={salesPagination}
+        invoiceRows={invoiceRows}
+        invoicesPagination={invoicesPagination}
+        paymentRows={paymentRows}
+        paymentsPagination={paymentsPagination}
+        showOrdersToolbarActions
+      />
+    </TabPanel>
 
-    {
-      activeTab === "orders" && (
-        <section class="customer-record-tab-panel" aria-label="Customer orders">
-          <AdminCustomerRecordTabTable
-            tab="orders"
-            customerBasePath={customerBasePath}
-            customerReturnTo={customerReturnTo}
-            orderFilters={orderFilters}
-            orderRows={orderRows}
-            ordersPagination={ordersPagination}
-            salesRows={salesRows}
-            salesPagination={salesPagination}
-            invoiceRows={invoiceRows}
-            invoicesPagination={invoicesPagination}
-            paymentRows={paymentRows}
-            paymentsPagination={paymentsPagination}
-            showOrdersToolbarActions
-          />
-        </section>
-      )
-    }
+    <TabPanel
+      slot="panels"
+      target="sales"
+      active={activeTab === "sales"}
+      variant="plain"
+      aria-label="Customer sales"
+    >
+      <AdminCustomerRecordTabTable
+        tab="sales"
+        customerBasePath={customerBasePath}
+        customerReturnTo={customerReturnTo}
+        orderFilters={orderFilters}
+        orderRows={orderRows}
+        ordersPagination={ordersPagination}
+        salesRows={salesRows}
+        salesPagination={salesPagination}
+        invoiceRows={invoiceRows}
+        invoicesPagination={invoicesPagination}
+        paymentRows={paymentRows}
+        paymentsPagination={paymentsPagination}
+      />
+    </TabPanel>
 
-    {
-      activeTab === "sales" && (
-        <section class="customer-record-tab-panel" aria-label="Customer sales">
-          <AdminCustomerRecordTabTable
-            tab="sales"
-            customerBasePath={customerBasePath}
-            customerReturnTo={customerReturnTo}
-            orderFilters={orderFilters}
-            orderRows={orderRows}
-            ordersPagination={ordersPagination}
-            salesRows={salesRows}
-            salesPagination={salesPagination}
-            invoiceRows={invoiceRows}
-            invoicesPagination={invoicesPagination}
-            paymentRows={paymentRows}
-            paymentsPagination={paymentsPagination}
-          />
-        </section>
-      )
-    }
+    <TabPanel
+      slot="panels"
+      target="invoices"
+      active={activeTab === "invoices"}
+      variant="plain"
+      aria-label="Customer invoices"
+    >
+      <AdminCustomerRecordTabTable
+        tab="invoices"
+        customerBasePath={customerBasePath}
+        customerReturnTo={customerReturnTo}
+        orderFilters={orderFilters}
+        orderRows={orderRows}
+        ordersPagination={ordersPagination}
+        salesRows={salesRows}
+        salesPagination={salesPagination}
+        invoiceRows={invoiceRows}
+        invoicesPagination={invoicesPagination}
+        paymentRows={paymentRows}
+        paymentsPagination={paymentsPagination}
+      />
+    </TabPanel>
 
-    {
-      activeTab === "invoices" && (
-        <section
-          class="customer-record-tab-panel"
-          aria-label="Customer invoices"
-        >
-          <AdminCustomerRecordTabTable
-            tab="invoices"
-            customerBasePath={customerBasePath}
-            customerReturnTo={customerReturnTo}
-            orderFilters={orderFilters}
-            orderRows={orderRows}
-            ordersPagination={ordersPagination}
-            salesRows={salesRows}
-            salesPagination={salesPagination}
-            invoiceRows={invoiceRows}
-            invoicesPagination={invoicesPagination}
-            paymentRows={paymentRows}
-            paymentsPagination={paymentsPagination}
-          />
-        </section>
-      )
-    }
-
-    {
-      activeTab === "payments" && (
-        <section
-          class="customer-record-tab-panel"
-          aria-label="Customer payment records"
-        >
-          <AdminCustomerRecordTabTable
-            tab="payments"
-            customerBasePath={customerBasePath}
-            customerReturnTo={customerReturnTo}
-            orderFilters={orderFilters}
-            orderRows={orderRows}
-            ordersPagination={ordersPagination}
-            salesRows={salesRows}
-            salesPagination={salesPagination}
-            invoiceRows={invoiceRows}
-            invoicesPagination={invoicesPagination}
-            paymentRows={paymentRows}
-            paymentsPagination={paymentsPagination}
-          />
-        </section>
-      )
-    }
-  </div>
+    <TabPanel
+      slot="panels"
+      target="payments"
+      active={activeTab === "payments"}
+      variant="plain"
+      aria-label="Customer payment records"
+    >
+      <AdminCustomerRecordTabTable
+        tab="payments"
+        customerBasePath={customerBasePath}
+        customerReturnTo={customerReturnTo}
+        orderFilters={orderFilters}
+        orderRows={orderRows}
+        ordersPagination={ordersPagination}
+        salesRows={salesRows}
+        salesPagination={salesPagination}
+        invoiceRows={invoiceRows}
+        invoicesPagination={invoicesPagination}
+        paymentRows={paymentRows}
+        paymentsPagination={paymentsPagination}
+      />
+    </TabPanel>
+  </Tabs>
 
   <Sheet id="customer-record-payment-sheet" width="42rem">
     <div slot="header" class="order-create-sheet__header-copy">
@@ -1121,28 +1089,6 @@ function tabHref(tab: CustomerRecordTab) {
     height: 0.65rem;
     border-radius: 9999px;
     flex-shrink: 0;
-  }
-
-  .customer-record-tabs__nav {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  .customer-record-tabs__link {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.7rem 0.95rem;
-    border-bottom: 2px solid transparent;
-    color: #6b7280;
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .customer-record-tabs__link.is-active {
-    color: #111827;
-    border-bottom-color: var(--color-brand-red);
   }
 
   @media (max-width: 960px) {

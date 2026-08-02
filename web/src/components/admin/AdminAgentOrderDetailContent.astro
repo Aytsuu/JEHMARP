@@ -217,7 +217,12 @@ const defaultTotalCommission = commissionBreakdown.reduce(
               <dd>
                 {
                   agentDetailsHref ? (
-                    <a href={agentDetailsHref}>{agentName}</a>
+                    <a
+                      class="agent-order-detail-stat__agent-link"
+                      href={agentDetailsHref}
+                    >
+                      {agentName}
+                    </a>
                   ) : (
                     agentName
                   )

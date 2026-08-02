@@ -5,6 +5,7 @@ import {
 import { initDashboardCellPopovers } from "@/lib/client/dashboard-cell-popover";
 import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
 import { initDashboardSheets } from "@/lib/client/dashboard-sheet";
+import { initRecordPageTabs } from "@/lib/client/record-page-tabs";
 
 type SelectedOrderSummary = {
   id: string;
@@ -12,8 +13,6 @@ type SelectedOrderSummary = {
   date: string;
   amount: string;
 };
-
-type CustomerRecordTab = "orders" | "sales" | "invoices" | "payments";
 
 const CUSTOMER_PAYMENT_SHEET_ID = "customer-record-payment-sheet";
 
@@ -29,15 +28,6 @@ function getCustomerRecordSection() {
 
 function getCustomerPaymentSheet() {
   return document.getElementById(CUSTOMER_PAYMENT_SHEET_ID);
-}
-
-function getActiveCustomerRecordTab(): CustomerRecordTab {
-  const tab = new URLSearchParams(window.location.search).get("tab");
-  if (tab === "sales" || tab === "invoices" || tab === "payments") {
-    return tab;
-  }
-
-  return "orders";
 }
 
 function getOrderCheckboxes(section: HTMLElement) {
@@ -197,70 +187,74 @@ function initCustomerRecordFragmentTables(section: HTMLElement) {
 
   const pagePath = `/admin/customers/${customerId}`;
   const fragmentPath = `${pagePath}/fragment`;
-  const activeTab = getActiveCustomerRecordTab();
 
-  if (activeTab === "orders" && document.querySelector("[data-customer-record-orders-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `customer-record-orders-${customerId}-v1`,
-      fragmentPath,
-      pagePath,
+  const tableConfigs = [
+    {
+      tab: "orders" as const,
       formSelector: "[data-customer-record-orders-filter-form]",
+      cacheKey: `customer-record-orders-${customerId}-v1`,
       tableShellSelector: "[data-customer-record-orders-table-shell]",
       skeletonTemplateSelector: "[data-customer-record-orders-filter-skeleton]",
-      filterKeys: ["tab", "search", "source", "orderStatus", "paymentStatus"],
+      filterKeys: ["tab", "search", "source", "orderStatus", "paymentStatus"] as const,
       searchInputSelector: "[data-customer-record-orders-search]",
-      historyStateKey: "customerRecordQuery",
-      updatedEvents: ["customer-record:table-updated"],
-    });
-    return;
-  }
-
-  if (activeTab === "sales" && document.querySelector("[data-customer-record-sales-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `customer-record-sales-${customerId}-v1`,
-      fragmentPath,
-      pagePath,
+    },
+    {
+      tab: "sales" as const,
       formSelector: "[data-customer-record-sales-filter-form]",
+      cacheKey: `customer-record-sales-${customerId}-v1`,
       tableShellSelector: "[data-customer-record-sales-table-shell]",
       skeletonTemplateSelector: "[data-customer-record-sales-filter-skeleton]",
-      filterKeys: ["tab", "search", "source"],
+      filterKeys: ["tab", "search", "source"] as const,
       searchInputSelector: "[data-customer-record-sales-search]",
-      historyStateKey: "customerRecordQuery",
-      updatedEvents: ["customer-record:table-updated"],
-    });
-    return;
-  }
-
-  if (activeTab === "invoices" && document.querySelector("[data-customer-record-invoices-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `customer-record-invoices-${customerId}-v1`,
-      fragmentPath,
-      pagePath,
+    },
+    {
+      tab: "invoices" as const,
       formSelector: "[data-customer-record-invoices-filter-form]",
+      cacheKey: `customer-record-invoices-${customerId}-v1`,
       tableShellSelector: "[data-customer-record-invoices-table-shell]",
       skeletonTemplateSelector: "[data-customer-record-invoices-filter-skeleton]",
-      filterKeys: ["tab", "search"],
+      filterKeys: ["tab", "search"] as const,
       searchInputSelector: "[data-customer-record-invoices-search]",
-      historyStateKey: "customerRecordQuery",
-      updatedEvents: ["customer-record:table-updated"],
-    });
-    return;
-  }
-
-  if (activeTab === "payments" && document.querySelector("[data-customer-record-payments-filter-form]")) {
-    initDashboardFragmentTable({
-      cacheKey: `customer-record-payments-${customerId}-v1`,
-      fragmentPath,
-      pagePath,
+    },
+    {
+      tab: "payments" as const,
       formSelector: "[data-customer-record-payments-filter-form]",
+      cacheKey: `customer-record-payments-${customerId}-v1`,
       tableShellSelector: "[data-customer-record-payments-table-shell]",
       skeletonTemplateSelector: "[data-customer-record-payments-filter-skeleton]",
-      filterKeys: ["tab", "search"],
+      filterKeys: ["tab", "search"] as const,
       searchInputSelector: "[data-customer-record-payments-search]",
+    },
+  ];
+
+  tableConfigs.forEach((tableConfig) => {
+    if (!document.querySelector(tableConfig.formSelector)) {
+      return;
+    }
+
+    initDashboardFragmentTable({
+      cacheKey: tableConfig.cacheKey,
+      fragmentPath,
+      pagePath,
+      formSelector: tableConfig.formSelector,
+      tableShellSelector: tableConfig.tableShellSelector,
+      skeletonTemplateSelector: tableConfig.skeletonTemplateSelector,
+      filterKeys: tableConfig.filterKeys,
+      searchInputSelector: tableConfig.searchInputSelector,
       historyStateKey: "customerRecordQuery",
       updatedEvents: ["customer-record:table-updated"],
     });
-  }
+  });
+}
+
+function initCustomerRecordTabs(section: HTMLElement) {
+  initRecordPageTabs({
+    onTabChange: (tab) => {
+      if (tab === "orders") {
+        refreshCustomerRecordPaymentSelection(section);
+      }
+    },
+  });
 }
 
 function resetCustomerRecordOrdersBulkPdf() {
@@ -281,6 +275,7 @@ export function initCustomerRecordPage() {
 
   initDashboardSheets();
   initDashboardCellPopovers();
+  initCustomerRecordTabs(section);
   initCustomerRecordFragmentTables(section);
 
   if (section.dataset.customerPaymentSheetInitialized !== "true") {

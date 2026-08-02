@@ -23,6 +23,38 @@ env:
   UPSTASH_REDIS_REST_TOKEN: ci_redis_token
 
 jobs:
+  detect-changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      supabase: ${{ steps.filter.outputs.supabase }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect supabase changes
+        id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            if git ls-tree -r --name-only HEAD -- supabase | grep -q .; then
+              echo "supabase=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "supabase=false" >> "$GITHUB_OUTPUT"
+            fi
+            exit 0
+          fi
+
+          if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/ | grep -q .; then
+            echo "supabase=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "supabase=false" >> "$GITHUB_OUTPUT"
+          fi
+
   web:
     name: Web checks
     runs-on: ubuntu-latest
@@ -57,3 +89,60 @@ jobs:
       - name: Build
         working-directory: web
         run: npm run build
+
+  supabase:
+    name: Local Supabase checks
+    needs: detect-changes
+    if: needs.detect-changes.outputs.supabase == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate new migration metadata and expand SQL
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            echo "Initial branch push; skipping added-migration metadata gate."
+            exit 0
+          fi
+
+          added_files="$(git diff --diff-filter=A --name-only "${{ github.event.before }}" "${{ github.sha }}" -- supabase/migrations || true)"
+          if [ -z "${added_files}" ]; then
+            echo "No newly added migration files in this push."
+            exit 0
+          fi
+
+          metadata_args=(--require-phase-for-added)
+          file_args=(--files)
+          while IFS= read -r file; do
+            [ -z "${file}" ] && continue
+            metadata_args+=(--added-files "${file}")
+            file_args+=("${file}")
+          done <<< "${added_files}"
+
+          bash .github/scripts/validate-migration-phase-metadata.sh "${metadata_args[@]}" "${file_args[@]}"
+          bash .github/scripts/validate-expand-migration-sql.sh "${file_args[@]}"
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.109.1
+
+      - name: Show Supabase CLI version
+        run: supabase --version
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Replay local migrations
+        run: supabase db reset --local --no-seed
+
+      - name: Lint local database
+        run: supabase db lint --local --fail-on error
+
+      - name: Run SQL tests
+        run: bash supabase/tests/run.sh

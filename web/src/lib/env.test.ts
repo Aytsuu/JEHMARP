@@ -72,6 +72,8 @@ describe("parseServerEnv", () => {
   });
 
   it("reads server values from import.meta.env", () => {
+    vi.stubEnv("DEV", false);
+    vi.stubEnv("MODE", "production");
     vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
     vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
@@ -107,9 +109,28 @@ describe("parseServerEnv", () => {
     });
 
     expect(env).toEqual({
-      supabaseUrl: "http://127.0.0.1:55421",
+      supabaseUrl: "http://127.0.0.1:54321",
       supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
       supabaseServerKey: "sb_secret_N7UND0UgjKTVK-Uodkm0Hg_xSvEMPvz",
+    });
+  });
+
+  it("accepts local-only Supabase env values during development", () => {
+    const env = parseServerEnv({
+      DEV: true,
+      LOCAL_SUPABASE_URL: "http://127.0.0.1:54321",
+      LOCAL_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_local_key",
+      LOCAL_SUPABASE_SECRET_KEY: "sb_secret_local_key",
+      PUBLIC_TURNSTILE_SITE_KEY: "site_key",
+      TURNSTILE_SECRET_KEY: "secret_key",
+    });
+
+    expect(env).toEqual({
+      supabaseUrl: "http://127.0.0.1:54321",
+      supabasePublishableKey: "sb_publishable_local_key",
+      supabaseServerKey: "sb_secret_local_key",
+      turnstileSiteKey: "site_key",
+      turnstileSecretKey: "secret_key",
     });
   });
 });
@@ -142,7 +163,7 @@ describe("parsePublicEnv", () => {
     vi.stubEnv("PUBLIC_TURNSTILE_SITE_KEY", "");
 
     expect(getPublicEnv()).toEqual({
-      supabaseUrl: "http://127.0.0.1:55421",
+      supabaseUrl: "http://127.0.0.1:54321",
       supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
     });
   });
@@ -165,7 +186,7 @@ describe("parsePublicEnv", () => {
     });
 
     expect(env).toEqual({
-      supabaseUrl: "http://127.0.0.1:55421",
+      supabaseUrl: "http://127.0.0.1:54321",
       supabasePublishableKey: "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH",
     });
   });
