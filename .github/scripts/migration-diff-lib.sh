@@ -4,7 +4,7 @@
 # Source this file; it is not meant to be executed directly.
 
 migration_diff_lib_repository_root() {
-  local script_dir
+  local script_di
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   cd "${script_dir}/../.." && pwd
 }

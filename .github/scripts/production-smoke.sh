@@ -17,7 +17,7 @@ Environment:
   BASE_URL / PRODUCTION_BASE_URL / STAGING_BASE_URL
                                    Target origin (required unless resolved externally).
   WORKER_VERSION_ID                Optional Worker version ID for version-targeted smoke tests.
-                                   Sets Cloudflare-Workers-Version-Overrides using the worker
+                                   Sets Cloudflare-Workers-Version-Overrides using the worke
                                    name from web/wrangler.jsonc (RFC 8941 dictionary format).
   SMOKE_MAX_ATTEMPTS               Public-route attempts after a Worker deployment (default: 6).
   SMOKE_RETRY_DELAY_SECONDS        Delay between public-route attempts (default: 5).
