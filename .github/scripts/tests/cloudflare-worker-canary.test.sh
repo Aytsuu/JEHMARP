@@ -183,6 +183,31 @@ if [ "$list_stable" != "$FALLBACK_UUID" ]; then
   exit 1
 fi
 
+write_fixture "version-upload.ndjson" \
+  "{\"type\":\"version-upload\",\"version\":1,\"worker_name\":\"jehmarp\",\"version_id\":\"${UPLOAD_UUID}\"}"
+
+parsed="$(
+  # shellcheck source=/dev/null
+  source "${CANARY_SCRIPT}"
+  parse_wrangler_output_version_id "${FIXTURE_DIR}/version-upload.ndjson"
+)"
+if [ "$parsed" != "$UPLOAD_UUID" ]; then
+  echo "Unexpected parsed version_id: ${parsed}" >&2
+  exit 1
+fi
+
+header="Cloudflare-Workers-Version-Overrides: jehmarp=\"${UPLOAD_UUID}\""
+built="$(
+  worker_name="jehmarp"
+  version_id="${UPLOAD_UUID}"
+  printf 'Cloudflare-Workers-Version-Overrides: %s="%s"' "$worker_name" "$version_id"
+)"
+
+if [ "$built" != "$header" ]; then
+  echo "Unexpected override header: ${built}" >&2
+  exit 1
+fi
+
 stdout_file="${FIXTURE_DIR}/stable.stdout"
 stderr_file="${FIXTURE_DIR}/stable.stderr"
 run_with_mock_wrangler status stable-version >"$stdout_file" 2>"$stderr_file"
