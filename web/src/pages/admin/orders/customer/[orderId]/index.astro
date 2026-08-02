@@ -36,6 +36,7 @@ import {
   buildSalesInvoiceLayout,
   getDocumentColumnTemplate,
 } from "@/lib/order-documents/layout";
+import { loadDocumentLayoutOptions } from "@/lib/platform-settings/document-layout";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
 import {
@@ -71,9 +72,10 @@ const orderDetailTabIds = [
 ] as const;
 const requestedOrderDetailTab = Astro.url.searchParams.get("tab");
 
-const [dashboardData, order] = await Promise.all([
+const [dashboardData, order, documentLayout] = await Promise.all([
   loadAdminDashboardData(),
   loadAdminOrder(orderId),
+  loadDocumentLayoutOptions(),
 ]);
 
 if (!order) {
@@ -267,8 +269,8 @@ function quantityValidationDataset(
       : "false",
   };
 }
-const orderSlipLayout = buildOrderSlipLayout(order);
-const salesInvoiceLayout = buildSalesInvoiceLayout(order);
+const orderSlipLayout = buildOrderSlipLayout(order, documentLayout);
+const salesInvoiceLayout = buildSalesInvoiceLayout(order, documentLayout);
 const orderSlipGridTemplate = getDocumentColumnTemplate(
   orderSlipLayout.columns,
 );
@@ -1143,7 +1145,15 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                   ))
                 }
               </div>
-              <div class="pdf-preview-logo">LOGO</div>
+              <div class="pdf-preview-logo">
+                {
+                  orderSlipLayout.logoUrl ? (
+                    <img src={orderSlipLayout.logoUrl} alt="" />
+                  ) : (
+                    "LOGO"
+                  )
+                }
+              </div>
               <h3 class="pdf-preview-title">{orderSlipLayout.title}</h3>
             </header>
 
@@ -1289,7 +1299,15 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                         </p>
                       ))}
                     </div>
-                    <div class="pdf-preview-logo">LOGO</div>
+                    <div class="pdf-preview-logo">
+                      {
+                        salesInvoiceLayout.logoUrl ? (
+                          <img src={salesInvoiceLayout.logoUrl} alt="" />
+                        ) : (
+                          "LOGO"
+                        )
+                      }
+                    </div>
                     <h3 class="pdf-preview-title">
                       {salesInvoiceLayout.title}
                     </h3>

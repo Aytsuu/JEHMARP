@@ -4,7 +4,7 @@ import { buildOrderSlipPdf } from "@/lib/admin-dashboard/order-slip-pdf";
 import { loadAgentOrder } from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
 import { fullName } from "@/lib/order-documents/view";
-import { loadDocumentLayoutOptions } from "@/lib/platform-settings/document-layout";
+import { loadDocumentPdfLayoutOptions } from "@/lib/platform-settings/document-layout";
 
 export const prerender = false;
 
@@ -23,7 +23,7 @@ export const GET: APIRoute = async (context) => {
 
   const [order, documentLayout] = await Promise.all([
     loadAgentOrder(context, orderId),
-    loadDocumentLayoutOptions(),
+    loadDocumentPdfLayoutOptions(),
   ]);
   if (!order) return new Response("Order not found.", { status: 404 });
   const pdf = buildOrderSlipPdf(order, documentLayout);

@@ -3,6 +3,7 @@ import { fullName, orderTotal } from "@/lib/order-documents/view";
 import { getBrandLines as getSettingsBrandLines } from "@/lib/platform-settings/branding";
 import { formatDocumentPaymentLines, formatOrderSlipPaymentLines } from "@/lib/platform-settings/document-payment";
 import type { DocumentLayoutOptions } from "@/lib/platform-settings/types";
+import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 const orderSlipColumnWidths = [145, 60, 75, 75, 160] as const;
 const salesInvoiceColumnWidths = [235, 80, 100, 100] as const;
@@ -20,6 +21,7 @@ export type DocumentTableRow = {
 
 export type OrderSlipLayout = {
   brandLines: string[];
+  logoUrl: string | null;
   title: string;
   dateLabel: string;
   sellerLabel: string;
@@ -39,6 +41,7 @@ export type OrderSlipLayout = {
 
 export type SalesInvoiceLayout = {
   brandLines: string[];
+  logoUrl: string | null;
   title: string;
   dateLabel: string;
   invoiceNumberLabel: string;
@@ -58,6 +61,7 @@ export function buildOrderSlipLayout(order: DocumentOrder, options: DocumentLayo
   const sellerName = getSellerName(order, options);
   return {
     brandLines: getBrandLines(options.businessProfile),
+    logoUrl: resolveDocumentLogoUrl(options),
     title: "ORDER SLIP",
     dateLabel: `Date: ${formatDocumentDate(order.created_at)}`,
     sellerLabel: `Seller: ${sellerName}`,
@@ -110,6 +114,7 @@ export function buildSalesInvoiceLayout(order: DocumentOrder, options: DocumentL
   const paymentDetailLines = formatDocumentPaymentLines(options.documentPayment);
   return {
     brandLines: getBrandLines(options.businessProfile),
+    logoUrl: resolveDocumentLogoUrl(options),
     title: "SALES INVOICE",
     dateLabel: `Date: ${formatDocumentDate(invoice?.issued_at ?? invoice?.created_at ?? order.created_at)}`,
     invoiceNumberLabel: `Invoice No: ${invoice?.invoice_number ?? ""}`,
@@ -156,6 +161,10 @@ export function getDocumentColumnTemplate(columns: DocumentTableColumn[]) {
 
 export function getBrandLines(profile?: DocumentLayoutOptions["businessProfile"]) {
   return getSettingsBrandLines(profile);
+}
+
+export function resolveDocumentLogoUrl(options: DocumentLayoutOptions = {}) {
+  return resolvePublicStorageUrl(options.businessProfile?.logoPath ?? null);
 }
 
 export function getSellerName(order: DocumentOrder, options: DocumentLayoutOptions = {}) {
