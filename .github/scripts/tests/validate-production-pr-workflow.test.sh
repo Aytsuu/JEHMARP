@@ -32,8 +32,14 @@ if ! grep -q '^  validate:$' "$WORKFLOW"; then
 fi
 
 validation_job="$(sed -n '/^  validate:/,$p' "$WORKFLOW")"
+
 if printf '%s\n' "$validation_job" | grep -Eq 'secrets\.(PUBLIC_SUPABASE|SUPABASE_SECRET_KEY|PUBLIC_TURNSTILE|TURNSTILE_SECRET_KEY|UPSTASH_|RESEND_|RESELLER_|SUPABASE_ACCESS_TOKEN|SUPABASE_DB_PASSWORD)'; then
   echo "Secret-free PR validation job must not expose production application or database credentials." >&2
+  exit 1
+fi
+
+if printf '%s\n' "$validation_job" | grep -q 'supabase-db-push-remote.sh'; then
+  echo "Validate production PR must not run credentialed production migration dry-runs inline." >&2
   exit 1
 fi
 
@@ -84,6 +90,16 @@ done
 
 if ! grep -q 'pull_request_target:' "$TRUSTED_DRY_RUN_WORKFLOW"; then
   echo "Credentialed production migration dry-run must be defined on trusted main via pull_request_target." >&2
+  exit 1
+fi
+
+if ! grep -q 'overlay-candidate-migration-data.sh' "$TRUSTED_DRY_RUN_WORKFLOW"; then
+  echo "Trusted production migration dry-run must overlay candidate migration data." >&2
+  exit 1
+fi
+
+if ! grep -q 'assert-supabase-baseline-ledger-state.sh' "$TRUSTED_DRY_RUN_WORKFLOW"; then
+  echo "Trusted production migration dry-run must assert ledger state before db push." >&2
   exit 1
 fi
 
