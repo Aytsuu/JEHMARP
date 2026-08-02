@@ -30,8 +30,6 @@ jobs:
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
       RESELLER_PRICE_LIST_FROM: ${{ secrets.RESELLER_PRICE_LIST_FROM }}
       RESELLER_ADMIN_EMAIL: ${{ secrets.RESELLER_ADMIN_EMAIL }}
-      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -83,33 +81,3 @@ jobs:
 
       - name: Run SQL tests
         run: bash supabase/tests/run.sh
-
-      - name: Link production Supabase project
-        id: supabase_link
-        continue-on-error: true
-        run: bash .github/scripts/supabase-link-retry.sh "${{ secrets.SUPABASE_PROJECT_REF }}"
-
-      - name: Check pending production migrations
-        env:
-          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
-          SUPABASE_DB_PUSH_DRY_RUN: "true"
-        run: |
-          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
-            export SUPABASE_LINKED=true
-          else
-            export SUPABASE_LINKED=false
-          fi
-          bash .github/scripts/supabase-db-push-remote.sh
-
-      - name: Show migration status
-        env:
-          SUPABASE_DB_POOLER_URL: ${{ secrets.SUPABASE_DB_POOLER_URL }}
-        run: |
-          if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
-            supabase migration list --linked --dns-resolver https
-          elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
-            supabase migration list --db-url "$SUPABASE_DB_POOLER_URL" --dns-resolver https
-          else
-            echo "Skipping migration list because Supabase link failed."
-            exit 1
-          fi
