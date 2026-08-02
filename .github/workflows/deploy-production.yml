@@ -212,7 +212,11 @@ jobs:
         run: |
           set -euo pipefail
           stable_version_id="$(bash .github/scripts/cloudflare-worker-canary.sh stable-version)"
-          echo "stable_version_id=${stable_version_id}" >> "$GITHUB_OUTPUT"
+          if ! printf '%s' "${stable_version_id}" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "stable-version must emit exactly one Worker version UUID." >&2
+            exit 1
+          fi
+          printf 'stable_version_id=%s\n' "${stable_version_id}" >> "${GITHUB_OUTPUT}"
           echo "Prior stable Worker version: ${stable_version_id}"
 
       - name: Upload new Worker version
@@ -220,7 +224,11 @@ jobs:
         run: |
           set -euo pipefail
           new_version_id="$(bash .github/scripts/cloudflare-worker-canary.sh upload --env-file .env.production)"
-          echo "new_version_id=${new_version_id}" >> "$GITHUB_OUTPUT"
+          if ! printf '%s' "${new_version_id}" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo "upload must emit exactly one Worker version UUID." >&2
+            exit 1
+          fi
+          printf 'new_version_id=%s\n' "${new_version_id}" >> "${GITHUB_OUTPUT}"
           echo "Uploaded Worker version: ${new_version_id}"
 
       - name: Resolve production base URL

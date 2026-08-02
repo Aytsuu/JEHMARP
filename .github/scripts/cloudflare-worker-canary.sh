@@ -116,7 +116,31 @@ assert_versions_api() {
     exit 1
   fi
 
-  echo "wrangler ${wrangler_version} supports versions upload/deploy."
+  echo "wrangler ${wrangler_version} supports versions upload/deploy." >&2
+}
+
+assert_worker_version_id() {
+  local candidate="${1:-}"
+
+  if [ -z "$candidate" ]; then
+    echo "Worker version ID is required." >&2
+    exit 1
+  fi
+
+  if [[ "$candidate" == *$'\n'* ]] || [[ "$candidate" == *$'\r'* ]]; then
+    echo "Worker version ID must be a single line." >&2
+    exit 1
+  fi
+
+  if ! [[ "$candidate" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+    echo "Worker version ID must be a canonical UUID." >&2
+    exit 1
+  fi
+}
+
+emit_worker_version_id() {
+  assert_worker_version_id "$1"
+  printf '%s\n' "$1"
 }
 
 parse_wrangler_output_version_id() {
@@ -169,12 +193,12 @@ upload_version() {
       echo "Env file not found: ${env_file}" >&2
       exit 1
     fi
-    WRANGLER_OUTPUT_FILE_PATH="$output_file" wrangler_cmd versions upload --env-file "$env_file"
+    WRANGLER_OUTPUT_FILE_PATH="$output_file" wrangler_cmd versions upload --env-file "$env_file" >&2
   else
-    WRANGLER_OUTPUT_FILE_PATH="$output_file" wrangler_cmd versions upload
+    WRANGLER_OUTPUT_FILE_PATH="$output_file" wrangler_cmd versions upload >&2
   fi
 
-  parse_wrangler_output_version_id "$output_file"
+  emit_worker_version_id "$(parse_wrangler_output_version_id "$output_file")"
 }
 
 parse_deployments_status_json() {
@@ -294,7 +318,8 @@ stable_version() {
 
   if run_wrangler_json_to_file "$output_file" "$error_file" deployments status --name "$worker_name" --json \
     && [ -s "$output_file" ]; then
-    if parse_deployments_status_json "$output_file"; then
+    if version_id="$(parse_deployments_status_json "$output_file")"; then
+      emit_worker_version_id "$version_id"
       return 0
     fi
   fi
@@ -314,7 +339,7 @@ stable_version() {
     exit 1
   fi
 
-  parse_latest_version_from_list_json "$output_file"
+  emit_worker_version_id "$(parse_latest_version_from_list_json "$output_file")"
 }
 
 validate_percentage_pair() {
@@ -341,13 +366,15 @@ deploy_split() {
 
   assert_versions_api
   validate_percentage_pair "$new_pct" "$stable_pct"
+  assert_worker_version_id "$new_version_id"
+  assert_worker_version_id "$stable_version_id"
 
   if [ -z "$new_version_id" ] || [ -z "$stable_version_id" ]; then
     echo "Both new and stable version IDs are required." >&2
     exit 1
   fi
 
-  echo "Deploying traffic split: new=${new_version_id}@${new_pct}% stable=${stable_version_id}@${stable_pct}%"
+  echo "Deploying traffic split: new=${new_version_id}@${new_pct}% stable=${stable_version_id}@${stable_pct}%" >&2
   wrangler_cmd versions deploy \
     "${new_version_id}@${new_pct}" \
     "${stable_version_id}@${stable_pct}" \
