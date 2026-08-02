@@ -75,6 +75,16 @@ if ! grep -q 'rollback-on-manual-auth-failure' "$WORKFLOW"; then
   exit 1
 fi
 
+if ! grep -q 'rollback-on-remainder-failure' "$WORKFLOW"; then
+  echo "deploy-production.yml must roll back when remainder promotion fails." >&2
+  exit 1
+fi
+
+if ! grep -q 'needs.canary-promote-remainder.result != .success' "$WORKFLOW"; then
+  echo "deploy-production.yml must guard remainder rollback on canary-promote-remainder failure." >&2
+  exit 1
+fi
+
 if ! grep -q 'AUTH_SMOKE_TARGET_ENV: staging' "$STAGING_WORKFLOW" \
   || ! grep -q 'AUTH_SMOKE_TURNSTILE_MODE: test' "$STAGING_WORKFLOW"; then
   echo "deploy-staging.yml must keep automated admin smoke with test Turnstile mode." >&2

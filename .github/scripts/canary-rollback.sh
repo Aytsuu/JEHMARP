@@ -23,6 +23,7 @@ EOF
 
 write_rollback_summary() {
   local reason="$1"
+  local outcome="${CANARY_ROLLBACK_OUTCOME:-completed}"
 
   if [ -z "${GITHUB_STEP_SUMMARY:-}" ]; then
     return 0
@@ -34,8 +35,11 @@ write_rollback_summary() {
     echo "| Field | Value |"
     echo "| --- | --- |"
     echo "| Reason | ${reason} |"
-    echo "| Stable version (restored to 100%) | \`${STABLE_VERSION_ID}\` |"
+    echo "| Last attempted stage | ${CANARY_LAST_ATTEMPTED_STAGE:-unknown} |"
+    echo "| Rollback target (stable@100%) | \`${STABLE_VERSION_ID}\` |"
     echo "| Canary version (set to 0%) | \`${NEW_VERSION_ID}\` |"
+    echo "| Rollback attempted | yes |"
+    echo "| Rollback outcome | ${outcome} |"
     echo ""
     echo "Traffic split command:"
     echo ""

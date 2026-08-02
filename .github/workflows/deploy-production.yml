@@ -391,6 +391,7 @@ jobs:
 
       - name: Promote canary to 25%
         run: |
+          echo "CANARY_LAST_ATTEMPTED_STAGE=25%" >> "$GITHUB_ENV"
           bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
             "$NEW_VERSION_ID" \
             "$STABLE_VERSION_ID" \
@@ -407,6 +408,7 @@ jobs:
 
       - name: Promote canary to 50%
         run: |
+          echo "CANARY_LAST_ATTEMPTED_STAGE=50%" >> "$GITHUB_ENV"
           bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
             "$NEW_VERSION_ID" \
             "$STABLE_VERSION_ID" \
@@ -445,6 +447,7 @@ jobs:
 
       - name: Promote canary to 100%
         run: |
+          echo "CANARY_LAST_ATTEMPTED_STAGE=100%" >> "$GITHUB_ENV"
           bash .github/scripts/cloudflare-worker-canary.sh deploy-split \
             "$NEW_VERSION_ID" \
             "$STABLE_VERSION_ID" \
@@ -459,7 +462,14 @@ jobs:
           OBSERVATION_LABEL: after 100% promotion
         run: bash .github/scripts/canary-observe-and-guard.sh
 
+      - name: Record promotion context
+        if: always()
+        id: promotion_context
+        run: |
+          echo "last_attempted_stage=${CANARY_LAST_ATTEMPTED_STAGE:-before-25-percent}" >> "$GITHUB_OUTPUT"
+
       - name: Write release summary
+        if: success()
         run: |
           {
             echo "### Production release"
@@ -471,6 +481,10 @@ jobs:
             echo "| Prior stable Worker version (rollback target) | \`${STABLE_VERSION_ID}\` |"
             echo "| Canary path | 0% → 5% → manual auth gate → 25% → 50% → 100% |"
             echo "| Manual auth gate | after 5% promotion (\`production-canary-auth\`) |"
+            echo "| Last attempted stage | 100% (completed) |"
+            echo "| Rollback target | \`${STABLE_VERSION_ID}\` |"
+            echo "| Rollback attempted | no |"
+            echo "| Rollback outcome | not required |"
             echo ""
             echo "#### Immediate rollback"
             echo ""
@@ -489,4 +503,72 @@ jobs:
             echo "from a stable cookie or session identifier so HTML/assets/API requests stay on"
             echo "the same Worker version during percentage-based rollouts."
             echo "See: https://developers.cloudflare.com/workers/configuration/versions-and-deployments/gradual-deployments/version-affinity/"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Write remainder failure summary
+        if: failure()
+        run: |
+          {
+            echo "### Production canary remainder failure"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Last attempted stage | ${CANARY_LAST_ATTEMPTED_STAGE:-unknown} |"
+            echo "| Rollback target (stable@100%) | \`${STABLE_VERSION_ID}\` |"
+            echo "| Canary version | \`${NEW_VERSION_ID}\` |"
+            echo "| Rollback attempted | pending independent rollback job |"
+            echo "| Rollback outcome | see rollback-on-remainder-failure job |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+    outputs:
+      last_attempted_stage: ${{ steps.promotion_context.outputs.last_attempted_stage }}
+
+  rollback-on-remainder-failure:
+    name: Roll back canary after remainder promotion failure
+    needs:
+      - migrate-and-canary-5
+      - manual-production-auth
+      - canary-promote-remainder
+    if: ${{ always() && needs.migrate-and-canary-5.result == 'success' && needs.manual-production-auth.result == 'success' && needs.canary-promote-remainder.result != 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      NEW_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.new_version_id }}
+      STABLE_VERSION_ID: ${{ needs.migrate-and-canary-5.outputs.stable_version_id }}
+      CANARY_LAST_ATTEMPTED_STAGE: ${{ needs.canary-promote-remainder.outputs.last_attempted_stage }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Roll back Worker traffic to stable version
+        run: bash .github/scripts/canary-rollback.sh "Canary remainder promotion did not complete successfully."
+
+      - name: Write remainder rollback summary
+        if: always()
+        run: |
+          {
+            echo "### Remainder failure rollback outcome"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Last attempted stage | ${CANARY_LAST_ATTEMPTED_STAGE:-unknown} |"
+            echo "| Rollback target (stable@100%) | \`${STABLE_VERSION_ID}\` |"
+            echo "| Canary version (set to 0%) | \`${NEW_VERSION_ID}\` |"
+            echo "| Rollback attempted | yes |"
+            echo "| Rollback outcome | ${{ job.status }} |"
           } >> "$GITHUB_STEP_SUMMARY"

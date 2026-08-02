@@ -39,33 +39,24 @@ assert_exact_stdout_uuid() {
 
 write_mock_wrangler() {
   local mode="$1"
-  local mock_bin="${FIXTURE_DIR}/bin"
-  mkdir -p "$mock_bin"
-
-  cat > "${mock_bin}/npx" <<EOF
+  cat > "${FIXTURE_DIR}/mock-wrangler" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "\$1" != "wrangler" ]; then
-  echo "unexpected npx invocation: \$*" >&2
-  exit 99
-fi
-shift
-
-case "\$1" in
+case "\${1:-}" in
   --version)
     echo "4.112.0"
     ;;
   versions)
     shift
-    case "\$1" in
+    case "\${1:-}" in
       upload)
         echo "Uploading Worker version..." >&1
         if [ -n "\${WRANGLER_OUTPUT_FILE_PATH:-}" ]; then
           printf '%s\n' '{"type":"version-upload","version_id":"${UPLOAD_UUID}"}' > "\$WRANGLER_OUTPUT_FILE_PATH"
         fi
         ;;
-      deploy)
+      deploy|--help|-h)
         exit 0
         ;;
       list)
@@ -93,7 +84,7 @@ case "\$1" in
     ;;
   deployments)
     shift
-    if [ "\$1" = "status" ]; then
+    if [ "\${1:-}" = "status" ]; then
       shift
       while [ "\$#" -gt 0 ]; do
         case "\$1" in
@@ -121,8 +112,8 @@ case "\$1" in
     ;;
 esac
 EOF
-  chmod +x "${mock_bin}/npx"
-  printf '%s' "$mock_bin"
+  chmod +x "${FIXTURE_DIR}/mock-wrangler"
+  printf '%s' "${FIXTURE_DIR}/mock-wrangler"
 }
 
 run_with_mock_wrangler() {
@@ -131,9 +122,9 @@ run_with_mock_wrangler() {
   local mock_bin
   mock_bin="$(write_mock_wrangler "$mode")"
 
+  CANARY_WRANGLER_BIN="$mock_bin" \
   CLOUDFLARE_API_TOKEN="test-token" \
   CLOUDFLARE_ACCOUNT_ID="test-account" \
-  PATH="${mock_bin}:${PATH}" \
     bash "$CANARY_SCRIPT" "$@"
 }
 
