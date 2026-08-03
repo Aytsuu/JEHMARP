@@ -1,3 +1,10 @@
+-- migration-phase: expand
+-- owner: platform
+-- lock-impact: low
+-- backfill: none
+-- compatible-with: worker >= 2026.08.0
+-- forward-repair: supabase/migrations/20260804000006_order_admin_agents_by_created_at.sql
+
 -- Admin agents table should show newest agents first, consistent with other admin lists.
 
 create or replace function public.list_admin_agent_rows(

@@ -1,6 +1,7 @@
 ---
 import AdminOrderManagement from "@/components/admin/AdminOrderManagement.astro";
 import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
+import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import {
   formatAdminActionFeedback,
   markUnreadAdminOrdersRead,
@@ -55,4 +56,11 @@ const feedback = formatAdminActionFeedback(Astro.url);
     activeFilters={orderFilters}
     filterQuery={orderFilterQuery}
   />
+  <DashboardModal
+    id="pending-customer-orders-modal"
+    title="Pending customer orders"
+    description="Review customer orders awaiting acceptance."
+  >
+    <div data-pending-customer-orders-modal-body class="pending-payments-list"></div>
+  </DashboardModal>
 </AdminPageFrame>

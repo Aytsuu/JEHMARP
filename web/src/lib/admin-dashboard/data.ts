@@ -542,6 +542,14 @@ export type AdminOrderTableRow = {
   pending_customer_order_count: number | null;
 };
 
+export type AdminDistributionPendingCustomerOrder = {
+  id: string;
+  customer_label: string;
+  created_at: string;
+  total_amount: number;
+  href: string;
+};
+
 export type AdminSalesTableRow = {
   id: string;
   created_at: string;
@@ -930,6 +938,34 @@ export async function loadAdminCustomerDetailsData(
     customer,
     customerOrders,
   };
+}
+
+export async function loadDistributionPendingCustomerOrders(
+  distributionOrderId: string,
+): Promise<AdminDistributionPendingCustomerOrder[]> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("list_distribution_pending_customer_orders", {
+    target_order_id: distributionOrderId,
+  });
+
+  if (error) {
+    throwLoadError("Unable to load pending customer orders.", error);
+  }
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+    .map((row) => ({
+      id: String(row.id ?? ""),
+      customer_label: String(row.customer_label ?? "Customer"),
+      created_at: String(row.created_at ?? ""),
+      total_amount: Number(row.total_amount ?? 0),
+      href: String(row.href ?? ""),
+    }))
+    .filter((row) => row.id.length > 0);
 }
 
 export async function agentHasDistributionOrders(agentId: string) {

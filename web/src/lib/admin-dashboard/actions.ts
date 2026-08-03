@@ -284,6 +284,9 @@ export type AdminAction =
         payment_status: "unpaid";
         release_date: string;
         submitted_by: string;
+        approved_by: string;
+        approved_at: string;
+        created_at: string;
         updated_at: string;
       };
       items: {

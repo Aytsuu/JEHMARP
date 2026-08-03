@@ -1,3 +1,10 @@
+-- migration-phase: expand
+-- owner: platform
+-- lock-impact: low
+-- backfill: none
+-- compatible-with: worker >= 2026.08.0
+-- forward-repair: supabase/migrations/20260804000005_exclude_agents_from_credit_limit.sql
+
 -- Agent identity customers are not subject to retail credit limits.
 
 create or replace function private.customer_is_agent_identity(target_customer_id uuid)

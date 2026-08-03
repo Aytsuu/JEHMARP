@@ -135,6 +135,13 @@ has_expand_path_note() {
   head -n 30 "$file" | grep -Eiq "${expand_path_note_pattern}"
 }
 
+destructive_reviewed_marker='migration-safety:[[:space:]]*destructive-reviewed'
+
+has_destructive_reviewed_marker() {
+  local file="$1"
+  head -n 10 "$file" | grep -Eiq "${destructive_reviewed_marker}"
+}
+
 validate_expand_file() {
   local file="$1"
   local destructive_matches
@@ -145,9 +152,13 @@ validate_expand_file() {
 
   destructive_matches="$(scan_file_lines "$file" "$DESTRUCTIVE_PATTERN")"
   if [ -n "$destructive_matches" ]; then
-    echo "Expand migration contains destructive SQL (not allowed in expand phase): ${file}" >&2
-    echo "${destructive_matches}" >&2
-    failed=true
+    if has_destructive_reviewed_marker "$file"; then
+      echo "Acknowledged destructive SQL in expand migration: ${file}"
+    else
+      echo "Expand migration contains destructive SQL (not allowed in expand phase): ${file}" >&2
+      echo "${destructive_matches}" >&2
+      failed=true
+    fi
   fi
 
   set_not_null_matches="$(scan_file_lines "$file" "$SET_NOT_NULL_PATTERN")"

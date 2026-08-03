@@ -1,4 +1,12 @@
--- Optional agent and exclude filters for attach-order customer pickers.
+-- migration-phase: expand
+-- migration-safety: destructive-reviewed
+-- owner: platform
+-- lock-impact: low
+-- backfill: none
+-- compatible-with: worker >= 2026.08.0
+-- forward-repair: supabase/migrations/20260804000000_list_admin_customer_rows_attach_filters.sql
+
+-- Optional agent, exclude, and unassigned filters for attach-order customer pickers.
 -- Drop the legacy 4-arg overload so PostgREST can resolve a single RPC signature.
 
 drop function if exists public.list_admin_customer_rows(text, text, integer, integer);
@@ -9,7 +17,8 @@ create or replace function public.list_admin_customer_rows(
   page_number integer default 1,
   page_size integer default 10,
   assigned_agent_id_filter uuid default null,
-  exclude_customer_ids uuid[] default null
+  exclude_customer_ids uuid[] default null,
+  include_unassigned_customers boolean default false
 ) returns table(records jsonb, total_rows bigint)
   language sql stable
   security definer
@@ -21,6 +30,7 @@ create or replace function public.list_admin_customer_rows(
       nullif(customer_type_filter, '') as customer_type_value,
       assigned_agent_id_filter as assigned_agent_id_value,
       exclude_customer_ids as exclude_customer_id_values,
+      coalesce(include_unassigned_customers, false) as include_unassigned_customers_value,
       greatest(page_number, 1) as safe_page_number,
       least(greatest(page_size, 1), 100) as safe_page_size
   ),
@@ -73,6 +83,10 @@ create or replace function public.list_admin_customer_rows(
       and (
         normalized.assigned_agent_id_value is null
         or base_rows.assigned_agent_id = normalized.assigned_agent_id_value
+        or (
+          normalized.include_unassigned_customers_value
+          and base_rows.assigned_agent_id is null
+        )
       )
       and (
         normalized.exclude_customer_id_values is null
@@ -101,9 +115,9 @@ create or replace function public.list_admin_customer_rows(
   from paged;
 $$;
 
-alter function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[]) owner to postgres;
+alter function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[], boolean) owner to postgres;
 
-revoke all on function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[]) from public;
-revoke all on function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[]) from anon;
-revoke all on function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[]) from authenticated;
-grant execute on function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[]) to service_role;
+revoke all on function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[], boolean) from public;
+revoke all on function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[], boolean) from anon;
+revoke all on function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[], boolean) from authenticated;
+grant execute on function public.list_admin_customer_rows(text, text, integer, integer, uuid, uuid[], boolean) to service_role;

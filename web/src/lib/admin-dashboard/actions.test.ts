@@ -3553,6 +3553,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3673,6 +3676,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3741,6 +3747,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3808,6 +3817,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3900,6 +3912,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [

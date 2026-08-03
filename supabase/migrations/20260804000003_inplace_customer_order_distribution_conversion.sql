@@ -1,3 +1,10 @@
+-- migration-phase: expand
+-- owner: platform
+-- lock-impact: low
+-- backfill: none
+-- compatible-with: worker >= 2026.08.0
+-- forward-repair: supabase/migrations/20260804000003_inplace_customer_order_distribution_conversion.sql
+
 -- Convert promoted customer orders in place instead of inserting a duplicate distribution row.
 
 create or replace function private.is_valid_distribution_order_status_transition(

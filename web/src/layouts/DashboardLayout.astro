@@ -250,6 +250,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
       import { initOrderStatusAutoSave } from "@/lib/client/order-status-auto-save";
       import { initTableActionMenus } from "@/lib/client/table-action-menu";
       import { initAdminOrderBulkPdf } from "@/lib/client/admin-order-bulk-pdf";
+      import { initAdminOrderPendingCustomersModal } from "@/lib/client/admin-order-pending-customers-modal";
       import { initAdminOrdersFragmentTable } from "@/lib/client/admin-orders-fragment-table";
       import { clearDashboardFragmentCaches } from "@/lib/client/dashboard-fragment-cache";
       import { initFormSubmissionState } from "@/lib/client/form-submission-state";
@@ -838,6 +839,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         initTableActionMenus();
         initAdminOrdersFragmentTable();
         initAdminOrderBulkPdf();
+        initAdminOrderPendingCustomersModal();
       }
 
       document.addEventListener("DOMContentLoaded", initDashboardFeatures);

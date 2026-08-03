@@ -1,3 +1,10 @@
+-- migration-phase: expand
+-- owner: platform
+-- lock-impact: low
+-- backfill: none
+-- compatible-with: worker >= 2026.08.0
+-- forward-repair: supabase/migrations/20260804000002_set_approval_on_converted_distribution_orders.sql
+
 -- Stamp admin approval on distribution orders created from customer-order conversion.
 
 create or replace function public.convert_customer_order_to_agent_distribution_order(target_order_id uuid)

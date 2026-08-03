@@ -102,6 +102,11 @@ export function formatDate(value: string | null) {
   return formatDateTime(value);
 }
 
+export function pendingCustomerOrdersAwaitingLabel(count: number) {
+  const orderLabel = count === 1 ? "order" : "orders";
+  return `${count} customer ${orderLabel} awaiting`;
+}
+
 export function formatSalePaymentSummary(paymentCount: number) {
   const count = Number.isFinite(paymentCount) ? Math.max(0, Math.trunc(paymentCount)) : 0;
 

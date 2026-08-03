@@ -302,7 +302,7 @@ async function loadCustomerAgentOrderTargetProfiles(
   const customerItems = customerRecords.map((customer) =>
     mapCustomerProfile(customer, paymentNoticeById.get(customer.id) ?? ""),
   );
-  const agentItems = agentRecords.map(mapAgentProfile);
+  const agentItems = agentRecords.map((agent) => mapAgentProfile(agent));
   const items = [...customerItems, ...agentItems];
 
   return {

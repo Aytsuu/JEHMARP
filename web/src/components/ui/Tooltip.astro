@@ -5,6 +5,7 @@ type Props = {
   class?: string;
   sidebarOnly?: boolean;
   focusable?: boolean;
+  interactive?: boolean;
 };
 
 const {
@@ -12,17 +13,23 @@ const {
   placement = "above",
   class: className,
   sidebarOnly = false,
-  focusable = true,
+  focusable,
+  interactive = false,
 } = Astro.props;
+const isFocusable = focusable ?? !interactive;
 ---
 
 <span
-  class:list={["dashboard-tooltip", className]}
-  tabindex={focusable ? 0 : undefined}
+  class:list={[
+    "dashboard-tooltip",
+    interactive && "dashboard-tooltip--interactive",
+    className,
+  ]}
+  tabindex={isFocusable ? 0 : undefined}
   data-tooltip={text}
   data-tooltip-placement={placement}
   data-tooltip-sidebar-only={sidebarOnly ? "true" : undefined}
-  aria-label={text}
+  aria-label={isFocusable ? text : undefined}
 >
   <slot />
 </span>

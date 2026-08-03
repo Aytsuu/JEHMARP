@@ -107,7 +107,7 @@ export function parseAgentActionFormData(
   _assignedCustomerIds: ReadonlySet<string>,
 ): AgentActionParseResult {
   void _agentUserId;
-  const assignedCustomerIds = _assignedCustomerIds;
+  void _assignedCustomerIds;
 
   try {
     const action = requiredString(formData, "action");
