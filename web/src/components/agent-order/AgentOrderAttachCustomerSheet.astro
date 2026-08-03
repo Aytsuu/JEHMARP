@@ -115,7 +115,7 @@ function productOptionLabel(product: ProductOption) {
             <h3 class="order-create-section__title">Customer</h3>
           </div>
           <div class="order-create-section__body">
-            <label class="field-row">
+            <div class="field-row">
               <span>Existing customer</span>
               <OrderCustomerPicker disabled={!canSubmit} />
               <p
@@ -123,7 +123,7 @@ function productOptionLabel(product: ProductOption) {
                 hidden
                 data-customer-order-notice
               ></p>
-            </label>
+            </div>
           </div>
         </section>
 

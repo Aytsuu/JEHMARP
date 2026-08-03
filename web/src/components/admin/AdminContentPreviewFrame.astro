@@ -11,7 +11,7 @@ const guestViewHref = activePath;
 ---
 
 <div class="admin-content-preview" data-admin-content-preview>
-  <div class="admin-content-preview__scroll">
+  <div class="admin-content-preview__scroll" data-admin-content-preview-scroll>
     <PublicSitePreview
       activePath={activePath}
       previewRoot={ADMIN_CONTENT_PREVIEW_ROOT}
@@ -40,29 +40,39 @@ const guestViewHref = activePath;
   .admin-content-preview {
     position: relative;
     display: flex;
-    flex: 1 0 auto;
+    flex: 1 1 0;
     flex-direction: column;
     width: 100%;
-    min-height: min-content;
-    overflow: visible;
+    min-height: 0;
+    height: 0;
+    overflow: hidden;
     background: #ffffff;
   }
 
   .admin-content-preview__scroll {
-    flex: 1 0 auto;
-    min-height: min-content;
+    position: relative;
+    flex: 1 1 0;
+    min-height: 0;
+    height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    overflow-anchor: none;
+    scroll-padding-top: var(--public-site-header-height);
+  }
+
+  .admin-content-preview__scroll :global(.public-site-preview.public-body) {
+    display: block;
+    min-height: 100%;
     overflow: visible;
   }
 
   .admin-content-preview :global(.public-site-preview) {
-    display: flex;
-    flex-direction: column;
     min-height: 100%;
   }
 
   .admin-content-preview :global(.public-site-preview__main) {
     display: block;
-    flex: 1 0 auto;
+    min-height: 100%;
   }
 
   .admin-content-preview-floating-bar {

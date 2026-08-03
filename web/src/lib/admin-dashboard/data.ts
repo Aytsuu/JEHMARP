@@ -664,10 +664,9 @@ export type AdminProductManagementData = Pick<
 
 export type AdminOrderManagementData = Pick<
   AdminDashboardData,
-  "agents" | "customers" | "agentOrders" | "orders" | "products"
+  "agents" | "products"
 > & {
   orderRows: AdminOrderTableRow[];
-  customerBalances: Record<string, number>;
   pagination: AdminPaginatedResult<AdminOrderTableRow>["pagination"];
 };
 
@@ -807,23 +806,16 @@ export async function loadAdminOrderManagementData(
   pagination: AdminPaginationParams = defaultAdminPagination,
 ): Promise<AdminOrderManagementData> {
   const supabase = createSupabaseAdminClient();
-  const [products, agents, customers, orderRows, orders, customerBalances] = await Promise.all([
+  const [products, agents, orderRows] = await Promise.all([
     loadProducts(supabase),
     loadAgents(supabase),
-    loadCustomers(supabase),
     loadPaginatedAdminOrderRows(supabase, orderFilters, pagination),
-    loadOrders(supabase, 50),
-    loadCustomerOutstandingBalances(supabase),
   ]);
 
   return {
     products,
     agents,
-    customers,
-    agentOrders: [],
-    orders,
     orderRows: orderRows.records,
-    customerBalances,
     pagination: orderRows.pagination,
   };
 }
@@ -1365,57 +1357,6 @@ async function loadPaginatedAdminActivityRows(
       occurredAt: row.occurredAt ?? row.occurred_at ?? "",
     })),
   };
-}
-
-async function loadCustomerOutstandingBalances(
-  supabase: SupabaseAdminClient,
-): Promise<Record<string, number>> {
-  const { data, error } = await supabase
-    .from("order")
-    .select(`
-      id,
-      customer_id,
-      order_status,
-      payment_status,
-      order_item (
-        final_quantity,
-        unit_price
-      ),
-      payment (
-        amount
-      )
-    `)
-    .in("order_kind", customerOrderKinds)
-    .neq("order_status", "closed")
-    .in("payment_status", ["unpaid", "partial"])
-    .is("converted_at", null);
-
-  if (error) throwLoadError("Unable to load customer outstanding balances.", error);
-
-  return ((data ?? []) as Array<{
-    customer_id?: unknown;
-    customer_order_item?: Array<{ final_quantity?: unknown; unit_price?: unknown }> | null;
-    order_item?: Array<{ final_quantity?: unknown; unit_price?: unknown }> | null;
-    payment?: Array<{ amount?: unknown }> | null;
-  }>).reduce<Record<string, number>>((balances, order) => {
-    if (typeof order.customer_id !== "string") return balances;
-
-    const orderTotal = (order.order_item ?? order.customer_order_item ?? []).reduce((total, item) => {
-      const quantity = Number(item.final_quantity ?? 0);
-      const unitPrice = Number(item.unit_price ?? 0);
-      return total + (Number.isFinite(quantity) && Number.isFinite(unitPrice) ? quantity * unitPrice : 0);
-    }, 0);
-    const paidTotal = (order.payment ?? []).reduce((total, payment) => {
-      const amount = Number(payment.amount ?? 0);
-      return total + (Number.isFinite(amount) ? amount : 0);
-    }, 0);
-    const balance = Math.max(roundCurrency(orderTotal - paidTotal), 0);
-
-    return {
-      ...balances,
-      [order.customer_id]: roundCurrency((balances[order.customer_id] ?? 0) + balance),
-    };
-  }, {});
 }
 
 function escapePostgrestFilterValue(value: string) {

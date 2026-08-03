@@ -53,11 +53,15 @@ export default defineConfig({
         'recharts',
         ...transitionVirtualModules,
       ],
+      exclude: ['sharp'],
     },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
+    },
+    ssr: {
+      external: ['sharp'],
     },
   },
   prefetch: {

@@ -4,6 +4,7 @@ import {
 } from "@/lib/order-documents/layout";
 import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
 import { buildPdfDocument, pdfPageWidth } from "@/lib/order-documents/pdf-document";
+import { buildLogoImageDrawCommand } from "@/lib/order-documents/pdf-logo";
 
 const pageWidth = pdfPageWidth;
 const marginX = 40;
@@ -28,7 +29,9 @@ export function buildOrderSlipContentStreams(order: DocumentOrder, options: Docu
 }
 
 export function buildOrderSlipPdf(order: DocumentOrder, options: DocumentLayoutOptions = {}): Uint8Array {
-  return buildPdfDocument(buildOrderSlipContentStreams(order, options));
+  return buildPdfDocument(buildOrderSlipContentStreams(order, options), {
+    logoImage: options.logoImage ?? null,
+  });
 }
 
 export function buildBulkOrderSlipPdf(orders: DocumentOrder[], options: DocumentLayoutOptions = {}): Uint8Array {
@@ -38,7 +41,9 @@ export function buildBulkOrderSlipPdf(orders: DocumentOrder[], options: Document
     throw new Error("No order slip pages to generate.");
   }
 
-  return buildPdfDocument(contentStreams);
+  return buildPdfDocument(contentStreams, {
+    logoImage: options.logoImage ?? null,
+  });
 }
 
 function chunkOrderItems(items: DocumentOrderItem[]) {
@@ -53,7 +58,7 @@ function chunkOrderItems(items: DocumentOrderItem[]) {
 function buildOrderSlipPageContent(order: DocumentOrder, page: OrderSlipPage, options: DocumentLayoutOptions = {}) {
   const commands: string[] = [];
   const layout = buildOrderSlipLayout(order, options);
-  drawHeader(commands, page, layout.brandLines);
+  drawHeader(commands, page, layout, options);
   drawOrderFields(commands, layout);
   const tableBottomY = drawItemsTable(commands, page.items, options);
   drawOrderTotal(commands, layout, tableBottomY);
@@ -61,20 +66,42 @@ function buildOrderSlipPageContent(order: DocumentOrder, page: OrderSlipPage, op
   return commands.join("\n");
 }
 
-function drawHeader(commands: string[], page: OrderSlipPage, brandLines: string[]) {
-  addText(commands, pageWidth / 2, 802, brandLines[0], { align: "center", size: 13 });
-  addText(commands, pageWidth / 2, 786, brandLines[1], { align: "center", size: 10 });
-  addText(commands, pageWidth / 2, 771, brandLines[2], { align: "center", size: 10 });
+function drawHeader(
+  commands: string[],
+  page: OrderSlipPage,
+  layout: ReturnType<typeof buildOrderSlipLayout>,
+  options: DocumentLayoutOptions = {},
+) {
+  addText(commands, pageWidth / 2, 802, layout.brandLines[0], { align: "center", size: 13 });
+  addText(commands, pageWidth / 2, 786, layout.brandLines[1], { align: "center", size: 10 });
+  addText(commands, pageWidth / 2, 771, layout.brandLines[2], { align: "center", size: 10 });
   addText(commands, pageWidth / 2, 750, page.pageCount > 1 ? `ORDER SLIP - Page ${page.pageNumber}` : "ORDER SLIP", {
     align: "center",
     size: 14,
   });
+  drawDocumentLogo(commands, options.logoImage);
+}
+
+function drawDocumentLogo(
+  commands: string[],
+  logoImage: DocumentLayoutOptions["logoImage"],
+) {
+  if (logoImage) {
+    commands.push(
+      buildLogoImageDrawCommand(logoImage.name, logoImage.width, logoImage.height, {
+        centerX: 525,
+        centerY: 780,
+        maxSize: 60,
+      }),
+    );
+    return;
+  }
+
   drawCircle(commands, 525, 780, 30);
   addText(commands, 525, 778, "LOGO", { align: "center", size: 9 });
 }
 
 function drawOrderFields(commands: string[], layout: ReturnType<typeof buildOrderSlipLayout>) {
-
   addText(commands, 40, 717, layout.dateLabel, { size: 10 });
   drawLine(commands, 73, 713, 190, 713);
   addText(commands, 40, 695, layout.sellerLabel, { size: 10 });

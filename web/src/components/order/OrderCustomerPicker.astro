@@ -2,16 +2,23 @@
 type Props = {
   disabled?: boolean;
   showPaymentNotice?: boolean;
+  placeholder?: string;
+  searchLabel?: string;
 };
 
-const { disabled = false, showPaymentNotice = false } = Astro.props;
+const {
+  disabled = false,
+  showPaymentNotice = false,
+  placeholder = "Type a customer or agent name",
+  searchLabel = "Search customer or agent",
+} = Astro.props;
 ---
 
 <div class="order-customer-picker" data-customer-picker>
   <input
     autocomplete="off"
-    placeholder="Type a customer name"
-    aria-label="Search customer"
+    placeholder={placeholder}
+    aria-label={searchLabel}
     data-customer-search
     data-customer-search-input
     disabled={disabled}
@@ -40,10 +47,56 @@ const { disabled = false, showPaymentNotice = false } = Astro.props;
     </svg>
   </button>
   <div class="order-customer-picker__menu" hidden data-customer-picker-menu>
+    <p class="order-customer-picker__summary" hidden data-customer-picker-summary>
+      Try entering a customer or agent name.
+    </p>
     <div class="order-customer-picker__options" data-customer-options></div>
     <p class="order-customer-picker__empty" hidden data-customer-options-empty>
-      No customers found.
+      No customers or agents found.
     </p>
+    <div class="order-customer-picker__footer" hidden data-customer-picker-footer>
+      <span class="table-pagination__record-count" data-customer-picker-total-records></span>
+      <div class="table-pagination table-pagination--controls-only" data-customer-picker-pagination-controls hidden>
+        <div class="table-pagination__controls table-pagination__controls--merged">
+          <button
+            type="button"
+            class="btn-secondary table-pagination__arrow"
+            aria-label="Previous page"
+            data-customer-picker-prev
+          >
+            <svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m15 18-6-6 6-6"></path>
+            </svg>
+          </button>
+          <div class="table-pagination__page-editor">
+            <span class="table-pagination__page-label">Page</span>
+            <input
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              class="table-pagination__page-input"
+              data-customer-picker-page
+              data-digits-only
+              value="1"
+              aria-label="Current page"
+            />
+            <span class="table-pagination__page-total">
+              of <span data-customer-picker-total>1</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            class="btn-secondary table-pagination__arrow"
+            aria-label="Next page"
+            data-customer-picker-next
+          >
+            <svg class="table-pagination__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m9 18 6-6-6-6"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 {
@@ -55,4 +108,3 @@ const { disabled = false, showPaymentNotice = false } = Astro.props;
     ></p>
   )
 }
-<input type="hidden" data-customer-id />

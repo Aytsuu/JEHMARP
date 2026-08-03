@@ -66,7 +66,15 @@ export type PlatformSettingsPatch = {
   documentNumbering?: Partial<DocumentNumberingSettings>;
 };
 
+export type DocumentLogoImage = {
+  name: string;
+  width: number;
+  height: number;
+  jpegBytes: Uint8Array;
+};
+
 export type DocumentLayoutOptions = {
   businessProfile?: BusinessProfileSettings;
   documentPayment?: DocumentPaymentSettings;
+  logoImage?: DocumentLogoImage | null;
 };
