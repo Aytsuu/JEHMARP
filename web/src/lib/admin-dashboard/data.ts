@@ -723,6 +723,11 @@ export type AdminAgentDetailsData = {
   agentRemainingBalance: number;
 };
 
+export type AdminCustomerDetailsData = {
+  customer: AdminCustomer;
+  customerOrders: AdminOrder[];
+};
+
 export async function loadAdminDashboardData(
   options: AdminDashboardDataOptions = {},
 ): Promise<AdminDashboardData> {
@@ -901,6 +906,24 @@ export async function loadAdminCustomerRecord(customerId: string): Promise<Admin
   return data
     ? normalizeAdminCustomer(mapCustomerWithProfile(data as Parameters<typeof mapCustomerWithProfile>[0]))
     : null;
+}
+
+export async function loadAdminCustomerDetailsData(
+  customerId: string,
+): Promise<AdminCustomerDetailsData | null> {
+  const supabase = createSupabaseAdminClient();
+  const customer = await loadAdminCustomerRecord(customerId);
+
+  if (!customer) {
+    return null;
+  }
+
+  const customerOrders = await loadOrdersForCustomers(supabase, [customerId]);
+
+  return {
+    customer,
+    customerOrders,
+  };
 }
 
 export async function agentHasDistributionOrders(agentId: string) {

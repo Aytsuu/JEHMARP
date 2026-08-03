@@ -11,7 +11,7 @@ import {
   paginateCustomerRecords,
   parseCustomerRecordTab,
 } from "@/lib/admin-dashboard/customer-record";
-import { loadAdminDashboardData } from "@/lib/admin-dashboard/data";
+import { loadAdminCustomerDetailsData } from "@/lib/admin-dashboard/data";
 import { parseAdminOrderFilters } from "@/lib/admin-dashboard/order-filters";
 import { parseAdminPagination } from "@/lib/admin-dashboard/pagination";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
@@ -33,17 +33,17 @@ if (!customerId) {
   return new Response("Customer not found.", { status: 404 });
 }
 
-const data = await loadAdminDashboardData();
-const customer = data.customers.find((entry) => entry.id === customerId);
+const detailData = await loadAdminCustomerDetailsData(customerId);
 
-if (!customer) {
+if (!detailData) {
   return new Response("Customer not found.", { status: 404 });
 }
 
+const customer = detailData.customer;
+const customerOrders = detailData.customerOrders;
 const activeTab = parseCustomerRecordTab(Astro.url.searchParams.get("tab"));
 const orderFilters = parseAdminOrderFilters(Astro.url);
 const pagination = parseAdminPagination(Astro.url);
-const customerOrders = data.orders.filter((order) => order.customer_id === customerId);
 const customerReturnTo = encodeURIComponent(`/admin/customers/${customer.id}`);
 const customerBasePath = `/admin/customers/${customer.id}`;
 const filteredOrders = filterCustomerOrders(customerOrders, orderFilters);

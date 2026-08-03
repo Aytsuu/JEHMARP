@@ -578,6 +578,55 @@ describe("loadAdminDashboardData", () => {
     expect(result?.previousCustomerOrders).toEqual([]);
   });
 
+  it("loads all orders for a single customer on customer details", async () => {
+    const customerId = "customer-1";
+    const customerRow = {
+      id: customerId,
+      tracking_number: "JHM-CUST1",
+      assigned_agent_id: null,
+      is_reseller: false,
+      credit_limit: 1000,
+      credit_limit_exceeded: false,
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+      profile: {
+        first_name: "Maria",
+        last_name: "Cruz",
+        display_name: "Maria Cruz",
+        email: "maria@example.test",
+        phone_number: "09171111111",
+        address: "Quezon City",
+      },
+    };
+    const customerOrder = createMockOrder({
+      id: "order-1",
+      customer_id: customerId,
+      customer: null,
+    });
+    const customerBuilder = createQueryBuilder({ data: [customerRow], error: null });
+    const orderBuilder = createQueryBuilder({ data: [customerOrder], error: null });
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return customerBuilder;
+      if (table === "order") return orderBuilder;
+      return createQueryBuilder();
+    });
+    createSupabaseAdminClient.mockReturnValue({
+      from,
+      auth: {
+        admin: {
+          listUsers: vi.fn(() => Promise.resolve({ data: { users: [] }, error: null })),
+        },
+      },
+    });
+    const { loadAdminCustomerDetailsData } = await import("./data");
+
+    const result = await loadAdminCustomerDetailsData(customerId);
+
+    expect(result?.customer.id).toBe(customerId);
+    expect(result?.customerOrders.map((order) => order.id)).toEqual(["order-1"]);
+    expect(orderBuilder.in).toHaveBeenCalledWith("customer_id", [customerId]);
+  });
+
   it("loads converted source order metadata with an admin agent order", async () => {
     const agentOrder = {
       id: "agent-order-1",
