@@ -2,6 +2,7 @@
 import Tooltip from "@/components/ui/Tooltip.astro";
 import {
   getDashboardSidebarCategories,
+  formatSidebarUnreadCount,
   type DashboardSidebarUnreadBadge,
 } from "@/lib/dashboard/sidebar-navigation";
 import {
@@ -58,6 +59,9 @@ const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPat
                         item.href !== "/agent" &&
                         Astro.url.pathname.startsWith(item.href));
                     const unreadBadge = sidebarUnreadBadges[item.href];
+                    const unreadCount = unreadBadge
+                      ? ("count" in unreadBadge ? unreadBadge.count : unreadBadge.ids.length)
+                      : 0;
                     const routeStatus = routeStatuses[item.href];
                     const showRouteStatus = routeStatus && routeStatus.status !== "ready";
                     const routeStatusLabel = routeStatus
@@ -121,10 +125,7 @@ const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPat
                                 )
                               }
                               {
-                                unreadBadge &&
-                                  ("count" in unreadBadge
-                                    ? unreadBadge.count > 0
-                                    : unreadBadge.ids.length > 0) && (
+                                unreadBadge && unreadCount > 0 && (
                                     <span
                                       class="dashboard-sidebar__nav-badge"
                                       data-sidebar-unread-badge={
@@ -138,11 +139,10 @@ const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPat
                                           ? undefined
                                           : JSON.stringify(unreadBadge.ids)
                                       }
-                                      aria-label={`${item.label} unread count`}
+                                      data-unread-count={unreadCount}
+                                      aria-label={`${item.label} unread count: ${unreadCount}`}
                                     >
-                                      {"count" in unreadBadge
-                                        ? unreadBadge.count
-                                        : unreadBadge.ids.length}
+                                      {formatSidebarUnreadCount(unreadCount)}
                                     </span>
                                   )
                               }

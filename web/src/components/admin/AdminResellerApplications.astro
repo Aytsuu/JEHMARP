@@ -160,6 +160,7 @@ const skeletonRows = Array.from({ length: 6 });
 
 <script>
   import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
+  import { formatSidebarUnreadCount } from "@/lib/dashboard/sidebar-navigation";
 
   function initAdminResellerFilters() {
     initDashboardFragmentTable({
@@ -217,8 +218,10 @@ const skeletonRows = Array.from({ length: 6 });
       );
       if (!badge) return;
 
-      const nextCount = Math.max(0, Number.parseInt(badge.textContent || "0", 10) + delta);
-      badge.textContent = String(nextCount);
+      const currentCount = Number.parseInt(badge.dataset.unreadCount || "0", 10) || 0;
+      const nextCount = Math.max(0, currentCount + delta);
+      badge.dataset.unreadCount = String(nextCount);
+      badge.textContent = formatSidebarUnreadCount(nextCount);
       badge.hidden = nextCount < 1;
     }
 
