@@ -1,4 +1,5 @@
 import { getServerEnv } from "@/lib/env";
+import { resolveTransactionalEmailFrom } from "@/lib/public-website/transactional-email";
 import type { NotificationEvent } from "./types";
 import { resolveNotificationEmails } from "./notifications";
 
@@ -15,7 +16,9 @@ export async function sendOperationalNotificationEmail(input: {
   if (!env.resendApiKey || recipients.length === 0) return "skipped";
 
   const fetcher = input.fetch ?? fetch;
-  const from = env.resellerPriceListFrom ?? "notifications@jehmarp.local";
+  const from = resolveTransactionalEmailFrom({
+    resellerPriceListFrom: env.resellerPriceListFrom,
+  }) ?? "notifications@jehmarp.local";
   const response = await fetcher("https://api.resend.com/emails", {
     method: "POST",
     headers: {

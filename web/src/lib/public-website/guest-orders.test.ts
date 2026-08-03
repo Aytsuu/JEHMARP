@@ -124,9 +124,21 @@ describe("submitGuestOrder", () => {
       },
       error: null,
     }));
+    const settingsMaybeSingle = vi.fn(() => Promise.resolve({
+      data: null,
+      error: null,
+    }));
     const eq = vi.fn(() => ({ maybeSingle }));
+    const settingsEq = vi.fn(() => ({ maybeSingle: settingsMaybeSingle }));
     const select = vi.fn(() => ({ eq }));
-    const from = vi.fn(() => ({ select }));
+    const settingsSelect = vi.fn(() => ({ eq: settingsEq }));
+    const from = vi.fn((table: string) => {
+      if (table === "platform_settings") {
+        return { select: settingsSelect };
+      }
+
+      return { select };
+    });
     const fetcher = vi.fn((url: string) => {
       if (url === "https://challenges.cloudflare.com/turnstile/v0/siteverify") {
         return Promise.resolve(Response.json({ success: true }));

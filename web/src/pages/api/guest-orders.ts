@@ -25,7 +25,7 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   }
 
   try {
-    await submitGuestOrder(parsed.data, {
+    const result = await submitGuestOrder(parsed.data, {
       clientIp: getClientIp(request.headers),
       siteOrigin: url.origin,
     });
@@ -34,7 +34,13 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
     });
 
     if (parsed.data.customer.email) {
-      params.set("email", "1");
+      if (result.trackingEmailStatus === "sent") {
+        params.set("email", "1");
+      } else if (result.trackingEmailStatus === "failed") {
+        params.set("email", "failed");
+      } else if (result.trackingEmailStatus === "skipped") {
+        params.set("email", "unavailable");
+      }
     }
 
     return redirect(`${returnPath}?${params.toString()}`, 303);

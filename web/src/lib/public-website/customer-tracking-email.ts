@@ -1,4 +1,5 @@
 import { getServerEnv } from "@/lib/env";
+import { resolveTransactionalEmailFrom } from "@/lib/public-website/transactional-email";
 
 export type CustomerTrackingEmailContext = {
   recipientName: string;
@@ -15,10 +16,15 @@ export type CustomerTrackingEmailResult =
 export async function sendCustomerTrackingNumberEmail(
   to: string,
   context: CustomerTrackingEmailContext,
-  options: { fetch?: typeof fetch } = {},
+  options: {
+    fetch?: typeof fetch;
+    from?: string | null;
+  } = {},
 ): Promise<CustomerTrackingEmailResult> {
   const env = getServerEnv();
-  const from = env.resellerPriceListFrom;
+  const from = options.from ?? resolveTransactionalEmailFrom({
+    resellerPriceListFrom: env.resellerPriceListFrom,
+  });
 
   if (!env.resendApiKey || !from) {
     return { status: "skipped" };

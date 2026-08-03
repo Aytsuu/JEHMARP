@@ -154,6 +154,50 @@ describe("POST /api/guest-orders", () => {
       siteOrigin: "https://shop.example.test",
     });
   });
+
+  it("does not claim the tracking email was sent when delivery was skipped", async () => {
+    const payload = {
+      customer: {
+        firstName: "Maria",
+        lastName: "Santos",
+        phoneNumber: "09170000000",
+        email: "maria@example.com",
+        address: "San Pedro",
+      },
+      items: [
+        {
+          productId: "product-1",
+          quantity: 2,
+        },
+      ],
+      turnstileToken: "turnstile-token",
+    };
+
+    parseGuestOrderFormData.mockReturnValue({
+      success: true,
+      data: payload,
+    });
+    submitGuestOrder.mockResolvedValue({
+      orderId: "order-id",
+      trackingNumber: "JHM-ABCD2345",
+      trackingEmailStatus: "skipped",
+    });
+
+    const { POST } = await import("./guest-orders");
+    const response = await POST({
+      request: new Request("https://shop.example.test/api/guest-orders", {
+        method: "POST",
+        headers: {
+          origin: "https://shop.example.test",
+        },
+        body: validFormData(),
+      }),
+      url: new URL("https://shop.example.test/api/guest-orders"),
+      redirect: redirectResponse,
+    } as Parameters<APIRoute>[0]);
+
+    expect(response.headers.get("location")).toBe("/shop?order=submitted&email=unavailable");
+  });
 });
 
 function redirectResponse(path: string, status?: number): Response {

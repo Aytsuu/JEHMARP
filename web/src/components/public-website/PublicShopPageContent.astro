@@ -12,7 +12,7 @@ import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 type Props = {
   products: PublicProduct[];
   orderStatus: string | null;
-  orderEmailSent: boolean;
+  orderEmailStatus: "sent" | "failed" | "unavailable" | null;
   orderMessage: string | null;
   turnstileSiteKey: string | null;
   returnPath?: string;
@@ -21,7 +21,7 @@ type Props = {
 const {
   products,
   orderStatus,
-  orderEmailSent,
+  orderEmailStatus,
   orderMessage,
   turnstileSiteKey,
   returnPath,
@@ -89,9 +89,13 @@ const canSubmitOrder =
   availableOrderProducts.length > 0 &&
   Boolean(turnstileSiteKey);
 
-const orderSuccessMessage = orderEmailSent
+const orderSuccessMessage = orderEmailStatus === "sent"
   ? "Your guest order was submitted for review. We sent your customer tracking number to the email address you provided."
-  : "Your guest order was submitted for review. Our team will share your customer tracking number with you so you can follow your order status.";
+  : orderEmailStatus === "failed"
+    ? "Your guest order was submitted for review, but we could not deliver the tracking email. Please contact our team so we can share your customer tracking number."
+    : orderEmailStatus === "unavailable"
+      ? "Your guest order was submitted for review. Email delivery is not available right now, so our team will share your customer tracking number with you."
+      : "Your guest order was submitted for review. Our team will share your customer tracking number with you so you can follow your order status.";
 
 const orderErrorMessage =
   orderMessage ?? "Please check the order form and try again.";
