@@ -42,20 +42,6 @@ type PendingPaymentConfirmation = {
   dateRequested: string;
 };
 
-type AttachCustomerCustomer = {
-  id: string;
-  label: string;
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-  email: string;
-  address: string;
-  balance: number;
-  creditLimit: number;
-  creditExceeded: boolean;
-  paymentNotice: "unpaid" | "partial" | null;
-};
-
 type CustomerOrderCounts = {
   pending: number;
   unpaid: number;
@@ -88,7 +74,6 @@ type Props = {
   customerOrderRows: AdminOrder[];
   ordersPagination: AdminPagination;
   orderFilters: AdminOrderFilters;
-  attachCustomerCustomers: AttachCustomerCustomer[];
   attachCustomerProducts: Array<{
     id: string;
     name: string;
@@ -125,7 +110,6 @@ const {
   customerOrderRows,
   ordersPagination,
   orderFilters,
-  attachCustomerCustomers,
   attachCustomerProducts,
   todayDate,
   todayTime,
@@ -962,7 +946,6 @@ const defaultTotalCommission = commissionBreakdown.reduce(
 
   <AgentOrderAttachCustomerSheet
     agentOrderId={agentOrder.id}
-    customers={attachCustomerCustomers}
     products={attachCustomerProducts}
     mode="admin"
     canAttachCustomer={canAttachCustomer}

@@ -184,6 +184,9 @@ describe("parseAdminActionFormData", () => {
           payment_status: "unpaid",
           release_date: combineDateAndTime("2026-07-18", "09:30"),
           submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          created_at: expect.any(String),
           updated_at: expect.any(String),
         },
         payment: null,
@@ -337,6 +340,9 @@ describe("parseAdminActionFormData", () => {
           payment_status: "unpaid",
           release_date: combineDateAndTime("2026-07-18", "11:15"),
           submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          created_at: expect.any(String),
           updated_at: expect.any(String),
         },
         payment: null,
@@ -380,6 +386,9 @@ describe("parseAdminActionFormData", () => {
           payment_status: "unpaid",
           release_date: combineDateAndTime("2026-07-18", "11:15"),
           submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          created_at: expect.any(String),
           updated_at: expect.any(String),
         },
         payment: null,
@@ -498,6 +507,9 @@ describe("parseAdminActionFormData", () => {
           payment_status: "unpaid",
           release_date: combineDateAndTime("2026-07-18", "09:30"),
           submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          created_at: expect.any(String),
           updated_at: expect.any(String),
         },
         payment: null,
@@ -3283,6 +3295,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3297,7 +3312,7 @@ describe("executeAdminAction", () => {
 
     expect(from).toHaveBeenCalledWith("order");
     expect(from).toHaveBeenCalledWith("order_item");
-    expect(orderInsert).toHaveBeenCalledWith({
+    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
       order_kind: "customer",
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
@@ -3306,8 +3321,11 @@ describe("executeAdminAction", () => {
       payment_status: "unpaid",
       release_date: "2026-07-18T03:15:00.000Z",
       submitted_by: adminUserId,
+      approved_by: adminUserId,
+      approved_at: "2026-07-01T00:00:00.000Z",
+      created_at: "2026-07-01T00:00:00.000Z",
       updated_at: "2026-07-01T00:00:00.000Z",
-    });
+    }));
     expect(itemInsert).toHaveBeenCalledWith([
       {
         order_id: orderId,
@@ -3357,6 +3375,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3371,7 +3392,7 @@ describe("executeAdminAction", () => {
 
     expect(agentSelect).toHaveBeenCalledWith("customer_id");
     expect(agentEq).toHaveBeenCalledWith("id", agentId);
-    expect(orderInsert).toHaveBeenCalledWith({
+    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
       order_kind: "customer",
       customer_id: customerId,
       agent_id: agentId,
@@ -3380,8 +3401,11 @@ describe("executeAdminAction", () => {
       payment_status: "unpaid",
       release_date: "2026-07-18T03:15:00.000Z",
       submitted_by: adminUserId,
+      approved_by: adminUserId,
+      approved_at: "2026-07-01T00:00:00.000Z",
+      created_at: "2026-07-01T00:00:00.000Z",
       updated_at: "2026-07-01T00:00:00.000Z",
-    });
+    }));
     expect(itemInsert).toHaveBeenCalledWith([
       {
         order_id: orderId,
@@ -3423,6 +3447,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3443,6 +3470,9 @@ describe("executeAdminAction", () => {
       order_status: "pending_customers",
       notes: null,
       submitted_by: adminUserId,
+      approved_by: adminUserId,
+      approved_at: expect.any(String),
+      created_at: expect.any(String),
       admin_read_by: adminUserId,
       release_date: "2026-07-18T03:15:00.000Z",
     }));

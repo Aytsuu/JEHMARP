@@ -55,9 +55,6 @@ const attachCustomerEntriesSchema = z
 
 export function parseAttachCustomerEntriesJson(
   raw: string,
-  options?: {
-    assignedCustomerIds?: ReadonlySet<string>;
-  },
 ): AgentOrderAttachEntry[] {
   let parsed: unknown;
 
@@ -71,13 +68,6 @@ export function parseAttachCustomerEntriesJson(
 
   return entries.map((entry) => {
     if (entry.customerId) {
-      if (
-        options?.assignedCustomerIds &&
-        !options.assignedCustomerIds.has(entry.customerId)
-      ) {
-        throw new Error("Selected customer is not assigned to this agent.");
-      }
-
       return {
         customer: {
           type: "existing" as const,

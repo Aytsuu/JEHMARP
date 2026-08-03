@@ -91,51 +91,6 @@ const attachCustomerProducts = buildAttachCustomerProductOptions({
   agentOrder,
   products: data.products,
 });
-const customerBalanceById = data.orders.reduce<Record<string, number>>((balances, order) => {
-  if (!order.customer_id) return balances;
-
-  const balance = Math.max(orderTotal(order, "final_quantity") - orderPaymentTotal(order), 0);
-  if (balance <= 0) return balances;
-
-  return {
-    ...balances,
-    [order.customer_id]: (balances[order.customer_id] ?? 0) + balance,
-  };
-}, {});
-const attachedCustomerIds = agentOrder.customer_order.flatMap((order) =>
-  order.customer_id ? [order.customer_id] : [],
-);
-const paymentNoticeByCustomerId = data.orders.reduce<Record<string, "unpaid" | "partial">>((notices, order) => {
-  const paymentNotice = order.payment_status === "unpaid" || order.payment_status === "partial"
-    ? order.payment_status
-    : null;
-
-  if (!order.customer_id || !paymentNotice) {
-    return notices;
-  }
-
-  return {
-    ...notices,
-    [order.customer_id]: notices[order.customer_id] === "unpaid"
-      ? "unpaid"
-      : paymentNotice,
-  };
-}, {});
-const attachCustomerCustomers = data.customers
-  .filter((customer) => !attachedCustomerIds.includes(customer.id))
-  .map((customer) => ({
-  id: customer.id,
-  label: fullName(customer),
-  firstName: customer.first_name,
-  lastName: customer.last_name,
-  phoneNumber: customer.phone_number,
-  email: customer.email ?? "",
-  address: customer.address,
-  balance: customerBalanceById[customer.id] ?? 0,
-  creditLimit: customer.credit_limit,
-  creditExceeded: customer.credit_limit_exceeded,
-  paymentNotice: paymentNoticeByCustomerId[customer.id] ?? null,
-}));
 const totalPaid = agentOrder.customer_order.reduce(
   (sum, order) => sum + orderPaymentTotal(order),
   0,
@@ -710,7 +665,6 @@ function isOrderDetailTabActive(tab: OrderDetailTabId) {
 
   <AgentOrderAttachCustomerSheet
     agentOrderId={agentOrder.id}
-    customers={attachCustomerCustomers}
     products={attachCustomerProducts}
     mode="agent"
     canAttachCustomer={canAttachCustomer}

@@ -6,6 +6,8 @@ import {
   agentRecordEstimatedInvoiceTotal,
   buildAgentPerformanceQuickStats,
   buildAgentReceivableSegments,
+  buildAgentRecordOrderRows,
+  filterAgentRecordOrderRows,
   formatKgSoldTrendDiff,
 } from "./agent-record";
 
@@ -549,5 +551,51 @@ describe("agent record receivable summaries", () => {
     expect(segments[0]?.tooltip).toContain("Allocated on distributions:");
     expect(segments[0]?.tooltip).not.toContain("Personal orders:");
     expect(segments[0]?.tooltip).not.toContain("Unallocated distribution orders:");
+  });
+});
+
+describe("buildAgentRecordOrderRows", () => {
+  it("lists personal and distributed orders while hiding converted and child orders", () => {
+    const rows = buildAgentRecordOrderRows(
+      [
+        createCustomerOrder({ id: "personal-order" }),
+        createCustomerOrder({
+          id: "child-order",
+          parent_order_id: "distribution-order",
+        }),
+        createCustomerOrder({
+          id: "converted-order",
+          converted_at: "2026-07-02T00:00:00.000Z",
+          parent_order_id: "distribution-order",
+        }),
+      ],
+      [
+        createAgentOrder({ id: "distribution-order" }),
+      ],
+      encodeURIComponent("/admin/agents/agent-1"),
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.id)).toEqual(["personal-order", "distribution-order"]);
+    expect(rows.find((row) => row.id === "personal-order")).toMatchObject({
+      order_type: "personal",
+      order_type_label: "Personal",
+    });
+    expect(rows.find((row) => row.id === "distribution-order")).toMatchObject({
+      order_type: "distributed",
+      order_type_label: "Distributed",
+    });
+  });
+
+  it("filters rows by personal and distributed order types", () => {
+    const rows = buildAgentRecordOrderRows(
+      [createCustomerOrder({ id: "personal-order" })],
+      [createAgentOrder({ id: "distribution-order" })],
+      encodeURIComponent("/admin/agents/agent-1"),
+    );
+
+    expect(filterAgentRecordOrderRows(rows, { orderType: "personal" })).toHaveLength(1);
+    expect(filterAgentRecordOrderRows(rows, { orderType: "distributed" })).toHaveLength(1);
+    expect(filterAgentRecordOrderRows(rows, { orderType: "personal" })[0]?.id).toBe("personal-order");
   });
 });

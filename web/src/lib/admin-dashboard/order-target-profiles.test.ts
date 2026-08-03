@@ -10,6 +10,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 import {
   buildOrderTargetPickerSummary,
+  loadAttachOrderTargetProfiles,
   loadOrderTargetProfiles,
   parseOrderTargetProfileQuery,
 } from "./order-target-profiles";
@@ -21,6 +22,7 @@ describe("parseOrderTargetProfileQuery", () => {
         page: 1,
         scope: "customer-agent",
         search: "",
+        agentOrderId: "",
       });
   });
 
@@ -31,6 +33,18 @@ describe("parseOrderTargetProfileQuery", () => {
       page: 2,
       scope: "customer",
       search: "maria",
+      agentOrderId: "",
+    });
+  });
+
+  it("parses attach-order filters", () => {
+    expect(parseOrderTargetProfileQuery(new URL(
+      "https://example.test/admin/order-target-profiles.json?scope=customer&agentOrderId=order-1",
+    ))).toEqual({
+      page: 1,
+      scope: "customer",
+      search: "",
+      agentOrderId: "order-1",
     });
   });
 });
@@ -87,13 +101,36 @@ function buildCustomerRow(id: string, firstName: string, lastName: string) {
   };
 }
 
-function buildAgentRow(id: string, displayName: string) {
+function buildAgentListRow(id: string, displayName: string) {
   return {
     id,
     display_name: displayName,
     contact: "09171112222",
     email: `${displayName.toLowerCase().replace(/\s+/g, ".")}@example.test`,
     status: "active",
+  };
+}
+
+function buildAgentAttachRecord(id: string, displayName: string, customerId: string) {
+  return {
+    id,
+    user_id: null,
+    customer_id: customerId,
+    promoted_from_customer_id: null,
+    promoted_from_customer_at: null,
+    employee_id: null,
+    status: "active",
+    created_at: "2026-07-01T00:00:00.000Z",
+    updated_at: "2026-07-01T00:00:00.000Z",
+    profile: {
+      id: `${id}-profile`,
+      first_name: displayName.split(" ")[0] ?? displayName,
+      last_name: displayName.split(" ").slice(1).join(" ") || "Agent",
+      display_name: displayName,
+      phone_number: "09171112222",
+      email: `${displayName.toLowerCase().replace(/\s+/g, ".")}@example.test`,
+      address: "Agent address",
+    },
   };
 }
 
@@ -106,7 +143,7 @@ describe("loadOrderTargetProfiles", () => {
     const customers = Array.from({ length: 12 }, (_, index) =>
       buildCustomerRow(`customer-${index + 1}`, `Customer${index + 1}`, "Buyer"));
     const agents = Array.from({ length: 4 }, (_, index) =>
-      buildAgentRow(`agent-${index + 1}`, `Agent ${index + 1}`));
+      buildAgentListRow(`agent-${index + 1}`, `Agent ${index + 1}`));
     const orderBuilder = {
       select: vi.fn(() => orderBuilder),
       in: vi.fn(() => orderBuilder),
@@ -163,7 +200,7 @@ describe("loadOrderTargetProfiles", () => {
     const customers = Array.from({ length: 12 }, (_, index) =>
       buildCustomerRow(`customer-${index + 1}`, `Customer${index + 1}`, "Buyer"));
     const agents = Array.from({ length: 4 }, (_, index) =>
-      buildAgentRow(`agent-${index + 1}`, `Agent ${index + 1}`));
+      buildAgentListRow(`agent-${index + 1}`, `Agent ${index + 1}`));
     const orderBuilder = {
       select: vi.fn(() => orderBuilder),
       in: vi.fn(() => orderBuilder),
@@ -257,5 +294,69 @@ describe("loadOrderTargetProfiles", () => {
     expect(result.totalProfiles).toBe(9);
     expect(result.hasPagination).toBe(false);
     expect(result.totalPages).toBe(1);
+  });
+});
+
+describe("loadAttachOrderTargetProfiles", () => {
+  beforeEach(() => {
+    createSupabaseAdminClient.mockReset();
+  });
+
+  it("scopes customers to the distribution agent and includes unassigned customers", async () => {
+    const orderBuilder = {
+      select: vi.fn(() => orderBuilder),
+      eq: vi.fn(() => orderBuilder),
+      not: vi.fn(() => orderBuilder),
+      in: vi.fn(() => orderBuilder),
+      neq: vi.fn(() => orderBuilder),
+      then: (resolve: (value: { data: { customer_id: string }[]; error: null }) => unknown) => resolve({
+        data: [{ customer_id: "attached-customer" }],
+        error: null,
+      }),
+    };
+    const agentBuilder = {
+      select: vi.fn(() => agentBuilder),
+      eq: vi.fn(() => agentBuilder),
+      maybeSingle: vi.fn(() => Promise.resolve({
+        data: buildAgentAttachRecord("agent-1", "Carlos Agent", "agent-customer-1"),
+        error: null,
+      })),
+    };
+    const rpc = vi.fn(() => Promise.resolve({
+      data: [{
+        records: [buildCustomerRow("customer-1", "Maria", "Buyer")],
+        total_rows: "1",
+      }],
+      error: null,
+    }));
+
+    createSupabaseAdminClient.mockReturnValue({
+      rpc,
+      from: vi.fn((table: string) => (table === "agent" ? agentBuilder : orderBuilder)),
+    });
+
+    const result = await loadAttachOrderTargetProfiles({
+      agentOrderId: "distribution-order-1",
+      assignedAgentId: "agent-1",
+      page: 1,
+      search: "",
+    });
+
+    expect(rpc).toHaveBeenCalledWith("list_admin_customer_rows", expect.objectContaining({
+      assigned_agent_id_filter: "agent-1",
+      include_unassigned_customers: true,
+      exclude_customer_ids: ["attached-customer", "agent-customer-1"],
+    }));
+    expect(result.items[0]).toMatchObject({
+      type: "agent",
+      id: "agent-1",
+      label: "Carlos Agent",
+      attachCustomerId: "agent-customer-1",
+    });
+    expect(result.items[1]).toMatchObject({
+      type: "customer",
+      id: "customer-1",
+    });
+    expect(result.agentTotal).toBe(1);
   });
 });

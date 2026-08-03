@@ -35,7 +35,7 @@ describe("parseAttachCustomerEntriesJson", () => {
       },
     ]);
 
-    expect(parseAttachCustomerEntriesJson(payload, { assignedCustomerIds: new Set([customerId]) })).toEqual([
+    expect(parseAttachCustomerEntriesJson(payload)).toEqual([
       {
         customer: {
           type: "existing",
@@ -71,7 +71,7 @@ describe("parseAttachCustomerEntriesJson", () => {
     ]);
   });
 
-  it("rejects unassigned existing customers for agents", () => {
+  it("parses existing customers without client-side assignment checks", () => {
     const payload = JSON.stringify([
       {
         customerId,
@@ -85,8 +85,20 @@ describe("parseAttachCustomerEntriesJson", () => {
       },
     ]);
 
-    expect(() => parseAttachCustomerEntriesJson(payload, { assignedCustomerIds: new Set() })).toThrow(
-      "Selected customer is not assigned to this agent.",
-    );
+    expect(parseAttachCustomerEntriesJson(payload)).toEqual([
+      {
+        customer: {
+          type: "existing",
+          customerId,
+        },
+        items: [
+          {
+            productId,
+            quantity: 1,
+            addDetails: null,
+          },
+        ],
+      },
+    ]);
   });
 });

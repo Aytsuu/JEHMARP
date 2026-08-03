@@ -1291,6 +1291,7 @@ function parseAdminActionFormDataOrThrow(
         ? enumValue(formData, "agentOrderType", agentOrderTypes)
         : null;
       const payment = parseCreateOrderPaymentPayload(formData, adminUserId);
+      const timestamp = new Date().toISOString();
 
       if (agentOrderType === "distribution" && payment) {
         throw new Error("Downpayment is not supported for agent distribution orders.");
@@ -1320,7 +1321,10 @@ function parseAdminActionFormDataOrThrow(
           payment_status: "unpaid",
           release_date: requiredDateAndTimeFromFormData(formData, "releaseDate", "releaseTime"),
           submitted_by: adminUserId,
-          updated_at: new Date().toISOString(),
+          approved_by: adminUserId,
+          approved_at: timestamp,
+          created_at: timestamp,
+          updated_at: timestamp,
         },
         items: parseOrderItems(formData),
         payment,
@@ -2569,6 +2573,9 @@ async function executeAgentDistributionOrderCreate(
       notes: null,
       release_date: action.payload.release_date,
       submitted_by: action.payload.submitted_by,
+      approved_by: action.payload.submitted_by,
+      approved_at: timestamp,
+      created_at: timestamp,
       admin_read_at: timestamp,
       admin_read_by: action.payload.submitted_by,
       updated_at: timestamp,

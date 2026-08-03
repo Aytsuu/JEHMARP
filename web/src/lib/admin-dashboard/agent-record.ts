@@ -39,9 +39,17 @@ export type AgentRecordTab =
   | "customers"
   | "previous-orders";
 
-export type AgentRecordOrderType = "customer" | "agent";
+export type AgentRecordOrderType = "personal" | "distributed";
 
-export const agentRecordOrderTypes = ["customer", "agent"] as const;
+export const agentRecordOrderTypes = ["personal", "distributed"] as const;
+
+export function isAgentRecordPersonalOrder(order: AdminOrder) {
+  return !order.converted_at && !order.parent_order_id;
+}
+
+export function agentRecordPersonalOrders(customerOrders: AdminOrder[]) {
+  return customerOrders.filter(isAgentRecordPersonalOrder);
+}
 
 export type AgentRecordFilters = AdminOrderFilters & {
   orderType?: AgentRecordOrderType;
@@ -120,8 +128,12 @@ export function parseAgentRecordFilters(url: URL): AgentRecordFilters {
   const filters: AgentRecordFilters = { ...parseAdminOrderFilters(url) };
   const orderType = url.searchParams.get("orderType");
 
-  if (orderType === "customer" || orderType === "agent") {
+  if (orderType === "personal" || orderType === "distributed") {
     filters.orderType = orderType;
+  } else if (orderType === "customer") {
+    filters.orderType = "personal";
+  } else if (orderType === "agent") {
+    filters.orderType = "distributed";
   }
 
   return filters;
@@ -144,11 +156,11 @@ export function buildAgentRecordOrderRows(
   agentOrders: AdminAgentOrder[],
   agentReturnTo: string,
 ): AgentRecordOrderRow[] {
-  const customerRows = customerOrders.map((order) => ({
+  const personalRows = agentRecordPersonalOrders(customerOrders).map((order) => ({
     id: order.id,
     created_at: order.created_at,
-    order_type: "customer" as const,
-    order_type_label: "Customer",
+    order_type: "personal" as const,
+    order_type_label: "Personal",
     source: order.source,
     source_label: formatOrderSource(order.source),
     order_status: order.order_status,
@@ -158,13 +170,13 @@ export function buildAgentRecordOrderRows(
     href: `/admin/orders/customer/${order.id}?returnTo=${agentReturnTo}`,
   }));
 
-  const agentRows = agentOrders.map((order) => ({
+  const distributedRows = agentOrders.map((order) => ({
     id: order.id,
     created_at: order.created_at,
-    order_type: "agent" as const,
-    order_type_label: "Agent",
+    order_type: "distributed" as const,
+    order_type_label: "Distributed",
     source: null,
-    source_label: "Agent order",
+    source_label: "Distributed order",
     order_status: order.order_status,
     payment_status: agentOrderPaymentStatus(order),
     order_total: agentOrderReceivableTotal(order),
@@ -172,7 +184,7 @@ export function buildAgentRecordOrderRows(
     href: `/admin/orders/agent/${order.id}?returnTo=${agentReturnTo}`,
   }));
 
-  return [...customerRows, ...agentRows].sort(
+  return [...personalRows, ...distributedRows].sort(
     (left, right) =>
       new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
   );
@@ -189,7 +201,7 @@ export function filterAgentRecordOrderRows(
       return false;
     }
 
-    if (filters.source && (row.order_type !== "customer" || row.source !== filters.source)) {
+    if (filters.source && (row.order_type !== "personal" || row.source !== filters.source)) {
       return false;
     }
 
@@ -228,10 +240,11 @@ export function agentRecordOrderCounts(
   customerOrders: AdminOrder[],
   agentOrders: AdminAgentOrder[],
 ) {
+  const personalOrders = agentRecordPersonalOrders(customerOrders);
   const customerCounts = {
-    pending: customerOrders.filter((order) => order.order_status === "pending").length,
-    processing: customerOrders.filter((order) => order.order_status === "processing").length,
-    closed: customerOrders.filter((order) => order.order_status === "closed").length,
+    pending: personalOrders.filter((order) => order.order_status === "pending").length,
+    processing: personalOrders.filter((order) => order.order_status === "processing").length,
+    closed: personalOrders.filter((order) => order.order_status === "closed").length,
   };
   const agentPending = agentOrders.filter(
     (order) => order.order_status === "pending_customers" || order.order_status === "pending_order",
@@ -240,7 +253,7 @@ export function agentRecordOrderCounts(
   const agentClosed = agentOrders.filter((order) => order.order_status === "closed").length;
 
   return {
-    total: customerOrders.length + agentOrders.length,
+    total: personalOrders.length + agentOrders.length,
     pending: customerCounts.pending + agentPending,
     processing: customerCounts.processing + agentProcessing,
     closed: customerCounts.closed + agentClosed,

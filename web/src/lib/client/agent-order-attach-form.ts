@@ -100,22 +100,37 @@ function getCustomerEntryFallbackLabel(entry: HTMLElement) {
   return fullName || "New customer";
 }
 
-function getSelectedCustomerOption(entry: HTMLElement) {
+function getSelectedTargetOption(entry: HTMLElement) {
   const selectedCustomerId = entry.querySelector<HTMLInputElement>("input[data-customer-id]")?.value.trim() ?? "";
   if (!selectedCustomerId) return null;
 
-  return Array.from(entry.querySelectorAll<HTMLElement>("[data-customer-options] [data-customer-id]"))
-    .find((option) => option.dataset.customerId === selectedCustomerId) ?? null;
+  return Array.from(
+    entry.querySelectorAll<HTMLElement>(
+      "[data-customer-options] [data-order-target-option], [data-customer-options] [data-customer-id]",
+    ),
+  ).find((option) =>
+    option.dataset.customerId === selectedCustomerId
+    || option.dataset.attachCustomerId === selectedCustomerId,
+  ) ?? null;
+}
+
+function isAgentAttachSelection(entry: HTMLElement) {
+  const selectedOption = getSelectedTargetOption(entry);
+  return selectedOption?.dataset.orderTargetType === "agent";
 }
 
 function getCustomerEntryCreditLimitWarning(entry: HTMLElement) {
-  const selectedCustomer = getSelectedCustomerOption(entry);
+  if (isAgentAttachSelection(entry)) {
+    return null;
+  }
+
+  const selectedCustomer = getSelectedTargetOption(entry);
   const orderTotal = calculateOrderItemsTotal(collectOrderItems(entry));
   const warning = getOrderCreditLimitWarning({
-    currentBalance: selectedCustomer
+    currentBalance: selectedCustomer?.dataset.orderTargetType === "customer"
       ? Number(selectedCustomer.dataset.customerBalance ?? 0)
       : 0,
-    creditLimit: selectedCustomer
+    creditLimit: selectedCustomer?.dataset.orderTargetType === "customer"
       ? Number(selectedCustomer.dataset.customerCreditLimit ?? defaultNewCustomerCreditLimit)
       : defaultNewCustomerCreditLimit,
     orderTotal,
@@ -159,15 +174,16 @@ export function initAgentOrderAttachForm(root: ParentNode = document) {
       : root.querySelector<HTMLButtonElement>("[data-agent-order-attach-submit]");
     const customerEntries = form.querySelector<HTMLElement>("[data-customer-entries]");
     const customerEntryTemplate = form.querySelector<HTMLTemplateElement>("[data-customer-entry-template]");
-    const customerOptionTemplate = form.querySelector<HTMLTemplateElement>("[data-customer-option-template]");
     const orderItemTemplate = form.querySelector<HTMLTemplateElement>("[data-order-item-template]");
     const attachEntriesInput = form.querySelector<HTMLInputElement>("[data-attach-customer-entries]");
+    const customerPickerEndpoint = form.dataset.customerPickerEndpoint?.trim() ?? "";
+    const customerPickerAgentOrderId = form.dataset.customerPickerAgentOrderId?.trim() ?? "";
     const totalValue = form
       .closest<HTMLElement>("[data-sheet-root], .drawer-sheet")
       ?.querySelector<HTMLElement>("[data-agent-order-attach-total]")
       ?? root.querySelector<HTMLElement>("[data-agent-order-attach-total]");
 
-    if (!customerEntries || !customerEntryTemplate || !customerOptionTemplate || !orderItemTemplate) {
+    if (!customerEntries || !customerEntryTemplate || !orderItemTemplate) {
       return;
     }
 
@@ -175,10 +191,12 @@ export function initAgentOrderAttachForm(root: ParentNode = document) {
 
     const entriesContainer = customerEntries;
     const entryTemplate = customerEntryTemplate;
-    const optionTemplate = customerOptionTemplate;
     const itemTemplate = orderItemTemplate;
     const canSubmit = form.dataset.canSubmit !== "false";
     const entryControllers: CustomerEntryController[] = [];
+    const customerPickerApiExtraParams: Record<string, string> = customerPickerAgentOrderId.length > 0
+      ? { agentOrderId: customerPickerAgentOrderId }
+      : {};
 
     function updateOrderItemTitle(scope: ParentNode) {
       const title = scope.querySelector<HTMLElement>("[data-order-item-title]");
@@ -301,9 +319,13 @@ export function initAgentOrderAttachForm(root: ParentNode = document) {
 
       const pickerController = initOrderCustomerPicker({
         scope: entry,
-        customerOptionTemplate: optionTemplate,
+        apiEndpoint: customerPickerEndpoint || undefined,
+        profileScope: "customer",
+        apiExtraParams: customerPickerApiExtraParams,
+        cacheKey: `attach-order-target-profiles-${customerPickerAgentOrderId || "global"}-v3`,
         newCustomerFields,
         showPaymentNotice: true,
+        showProfileType: true,
         onChange: () => {
           refreshTitle();
           updateTotal();
@@ -466,9 +488,14 @@ export function initAgentOrderAttachForm(root: ParentNode = document) {
     }
 
     function confirmCreditLimitWarnings() {
-      const warnings = Array.from(
-        entriesContainer.querySelectorAll<HTMLElement>("[data-customer-entry]"),
-      ).map((entry) => getCustomerEntryCreditLimitWarning(entry))
+      const warnings = entryControllers
+        .map((controller) => {
+          if (controller.picker.getSelection().profile?.type === "agent") {
+            return null;
+          }
+
+          return getCustomerEntryCreditLimitWarning(controller.root);
+        })
         .filter((warning): warning is NonNullable<typeof warning> => warning !== null);
 
       if (warnings.length === 0) return true;

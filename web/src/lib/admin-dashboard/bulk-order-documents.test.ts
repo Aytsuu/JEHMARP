@@ -25,13 +25,14 @@ describe("bulk-order-documents", () => {
     const { parseBulkOrderSelections } = await import("./bulk-order-documents");
 
     expect(parseBulkOrderSelections([
+      "personal:49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      "distributed:7c66f907-8324-473c-b0b5-d017a4728121",
       "customer:49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       "agent:7c66f907-8324-473c-b0b5-d017a4728121",
-      "customer:49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
       "invalid",
     ])).toEqual([
-      { rowType: "customer", id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb" },
-      { rowType: "agent", id: "7c66f907-8324-473c-b0b5-d017a4728121" },
+      { rowType: "personal", id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb" },
+      { rowType: "distributed", id: "7c66f907-8324-473c-b0b5-d017a4728121" },
     ]);
   });
 
@@ -51,7 +52,7 @@ describe("bulk-order-documents", () => {
 
     const { resolveCustomerOrdersForBulkDocuments } = await import("./bulk-order-documents");
     const orders = await resolveCustomerOrdersForBulkDocuments([
-      { rowType: "agent", id: agentOrderId },
+      { rowType: "distributed", id: agentOrderId },
     ]);
 
     expect(loadAdminAgentOrder).toHaveBeenCalledWith(agentOrderId);
@@ -104,8 +105,8 @@ describe("bulk-order-documents", () => {
 
     const { buildBulkSalesInvoiceDocument } = await import("./bulk-order-documents");
     const pdf = await buildBulkSalesInvoiceDocument([
-      { rowType: "customer", id: withInvoice.id },
-      { rowType: "customer", id: withoutInvoice.id },
+      { rowType: "personal", id: withInvoice.id },
+      { rowType: "personal", id: withoutInvoice.id },
     ]);
 
     expect(pdf).not.toBeNull();
@@ -121,7 +122,7 @@ describe("bulk-order-documents", () => {
 
     const { buildBulkSalesInvoiceDocument } = await import("./bulk-order-documents");
     const pdf = await buildBulkSalesInvoiceDocument([
-      { rowType: "customer", id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb" },
+      { rowType: "personal", id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb" },
     ]);
 
     expect(pdf).toBeNull();

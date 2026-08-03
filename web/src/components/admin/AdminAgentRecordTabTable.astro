@@ -80,8 +80,8 @@ const skeletonRows = Array.from({ length: 6 });
             <div class="order-filter-form__field">
               <select name="orderType" aria-label="Filter by order type">
                 <option value="">All types</option>
-                <option value="customer" selected={orderFilters.orderType === "customer"}>Customer</option>
-                <option value="agent" selected={orderFilters.orderType === "agent"}>Agent</option>
+                <option value="personal" selected={orderFilters.orderType === "personal"}>Personal</option>
+                <option value="distributed" selected={orderFilters.orderType === "distributed"}>Distributed</option>
               </select>
             </div>
             <div class="order-filter-form__field">

@@ -176,7 +176,7 @@ export function parseAgentActionFormData(
         action: {
           type: "attach-agent-order-customer",
           agentOrderId: uuidSchema.parse(requiredString(formData, "agentOrderId")),
-          entries: parseAttachCustomerEntriesJson(entriesJson, { assignedCustomerIds }),
+          entries: parseAttachCustomerEntriesJson(entriesJson),
           requireApproval: true,
         },
       };

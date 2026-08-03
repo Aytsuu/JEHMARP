@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { throwLoadError } from "@/lib/load-error";
+import { agentWithProfileSelect, mapAgentWithProfile } from "@/lib/profile-identity";
 
 import type { AdminAgent, AdminCustomerTableRow } from "./data";
 import {
@@ -39,6 +40,7 @@ export type OrderTargetProfileAgent = {
   label: string;
   phoneNumber: string;
   email: string;
+  attachCustomerId?: string | null;
 };
 
 export type OrderTargetProfile = OrderTargetProfileCustomer | OrderTargetProfileAgent;
@@ -74,17 +76,36 @@ export function parseOrderTargetProfileQuery(url: URL): {
   page: number;
   scope: OrderTargetProfileScope;
   search: string;
+  agentOrderId: string;
 } {
   const page = positiveInteger(url.searchParams.get("page")) ?? 1;
   const scope: OrderTargetProfileScope = url.searchParams.get("scope") === "customer"
     ? "customer"
     : "customer-agent";
   const search = normalizeSearch(url.searchParams.get("q"));
+  const agentOrderId = url.searchParams.get("agentOrderId")?.trim() ?? "";
 
   return {
     page,
     scope,
     search,
+    agentOrderId,
+  };
+}
+
+export function parseAttachOrderTargetProfileQuery(url: URL): {
+  page: number;
+  search: string;
+  agentOrderId: string;
+} {
+  const page = positiveInteger(url.searchParams.get("page")) ?? 1;
+  const search = normalizeSearch(url.searchParams.get("q"));
+  const agentOrderId = url.searchParams.get("agentOrderId")?.trim() ?? "";
+
+  return {
+    page,
+    search,
+    agentOrderId,
   };
 }
 
@@ -92,17 +113,146 @@ export async function loadOrderTargetProfiles(input: {
   search?: string | null;
   page?: number;
   scope?: OrderTargetProfileScope;
+  assignedAgentId?: string | null;
+  excludeCustomerIds?: readonly string[];
 }): Promise<OrderTargetProfilesResult> {
   const supabase = createSupabaseAdminClient();
   const page = Math.max(Math.trunc(input.page ?? 1), 1);
   const scope = input.scope ?? "customer-agent";
   const search = normalizeSearch(input.search);
+  const customerFilters = {
+    assignedAgentId: input.assignedAgentId ?? null,
+    excludeCustomerIds: [...(input.excludeCustomerIds ?? [])],
+  };
 
   if (scope === "customer") {
-    return loadCustomerOnlyOrderTargetProfiles(supabase, search, page);
+    return loadCustomerOnlyOrderTargetProfiles(supabase, search, page, customerFilters);
   }
 
   return loadCustomerAgentOrderTargetProfiles(supabase, search, page);
+}
+
+export async function loadAttachOrderTargetProfiles(input: {
+  search?: string | null;
+  page?: number;
+  agentOrderId: string;
+  assignedAgentId?: string | null;
+}): Promise<OrderTargetProfilesResult> {
+  const supabase = createSupabaseAdminClient();
+  const page = Math.max(Math.trunc(input.page ?? 1), 1);
+  const search = normalizeSearch(input.search);
+  const [attachedCustomerIds, assignedAgentId] = await Promise.all([
+    loadAttachedCustomerIdsForAgentOrder(supabase, input.agentOrderId),
+    input.assignedAgentId ?? resolveAgentIdForAgentOrder(supabase, input.agentOrderId),
+  ]);
+
+  if (!assignedAgentId) {
+    throwLoadError("Unable to load distribution order agent.", new Error("Distribution order agent was not found."));
+  }
+
+  const agent = await fetchAgentForAttachOrder(supabase, assignedAgentId);
+  const agentAttachCustomerId = agent ? resolveAgentAttachCustomerId(agent) : null;
+  const agentAlreadyAttached = agentAttachCustomerId
+    ? attachedCustomerIds.includes(agentAttachCustomerId)
+    : false;
+  const agentProfile = agent && agentAttachCustomerId && !agentAlreadyAttached
+    ? buildDistributionAgentAttachProfile(agent, agentAttachCustomerId)
+    : null;
+  const agentVisible = agentProfile !== null && profileMatchesSearch(search, agentProfile.label);
+  const agentCount = agentVisible ? 1 : 0;
+
+  const excludeCustomerIds = [...attachedCustomerIds];
+  if (agentAttachCustomerId && !agentAlreadyAttached) {
+    excludeCustomerIds.push(agentAttachCustomerId);
+  }
+
+  const pageSize = ORDER_TARGET_CUSTOMER_ONLY_PAGE_SIZE;
+  const customerMeta = await fetchCustomerRows(supabase, search, 1, 1, {
+    assignedAgentId,
+    includeUnassignedCustomers: true,
+    excludeCustomerIds,
+  });
+  const customerTotal = customerMeta.pagination.totalRows;
+  const totalProfiles = customerTotal + agentCount;
+  const totalPages = Math.max(Math.ceil(totalProfiles / pageSize), 1);
+  const safePage = Math.min(Math.max(page, 1), totalPages);
+  const globalStart = (safePage - 1) * pageSize;
+  const globalEnd = Math.min(globalStart + pageSize, totalProfiles);
+  const customerSliceStart = Math.max(0, globalStart - agentCount);
+  const customerSliceEnd = Math.min(globalEnd - agentCount, customerTotal);
+  const customerSliceCount = Math.max(0, customerSliceEnd - customerSliceStart);
+
+  const customerRecords = await fetchRpcSlice(
+    (pageNumber, batchSize) => fetchCustomerRows(supabase, search, pageNumber, batchSize, {
+      assignedAgentId,
+      includeUnassignedCustomers: true,
+      excludeCustomerIds,
+    }),
+    customerSliceStart,
+    customerSliceCount,
+  );
+  const paymentNoticeById = await loadCustomerPaymentNoticesById(
+    supabase,
+    customerRecords.map((customer) => customer.id),
+  );
+  const customerItems = customerRecords.map((customer) =>
+    mapCustomerProfile(customer, paymentNoticeById.get(customer.id) ?? ""),
+  );
+  const items = agentVisible && globalStart === 0
+    ? [agentProfile, ...customerItems]
+    : customerItems;
+
+  return {
+    items,
+    totalProfiles,
+    customerTotal,
+    agentTotal: agentCount,
+    page: safePage,
+    pageSize,
+    segmentPageSize: pageSize,
+    totalPages,
+    hasPagination: totalPages > 1,
+    suggestedCount: items.length,
+    search,
+    scope: "customer",
+  };
+}
+
+export async function resolveAgentIdForAgentOrder(
+  supabase: SupabaseAdminClient,
+  agentOrderId: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("order")
+    .select("agent_id")
+    .eq("id", agentOrderId)
+    .eq("order_kind", "distribution")
+    .maybeSingle();
+
+  if (error) {
+    throwLoadError("Unable to load distribution order.", error);
+  }
+
+  return typeof data?.agent_id === "string" ? data.agent_id : null;
+}
+
+export async function loadAttachedCustomerIdsForAgentOrder(
+  supabase: SupabaseAdminClient,
+  agentOrderId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("order")
+    .select("customer_id")
+    .eq("parent_order_id", agentOrderId)
+    .not("customer_id", "is", null);
+
+  if (error) {
+    throwLoadError("Unable to load attached customers.", error);
+  }
+
+  return (data ?? [])
+    .map((row) => (typeof row.customer_id === "string" ? row.customer_id : ""))
+    .filter((customerId) => customerId.length > 0);
 }
 
 async function loadCustomerAgentOrderTargetProfiles(
@@ -175,9 +325,14 @@ async function loadCustomerOnlyOrderTargetProfiles(
   supabase: SupabaseAdminClient,
   search: string,
   page: number,
+  filters: {
+    assignedAgentId?: string | null;
+    includeUnassignedCustomers?: boolean;
+    excludeCustomerIds?: readonly string[];
+  } = {},
 ): Promise<OrderTargetProfilesResult> {
   const pageSize = ORDER_TARGET_CUSTOMER_ONLY_PAGE_SIZE;
-  const customers = await fetchCustomerRows(supabase, search, page, pageSize);
+  const customers = await fetchCustomerRows(supabase, search, page, pageSize, filters);
   const paymentNoticeById = await loadCustomerPaymentNoticesById(
     supabase,
     customers.records.map((customer) => customer.id),
@@ -209,12 +364,21 @@ async function fetchCustomerRows(
   search: string,
   pageNumber: number,
   pageSize: number,
+  filters: {
+    assignedAgentId?: string | null;
+    includeUnassignedCustomers?: boolean;
+    excludeCustomerIds?: readonly string[];
+  } = {},
 ): Promise<PaginatedRpcFetchResult<AdminCustomerTableRow>> {
+  const excludeCustomerIds = [...(filters.excludeCustomerIds ?? [])];
   const { data, error } = await supabase.rpc("list_admin_customer_rows", {
     search_query: search || null,
     customer_type_filter: null,
     page_number: pageNumber,
     page_size: pageSize,
+    assigned_agent_id_filter: filters.assignedAgentId ?? null,
+    exclude_customer_ids: excludeCustomerIds.length > 0 ? excludeCustomerIds : null,
+    include_unassigned_customers: filters.includeUnassignedCustomers ?? false,
   });
 
   if (error) {
@@ -295,14 +459,59 @@ function mapCustomerProfile(
   };
 }
 
-function mapAgentProfile(agent: AdminAgent): OrderTargetProfileAgent {
+function mapAgentProfile(agent: AdminAgent, attachCustomerId?: string | null): OrderTargetProfileAgent {
   return {
     type: "agent",
     id: agent.id,
     label: agent.display_name,
     phoneNumber: agent.contact ?? "",
     email: agent.email ?? "",
+    attachCustomerId: attachCustomerId ?? null,
   };
+}
+
+async function fetchAgentForAttachOrder(
+  supabase: SupabaseAdminClient,
+  agentId: string,
+): Promise<AdminAgent | null> {
+  const { data, error } = await supabase
+    .from("agent")
+    .select(agentWithProfileSelect)
+    .eq("id", agentId)
+    .maybeSingle();
+
+  if (error) {
+    throwLoadError("Unable to load agent profile.", error);
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return mapAgentWithProfile(
+    data as Parameters<typeof mapAgentWithProfile>[0],
+    null,
+  );
+}
+
+function resolveAgentAttachCustomerId(agent: AdminAgent) {
+  return agent.customer_id ?? agent.promoted_from_customer_id ?? null;
+}
+
+function buildDistributionAgentAttachProfile(
+  agent: AdminAgent,
+  attachCustomerId: string,
+): OrderTargetProfileAgent {
+  return mapAgentProfile(agent, attachCustomerId);
+}
+
+function profileMatchesSearch(search: string, label: string) {
+  const normalizedSearch = search.trim().toLowerCase();
+  if (!normalizedSearch) {
+    return true;
+  }
+
+  return label.toLowerCase().includes(normalizedSearch);
 }
 
 async function loadCustomerPaymentNoticesById(
@@ -415,4 +624,14 @@ export function buildOrderTargetPickerSummary(result: OrderTargetProfilesResult)
   }
 
   return "Try entering a customer or agent name.";
+}
+
+export function buildAttachOrderTargetPickerSummary(result: OrderTargetProfilesResult) {
+  if (result.search.length > 0) {
+    return "";
+  }
+
+  return result.agentTotal > 0
+    ? "Browse the agent and customers or search by name."
+    : "Browse customers or search by name.";
 }

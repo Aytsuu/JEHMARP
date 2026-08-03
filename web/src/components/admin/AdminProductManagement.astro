@@ -13,6 +13,7 @@ import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import {
   escapeTextareaValue,
   formatCurrency,
+  formatDate,
   productAgentCommissionLabel,
   productDisplayLabel,
 } from "@/lib/admin-dashboard/view";
@@ -357,16 +358,7 @@ function formatStockStatus(status: string): string {
                 data.products.map((product, index) => (
                   <tr data-status={product.is_active ? "active" : "inactive"}>
                     <td class="dashboard-table__number-column">{dashboardTableRowNumber(data.pagination, index)}</td>
-                    <td>
-                      {new Date(product.created_at).toLocaleDateString(
-                        "en-US",
-                        {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        },
-                      )}
-                    </td>
+                    <td>{formatDate(product.created_at)}</td>
 
                     {/* Product Cell (Editable Product Popover) */}
                     <td class="dashboard-table__cell--product">

@@ -1,7 +1,9 @@
 import type { APIRoute } from "astro";
 
 import {
+  buildAttachOrderTargetPickerSummary,
   buildOrderTargetPickerSummary,
+  loadAttachOrderTargetProfiles,
   loadOrderTargetProfiles,
   parseOrderTargetProfileQuery,
 } from "@/lib/admin-dashboard/order-target-profiles";
@@ -18,12 +20,21 @@ export const GET: APIRoute = async (context) => {
 
   try {
     const query = parseOrderTargetProfileQuery(context.url);
-    const result = await loadOrderTargetProfiles(query);
+    const result = query.agentOrderId.length > 0 && query.scope === "customer"
+      ? await loadAttachOrderTargetProfiles({
+          page: query.page,
+          search: query.search,
+          agentOrderId: query.agentOrderId,
+        })
+      : await loadOrderTargetProfiles(query);
+    const summary = query.agentOrderId.length > 0 && query.scope === "customer"
+      ? buildAttachOrderTargetPickerSummary(result)
+      : buildOrderTargetPickerSummary(result);
 
     return Response.json(
       {
         ...result,
-        summary: buildOrderTargetPickerSummary(result),
+        summary,
       },
       {
         headers: {

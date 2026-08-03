@@ -198,8 +198,8 @@ begin
     '10101010-0000-4000-8000-000000000101'
   );
 
-  if converted_agent_order_id is null then
-    raise exception 'Expected conversion RPC to return the new agent order id.';
+  if converted_agent_order_id is distinct from '10101010-0000-4000-8000-000000000101'::uuid then
+    raise exception 'Expected conversion RPC to return the same order id after in-place conversion.';
   end if;
 
   if not exists (
@@ -211,8 +211,13 @@ begin
       and order_status = 'pending_customers'
       and release_date = '2026-07-25T10:00:00Z'::timestamptz
       and notes like '%Converted from customer order 10101010-0000-4000-8000-000000000101%'
+      and parent_order_id is null
+      and converted_at is not null
+      and converted_by = '10101010-0000-4000-8000-000000000001'
+      and approved_by = '10101010-0000-4000-8000-000000000001'
+      and approved_at is not null
   ) then
-    raise exception 'Expected a pending agent order linked to the promoted agent.';
+    raise exception 'Expected the source order to become a pending distribution order for the promoted agent.';
   end if;
 
   select partial_quantity, add_details, agent_commission_amount
@@ -227,17 +232,6 @@ begin
       copied_quantity,
       copied_details,
       copied_commission;
-  end if;
-
-  if not exists (
-    select 1
-    from public."order"
-    where id = '10101010-0000-4000-8000-000000000101'
-      and parent_order_id = converted_agent_order_id
-      and converted_at is not null
-      and converted_by = '10101010-0000-4000-8000-000000000001'
-  ) then
-    raise exception 'Expected source customer order to keep its original link and store conversion audit metadata.';
   end if;
 
   blocked := false;
@@ -264,8 +258,8 @@ begin
     '10101010-0000-4000-8000-000000000103'
   );
 
-  if converted_agent_order_id is null then
-    raise exception 'Expected invoice-only customer order conversion RPC to return the new agent order id.';
+  if converted_agent_order_id is distinct from '10101010-0000-4000-8000-000000000103'::uuid then
+    raise exception 'Expected invoice-only customer order conversion RPC to return the same order id.';
   end if;
 
   if not exists (
@@ -275,6 +269,9 @@ begin
       and order_kind = 'distribution'
       and agent_id = '10101010-0000-4000-8000-000000000012'
       and order_status = 'pending_customers'
+      and parent_order_id is null
+      and converted_at is not null
+      and converted_by = '10101010-0000-4000-8000-000000000001'
   ) then
     raise exception 'Expected invoice-only customer order to convert into pending customer distribution.';
   end if;
@@ -396,10 +393,7 @@ declare
   order_row_paid numeric;
   order_row_remaining numeric;
 begin
-  select parent_order_id
-  into converted_agent_order_id
-  from public."order"
-  where id = '10101010-0000-4000-8000-000000000101';
+  converted_agent_order_id := '10101010-0000-4000-8000-000000000101';
 
   select
     (order_row.value->>'total_amount')::numeric,

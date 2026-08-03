@@ -334,7 +334,11 @@ export function getCustomerOrderDistributionConversionBlockReason(
     return "Not promoted";
   }
 
-  if (order.parent_order_id && order.converted_at) {
+  if (order.order_kind === "distribution") {
+    return "Converted";
+  }
+
+  if (order.converted_at) {
     return "Converted";
   }
 
