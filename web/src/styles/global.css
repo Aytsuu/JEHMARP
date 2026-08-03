@@ -1389,6 +1389,19 @@
     min-width: 0;
   }
 
+  .order-filter-form--paired {
+    grid-template-columns: minmax(22rem, 2.25fr) minmax(9rem, 0.65fr);
+  }
+
+  .order-filter-form--quad {
+    grid-template-columns:
+      minmax(22rem, 1.5fr) minmax(9rem, 0.65fr) minmax(10rem, 0.75fr) minmax(10rem, 0.75fr);
+  }
+
+  .product-filter-form--triple {
+    grid-template-columns: minmax(22rem, 1.5fr) minmax(9rem, 0.7fr) minmax(10rem, 0.8fr);
+  }
+
   .product-filter-form__reset,
   .order-filter-form__reset {
     min-height: 2.35rem;
@@ -2714,6 +2727,7 @@
     gap: 1rem;
     min-width: 0;
     max-width: 100%;
+    overflow-x: clip;
   }
 
   .admin-notifications-page .status-message,
@@ -3786,23 +3800,37 @@
   }
 
   .dashboard-interactive-table>.table-filters,
-  .dashboard-interactive-table>.order-management-toolbar,
-  .dashboard-interactive-table>.product-management-toolbar {
+  .dashboard-interactive-table>.product-management-toolbar,
+  .dashboard-interactive-table>.order-management-toolbar {
     flex-shrink: 0;
     margin-bottom: 0;
     padding: 0 var(--dashboard-page-inset-x) 0.75rem;
     display: flex;
     align-items: end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: nowrap;
     border-bottom: 1px solid #e5e7eb;
     background: #ffffff;
   }
 
+  .dashboard-interactive-table>.product-management-toolbar .product-filter-form,
+  .dashboard-interactive-table>.order-management-toolbar .order-filter-form {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .dashboard-interactive-table>.product-management-toolbar .product-management-toolbar__actions,
+  .dashboard-interactive-table>.order-management-toolbar .order-management-toolbar__actions {
+    flex: 0 0 auto;
+  }
+
   .dashboard-interactive-table>.table-filters .table-filters__search,
+  .dashboard-interactive-table>.product-management-toolbar .product-filter-form__field--search,
   .dashboard-interactive-table>.order-management-toolbar .order-filter-form__field--search {
     flex: 1;
-    min-width: 15rem;
+    min-width: 22rem;
+    max-width: 40rem;
   }
 
   .dashboard-interactive-table__surface {
@@ -3918,19 +3946,81 @@
     row-gap: 1.25rem;
     height: auto;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
     grid-template-rows: auto auto auto;
   }
 
   .dashboard-interactive-table.customer-record-table>.table-filters,
-  .dashboard-interactive-table.customer-record-table>.order-management-toolbar {
+  .dashboard-interactive-table.customer-record-table>.table-filters.order-management-toolbar,
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.table-filters,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.table-filters.order-management-toolbar,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: flex-end;
     margin-bottom: 0;
     padding: 0;
     border-bottom: 0;
     background: transparent;
+    gap: 0.75rem;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar .order-filter-form,
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar .product-filter-form,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar .order-filter-form,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar .product-filter-form {
+    display: flex;
+    flex: 0 0 100%;
+    flex-wrap: nowrap;
+    align-items: end;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+  }
+
+  .dashboard-interactive-table.customer-record-table .order-filter-form__field,
+  .dashboard-interactive-table.customer-record-table .product-filter-form__field,
+  .customer-record-page .dashboard-interactive-table.customer-record-table .order-filter-form__field,
+  .customer-record-page .dashboard-interactive-table.customer-record-table .product-filter-form__field {
+    flex: 0 1 9rem;
+    min-width: 9rem;
+  }
+
+  .dashboard-interactive-table.customer-record-table .order-filter-form__field--search,
+  .dashboard-interactive-table.customer-record-table .product-filter-form__field--search,
+  .customer-record-page .dashboard-interactive-table.customer-record-table .order-filter-form__field--search,
+  .customer-record-page .dashboard-interactive-table.customer-record-table .product-filter-form__field--search {
+    flex: 1 1 14rem;
+    min-width: 12rem;
+    max-width: 22rem;
+  }
+
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar .order-management-toolbar__actions,
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar .product-management-toolbar__actions,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar .order-management-toolbar__actions,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar .product-management-toolbar__actions {
+    flex: 0 0 100%;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
   }
 
   .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__surface {
     flex: none;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     height: var(--customer-record-table-fixed-height);
     min-height: var(--customer-record-table-fixed-height);
     max-height: var(--customer-record-table-fixed-height);
@@ -3942,6 +4032,8 @@
   .dashboard-interactive-table.customer-record-table .dashboard-table-board {
     height: 100%;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
     overflow: auto;
     overscroll-behavior: contain;
   }
@@ -3991,6 +4083,8 @@
   }
 
   .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__footer {
+    min-width: 0;
+    max-width: 100%;
     min-height: 0;
     border-top: 0;
     background: transparent;
@@ -4009,6 +4103,17 @@
     --customer-record-table-row-height: 3rem;
     --customer-record-table-visible-rows: 10;
     --customer-record-table-fixed-height: calc(var(--customer-record-table-row-height) * (var(--customer-record-table-visible-rows) + 1));
+  }
+
+  .customer-record-page {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .customer-record-page .ui-tab-panel--plain {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   .agent-order-detail-page {
@@ -4069,9 +4174,13 @@
     min-width: 0;
   }
 
-  .agent-order-detail-stat__item dd a {
-    color: inherit;
-    text-decoration: none;
+  .agent-order-detail-stat__truncate {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .agent-order-detail-stat__item dd a.agent-order-detail-stat__agent-link {
@@ -4086,10 +4195,6 @@
   .agent-order-detail-stat__item dd a.agent-order-detail-stat__agent-link:focus-visible {
     color: #551313;
     outline: none;
-  }
-
-  .agent-order-detail-stat__item dd a:hover {
-    color: var(--color-brand-red);
   }
 
   .agent-order-detail-stat__item--commission dd {
@@ -9282,10 +9387,12 @@
     gap: 1rem;
   }
 
+  .ui-picker,
   .order-customer-picker {
     position: relative;
   }
 
+  .ui-picker[data-open="true"],
   .order-customer-picker[data-open="true"] {
     z-index: 40;
   }
@@ -10053,7 +10160,6 @@
 
     .dashboard-body--agent .agent-mobile-nav__link--active {
       color: var(--color-brand-red);
-      background: #fff8f8;
     }
 
     .dashboard-body--agent .agent-mobile-nav__icon svg {
@@ -10429,7 +10535,7 @@
   .dashboard-table td.dashboard-table__actions-column,
   .table-wrap table th.dashboard-table__actions-column,
   .table-wrap table td.dashboard-table__actions-column {
-    width: auto;
+    width: 1%;
     min-width: 2rem;
     max-width: none;
     padding-left: 0.35rem;
@@ -10489,7 +10595,7 @@
 
   .agent-customers-table th.dashboard-table__actions-column,
   .agent-customers-table td.dashboard-table__actions-column {
-    width: auto;
+    width: 1%;
     min-width: 2rem;
     max-width: none;
     padding-left: 0.35rem;

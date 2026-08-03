@@ -117,7 +117,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
       <form
         method="get"
         action="/admin/customers"
-        class="order-filter-form"
+        class="order-filter-form order-filter-form--paired"
         data-customer-filter-form
         data-current-filter-query={filterQuery}
         aria-label="Filter customers"
@@ -148,19 +148,20 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
       <div class="order-management-toolbar__actions">
         <Button
           type="button"
-          class="order-management-toolbar__create"
-          data-open-create-sheet
-          data-sheet-target="#create-customer-sheet"
-        >
-          Create Customer
-        </Button>
-        <Button
-          type="button"
+          variant="outlined"
           class="order-management-toolbar__create"
           data-open-create-sheet
           data-sheet-target="#create-customer-registration-link-sheet"
         >
           Create Registration Link
+        </Button>
+        <Button
+          type="button"
+          class="order-management-toolbar__create"
+          data-open-create-sheet
+          data-sheet-target="#create-customer-sheet"
+        >
+          Create Customer
         </Button>
       </div>
     </div>

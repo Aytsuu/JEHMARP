@@ -3,7 +3,7 @@ import Accordion from "@/components/ui/Accordion.astro";
 import ActionMenu from "@/components/ActionMenu.astro";
 import Button from "@/components/ui/Button.astro";
 import Sheet from "@/components/ui/Sheet.astro";
-import OrderCustomerPicker from "@/components/order/OrderCustomerPicker.astro";
+import Picker from "@/components/ui/Picker.astro";
 import type { AdminOrderManagementData } from "@/lib/admin-dashboard/data";
 import ViewButton from "@/components/ViewButton.astro";
 import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
@@ -74,7 +74,7 @@ function pendingCustomerOrderLabel(count: number) {
         <div class="order-create-section__body">
           <div class="admin-form-grid order-create-form__existing-customer-grid">
             <div class="field-row">
-              <OrderCustomerPicker showPaymentNotice />
+              <Picker showPaymentNotice />
               <input type="hidden" name="customerId" data-customer-id />
               <input type="hidden" name="agentId" data-agent-order-agent-id />
             </div>
@@ -369,7 +369,7 @@ function pendingCustomerOrderLabel(count: number) {
       <form
         method="get"
         action="/admin/orders"
-        class="order-filter-form"
+        class="order-filter-form order-filter-form--quad"
         data-order-filter-form
         data-current-filter-query={filterQuery}
         aria-label="Filter orders"

@@ -27,7 +27,7 @@ const skeletonRows = Array.from({ length: 6 });
 <section class="admin-panel" aria-labelledby="admin-reseller-applications-title">
   <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table">
     <div class="table-filters order-management-toolbar">
-      <form method="get" action="/admin/reseller-applications" class="order-filter-form" data-reseller-filter-form data-current-filter-query={filterQuery} aria-label="Filter reseller applications">
+      <form method="get" action="/admin/reseller-applications" class="order-filter-form order-filter-form--paired" data-reseller-filter-form data-current-filter-query={filterQuery} aria-label="Filter reseller applications">
         <div class="order-filter-form__field order-filter-form__field--search">
           <input name="search" type="search" value={activeFilters.search ?? ""} placeholder="Search applicant name, email, or contact..." autocomplete="off" aria-label="Search reseller applications" data-reseller-search-input />
         </div>

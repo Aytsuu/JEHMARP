@@ -235,26 +235,15 @@ const defaultTotalCommission = commissionBreakdown.reduce(
             </div>
             <div class="agent-order-detail-stat__item">
               <dt>Contact</dt>
-              <dd>
-                {
-                  agentContact !== "No contact number" ? (
-                    <a href={`tel:${agentContact}`}>{agentContact}</a>
-                  ) : (
-                    agentContact
-                  )
-                }
-              </dd>
+              <dd>{agentContact}</dd>
             </div>
             <div class="agent-order-detail-stat__item">
               <dt>Email</dt>
-              <dd>
-                {
-                  agentEmail !== "No email address" ? (
-                    <a href={`mailto:${agentEmail}`}>{agentEmail}</a>
-                  ) : (
-                    agentEmail
-                  )
-                }
+              <dd
+                class="agent-order-detail-stat__truncate"
+                title={agentEmail !== "No email address" ? agentEmail : undefined}
+              >
+                {agentEmail}
               </dd>
             </div>
             <div class="agent-order-detail-stat__item">
@@ -424,7 +413,7 @@ const defaultTotalCommission = commissionBreakdown.reduce(
             <form
               method="get"
               action={pageBasePath}
-              class="order-filter-form"
+              class="order-filter-form order-filter-form--quad"
               aria-label="Filter customer orders"
               data-agent-order-customers-filter-form
             >

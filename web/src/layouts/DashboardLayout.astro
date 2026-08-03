@@ -303,7 +303,10 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
             ) as HTMLElement[];
 
             if (children.length === 0) {
-              maxWidth = Math.max(maxWidth, Math.ceil(cell.getBoundingClientRect().width));
+              const textContent = cell.textContent?.trim();
+              if (textContent) {
+                maxWidth = Math.max(maxWidth, Math.ceil(cell.scrollWidth));
+              }
               return;
             }
 
@@ -315,11 +318,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
               }
             });
 
-            maxWidth = Math.max(
-              maxWidth,
-              contentWidth + horizontalPadding,
-              Math.ceil(cell.scrollWidth),
-            );
+            maxWidth = Math.max(maxWidth, contentWidth + horizontalPadding);
           } finally {
             if (previousMaxWidth) {
               cell.style.maxWidth = previousMaxWidth;
@@ -512,15 +511,18 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
           }
 
           const widthPx = `${getSyncedTableColumnWidth(headerCell, bodyRows, columnIndex)}px`;
+          const isActionsColumn = headerCell.classList.contains(
+            "dashboard-table__actions-column",
+          );
           headerCell.style.width = widthPx;
           headerCell.style.minWidth = widthPx;
-          headerCell.style.maxWidth = "none";
+          headerCell.style.maxWidth = isActionsColumn ? widthPx : "none";
           for (const row of bodyRows) {
             const cell = row.children[columnIndex] as HTMLElement | undefined;
             if (cell) {
               cell.style.width = widthPx;
               cell.style.minWidth = widthPx;
-              cell.style.maxWidth = "none";
+              cell.style.maxWidth = isActionsColumn ? widthPx : "none";
             }
           }
         });
