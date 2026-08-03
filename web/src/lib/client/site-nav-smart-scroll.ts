@@ -8,7 +8,7 @@ type SiteNavWindow = Window & {
   __siteNavSmartScrollHidden?: boolean;
 };
 
-type ScrollRoot = HTMLElement | Window;
+type ScrollRoot = Window | HTMLElement;
 
 let activeScrollRoot: ScrollRoot | null = null;
 let activeOnScroll: (() => void) | null = null;
@@ -61,7 +61,7 @@ function resolveScrollRoot(): ScrollRoot {
 }
 
 function getScrollTop(scrollRoot: ScrollRoot) {
-  if (scrollRoot === window) {
+  if (!(scrollRoot instanceof HTMLElement)) {
     return window.scrollY || document.documentElement.scrollTop || 0;
   }
 

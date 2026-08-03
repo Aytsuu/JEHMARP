@@ -150,14 +150,6 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
     ?? scope.querySelector<HTMLInputElement>("input[data-customer-first-name]");
   const lastNameInput = fieldMap.lastName
     ?? scope.querySelector<HTMLInputElement>("input[data-customer-last-name]");
-  const phoneNumberInput = fieldMap.phoneNumber
-    ?? scope.querySelector<HTMLInputElement>("input[data-customer-phone-number]");
-  const emailInput = fieldMap.email
-    ?? scope.querySelector<HTMLInputElement>("input[data-customer-email]");
-  const addressTextarea = fieldMap.address
-    ?? scope.querySelector<HTMLTextAreaElement>("textarea[data-customer-address]");
-  const assignedAgentSelect = fieldMap.assignedAgentId
-    ?? scope.querySelector<HTMLSelectElement>("[data-customer-assigned-agent-id]");
   const isResellerCheckbox = fieldMap.isReseller
     ?? scope.querySelector<HTMLInputElement>("[data-customer-is-reseller]");
 
@@ -609,7 +601,6 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
       fillCustomerFields(selectedProfile);
       updateCustomerOrderNotice(selectedProfile);
     } else {
-      fillCustomerFields(null);
       updateCustomerOrderNotice(null);
     }
 

@@ -2,7 +2,13 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { throwLoadError } from "@/lib/load-error";
 
 import type { AdminAgent, AdminCustomerTableRow } from "./data";
-import { buildAdminPagination } from "./pagination";
+import {
+  adminPaginationPageSizes,
+  buildAdminPagination,
+  defaultAdminPagination,
+  type AdminPaginationPageSize,
+  type AdminPaginationParams,
+} from "./pagination";
 
 export const ORDER_TARGET_COMBINED_PAGE_SIZE = 10;
 export const ORDER_TARGET_CUSTOMER_ONLY_PAGE_SIZE = 10;
@@ -64,9 +70,13 @@ type PaginatedRpcFetchResult<T> = {
   pagination: ReturnType<typeof buildAdminPagination>;
 };
 
-export function parseOrderTargetProfileQuery(url: URL) {
+export function parseOrderTargetProfileQuery(url: URL): {
+  page: number;
+  scope: OrderTargetProfileScope;
+  search: string;
+} {
   const page = positiveInteger(url.searchParams.get("page")) ?? 1;
-  const scope = url.searchParams.get("scope") === "customer"
+  const scope: OrderTargetProfileScope = url.searchParams.get("scope") === "customer"
     ? "customer"
     : "customer-agent";
   const search = normalizeSearch(url.searchParams.get("q"));
@@ -213,7 +223,7 @@ async function fetchCustomerRows(
 
   return readPaginatedRpcRecords<AdminCustomerTableRow>(data, {
     page: pageNumber,
-    pageSize,
+    pageSize: normalizeAdminPageSize(pageSize),
   });
 }
 
@@ -236,7 +246,7 @@ async function fetchAgentRows(
 
   return readPaginatedRpcRecords<AdminAgent>(data, {
     page: pageNumber,
-    pageSize,
+    pageSize: normalizeAdminPageSize(pageSize),
   });
 }
 
@@ -361,7 +371,7 @@ function parseRpcRecordArray(value: unknown) {
 
 function readPaginatedRpcRecords<T>(
   data: unknown,
-  pagination: { page: number; pageSize: number },
+  pagination: AdminPaginationParams,
 ) {
   const rpcRow = Array.isArray(data)
     ? data[0] as AdminPaginatedRpcResponse | undefined
@@ -376,6 +386,11 @@ function readPaginatedRpcRecords<T>(
     records: rawRecords as T[],
     pagination: buildAdminPagination(Number.isFinite(totalRows) ? totalRows : 0, pagination),
   };
+}
+
+function normalizeAdminPageSize(pageSize: number): AdminPaginationPageSize {
+  return adminPaginationPageSizes.find((size) => size === pageSize)
+    ?? defaultAdminPagination.pageSize;
 }
 
 function fullCustomerName(customer: Pick<AdminCustomerTableRow, "first_name" | "last_name">) {
