@@ -122,11 +122,12 @@ jobs:
           BASELINE_LEDGER_TARGET: staging
         run: |
           if [ "${{ steps.supabase_link.outcome }}" = "success" ]; then
-            bash .github/scripts/assert-supabase-baseline-ledger-state.sh --linked --target staging
+            bash .github/scripts/assert-supabase-baseline-ledger-state.sh --linked --target staging --policy active-prefix
           elif [ -n "${SUPABASE_DB_POOLER_URL:-}" ]; then
             bash .github/scripts/assert-supabase-baseline-ledger-state.sh \
               --db-url "$SUPABASE_DB_POOLER_URL" \
-              --target staging
+              --target staging \
+              --policy active-prefix
           else
             echo "Cannot assert baseline ledger state without a linked project or SUPABASE_DB_POOLER_URL."
             exit 1
