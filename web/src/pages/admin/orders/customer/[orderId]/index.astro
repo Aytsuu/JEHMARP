@@ -6,6 +6,7 @@ import AdminPageFrame from "@/components/admin/AdminPageFrame.astro";
 import Tab from "@/components/ui/Tab.astro";
 import TabPanel from "@/components/ui/TabPanel.astro";
 import Tabs from "@/components/ui/Tabs.astro";
+import AlertDialog from "@/components/ui/AlertDialog.astro";
 import {
   formatAdminActionFeedback,
   markAdminOrderReadIfUnread,
@@ -521,7 +522,11 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                 customers.
               </p>
               {canConvertToDistributionOrder ? (
-                <form method="post" data-astro-reload>
+                <form
+                  id="convert-customer-order-distribution-form"
+                  method="post"
+                  data-astro-reload
+                >
                   <input
                     type="hidden"
                     name="action"
@@ -529,7 +534,16 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
                   />
                   <input type="hidden" name="orderId" value={order.id} />
                   <input type="hidden" name="returnTo" value={backHref} />
-                  <button type="submit">Proceed Conversion</button>
+                  <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">
+                    Submit conversion
+                  </button>
+                  <button
+                    type="button"
+                    data-open-alert-dialog="convert-customer-order-distribution-dialog"
+                    data-alert-dialog-form="convert-customer-order-distribution-form"
+                  >
+                    Proceed Conversion
+                  </button>
                 </form>
               ) : (
                 <div class="order-conversion-card__blocked">
@@ -2036,6 +2050,17 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
       </Tabs>
     </section>
   </div>
+
+  {
+    canConvertToDistributionOrder && (
+      <AlertDialog
+        id="convert-customer-order-distribution-dialog"
+        title="Convert to agent distribution order?"
+        description={`This will move order ${orderCode} for ${customerDisplayName} into a new agent distribution order with pending customers status, ready for distribution to the agent's customers.`}
+        confirmLabel="Proceed conversion"
+      />
+    )
+  }
 </AdminPageFrame>
 
 <script is:inline>
@@ -2624,6 +2649,12 @@ const orderNavigationEntries = buildOrderDetailNavEntries({
   .order-conversion-card button:disabled {
     background: #cbd5e1;
     color: #475569;
+    cursor: not-allowed;
+  }
+
+  .order-conversion-card button.form-submit-button--loading:disabled {
+    color: transparent !important;
+    opacity: 1;
   }
 
   .order-conversion-card button:not(:disabled):hover,

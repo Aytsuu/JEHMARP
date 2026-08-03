@@ -6,6 +6,7 @@ import Sheet from "@/components/ui/Sheet.astro";
 import Tab from "@/components/ui/Tab.astro";
 import TabPanel from "@/components/ui/TabPanel.astro";
 import Tabs from "@/components/ui/Tabs.astro";
+import Tooltip from "@/components/ui/Tooltip.astro";
 import type {
   AdminAgent,
   AdminCustomer,
@@ -148,8 +149,67 @@ const customerBasePath = `/admin/customers/${customer.id}`;
   </section>
 
   <div class="customer-record-cards">
-    <article class="customer-record-card">
-      <h2 class="customer-record-card__title">Contact information</h2>
+    <article class="customer-record-card customer-record-card--contact">
+      <div class="customer-record-card__header">
+        <h2 class="customer-record-card__title">Contact information</h2>
+        <button
+          type="button"
+          class="customer-record-card__edit-trigger table-cell-trigger"
+          data-open-cell-popover
+          data-popover-title={`Edit contact: ${customerName}`}
+          aria-label={`Edit contact information for ${customerName}`}
+        >
+          <span class="sr-only">Edit contact information</span>
+        </button>
+        <div class="hidden-popover-form-holder">
+          <form method="post" class="admin-table-form" data-astro-reload>
+            <input type="hidden" name="action" value="save-customer" />
+            <input type="hidden" name="customerId" value={customer.id} />
+            <input type="hidden" name="firstName" value={customer.first_name} />
+            <input type="hidden" name="lastName" value={customer.last_name} />
+            <input
+              type="hidden"
+              name="assignedAgentId"
+              value={customer.assigned_agent_id ?? ""}
+            />
+            <input
+              type="hidden"
+              name="creditLimit"
+              value={customer.credit_limit}
+            />
+            {
+              customer.is_reseller && (
+                <input type="hidden" name="isReseller" value="on" />
+              )
+            }
+            <label>
+              <span>Email</span>
+              <input
+                name="email"
+                type="email"
+                value={customer.email ?? ""}
+                autocomplete="email"
+              />
+            </label>
+            <label>
+              <span>Phone number</span>
+              <input
+                name="phoneNumber"
+                type="tel"
+                value={customer.phone_number}
+                required
+                inputmode="tel"
+                autocomplete="tel"
+              />
+            </label>
+            <label>
+              <span>Address</span>
+              <textarea name="address" rows="3" required>{customer.address}</textarea>
+            </label>
+            <button type="submit">Save changes</button>
+          </form>
+        </div>
+      </div>
       <dl
         class="customer-record-card__list customer-record-card__list--contact"
       >
@@ -284,7 +344,7 @@ const customerBasePath = `/admin/customers/${customer.id}`;
                   {assignedAgent.display_name}
                 </a>
               ) : (
-                "None"
+                "—"
               )
             }
           </dd>
@@ -379,20 +439,26 @@ const customerBasePath = `/admin/customers/${customer.id}`;
       {
         receivableSegments.map((segment) => (
           <li>
-            <span
-              class="customer-record-receivables__dot"
-              style={`background-color: ${segment.color};`}
-            />
-            <span class="customer-record-receivables__legend-label">
-              {segment.label}
-            </span>
-            <span class="customer-record-receivables__legend-meta">
-              {segment.invoiceCount} invoice
-              {segment.invoiceCount === 1 ? "" : "s"}
-            </span>
-            <strong class="customer-record-receivables__legend-value">
-              {formatCurrency(segment.receivable)}
-            </strong>
+            <Tooltip
+              text={segment.tooltip}
+              placement="below"
+              class="customer-record-receivables__legend-tooltip"
+            >
+              <span
+                class="customer-record-receivables__dot"
+                style={`background-color: ${segment.color};`}
+              />
+              <span class="customer-record-receivables__legend-label">
+                {segment.label}
+              </span>
+              <span class="customer-record-receivables__legend-meta">
+                {segment.invoiceCount} invoice
+                {segment.invoiceCount === 1 ? "" : "s"}
+              </span>
+              <strong class="customer-record-receivables__legend-value">
+                {formatCurrency(segment.receivable)}
+              </strong>
+            </Tooltip>
           </li>
         ))
       }
@@ -832,6 +898,10 @@ const customerBasePath = `/admin/customers/${customer.id}`;
     margin-bottom: 0;
   }
 
+  .customer-record-card--contact .customer-record-card__title {
+    margin-bottom: 0;
+  }
+
   .customer-record-card__edit-trigger {
     display: inline-flex;
     align-items: center;
@@ -1063,24 +1133,33 @@ const customerBasePath = `/admin/customers/${customer.id}`;
   .customer-record-receivables__legend li {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
     font-size: 0.86rem;
-    font-weight: 500;
     color: #374151;
   }
 
+  :global(.customer-record-receivables__legend-tooltip) {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  :global(.customer-record-receivables__legend-tooltip .customer-record-receivables__dot) {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+
   .customer-record-receivables__legend-label {
-    font-weight: 500;
-    color: #111827;
+    font-weight: 600;
   }
 
   .customer-record-receivables__legend-value {
-    font-weight: 600;
+    font-weight: 700;
     color: #111827;
   }
 
   .customer-record-receivables__legend-meta {
-    font-weight: 500;
     color: #6b7280;
   }
 

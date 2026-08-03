@@ -2,6 +2,7 @@ import type {
   AdminAgent,
   AdminAgentOrder,
   AdminAgentReceivedPayment,
+  AdminAgentRemittanceRecord,
   AdminCustomer,
   AdminOrder,
   AdminProduct,
@@ -20,7 +21,7 @@ import {
   agentOrderCommissionTotal,
   agentOrderPaymentStatus,
   agentOrderReceivableTotal,
-  agentOrderTotal,
+  agentOrderRemainingReceivable,
   formatCurrency,
   fullName,
   orderBalance,
@@ -66,7 +67,8 @@ export type AgentRecordOrderRow = {
   source_label: string;
   order_status: string;
   payment_status: string;
-  amount: number;
+  order_total: number;
+  remaining_receivable: number;
   href: string;
 };
 
@@ -151,7 +153,8 @@ export function buildAgentRecordOrderRows(
     source_label: formatOrderSource(order.source),
     order_status: order.order_status,
     payment_status: order.payment_status,
-    amount: orderBalance(order),
+    order_total: orderReceivableTotal(order, "final_quantity"),
+    remaining_receivable: orderBalance(order),
     href: `/admin/orders/customer/${order.id}?returnTo=${agentReturnTo}`,
   }));
 
@@ -164,7 +167,8 @@ export function buildAgentRecordOrderRows(
     source_label: "Agent order",
     order_status: order.order_status,
     payment_status: agentOrderPaymentStatus(order),
-    amount: agentOrderTotal(order),
+    order_total: agentOrderReceivableTotal(order),
+    remaining_receivable: agentOrderRemainingReceivable(order),
     href: `/admin/orders/agent/${order.id}?returnTo=${agentReturnTo}`,
   }));
 
@@ -550,6 +554,7 @@ export function buildAgentReceivableSegments(
     receivable: roundCurrency(
       (customerPendingSegment?.receivable ?? 0) + pendingAgentContribution.amount,
     ),
+    tooltip: customerPendingSegment?.tooltip ?? "",
   };
 
   return attachAgentReceivableTooltips(
@@ -562,35 +567,11 @@ export function buildAgentReceivableSegments(
 }
 
 export function agentRecordPaymentsSubmitted(
-  agentId: string,
-  customerOrders: AdminOrder[],
-  agentOrders: AdminAgentOrder[],
+  remittanceRecords: AdminAgentRemittanceRecord[],
 ) {
-  const seenPaymentIds = new Set<string>();
-  let total = 0;
-
-  const addOrderPayments = (order: AdminOrder) => {
-    for (const payment of order.agent_received_payment ?? []) {
-      if (payment.agent_id !== agentId || seenPaymentIds.has(payment.id)) {
-        continue;
-      }
-
-      seenPaymentIds.add(payment.id);
-      total += payment.amount;
-    }
-  };
-
-  for (const order of customerOrders) {
-    addOrderPayments(order);
-  }
-
-  for (const agentOrder of agentOrders) {
-    for (const customerOrder of agentOrder.customer_order) {
-      addOrderPayments(customerOrder);
-    }
-  }
-
-  return roundCurrency(total);
+  return roundCurrency(
+    remittanceRecords.reduce((total, record) => total + record.payment.amount, 0),
+  );
 }
 
 export function agentAccountLabel(status: AdminAgent["status"]) {
@@ -778,6 +759,7 @@ export function buildAgentPerformanceQuickStats(
   agentOrders: AdminAgentOrder[],
   products: Pick<AdminProduct, "id" | "category">[],
   agentReturnTo: string,
+  remittanceRecords: AdminAgentRemittanceRecord[] = [],
 ): AgentPerformanceQuickStats {
   const scopedCustomerOrders = collectAgentCustomerOrders(customerOrders, agentOrders);
   const categoryByProductId = new Map(
@@ -789,6 +771,9 @@ export function buildAgentPerformanceQuickStats(
     agentOrders,
     agentReturnTo,
   );
+  const resolvedRemittanceRecords = remittanceRecords.length > 0
+    ? remittanceRecords
+    : collectAgentRemittanceRecords(agentId, scopedCustomerOrders, agentOrders);
 
   return {
     kgSold: roundQuantity(
@@ -801,11 +786,7 @@ export function buildAgentPerformanceQuickStats(
       agentOrders,
       categoryByProductId,
     ),
-    remittance: buildAgentRemittancePerformance(
-      agentId,
-      scopedCustomerOrders,
-      agentOrders,
-    ),
+    remittance: buildAgentRemittancePerformance(resolvedRemittanceRecords),
     commissionEntries,
     commissionEarnedTotal: roundCurrency(
       commissionEntries.reduce((total, entry) => total + entry.amount, 0),
@@ -988,15 +969,8 @@ function buildTopSoldCategory(
 }
 
 function buildAgentRemittancePerformance(
-  agentId: string,
-  customerOrders: AdminOrder[],
-  agentOrders: AdminAgentOrder[],
+  remittanceRecords: AdminAgentRemittanceRecord[],
 ): AgentRemittancePerformance {
-  const remittanceRecords = collectAgentRemittanceRecords(
-    agentId,
-    customerOrders,
-    agentOrders,
-  );
   const confirmedRecords = remittanceRecords.filter(
     (record) => record.payment.status === "confirmed",
   );
@@ -1107,7 +1081,8 @@ function collectAgentRemittanceRecords(
 
   const addOrderPayments = (order: AdminOrder) => {
     for (const payment of order.agent_received_payment ?? []) {
-      if (payment.agent_id !== agentId || seenPaymentIds.has(payment.id)) {
+      const paymentAgentId = payment.agent_id ?? payment.agent?.id ?? null;
+      if (paymentAgentId !== agentId || seenPaymentIds.has(payment.id)) {
         continue;
       }
 
@@ -1155,7 +1130,9 @@ function resolveAgentOrderCommissionEarnedDate(agentOrder: AdminAgentOrder) {
   return latestPaymentDate ?? agentOrder.sale_date ?? agentOrder.updated_at ?? agentOrder.created_at;
 }
 
-function resolveOrderAnchorDate(order: AdminOrder) {
+function resolveOrderAnchorDate(
+  order: Pick<AdminOrder, "sale_date" | "created_at">,
+) {
   return order.sale_date ?? order.created_at;
 }
 

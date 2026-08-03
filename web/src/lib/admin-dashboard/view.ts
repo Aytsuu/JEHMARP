@@ -226,6 +226,19 @@ export function agentOrderReceivableTotal(order: AdminAgentOrder) {
   );
 }
 
+export function agentOrderPaidTotal(order: AdminAgentOrder) {
+  return roundCurrency(
+    order.customer_order.reduce((total, child) => total + orderPaymentTotal(child), 0),
+  );
+}
+
+export function agentOrderRemainingReceivable(order: AdminAgentOrder) {
+  return Math.max(
+    roundCurrency(agentOrderReceivableTotal(order) - agentOrderPaidTotal(order)),
+    0,
+  );
+}
+
 export function agentOrderPaymentStatus(
   order: Pick<AdminAgentOrder, "customer_order">,
 ): AdminOrder["payment_status"] {

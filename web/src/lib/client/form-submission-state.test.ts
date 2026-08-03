@@ -184,6 +184,62 @@ describe("initFormSubmissionState", () => {
     expect(button.disabled).toBe(true);
     expect(button.classList.contains("form-submit-button--loading")).toBe(true);
   });
+
+  it("disables alert-dialog trigger buttons and shows a loader when the linked form submits", () => {
+    const testDocument = createTestDocument(`
+      <form id="promote-form" method="post"></form>
+      <button
+        type="button"
+        data-alert-dialog-form="promote-form"
+      >
+        Promote to agent
+      </button>
+    `);
+    const form = testDocument.querySelector("form")!;
+    const triggerButton = testDocument.querySelector("button")!;
+
+    initFormSubmissionState(testDocument);
+    const event = submitForm(form);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(form.dataset.isSubmitting).toBe("true");
+    expect(triggerButton.disabled).toBe(true);
+    expect(triggerButton.classList.contains("form-submit-button--loading")).toBe(
+      true,
+    );
+    expect(triggerButton.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("shows the loader on the alert-dialog trigger instead of a hidden submit button", () => {
+    const testDocument = createTestDocument(`
+      <form id="promote-form" method="post">
+        <button type="submit" class="sr-only" tabindex="-1" aria-hidden="true">
+          Submit
+        </button>
+      </form>
+      <button
+        type="button"
+        data-alert-dialog-form="promote-form"
+      >
+        Promote to agent
+      </button>
+    `);
+    const form = testDocument.querySelector("form")!;
+    const triggerButton = testDocument.querySelector(
+      "[data-alert-dialog-form]",
+    ) as HTMLButtonElement;
+    const hiddenSubmitButton = form.querySelector("button")!;
+
+    initFormSubmissionState(testDocument);
+    submitForm(form, hiddenSubmitButton);
+
+    expect(triggerButton.classList.contains("form-submit-button--loading")).toBe(
+      true,
+    );
+    expect(hiddenSubmitButton.classList.contains("form-submit-button--loading")).toBe(
+      false,
+    );
+  });
 });
 
 describe("resetFormSubmissionState", () => {

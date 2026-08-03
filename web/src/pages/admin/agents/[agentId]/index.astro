@@ -98,13 +98,14 @@ const showPreviousOrdersTab = Boolean(agent.promoted_from_customer_id);
 
 const orderCounts = agentRecordOrderCounts(customerOrders, detailData.agentOrders);
 const commissionEarned = agentRecordCommissionTotal(customerOrders, detailData.agentOrders);
-const paymentsSubmitted = agentRecordPaymentsSubmitted(agent.id, customerOrders, detailData.agentOrders);
+const paymentsSubmitted = agentRecordPaymentsSubmitted(detailData.agentRemittanceRecords);
 const performanceQuickStats = buildAgentPerformanceQuickStats(
   agent.id,
   customerOrders,
   detailData.agentOrders,
   dashboardData.products,
   agentReturnTo,
+  detailData.agentRemittanceRecords,
 );
 const processingReceivableTotal = customerProcessingReceivableTotal(customerOrders);
 const estimatedInvoiceTotal = agentRecordEstimatedInvoiceTotal(

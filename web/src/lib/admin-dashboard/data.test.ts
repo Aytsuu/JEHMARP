@@ -493,12 +493,14 @@ describe("loadAdminDashboardData", () => {
       },
     };
     const assignedOrder = createMockOrder({
+      id: "order-assigned-1",
       customer_id: assignedCustomerId,
       customer: null,
       customer_order_item: [{ final_quantity: 5, unit_price: 100 }],
       payment: [{ amount: 100 }],
     });
     const agentOwnOrder = createMockOrder({
+      id: "order-agent-own-1",
       customer_id: agentCustomerId,
       customer: null,
       customer_order_item: [{ final_quantity: 3, unit_price: 100 }],
@@ -573,9 +575,188 @@ describe("loadAdminDashboardData", () => {
     const result = await loadAdminAgentDetailsData("agent-1");
 
     expect(result?.assignedCustomers.map((customer) => customer.id)).toEqual([assignedCustomerId]);
+    expect(result?.customerOrders.map((order) => order.id).sort()).toEqual([
+      agentOwnOrder.id,
+      assignedOrder.id,
+    ].sort());
     expect(result?.remainingBalance).toBe(400);
     expect(result?.agentRemainingBalance).toBe(250);
     expect(result?.previousCustomerOrders).toEqual([]);
+    expect(result?.agentRemittanceRecords).toEqual([]);
+  });
+
+  it("loads remittance records directly for an agent", async () => {
+    const agentId = "agent-1";
+    const agentRow = {
+      id: agentId,
+      user_id: "user-1",
+      customer_id: null,
+      employee_id: "EMP-001",
+      status: "active",
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+      profile: {
+        first_name: "Carlos",
+        last_name: "Dela Cruz",
+        display_name: "Carlos Dela Cruz",
+        email: "carlos@example.test",
+        phone_number: "09170000000",
+        address: null,
+      },
+    };
+    const remittanceRow = {
+      id: "remit-1",
+      order_id: "order-1",
+      agent_id: agentId,
+      amount: 500,
+      payment_method: "Cash",
+      payment_terms: "Cash on Delivery (COD)",
+      payment_date: "2026-07-04T00:00:00.000Z",
+      reference_number: null,
+      notes: null,
+      status: "confirmed",
+      confirmed_at: "2026-07-04T08:00:00.000Z",
+      created_at: "2026-07-04T08:00:00.000Z",
+      updated_at: "2026-07-04T08:00:00.000Z",
+      order: {
+        id: "order-1",
+        sale_date: "2026-07-01",
+        created_at: "2026-07-01T00:00:00.000Z",
+      },
+    };
+    const agentBuilder = createQueryBuilder({ data: [agentRow], error: null });
+    const customerBuilder = createQueryBuilder({ data: [], error: null });
+    const remittanceBuilder = createQueryBuilder({ data: [remittanceRow], error: null });
+    const from = vi.fn((table: string) => {
+      if (table === "agent") return agentBuilder;
+      if (table === "customer") return customerBuilder;
+      if (table === "agent_received_payment") return remittanceBuilder;
+      if (table === "order") return createQueryBuilder();
+      return createQueryBuilder();
+    });
+    createSupabaseAdminClient.mockReturnValue({
+      from,
+      auth: {
+        admin: {
+          listUsers: vi.fn(() => Promise.resolve({ data: { users: [] }, error: null })),
+        },
+      },
+    });
+    const { loadAdminAgentDetailsData } = await import("./data");
+
+    const result = await loadAdminAgentDetailsData(agentId);
+
+    expect(result?.agentRemittanceRecords).toHaveLength(1);
+    expect(result?.agentRemittanceRecords[0]?.payment.id).toBe("remit-1");
+    expect(result?.agentRemittanceRecords[0]?.payment.amount).toBe(500);
+    expect(result?.agentRemittanceRecords[0]?.order.id).toBe("order-1");
+  });
+
+  it("includes a promoted agent's pre-promotion customer orders in agent details customerOrders", async () => {
+    const promotedCustomerId = "customer-promoted";
+    const agentRow = {
+      id: "agent-promoted",
+      user_id: "user-promoted",
+      customer_id: promotedCustomerId,
+      promoted_from_customer_id: promotedCustomerId,
+      promoted_from_customer_at: "2026-07-03T00:00:00.000Z",
+      employee_id: "EMP-002",
+      status: "active",
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+      profile: {
+        first_name: "Ana",
+        last_name: "Reyes",
+        display_name: "Ana Reyes",
+        email: "ana@example.test",
+        phone_number: "09172222222",
+        address: null,
+      },
+    };
+    const promotedOrder = createMockOrder({
+      id: "order-promoted-1",
+      customer_id: promotedCustomerId,
+      customer: null,
+      customer_order_item: [{ final_quantity: 2, unit_price: 100 }],
+      payment: [],
+    });
+    const convertedOrder = createMockOrder({
+      id: "order-promoted-converted",
+      customer_id: promotedCustomerId,
+      customer: null,
+      converted_at: "2026-07-04T00:00:00.000Z",
+      parent_order_id: "distribution-1",
+      customer_order_item: [{ final_quantity: 1, unit_price: 100 }],
+      payment: [],
+    });
+    const createOrderQueryMock = () => {
+      let lastCustomerIds: string[] = [];
+      let excludeConvertedOrders = false;
+      const orderChain = {
+        select: vi.fn(function select() { return orderChain; }),
+        in: vi.fn((field: string, values: string[]) => {
+          if (field === "customer_id") {
+            lastCustomerIds = values;
+          }
+          return orderChain;
+        }),
+        eq: vi.fn((field: string, value: unknown) => {
+          if (field === "order_kind" && value === "distribution") {
+            return {
+              eq: vi.fn(() => ({
+                order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+              })),
+            };
+          }
+          return orderChain;
+        }),
+        is: vi.fn((field: string) => {
+          if (field === "converted_at") {
+            excludeConvertedOrders = true;
+          }
+          return orderChain;
+        }),
+        order: vi.fn(() => ({
+          then: (resolve: (value: MockResponse) => unknown) => {
+            if (!lastCustomerIds.includes(promotedCustomerId)) {
+              return resolve({ data: [], error: null });
+            }
+
+            const data = excludeConvertedOrders
+              ? [promotedOrder]
+              : [convertedOrder, promotedOrder];
+            excludeConvertedOrders = false;
+            return resolve({ data, error: null });
+          },
+        })),
+      };
+      return orderChain;
+    };
+    const agentBuilder = createQueryBuilder({ data: [agentRow], error: null });
+    const customerBuilder = createQueryBuilder({ data: [], error: null });
+    const from = vi.fn((table: string) => {
+      if (table === "agent") return agentBuilder;
+      if (table === "customer") return customerBuilder;
+      if (table === "order") return createOrderQueryMock();
+      return createQueryBuilder();
+    });
+    createSupabaseAdminClient.mockReturnValue({
+      from,
+      auth: {
+        admin: {
+          listUsers: vi.fn(() => Promise.resolve({ data: { users: [] }, error: null })),
+        },
+      },
+    });
+    const { loadAdminAgentDetailsData } = await import("./data");
+
+    const result = await loadAdminAgentDetailsData("agent-promoted");
+
+    expect(result?.customerOrders.map((order) => order.id)).toEqual([promotedOrder.id]);
+    expect(result?.previousCustomerOrders.map((order) => order.id).sort()).toEqual([
+      convertedOrder.id,
+      promotedOrder.id,
+    ].sort());
   });
 
   it("loads all orders for a single customer on customer details", async () => {

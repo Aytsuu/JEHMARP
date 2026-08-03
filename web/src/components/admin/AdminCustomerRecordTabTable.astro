@@ -24,6 +24,7 @@ import {
   formatDate,
   formatSalePaymentSummary,
   orderBalance,
+  orderReceivableTotal,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { formatOrderCode } from "@/lib/order-detail-nav";
@@ -177,15 +178,17 @@ const skeletonRows = Array.from({ length: 6 });
                   <th scope="col">Source</th>
                   <th scope="col">Order Status</th>
                   <th scope="col">Payment Status</th>
-                  <th scope="col">Balance</th>
+                  <th scope="col">Order Total</th>
+                  <th scope="col">Remaining Receivable</th>
                   <DashboardTableActionsHeader />
                 </tr>
               </thead>
               <tbody>
                 {orderRows.length === 0 ? (
-                  <DashboardTableEmptyState colspan={9} message="No orders match the selected filters." />
+                  <DashboardTableEmptyState colspan={10} message="No orders match the selected filters." />
                 ) : orderRows.map((order, index) => {
-                  const balance = orderBalance(order);
+                  const orderTotalAmount = orderReceivableTotal(order, "final_quantity");
+                  const remainingReceivable = orderBalance(order);
                   const isPaid = order.payment_status === "paid";
                   return (
                     <tr>
@@ -200,8 +203,8 @@ const skeletonRows = Array.from({ length: 6 });
                             data-order-row-type="customer"
                             data-order-code={formatOrderCode(order.id)}
                             data-order-date={formatDate(order.created_at)}
-                            data-order-balance={formatCurrency(balance)}
-                            data-order-balance-value={balance}
+                            data-order-balance={formatCurrency(remainingReceivable)}
+                            data-order-balance-value={remainingReceivable}
                             data-order-payment-eligible={!isPaid}
                           />
                         </label>
@@ -215,7 +218,8 @@ const skeletonRows = Array.from({ length: 6 });
                       <td>
                         <StatusBadge kind="payment" status={order.payment_status} label={autoCapitalize(order.payment_status)} />
                       </td>
-                      <td>{formatCurrency(balance)}</td>
+                      <td>{formatCurrency(orderTotalAmount)}</td>
+                      <td>{formatCurrency(remainingReceivable)}</td>
                       <td class="dashboard-table__actions-column">
                         <ViewButton href={`/admin/orders/customer/${order.id}?returnTo=${customerReturnTo}`} data-astro-prefetch="false" />
                       </td>
@@ -245,7 +249,8 @@ const skeletonRows = Array.from({ length: 6 });
                 <th scope="col">Source</th>
                 <th scope="col">Order Status</th>
                 <th scope="col">Payment Status</th>
-                <th scope="col">Balance</th>
+                <th scope="col">Order Total</th>
+                <th scope="col">Remaining Receivable</th>
                 <DashboardTableActionsHeader />
               </tr>
             </thead>
@@ -257,6 +262,7 @@ const skeletonRows = Array.from({ length: 6 });
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>

@@ -156,13 +156,14 @@ const skeletonRows = Array.from({ length: 6 });
                   <th scope="col">Source</th>
                   <th scope="col">Order Status</th>
                   <th scope="col">Payment Status</th>
-                  <th scope="col">Amount</th>
+                  <th scope="col">Order Total</th>
+                  <th scope="col">Remaining Receivable</th>
                   <DashboardTableActionsHeader />
                 </tr>
               </thead>
               <tbody>
                 {orderRows.length === 0 ? (
-                  <DashboardTableEmptyState colspan={10} message="No orders match the selected filters." />
+                  <DashboardTableEmptyState colspan={11} message="No orders match the selected filters." />
                 ) : orderRows.map((order, index) => (
                   <tr>
                     <td class="dashboard-table__number-column">{dashboardTableRowNumber(ordersPagination, index)}</td>
@@ -187,7 +188,8 @@ const skeletonRows = Array.from({ length: 6 });
                     <td>
                       <StatusBadge kind="payment" status={order.payment_status} label={autoCapitalize(order.payment_status)} />
                     </td>
-                    <td>{formatCurrency(order.amount)}</td>
+                    <td>{formatCurrency(order.order_total)}</td>
+                    <td>{formatCurrency(order.remaining_receivable)}</td>
                     <td class="dashboard-table__actions-column">
                       <ViewButton href={order.href} label={`View ${order.order_type_label.toLowerCase()} order ${formatOrderCode(order.id)}`} />
                     </td>
@@ -217,7 +219,8 @@ const skeletonRows = Array.from({ length: 6 });
                 <th scope="col">Source</th>
                 <th scope="col">Order Status</th>
                 <th scope="col">Payment Status</th>
-                <th scope="col">Amount</th>
+                <th scope="col">Order Total</th>
+                <th scope="col">Remaining Receivable</th>
                 <DashboardTableActionsHeader />
               </tr>
             </thead>
@@ -232,6 +235,7 @@ const skeletonRows = Array.from({ length: 6 });
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
+                  <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block"></span></td>
                   <td><span class="table-skeleton-block table-skeleton-block--short"></span></td>
                 </tr>

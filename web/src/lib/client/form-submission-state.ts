@@ -11,6 +11,20 @@ function isPostForm(form: HTMLFormElement) {
   return (form.getAttribute("method") || "get").toLowerCase() === "post";
 }
 
+function getAlertDialogTriggerButtons(form: HTMLFormElement) {
+  const formId = form.id;
+  if (!formId) {
+    return [];
+  }
+
+  const root = form.ownerDocument;
+  return Array.from(
+    root.querySelectorAll<HTMLButtonElement>(
+      `[data-alert-dialog-form="${formId}"]`,
+    ),
+  );
+}
+
 function getSubmitButtons(form: HTMLFormElement) {
   const root = form.ownerDocument;
   const buttons = Array.from(
@@ -28,7 +42,29 @@ function getSubmitButtons(form: HTMLFormElement) {
     ),
   );
 
-  return [...new Set([...buttons, ...externalButtons])];
+  return [
+    ...new Set([
+      ...buttons,
+      ...externalButtons,
+      ...getAlertDialogTriggerButtons(form),
+    ]),
+  ];
+}
+
+function resolveLoadingButton(
+  form: HTMLFormElement,
+  submitter: HTMLButtonElement | null,
+) {
+  const alertDialogTrigger = getAlertDialogTriggerButtons(form)[0] ?? null;
+  if (alertDialogTrigger) {
+    return alertDialogTrigger;
+  }
+
+  if (submitter) {
+    return submitter;
+  }
+
+  return null;
 }
 
 function applySubmittingState(
@@ -47,9 +83,10 @@ function applySubmittingState(
     button.disabled = true;
   });
 
-  if (submitter) {
-    submitter.classList.add(LOADING_CLASS);
-    submitter.setAttribute("aria-busy", "true");
+  const loadingButton = resolveLoadingButton(form, submitter);
+  if (loadingButton) {
+    loadingButton.classList.add(LOADING_CLASS);
+    loadingButton.setAttribute("aria-busy", "true");
   }
 }
 
@@ -58,6 +95,12 @@ export function setFormSubmittingState(
   submitter: HTMLButtonElement | null,
 ) {
   applySubmittingState(form, submitter);
+}
+
+export function getFormAlertDialogTriggerButton(
+  form: HTMLFormElement,
+): HTMLButtonElement | null {
+  return getAlertDialogTriggerButtons(form)[0] ?? null;
 }
 
 export function resetFormSubmissionState(form: HTMLFormElement) {

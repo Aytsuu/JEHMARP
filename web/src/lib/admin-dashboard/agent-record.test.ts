@@ -229,6 +229,29 @@ describe("buildAgentPerformanceQuickStats", () => {
       [],
       [...products],
       encodeURIComponent("/admin/agents/agent-1"),
+      [{
+        payment: {
+          id: "remit-1",
+          order_id: "order-remit",
+          agent_id: "agent-1",
+          amount: 500,
+          payment_method: "cash",
+          payment_terms: "full",
+          payment_date: "2026-07-04",
+          reference_number: null,
+          notes: null,
+          status: "confirmed",
+          confirmed_at: "2026-07-04T08:00:00.000Z",
+          created_at: "2026-07-04T08:00:00.000Z",
+          updated_at: "2026-07-04T08:00:00.000Z",
+          agent: null,
+        },
+        order: {
+          id: "order-remit",
+          sale_date: null,
+          created_at: "2026-07-01T00:00:00.000Z",
+        },
+      }],
     );
 
     expect(stats.remittance).toMatchObject({

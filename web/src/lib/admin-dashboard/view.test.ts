@@ -4,8 +4,10 @@ import type { AdminAgentOrder, AdminOrder } from "./data";
 import {
   agentCustomerBalance,
   agentOrderCommissionTotal,
+  agentOrderPaidTotal,
   agentOrderPaymentStatus,
   agentOrderReceivableTotal,
+  agentOrderRemainingReceivable,
   canConvertPromotedCustomerOrderToDistribution,
   canManageOrderCommissions,
   customerOrderDistributionConversionBlockMessage,
@@ -301,6 +303,28 @@ describe("agentOrderReceivableTotal", () => {
 
     expect(agentOrderCommissionTotal(order)).toBe(60);
     expect(agentOrderReceivableTotal(order)).toBe(840);
+  });
+});
+
+describe("agentOrderRemainingReceivable", () => {
+  it("subtracts linked customer order payments from the agent receivable total", () => {
+    const order = {
+      agent_order_item: [
+        {
+          quantity: 3,
+          agent_commission_amount: 20,
+          product: { default_price: 300 },
+        },
+      ],
+      customer_order: [
+        {
+          payment: [{ amount: 200 }],
+        },
+      ],
+    } as AdminAgentOrder;
+
+    expect(agentOrderPaidTotal(order)).toBe(200);
+    expect(agentOrderRemainingReceivable(order)).toBe(680);
   });
 });
 
