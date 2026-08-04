@@ -58,6 +58,8 @@ export function initAdminCreateOrderSheet() {
   const newCustomerFields = form.querySelector<HTMLElement>("[data-new-customer-fields]");
   const isResellerCheckbox = form.querySelector<HTMLInputElement>("[data-customer-is-reseller]");
 
+  // Declared before init because picker onChange runs during initOrderCustomerPicker.
+  // eslint-disable-next-line prefer-const -- assigned after options; must stay undefined during init callback
   let profilePicker: OrderCustomerPickerController | undefined;
 
   function selectedCustomerIsReseller() {
