@@ -366,7 +366,7 @@ function linkedCustomerOrdersLabel(count: number) {
     </div>
   </Sheet>
 
-  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table">
+  <div class="order-management-controls">
     <div class="table-filters order-management-toolbar">
       <form
         method="get"
@@ -450,6 +450,19 @@ function linkedCustomerOrdersLabel(count: number) {
       </div>
     </div>
 
+    {!canCreateOrder && (
+      <section class="order-management-notice" aria-live="polite">
+        <p class="order-management-notice__copy">
+          You cannot create an order until at least one product exists.{" "}
+          <a href="/admin/products?create=product" class="order-management-notice__action">
+            Create a product
+          </a>
+        </p>
+      </section>
+    )}
+  </div>
+
+  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table dashboard-interactive-table--orders-content">
     <div data-order-table-shell class="dashboard-interactive-table__surface">
       <DashboardTableBoard>
         <table class="dashboard-table">
@@ -690,6 +703,30 @@ function linkedCustomerOrdersLabel(count: number) {
 
   .order-management-toolbar__document-menu {
     min-height: 2.35rem;
+  }
+
+  .order-management-notice {
+    margin: 0;
+    color: #92400e;
+  }
+
+  .order-management-notice__copy {
+    margin: 0;
+    line-height: 1.55;
+    font-size: 0.92rem;
+  }
+
+  .order-management-notice__action {
+    color: var(--color-brand-red);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .order-management-notice__action:hover,
+  .order-management-notice__action:focus-visible {
+    color: #551313;
+    outline: none;
   }
 
   .order-table-actions {

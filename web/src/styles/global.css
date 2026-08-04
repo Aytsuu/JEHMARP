@@ -3812,7 +3812,8 @@
 
   .dashboard-interactive-table>.table-filters,
   .dashboard-interactive-table>.product-management-toolbar,
-  .dashboard-interactive-table>.order-management-toolbar {
+  .dashboard-interactive-table>.order-management-toolbar,
+  .order-management-controls>.order-management-toolbar {
     flex-shrink: 0;
     margin-bottom: 0;
     padding: 0 var(--dashboard-page-inset-x) 0.75rem;
@@ -3825,20 +3826,43 @@
     background: #ffffff;
   }
 
+  .order-management-controls:has(.order-management-notice)>.order-management-toolbar {
+    border-bottom: none;
+    padding-bottom: 0.35rem;
+  }
+
+  .order-management-controls {
+    flex-shrink: 0;
+    background: #ffffff;
+  }
+
+  .order-management-controls .order-management-notice {
+    margin: 0;
+    padding: 1rem var(--dashboard-page-inset-x);
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .dashboard-interactive-table--orders-content {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
   .dashboard-interactive-table>.product-management-toolbar .product-filter-form,
-  .dashboard-interactive-table>.order-management-toolbar .order-filter-form {
+  .dashboard-interactive-table>.order-management-toolbar .order-filter-form,
+  .order-management-controls>.order-management-toolbar .order-filter-form {
     flex: 0 0 auto;
     min-width: 0;
   }
 
   .dashboard-interactive-table>.product-management-toolbar .product-management-toolbar__actions,
-  .dashboard-interactive-table>.order-management-toolbar .order-management-toolbar__actions {
+  .dashboard-interactive-table>.order-management-toolbar .order-management-toolbar__actions,
+  .order-management-controls>.order-management-toolbar .order-management-toolbar__actions {
     flex: 0 0 auto;
   }
 
   .dashboard-interactive-table>.table-filters .table-filters__search,
   .dashboard-interactive-table>.product-management-toolbar .product-filter-form__field--search,
-  .dashboard-interactive-table>.order-management-toolbar .order-filter-form__field--search {
+  .dashboard-interactive-table>.order-management-toolbar .order-filter-form__field--search,
+  .order-management-controls>.order-management-toolbar .order-filter-form__field--search {
     flex: 1;
     min-width: 22rem;
     max-width: 40rem;

@@ -1340,4 +1340,32 @@ function formatStockStatus(status: string): string {
   ) {
     initCreateProductCategorySuggestion();
   }
+
+  function openCreateProductSheetFromQuery() {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("create") !== "product") return;
+
+    const trigger = document.querySelector<HTMLElement>(
+      '[data-sheet-target="#create-product-sheet"]',
+    );
+    trigger?.click();
+
+    url.searchParams.delete("create");
+    const nextSearch = url.searchParams.toString();
+    window.history.replaceState(
+      {},
+      "",
+      `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash}`,
+    );
+  }
+
+  document.addEventListener("DOMContentLoaded", openCreateProductSheetFromQuery);
+  document.addEventListener("astro:after-swap", openCreateProductSheetFromQuery);
+  document.addEventListener("astro:page-load", openCreateProductSheetFromQuery);
+  if (
+    document.readyState === "complete" ||
+    document.readyState === "interactive"
+  ) {
+    openCreateProductSheetFromQuery();
+  }
 </script>
