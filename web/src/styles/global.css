@@ -32,6 +32,13 @@
 @layer base {
   :root {
     --public-site-header-height: 5rem;
+    --app-viewport-height: 100vh;
+  }
+
+  @supports (height: 100dvh) {
+    :root {
+      --app-viewport-height: 100dvh;
+    }
   }
 
   html {
@@ -2634,7 +2641,7 @@
   .dashboard-body:has([data-agent-notifications-page]),
   .dashboard-body:has([data-admin-record-page]),
   .dashboard-body:has([data-dashboard-record-page]) {
-    height: 100vh;
+    height: var(--app-viewport-height);
     overflow: hidden;
   }
 
@@ -2642,7 +2649,7 @@
   .dashboard-frame:has([data-agent-notifications-page]),
   .dashboard-frame:has([data-admin-record-page]),
   .dashboard-frame:has([data-dashboard-record-page]) {
-    height: 100vh;
+    height: var(--app-viewport-height);
     min-height: 0;
     overflow: hidden;
   }
@@ -2655,7 +2662,7 @@
     flex-direction: column;
     height: 100%;
     min-height: 0;
-    max-height: 100vh;
+    max-height: var(--app-viewport-height);
     overflow: hidden;
     padding: 0;
   }
@@ -3517,11 +3524,27 @@
     font-size: 0.88rem;
     font-weight: 600;
     line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
     cursor: pointer;
     transition:
       background-color 0.2s ease,
       border-color 0.2s ease,
       color 0.2s ease;
+  }
+
+  .alert-dialog__button--ghost {
+    background: transparent;
+    border-color: transparent;
+    color: #374151;
+  }
+
+  .alert-dialog__button--ghost:hover:not(:disabled),
+  .alert-dialog__button--ghost:focus-visible:not(:disabled) {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-brand-red);
+    outline: none;
   }
 
   .alert-dialog__button--secondary {
@@ -8654,6 +8677,8 @@
     flex-direction: column;
     z-index: 101;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .drawer-sheet--open .drawer-sheet__content {
@@ -8661,6 +8686,7 @@
   }
 
   .drawer-sheet__header {
+    flex-shrink: 0;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -8708,13 +8734,17 @@
   }
 
   .drawer-sheet__body {
-    flex-grow: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior: none;
     padding: 1.5rem 2rem;
     min-width: 0;
   }
 
   .drawer-sheet__footer {
+    flex-shrink: 0;
     border-top: 1px solid #e5e7eb;
     padding: 1.25rem 2rem;
     background-color: #ffffff;
@@ -9717,70 +9747,70 @@
   }
 
   @media (max-width: 47.99rem) {
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__header {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__header {
       padding: 0.85rem 0.75rem 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__body {
       padding: 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__footer {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__footer {
       padding: 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-sheet__footer {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-sheet__footer {
       flex-direction: column;
       align-items: stretch;
       gap: 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-sheet__footer button[type="submit"] {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-sheet__footer button[type="submit"] {
       width: 100%;
       margin-top: 0;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__title {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__title {
       font-size: 1.1rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-sheet__header-description {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-sheet__header-description {
       font-size: 0.85rem;
       line-height: 1.4;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-form {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-form {
       gap: 1rem;
       min-width: 0;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section {
       gap: 0.5rem;
       min-width: 0;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__body {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__body {
       gap: 0.75rem;
       min-width: 0;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__body.admin-form-grid {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__body.admin-form-grid {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__title::before,
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__title::after {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__title::before,
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__title::after {
       display: none;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__title {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__title {
       gap: 0;
       font-size: 0.82rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body form input,
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body form select,
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body form textarea {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__body form input,
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__body form select,
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__body form textarea {
       width: 100%;
       min-width: 0;
       max-width: 100%;
@@ -9789,43 +9819,43 @@
       font-size: 0.9rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .field-row--date {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .field-row--date {
       justify-items: start;
       width: fit-content;
       max-width: 100%;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .field-row--date input[type="date"],
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .field-row--date input[type="datetime-local"] {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .field-row--date input[type="date"],
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .field-row--date input[type="datetime-local"] {
       width: auto;
       max-width: 100%;
       min-width: 0;
       field-sizing: content;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-form label.field-row:not(.field-row--date) {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-form label.field-row:not(.field-row--date) {
       min-width: 0;
       width: 100%;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .ui-accordion__summary {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .ui-accordion__summary {
       padding: 0.75rem;
       gap: 0.5rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .ui-accordion__content {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .ui-accordion__content {
       padding: 0 0.75rem 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-item-accordion__fields {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-item-accordion__fields {
       gap: 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-item-list {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-item-list {
       gap: 0.65rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-form__total {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-form__total {
       width: 100%;
       margin-right: 0;
     }
@@ -9840,6 +9870,7 @@
   html.sheet-open,
   body.sheet-open {
     overflow: hidden;
+    overscroll-behavior: none;
   }
 
   body.sheet-open .dashboard-frame {
@@ -10004,6 +10035,9 @@
     padding: 0.65rem 0.75rem;
     color: #ffffff;
     font: inherit;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
     text-decoration: none;
     text-align: left;
     cursor: pointer;
@@ -10182,10 +10216,25 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
+    .dashboard-body--agent:has([data-dashboard-record-page]),
+    .dashboard-body--agent:has([data-agent-record-page]) {
+      height: var(--app-viewport-height);
+    }
+
+    .dashboard-body--agent:has([data-dashboard-record-page]) .dashboard-frame,
+    .dashboard-body--agent:has([data-agent-record-page]) .dashboard-frame {
+      height: var(--app-viewport-height);
+    }
+
+    .dashboard-body--agent:has([data-dashboard-record-page]) .dashboard-main,
+    .dashboard-body--agent:has([data-agent-record-page]) .dashboard-main {
+      max-height: var(--app-viewport-height);
+    }
+
     .dashboard-body--agent .dashboard-main {
       display: flex;
       flex-direction: column;
-      min-height: 100dvh;
+      min-height: var(--app-viewport-height);
       padding-top: 0;
       padding-bottom: env(safe-area-inset-bottom, 0);
     }
@@ -10199,16 +10248,19 @@
       display: flex;
       flex: 1;
       flex-direction: column;
-      min-height: calc(100dvh - env(safe-area-inset-bottom, 0));
+      min-height: calc(var(--app-viewport-height) - env(safe-area-inset-bottom, 0));
     }
 
     .dashboard-body--agent.dashboard-body--agent-mobile-primary .dashboard-main__content--agent {
-      min-height: calc(100dvh - var(--agent-mobile-header-height) - var(--agent-mobile-nav-height) - env(safe-area-inset-bottom, 0));
+      min-height: calc(
+        var(--app-viewport-height) - var(--agent-mobile-header-height) - var(--agent-mobile-nav-height) -
+          env(safe-area-inset-bottom, 0)
+      );
     }
 
     .dashboard-body--agent .admin-notifications-page__inner {
       max-width: none;
-      padding: 0.75rem;
+      padding: 0.75rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom, 0));
     }
 
     [data-agent-primary-page] .admin-notifications-page__intro {

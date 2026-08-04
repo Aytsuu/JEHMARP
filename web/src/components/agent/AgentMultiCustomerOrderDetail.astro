@@ -1,0 +1,1064 @@
+---
+import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
+import Button from "@/components/ui/Button.astro";
+import Sheet from "@/components/ui/Sheet.astro";
+import Tab from "@/components/ui/Tab.astro";
+import TabPanel from "@/components/ui/TabPanel.astro";
+import Tabs from "@/components/ui/Tabs.astro";
+import ViewButton from "@/components/ViewButton.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import type { AgentOrder } from "@/lib/agent-dashboard/data";
+import {
+  formatCurrency,
+  formatDate,
+  fullName,
+  orderExpectedCommission,
+  orderPaymentTotal,
+  orderTotal,
+} from "@/lib/agent-dashboard/view";
+import {
+  attachCustomerBlockMessage,
+  formatAgentOrderDistributionStatus,
+  formatPendingIndicator,
+  getAgentOrderProductDistribution,
+} from "@/lib/agent-order-distribution";
+import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
+
+function deriveRemittancePaymentStatus(
+  paid: number,
+  receivable: number,
+  remittanceBalance: number,
+): "unpaid" | "partial" | "paid" {
+  if (paid <= 0) {
+    return "unpaid";
+  }
+
+  if (remittanceBalance <= 0 || paid >= receivable) {
+    return "paid";
+  }
+
+  return "partial";
+}
+
+type ProductOption = {
+  id: string;
+  name: string;
+  unitLabel: string;
+  defaultPrice: number;
+  remainingQuantity?: number | null;
+};
+
+type OrderStatusCounts = {
+  pending: number;
+  unpaid: number;
+  partial: number;
+  paid: number;
+};
+
+type Props = {
+  agentOrder: AgentOrder;
+  agentOrderCode: string;
+  productCount: number;
+  customerCount: number;
+  paid: number;
+  commission: number;
+  grossTotal: number;
+  receivable: number;
+  remittanceBalance: number;
+  orderStatusCounts: OrderStatusCounts;
+  canAttachCustomer: boolean;
+  canRecordRemittance: boolean;
+  attachCustomerProducts: ProductOption[];
+  todayDate: string;
+  todayTime: string;
+  isOrderDetailTabActive: (tab: "products" | "customers") => boolean;
+};
+
+const {
+  agentOrder,
+  agentOrderCode,
+  productCount,
+  customerCount,
+  paid,
+  commission,
+  grossTotal,
+  receivable,
+  remittanceBalance,
+  orderStatusCounts,
+  canAttachCustomer,
+  canRecordRemittance,
+  attachCustomerProducts,
+  todayDate,
+  todayTime,
+  isOrderDetailTabActive,
+} = Astro.props;
+
+const attachCustomerTitle = attachCustomerBlockMessage(agentOrder);
+
+function orderQuantityKey(order: AgentOrder): "partial_quantity" | "final_quantity" {
+  return order.invoice.length > 0 ? "final_quantity" : "partial_quantity";
+}
+
+function pendingAgentPaymentTotal(order: AgentOrder) {
+  return (order.agent_received_payment ?? []).reduce((sum, payment) => {
+    return payment.status === "pending_admin_confirmation"
+      ? sum + payment.amount
+      : sum;
+  }, 0);
+}
+
+const statusBarTotal = Math.max(
+  orderStatusCounts.pending
+    + orderStatusCounts.unpaid
+    + orderStatusCounts.partial
+    + orderStatusCounts.paid,
+  1,
+);
+
+function statusBarWidth(count: number) {
+  return `${(count / statusBarTotal) * 100}%`;
+}
+
+const statusLegend = [
+  {
+    key: "pending",
+    label: "Pending",
+    count: orderStatusCounts.pending,
+    color: "#f59e0b",
+  },
+  {
+    key: "unpaid",
+    label: "Unpaid",
+    count: orderStatusCounts.unpaid,
+    color: "#dc2626",
+  },
+  {
+    key: "partial",
+    label: "Partial",
+    count: orderStatusCounts.partial,
+    color: "#d97706",
+  },
+  {
+    key: "paid",
+    label: "Paid",
+    count: orderStatusCounts.paid,
+    color: "#16a34a",
+  },
+] as const;
+
+const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, remittanceBalance);
+---
+
+<div class="agent-multi-order flex w-full max-w-full flex-col gap-4 sm:gap-5 lg:gap-6">
+  <section class="agent-multi-order__summary-card" aria-label="Order summary">
+    <div class="agent-multi-order__summary-head">
+      <h2 class="agent-multi-order__summary-title">Summary</h2>
+      <button
+        type="button"
+        class="agent-multi-order__remit-action"
+        data-open-create-sheet
+        data-sheet-target="#agent-multi-order-remittance-sheet"
+        disabled={!canRecordRemittance}
+        aria-label="Add remittance"
+      >
+        Add Remittance <span aria-hidden="true">→</span>
+      </button>
+    </div>
+    <dl class="agent-multi-order__summary-rows">
+      <div class="agent-multi-order__summary-row">
+        <dt>Paid</dt>
+        <dd>{formatCurrency(paid)}</dd>
+      </div>
+      <div class="agent-multi-order__summary-row">
+        <dt>Your commission</dt>
+        <dd>{formatCurrency(commission)}</dd>
+      </div>
+      <div class="agent-multi-order__summary-row">
+        <dt>Gross Total</dt>
+        <dd>{formatCurrency(grossTotal)}</dd>
+      </div>
+      <div class="agent-multi-order__summary-row">
+        <dt>Receivable</dt>
+        <dd>{formatCurrency(receivable)}</dd>
+      </div>
+    </dl>
+    <hr class="agent-multi-order__summary-divider" />
+    <p class="agent-multi-order__summary-balance">
+      Balance: <strong>{formatCurrency(remittanceBalance)}</strong>
+    </p>
+  </section>
+
+  <section class="agent-multi-order__details-card" aria-label="Order details">
+    <div class="agent-multi-order__details-rows">
+      <div class="agent-multi-order__detail-row">
+        <span class="agent-multi-order__detail-label">Order date</span>
+        <span class="agent-multi-order__detail-value">{formatDate(agentOrder.created_at)}</span>
+      </div>
+      <div class="agent-multi-order__detail-row">
+        <span class="agent-multi-order__detail-label">Release date</span>
+        <span class="agent-multi-order__detail-value">{formatDate(agentOrder.release_date ?? null)}</span>
+      </div>
+      <div class="agent-multi-order__detail-row">
+        <span class="agent-multi-order__detail-label">Order status</span>
+        <StatusBadge
+          kind="order"
+          status={agentOrder.order_status}
+          label={autoCapitalize(agentOrder.order_status)}
+        />
+      </div>
+      <div class="agent-multi-order__detail-row">
+        <span class="agent-multi-order__detail-label">Payment status</span>
+        <StatusBadge
+          kind="payment"
+          status={remittancePaymentStatus}
+          label={autoCapitalize(remittancePaymentStatus)}
+        />
+      </div>
+    </div>
+  </section>
+
+  <section class="agent-multi-order__orders-card" aria-label="Customer orders overview">
+    <h2 class="agent-multi-order__orders-title">Orders</h2>
+    <div
+      class="agent-multi-order__status-bar"
+      role="img"
+      aria-label={`${orderStatusCounts.pending} pending, ${orderStatusCounts.unpaid} unpaid, ${orderStatusCounts.partial} partial, ${orderStatusCounts.paid} paid`}
+    >
+      {
+        statusLegend.map((segment) => (
+          segment.count > 0 && (
+            <span
+              class="agent-multi-order__status-bar-segment"
+              style={`width: ${statusBarWidth(segment.count)}; background-color: ${segment.color};`}
+            />
+          )
+        ))
+      }
+    </div>
+    <hr class="agent-multi-order__orders-divider" />
+    <ul class="agent-multi-order__status-legend">
+      {
+        statusLegend.map((segment) => (
+          <li class="agent-multi-order__status-legend-item">
+            <span
+              class="agent-multi-order__status-dot"
+              style={`background-color: ${segment.color};`}
+              aria-hidden="true"
+            />
+            <span class="agent-multi-order__status-label">{segment.label}</span>
+            <strong class="agent-multi-order__status-count">{segment.count}</strong>
+          </li>
+        ))
+      }
+    </ul>
+  </section>
+
+  <Tabs
+    ariaLabel="Distribution order sections"
+    listClass="ui-tabs__list--stretch agent-multi-order__tabs"
+    panelsClass="agent-multi-order__tab-panels"
+    class="agent-multi-order__tabs-root min-h-0 flex-1"
+  >
+    <Tab slot="tabs" target="products" active={isOrderDetailTabActive("products")}>
+      Products
+    </Tab>
+    <Tab slot="tabs" target="customers" active={isOrderDetailTabActive("customers")}>
+      Customers ({customerCount})
+    </Tab>
+
+    <TabPanel
+      slot="panels"
+      target="products"
+      active={isOrderDetailTabActive("products")}
+      variant="plain"
+      class="agent-multi-order__tab-panel"
+      aria-label="Products"
+    >
+      <div class="agent-multi-order__tab-scroll">
+        {
+          productCount === 0 ? (
+            <p class="empty-state">No products have been added to this order yet.</p>
+          ) : (
+            <ul class="agent-multi-order__product-list">
+              {
+                agentOrder.agent_order_item.map((item) => {
+                  const unitPrice = item.product?.default_price ?? 0;
+                  const distribution = getAgentOrderProductDistribution(
+                    agentOrder,
+                    item.product_id,
+                  );
+
+                  return (
+                    <li class="agent-multi-order__product-item">
+                      <div class="agent-multi-order__product-head">
+                        <div class="min-w-0">
+                          <h3 class="agent-multi-order__product-name">
+                            {item.product?.name ?? "Missing product"}
+                          </h3>
+                          <p class="agent-multi-order__product-meta">
+                            {formatCurrency(unitPrice)} / {item.product?.unit_label ?? "unit"}
+                          </p>
+                        </div>
+                        <strong class="agent-multi-order__product-total">
+                          {formatCurrency(item.quantity * unitPrice)}
+                        </strong>
+                      </div>
+                      <dl class="agent-multi-order__product-details">
+                        <div>
+                          <dt>Quantity</dt>
+                          <dd>
+                            {item.quantity} {item.product?.unit_label ?? ""}
+                            {
+                              distribution.pendingQuantityIncrease > 0 && (
+                                <span class="agent-multi-order__pending-indicator">
+                                  {formatPendingIndicator(
+                                    distribution.pendingQuantityIncrease,
+                                    (value) => `${value} ${item.product?.unit_label ?? ""}`,
+                                  )}
+                                </span>
+                              )
+                            }
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Details</dt>
+                          <dd>{item.add_details ?? "N/A"}</dd>
+                        </div>
+                        <div>
+                          <dt>Commission</dt>
+                          <dd>{formatCurrency(item.agent_commission_amount)}</dd>
+                        </div>
+                        <div>
+                          <dt>Distribution</dt>
+                          <dd>
+                            {formatAgentOrderDistributionStatus({
+                              remainingQuantity: distribution.remainingQuantity,
+                              unitLabel: item.product?.unit_label ?? "unit",
+                            })}
+                          </dd>
+                        </div>
+                      </dl>
+                    </li>
+                  );
+                })
+              }
+            </ul>
+          )
+        }
+      </div>
+    </TabPanel>
+
+    <TabPanel
+      slot="panels"
+      target="customers"
+      active={isOrderDetailTabActive("customers")}
+      variant="plain"
+      class="agent-multi-order__tab-panel"
+      aria-label={`Customers (${customerCount})`}
+    >
+      <div class="agent-multi-order__customers-actions">
+        <Button
+          type="button"
+          data-open-create-sheet
+          data-sheet-target="#agent-order-attach-customer-sheet"
+          disabled={!canAttachCustomer}
+          title={attachCustomerTitle}
+          class="agent-multi-order__add-customer-button"
+        >
+          Add customer order
+        </Button>
+      </div>
+      <div class="agent-multi-order__tab-scroll">
+        {
+          customerCount === 0 ? (
+            <p class="empty-state">No customer orders have been attached yet.</p>
+          ) : (
+            <ul class="agent-multi-order__customer-list">
+              {
+                agentOrder.customer_order.map((order) => {
+                  const quantityKey = orderQuantityKey(order);
+                  const grossTotal = orderTotal(order, quantityKey);
+                  const orderCommission = orderExpectedCommission(order);
+                  const orderPaid = orderPaymentTotal(order);
+                  const pendingAgentReceived = pendingAgentPaymentTotal(order);
+                  const customerName = order.customer
+                    ? fullName(order.customer)
+                    : "Guest";
+
+                  return (
+                    <li class="agent-multi-order__customer-item">
+                      <div class="agent-multi-order__customer-head">
+                        <div class="min-w-0">
+                          <h3 class="agent-multi-order__customer-name">{customerName}</h3>
+                          <p class="agent-multi-order__customer-meta">
+                            {formatDate(order.created_at)} · {formatOrderSource(order.source)}
+                          </p>
+                        </div>
+                        <div class="agent-multi-order__customer-badges">
+                          <StatusBadge
+                            kind="order"
+                            status={order.order_status}
+                            label={autoCapitalize(order.order_status)}
+                          />
+                          <StatusBadge
+                            kind="payment"
+                            status={order.payment_status}
+                            label={autoCapitalize(order.payment_status)}
+                          />
+                        </div>
+                      </div>
+                      <dl class="agent-multi-order__customer-details">
+                        <div>
+                          <dt>Gross total</dt>
+                          <dd>{formatCurrency(grossTotal)}</dd>
+                        </div>
+                        <div>
+                          <dt>Paid</dt>
+                          <dd>{formatCurrency(orderPaid)}</dd>
+                        </div>
+                        <div>
+                          <dt>Commission</dt>
+                          <dd>{formatCurrency(orderCommission)}</dd>
+                        </div>
+                        {
+                          pendingAgentReceived > 0 && (
+                            <div>
+                              <dt>Pending confirmation</dt>
+                              <dd>{formatCurrency(pendingAgentReceived)}</dd>
+                            </div>
+                          )
+                        }
+                      </dl>
+                      <div class="agent-multi-order__customer-actions">
+                        <ViewButton href={`/agent/orders/${order.id}`} />
+                      </div>
+                    </li>
+                  );
+                })
+              }
+            </ul>
+          )
+        }
+      </div>
+    </TabPanel>
+  </Tabs>
+</div>
+
+<Sheet id="agent-multi-order-remittance-sheet" width="42rem">
+  <div slot="header" class="order-create-sheet__header-copy">
+    <h3 class="drawer-sheet__title" data-sheet-title>Add Remittance</h3>
+    <p class="order-create-sheet__header-description">
+      Submit remittance for {agentOrderCode}. Admin confirmation is required before it is applied.
+    </p>
+  </div>
+  <form
+    id="agent-multi-order-remittance-form"
+    method="post"
+    class="order-create-form"
+    data-agent-remittance-form
+    data-astro-reload
+  >
+    <input type="hidden" name="action" value="record-agent-payment-distribution" />
+    <div data-selected-remittance-order-inputs hidden></div>
+
+    {
+      customerCount > 0 && (
+        <div class="agent-multi-order-remittance-sheet__customer-orders">
+          <p class="agent-multi-order-remittance-sheet__customer-orders-label">Customer orders</p>
+          <ul class="agent-multi-order__remittance-order-list">
+            {
+              agentOrder.customer_order.map((order) => {
+                const quantityKey = orderQuantityKey(order);
+                const grossTotal = orderTotal(order, quantityKey);
+                const orderPaid = orderPaymentTotal(order);
+                const pendingAgentReceived = pendingAgentPaymentTotal(order);
+                const remainingBalance = Math.max(
+                  grossTotal - orderPaid - pendingAgentReceived,
+                  0,
+                );
+                const canSelect = remainingBalance > 0;
+                const customerName = order.customer
+                  ? fullName(order.customer)
+                  : "Guest";
+
+                return (
+                  <li class="agent-multi-order__remittance-order-item">
+                    <label class="agent-multi-order__remittance-order-label">
+                      <input
+                        type="checkbox"
+                        value={order.id}
+                        data-remittance-order-checkbox
+                        disabled={!canSelect || !canRecordRemittance}
+                      />
+                      <span class="agent-multi-order__remittance-order-copy">
+                        <strong>{customerName}</strong>
+                        <span>
+                          Balance {formatCurrency(remainingBalance)}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                );
+              })
+            }
+          </ul>
+        </div>
+      )
+    }
+
+    <div class="order-create-form__payment-fields">
+      <label class="field-row">
+        <span>Amount</span>
+        <input
+          type="number"
+          name="amount"
+          min="0.01"
+          step="0.01"
+          value={canRecordRemittance ? "0" : undefined}
+          disabled={!canRecordRemittance}
+          required
+        />
+      </label>
+      <div class="order-create-form__field-pair">
+        <label class="field-row">
+          <span>Payment method</span>
+          <select name="paymentMethod" disabled={!canRecordRemittance} required>
+            <option value="">Select method</option>
+            <option value="Cash">Cash</option>
+            <option value="Check">Check</option>
+          </select>
+        </label>
+        <label class="field-row">
+          <span>Payment terms</span>
+          <select name="paymentTerms" disabled={!canRecordRemittance} required>
+            <option value="">Select payment terms</option>
+            <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Gcash">Gcash</option>
+          </select>
+        </label>
+      </div>
+      <div class="order-create-form__field-pair">
+        <label class="field-row">
+          <span>Payment date</span>
+          <input
+            type="date"
+            name="paymentDate"
+            value={todayDate}
+            disabled={!canRecordRemittance}
+            required
+          />
+        </label>
+        <label class="field-row">
+          <span>Payment time</span>
+          <input
+            type="time"
+            name="paymentTime"
+            value={todayTime}
+            disabled={!canRecordRemittance}
+            required
+          />
+        </label>
+      </div>
+      <label class="field-row">
+        <span>Reference</span>
+        <input type="text" name="referenceNumber" disabled={!canRecordRemittance} />
+      </label>
+      <label class="field-row">
+        <span>Payment notes</span>
+        <textarea name="notes" rows="2" disabled={!canRecordRemittance}></textarea>
+      </label>
+    </div>
+  </form>
+  <div slot="footer" class="order-create-sheet__footer">
+    <p class="agent-multi-order-remittance-sheet__balance" aria-live="polite">
+      Remaining balance: <strong>{formatCurrency(remittanceBalance)}</strong>
+    </p>
+    <button
+      type="submit"
+      form="agent-multi-order-remittance-form"
+      disabled={!canRecordRemittance}
+    >
+      Submit for admin confirmation
+    </button>
+  </div>
+</Sheet>
+
+<AgentOrderAttachCustomerSheet
+  agentOrderId={agentOrder.id}
+  products={attachCustomerProducts}
+  mode="agent"
+  canAttachCustomer={canAttachCustomer}
+/>
+
+<script>
+  function initAgentRemittanceForm() {
+    const form = document.querySelector<HTMLFormElement>("[data-agent-remittance-form]");
+    if (!form || form.dataset.agentRemittanceInitialized === "true") return;
+    form.dataset.agentRemittanceInitialized = "true";
+
+    const selectedOrderInputContainer = form.querySelector<HTMLElement>(
+      "[data-selected-remittance-order-inputs]",
+    );
+    const selectedOrderIds: string[] = [];
+
+    const syncSelectedOrderInputs = () => {
+      if (!selectedOrderInputContainer) return;
+
+      selectedOrderInputContainer.replaceChildren(
+        ...selectedOrderIds.map((selectedOrderId) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = "orderId";
+          input.value = selectedOrderId;
+          return input;
+        }),
+      );
+    };
+
+    form.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+      if (!target.matches("[data-remittance-order-checkbox]")) return;
+
+      const existingIndex = selectedOrderIds.indexOf(target.value);
+
+      if (target.checked && existingIndex === -1) {
+        selectedOrderIds.push(target.value);
+      }
+
+      if (!target.checked && existingIndex !== -1) {
+        selectedOrderIds.splice(existingIndex, 1);
+      }
+
+      syncSelectedOrderInputs();
+    });
+
+    form.addEventListener("submit", (event) => {
+      if (selectedOrderIds.length === 0) {
+        event.preventDefault();
+        window.alert("Select at least one customer order for this remittance.");
+      }
+    });
+  }
+
+  initAgentRemittanceForm();
+  document.addEventListener("astro:after-swap", initAgentRemittanceForm);
+  document.addEventListener("astro:page-load", initAgentRemittanceForm);
+</script>
+
+<style>
+  .agent-multi-order__summary-card {
+    border-radius: 1rem;
+    background: var(--color-brand-red);
+    padding: 1.1rem 1rem 1rem;
+    color: #ffffff;
+  }
+
+  .agent-multi-order__summary-title,
+  .agent-multi-order__orders-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .agent-multi-order__summary-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .agent-multi-order__summary-rows {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0;
+  }
+
+  .agent-multi-order__summary-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .agent-multi-order__summary-row dt {
+    margin: 0;
+    font-size: 0.88rem;
+    font-weight: 500;
+    opacity: 0.92;
+  }
+
+  .agent-multi-order__summary-row dd {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .agent-multi-order__summary-divider,
+  .agent-multi-order__orders-divider {
+    margin: 0.9rem 0;
+    border: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+  }
+
+  .agent-multi-order__orders-divider {
+    border-top-color: rgba(17, 24, 39, 0.1);
+  }
+
+  .agent-multi-order__summary-balance {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 500;
+    text-align: center;
+  }
+
+  .agent-multi-order__summary-balance strong {
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+
+  .agent-multi-order__remit-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    border: 0;
+    background: transparent;
+    color: #ffffff;
+    padding: 0;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: normal;
+    text-transform: none;
+    cursor: pointer;
+  }
+
+  .agent-multi-order__remit-action:hover:not(:disabled),
+  .agent-multi-order__remit-action:focus-visible {
+    opacity: 0.88;
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .agent-multi-order__remit-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    text-decoration: none;
+  }
+
+  .agent-multi-order__orders-card,
+  .agent-multi-order__details-card {
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: transparent;
+    padding: 1rem;
+  }
+
+  .agent-multi-order__details-rows {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .agent-multi-order__detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .agent-multi-order__detail-label {
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .agent-multi-order__detail-value {
+    color: #111827;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .agent-multi-order__orders-title {
+    margin: 0 0 0.85rem;
+    color: #111827;
+  }
+
+  .agent-multi-order__status-bar {
+    display: flex;
+    overflow: hidden;
+    width: 100%;
+    min-height: 0.55rem;
+    border-radius: 999px;
+    background: #f3f4f6;
+  }
+
+  .agent-multi-order__status-bar-segment {
+    display: block;
+    min-width: 0;
+    height: 0.55rem;
+  }
+
+  .agent-multi-order__status-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent-multi-order__status-legend-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.55rem;
+    color: rgba(17, 24, 39, 0.72);
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .agent-multi-order__status-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+  }
+
+  .agent-multi-order__status-count {
+    color: #111827;
+    font-size: 0.92rem;
+    font-weight: 700;
+  }
+
+  .agent-multi-order__tabs-root :global(.agent-multi-order__tabs) {
+    margin-bottom: 0.75rem;
+  }
+
+  .agent-multi-order__tab-panels {
+    min-height: 0;
+  }
+
+  .agent-multi-order__tab-panel {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .agent-multi-order__tab-scroll {
+    max-height: 16rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.15rem;
+  }
+
+  .agent-multi-order__product-list,
+  .agent-multi-order__customer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent-multi-order__product-item,
+  .agent-multi-order__customer-item {
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.85rem;
+    background: #ffffff;
+    padding: 0.9rem 1rem;
+  }
+
+  .agent-multi-order__product-head,
+  .agent-multi-order__customer-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .agent-multi-order__product-name,
+  .agent-multi-order__customer-name {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .agent-multi-order__product-meta,
+  .agent-multi-order__customer-meta {
+    margin: 0.2rem 0 0;
+    font-size: 0.82rem;
+    color: rgba(17, 24, 39, 0.58);
+  }
+
+  .agent-multi-order__product-total {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .agent-multi-order__product-details,
+  .agent-multi-order__customer-details {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem 0.85rem;
+    margin: 0.85rem 0 0;
+  }
+
+  .agent-multi-order__product-details dt,
+  .agent-multi-order__customer-details dt {
+    color: rgba(17, 24, 39, 0.52);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .agent-multi-order__product-details dd,
+  .agent-multi-order__customer-details dd {
+    margin: 0.15rem 0 0;
+    color: #111827;
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .agent-multi-order__pending-indicator {
+    margin-left: 0.35rem;
+    color: #b45309;
+    font-size: 0.82em;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .agent-multi-order__customer-badges {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+
+  .agent-multi-order__customer-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.85rem;
+  }
+
+  .agent-multi-order__customers-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.75rem;
+  }
+
+  .agent-multi-order__remittance-order-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent-multi-order__remittance-order-item {
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.75rem;
+    background: #ffffff;
+  }
+
+  .agent-multi-order__remittance-order-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.75rem 0.85rem;
+    cursor: pointer;
+  }
+
+  .agent-multi-order__remittance-order-label input {
+    margin-top: 0.2rem;
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--color-brand-red);
+  }
+
+  .agent-multi-order__remittance-order-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  .agent-multi-order__remittance-order-copy strong {
+    color: #111827;
+    font-size: 0.9rem;
+  }
+
+  .agent-multi-order__remittance-order-copy span {
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.8rem;
+    font-weight: 600;
+  }
+
+  .agent-multi-order-remittance-sheet__customer-orders {
+    display: grid;
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+  }
+
+  .agent-multi-order-remittance-sheet__customer-orders-label {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .agent-multi-order-remittance-sheet__balance {
+    margin: 0;
+    margin-right: auto;
+    color: #6b7280;
+    font-size: 0.92rem;
+    line-height: 1.4;
+  }
+
+  .agent-multi-order-remittance-sheet__balance strong {
+    color: #111827;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 640px) {
+    .agent-multi-order__summary-card,
+    .agent-multi-order__orders-card,
+    .agent-multi-order__details-card {
+      padding: 1.15rem 1.1rem;
+    }
+
+    .agent-multi-order__tab-scroll {
+      max-height: 18rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .agent-multi-order__tab-scroll {
+      max-height: 20rem;
+    }
+
+    .agent-multi-order__product-details,
+    .agent-multi-order__customer-details {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .agent-multi-order__tab-scroll {
+      max-height: 22rem;
+    }
+  }
+</style>

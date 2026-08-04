@@ -52,6 +52,18 @@ export function canAttachCustomerToAgentOrder(order: AgentOrderAttachEligibility
   return !isAgentOrderCompletedAndPaid(order);
 }
 
+export function attachCustomerBlockMessage(order: AgentOrderAttachEligibilitySource) {
+  if (canAttachCustomerToAgentOrder(order)) {
+    return undefined;
+  }
+
+  if (order.order_status === "pending_order") {
+    return "This distribution order is awaiting admin approval.";
+  }
+
+  return "Completed and paid agent orders cannot accept new customers.";
+}
+
 export function sumApprovedDistributedQuantity(
   agentOrder: AgentOrderDistributionSource,
   productId: string,

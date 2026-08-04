@@ -28,6 +28,7 @@ const paymentTermsOptions = ["Cash on Delivery (COD)", "Bank Transfer", "Gcash"]
 
 type AgentActionResult = {
   statusMessage?: string;
+  redirectPath?: string;
 };
 type AgentDashboardContext = Pick<APIContext, "cookies" | "request" | "redirect"> & Partial<Pick<APIContext, "url">>;
 type SupabaseServerClient = ReturnType<typeof createSupabaseServerClient>;
@@ -86,6 +87,11 @@ export type AgentAction =
       type: "update-agent-profile";
       agentId: string;
       payload: ReturnType<typeof parseAgentProfileUpdateFields>;
+    }
+  | {
+      type: "convert-personal-order-to-distribution";
+      agentId: string;
+      orderId: string;
     };
 
 type ParseSuccess = {
@@ -193,6 +199,17 @@ export function parseAgentActionFormData(
       };
     }
 
+    if (action === "convert-personal-order-to-distribution") {
+      return {
+        success: true,
+        action: {
+          type: "convert-personal-order-to-distribution",
+          agentId,
+          orderId: uuidSchema.parse(requiredString(formData, "orderId")),
+        },
+      };
+    }
+
     throw new Error("Unknown agent action.");
   } catch (error) {
     return {
@@ -249,8 +266,9 @@ export async function handleAgentDashboardAction(
       { siteOrigin: context.url?.origin },
     );
     const message = actionResult?.statusMessage ?? getActionSuccessMessage(parsed.action);
+    const redirectTarget = actionResult?.redirectPath ?? returnPath;
 
-    return context.redirect(`${returnPath}?status=${encodeURIComponent(message)}`, 303);
+    return context.redirect(`${redirectTarget}?status=${encodeURIComponent(message)}`, 303);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Agent action failed.";
     logDevelopmentActionError({
@@ -397,6 +415,19 @@ export async function executeAgentAction(
         status: currentProfile.status,
       });
       return;
+    }
+    case "convert-personal-order-to-distribution": {
+      const { data, error } = await supabase.rpc("convert_personal_order_to_distribution_order", {
+        target_order_id: action.orderId,
+      });
+
+      if (error || typeof data !== "string") {
+        throw new Error(error?.message || "Unable to convert personal order.");
+      }
+
+      return {
+        redirectPath: `/agent/orders/multi-customers/${data}`,
+      };
     }
   }
 }
@@ -548,6 +579,8 @@ function getActionSuccessMessage(action: AgentAction) {
         : "Customer order submitted for admin approval.";
     case "update-agent-profile":
       return "Profile updated.";
+    case "convert-personal-order-to-distribution":
+      return "Order converted to distribution.";
   }
 }
 

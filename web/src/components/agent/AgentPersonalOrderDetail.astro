@@ -1,0 +1,738 @@
+---
+import Sheet from "@/components/ui/Sheet.astro";
+import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import Tab from "@/components/ui/Tab.astro";
+import TabPanel from "@/components/ui/TabPanel.astro";
+import Tabs from "@/components/ui/Tabs.astro";
+import type { AgentOrder } from "@/lib/agent-dashboard/data";
+import {
+  formatCurrency,
+  formatDate,
+} from "@/lib/agent-dashboard/view";
+import { autoCapitalize } from "@/lib/formatters";
+
+type TimelineItem = {
+  id: string;
+  title: string;
+  timestamp: string;
+  meta: string;
+};
+
+type Props = {
+  order: AgentOrder;
+  orderCode: string;
+  orderAmount: number;
+  orderQuantityKey: "partial_quantity" | "final_quantity";
+  productCount: number;
+  timelineItems: TimelineItem[];
+  orderSlipPdfHref: string;
+  todayDate: string;
+  todayTime: string;
+  canRecordAgentPayment: boolean;
+  remainingRecordableBalance: number;
+  pendingAgentReceivedTotal: number;
+  pendingAgentReceivedPayments: NonNullable<AgentOrder["agent_received_payment"]>;
+  isOrderDetailTabActive: (tab: "products" | "payment-record" | "timeline") => boolean;
+};
+
+const {
+  order,
+  orderCode,
+  orderAmount,
+  orderQuantityKey,
+  productCount,
+  timelineItems,
+  orderSlipPdfHref,
+  todayDate,
+  todayTime,
+  canRecordAgentPayment,
+  remainingRecordableBalance,
+  pendingAgentReceivedTotal,
+  pendingAgentReceivedPayments,
+  isOrderDetailTabActive,
+} = Astro.props;
+---
+
+<div class="agent-personal-order flex w-full max-w-full flex-col gap-4 sm:gap-5 lg:gap-6">
+  <section class="agent-personal-order__amount-card" aria-label="Order amount">
+    <div class="agent-personal-order__amount-row">
+      <p class="agent-personal-order__amount">{formatCurrency(orderAmount)}</p>
+      <button
+        type="button"
+        class="agent-personal-order__pay-action"
+        data-open-create-sheet
+        data-sheet-target="#agent-personal-order-payment-sheet"
+        disabled={!canRecordAgentPayment}
+        aria-label="Add payment"
+      >
+        Pay <span aria-hidden="true">→</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="agent-personal-order__details-card" aria-label="Order details">
+    <div class="agent-personal-order__details-rows">
+      <div class="agent-personal-order__detail-row">
+        <span class="agent-personal-order__detail-label">Order date</span>
+        <span class="agent-personal-order__detail-value">{formatDate(order.created_at)}</span>
+      </div>
+      <div class="agent-personal-order__detail-row">
+        <span class="agent-personal-order__detail-label">Release date</span>
+        <span class="agent-personal-order__detail-value">{formatDate(order.release_date ?? null)}</span>
+      </div>
+      <div class="agent-personal-order__detail-row">
+        <span class="agent-personal-order__detail-label">Order status</span>
+        <StatusBadge
+          kind="order"
+          status={order.order_status}
+          label={autoCapitalize(order.order_status)}
+        />
+      </div>
+      <div class="agent-personal-order__detail-row">
+        <span class="agent-personal-order__detail-label">Payment status</span>
+        <StatusBadge
+          kind="payment"
+          status={order.payment_status}
+          label={autoCapitalize(order.payment_status)}
+        />
+      </div>
+    </div>
+
+    <hr class="agent-personal-order__divider" />
+
+    <a
+      href={orderSlipPdfHref}
+      target="_blank"
+      rel="noreferrer"
+      class="agent-personal-order__slip-link"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      <span>Open order slip</span>
+    </a>
+  </section>
+
+  <Tabs
+    ariaLabel="Order detail sections"
+    listClass="ui-tabs__list--stretch agent-personal-order__tabs"
+    panelsClass="agent-personal-order__tab-panels"
+    class="agent-personal-order__tabs-root min-h-0 flex-1"
+  >
+    <Tab slot="tabs" target="products" active={isOrderDetailTabActive("products")}>
+      Products
+    </Tab>
+    <Tab slot="tabs" target="payment-record" active={isOrderDetailTabActive("payment-record")}>
+      Payment
+    </Tab>
+    <Tab slot="tabs" target="timeline" active={isOrderDetailTabActive("timeline")}>
+      Timeline
+    </Tab>
+
+    <TabPanel
+      slot="panels"
+      target="products"
+      active={isOrderDetailTabActive("products")}
+      variant="plain"
+      class="agent-personal-order__tab-panel"
+      aria-label="Products"
+    >
+      <div class="agent-personal-order__tab-scroll">
+        {
+          productCount === 0 ? (
+            <p class="empty-state">No products on this order.</p>
+          ) : (
+            <ul class="agent-personal-order__product-list">
+              {
+                order.customer_order_item.map((item) => {
+                  const quantity = item[orderQuantityKey];
+                  const subtotal = quantity * item.unit_price;
+
+                  return (
+                    <li class="agent-personal-order__product-item">
+                      <div class="agent-personal-order__product-head">
+                        <div class="min-w-0">
+                          <h3 class="agent-personal-order__product-name">
+                            {item.product?.name ?? "Missing product"}
+                          </h3>
+                          <p class="agent-personal-order__product-meta">
+                            {formatCurrency(item.unit_price)} / {item.product?.unit_label ?? "unit"} •{" "}
+                            {autoCapitalize(item.price_type)}
+                          </p>
+                        </div>
+                        <strong class="agent-personal-order__product-total">
+                          {formatCurrency(subtotal)}
+                        </strong>
+                      </div>
+                      <dl class="agent-personal-order__product-details">
+                        <div>
+                          <dt>Quantity</dt>
+                          <dd>
+                            {quantity} {item.product?.unit_label ?? ""}
+                            {
+                              orderQuantityKey === "final_quantity" &&
+                                item.partial_quantity !== item.final_quantity && (
+                                  <span class="agent-personal-order__product-original">
+                                    Orig. {item.partial_quantity}
+                                  </span>
+                                )
+                            }
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Details</dt>
+                          <dd>{item.add_details ?? "N/A"}</dd>
+                        </div>
+                        <div>
+                          <dt>Commission</dt>
+                          <dd>
+                            {formatCurrency(item.agent_commission_amount)} •{" "}
+                            {item.agent_commission_paid ? "Paid" : "Unpaid"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </li>
+                  );
+                })
+              }
+            </ul>
+          )
+        }
+      </div>
+    </TabPanel>
+
+    <TabPanel
+      slot="panels"
+      target="payment-record"
+      active={isOrderDetailTabActive("payment-record")}
+      variant="plain"
+      class="agent-personal-order__tab-panel"
+      aria-label="Payment record"
+    >
+      <div class="agent-personal-order__tab-scroll">
+        {
+          pendingAgentReceivedTotal > 0 && (
+            <p class="agent-personal-order__pending-note">
+              <strong>{formatCurrency(pendingAgentReceivedTotal)}</strong>
+              <span>awaiting admin confirmation</span>
+            </p>
+          )
+        }
+
+        {
+          pendingAgentReceivedPayments.length === 0 && order.payment.length === 0 ? (
+            <p class="empty-state">No payments recorded yet.</p>
+          ) : (
+            <ul class="agent-personal-order__payment-list">
+              {
+                pendingAgentReceivedPayments.map((payment) => (
+                  <li class="agent-personal-order__payment-item agent-personal-order__payment-item--pending">
+                    <div>
+                      <strong>{payment.payment_method}</strong>
+                      <span>
+                        {formatDate(payment.payment_date)} • {payment.payment_terms}
+                      </span>
+                      <span class="agent-personal-order__payment-pending-label">
+                        Pending confirmation
+                      </span>
+                    </div>
+                    <div class="agent-personal-order__payment-amount">
+                      {formatCurrency(payment.amount)}
+                    </div>
+                  </li>
+                ))
+              }
+              {
+                order.payment.map((payment) => (
+                  <li class="agent-personal-order__payment-item">
+                    <div>
+                      <strong>{payment.payment_method}</strong>
+                      <span>
+                        {formatDate(payment.payment_date)} • {payment.payment_terms}
+                      </span>
+                    </div>
+                    <div class="agent-personal-order__payment-amount">
+                      {formatCurrency(payment.amount)}
+                    </div>
+                  </li>
+                ))
+              }
+            </ul>
+          )
+        }
+      </div>
+    </TabPanel>
+
+    <TabPanel
+      slot="panels"
+      target="timeline"
+      active={isOrderDetailTabActive("timeline")}
+      variant="plain"
+      class="agent-personal-order__tab-panel"
+      aria-label="Order timeline"
+    >
+      <div class="agent-personal-order__tab-scroll">
+        {
+          timelineItems.length === 0 ? (
+            <p class="empty-state">No timeline events yet.</p>
+          ) : (
+            <ul class="agent-personal-order__timeline-list">
+              {
+                timelineItems.map((item) => (
+                  <li class="agent-personal-order__timeline-item">
+                    <div class="agent-personal-order__timeline-copy">
+                      <strong>{item.title}</strong>
+                      <span>{item.meta}</span>
+                    </div>
+                    <time datetime={item.timestamp}>{formatDate(item.timestamp)}</time>
+                  </li>
+                ))
+              }
+            </ul>
+          )
+        }
+      </div>
+    </TabPanel>
+  </Tabs>
+</div>
+
+<Sheet id="agent-personal-order-payment-sheet" width="42rem">
+  <div slot="header" class="order-create-sheet__header-copy">
+    <h3 class="drawer-sheet__title" data-sheet-title>Add payment</h3>
+    <p class="order-create-sheet__header-description">
+      Submit a payment for {orderCode}. Admin confirmation is required before it is applied.
+    </p>
+  </div>
+  <form
+    id="agent-personal-order-payment-form"
+    method="post"
+    class="order-create-form"
+    data-astro-reload
+  >
+    <input type="hidden" name="action" value="record-agent-payment" />
+    <input type="hidden" name="orderId" value={order.id} />
+    <div class="order-create-form__payment-fields">
+      <label class="field-row">
+        <span>Amount</span>
+        <input
+          type="number"
+          name="amount"
+          min="0.01"
+          step="0.01"
+          max={canRecordAgentPayment ? remainingRecordableBalance : undefined}
+          value={canRecordAgentPayment ? "0" : undefined}
+          disabled={!canRecordAgentPayment}
+          required
+        />
+      </label>
+      <div class="order-create-form__field-pair">
+        <label class="field-row">
+          <span>Payment method</span>
+          <select name="paymentMethod" disabled={!canRecordAgentPayment} required>
+            <option value="">Select method</option>
+            <option value="Cash">Cash</option>
+            <option value="Check">Check</option>
+          </select>
+        </label>
+        <label class="field-row">
+          <span>Payment terms</span>
+          <select name="paymentTerms" disabled={!canRecordAgentPayment} required>
+            <option value="">Select payment terms</option>
+            <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+            <option value="Bank Transfer">Bank Transfer</option>
+            <option value="Gcash">Gcash</option>
+          </select>
+        </label>
+      </div>
+      <div class="order-create-form__field-pair">
+        <label class="field-row">
+          <span>Payment date</span>
+          <input
+            type="date"
+            name="paymentDate"
+            value={todayDate}
+            disabled={!canRecordAgentPayment}
+            required
+          />
+        </label>
+        <label class="field-row">
+          <span>Payment time</span>
+          <input
+            type="time"
+            name="paymentTime"
+            value={todayTime}
+            disabled={!canRecordAgentPayment}
+            required
+          />
+        </label>
+      </div>
+      <label class="field-row">
+        <span>Reference</span>
+        <input type="text" name="referenceNumber" disabled={!canRecordAgentPayment} />
+      </label>
+      <label class="field-row">
+        <span>Payment notes</span>
+        <textarea name="notes" rows="2" disabled={!canRecordAgentPayment}></textarea>
+      </label>
+    </div>
+  </form>
+  <div slot="footer" class="order-create-sheet__footer">
+    <p class="agent-personal-order-payment-sheet__balance" aria-live="polite">
+      Remaining balance: <strong>{formatCurrency(remainingRecordableBalance)}</strong>
+    </p>
+    <button type="submit" form="agent-personal-order-payment-form" disabled={!canRecordAgentPayment}>
+      Submit for admin confirmation
+    </button>
+  </div>
+</Sheet>
+
+<style>
+  .agent-personal-order__amount-card {
+    border-radius: 1rem;
+    background: var(--color-brand-red);
+    padding: 1.25rem 1rem;
+  }
+
+  .agent-personal-order__amount-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .agent-personal-order__amount {
+    margin: 0;
+    min-width: 0;
+    flex: 1;
+    color: #ffffff;
+    font-size: clamp(1.75rem, 5vw, 2.25rem);
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .agent-personal-order__pay-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    border: 0;
+    background: transparent;
+    color: #ffffff;
+    padding: 0;
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 500;
+    line-height: 1.1;
+    letter-spacing: normal;
+    text-transform: none;
+    cursor: pointer;
+  }
+
+  .agent-personal-order__pay-action:hover:not(:disabled),
+  .agent-personal-order__pay-action:focus-visible {
+    opacity: 0.88;
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .agent-personal-order__pay-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    text-decoration: none;
+  }
+
+  .agent-personal-order__details-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: transparent;
+    padding: 1rem;
+  }
+
+  .agent-personal-order__details-rows {
+    display: grid;
+    gap: 0.85rem;
+  }
+
+  .agent-personal-order__detail-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .agent-personal-order__detail-label {
+    color: rgba(17, 24, 39, 0.62);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .agent-personal-order__detail-value {
+    color: #111827;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: right;
+  }
+
+  .agent-personal-order__divider {
+    margin: 1rem 0;
+    border: 0;
+    border-top: 1px solid #e5e7eb;
+  }
+
+  .agent-personal-order__slip-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    align-self: center;
+    margin: 0 auto;
+    color: #111827;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .agent-personal-order__slip-link svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .agent-personal-order__slip-link:hover,
+  .agent-personal-order__slip-link:focus-visible {
+    color: var(--color-brand-red);
+    outline: none;
+  }
+
+  .agent-personal-order__tabs-root {
+    min-width: 0;
+  }
+
+  .agent-personal-order__tabs-root :global(.agent-personal-order__tabs) {
+    margin-bottom: 0.75rem;
+  }
+
+  .agent-personal-order__tab-panels {
+    min-height: 0;
+  }
+
+  .agent-personal-order__tab-panel {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .agent-personal-order__tab-scroll {
+    max-height: 16rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 0.15rem;
+  }
+
+  .agent-personal-order__product-list,
+  .agent-personal-order__payment-list,
+  .agent-personal-order__timeline-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent-personal-order__product-item,
+  .agent-personal-order__payment-item,
+  .agent-personal-order__timeline-item {
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 0.85rem;
+    background: #ffffff;
+  }
+
+  .agent-personal-order__product-item {
+    padding: 0.9rem 1rem;
+  }
+
+  .agent-personal-order__product-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .agent-personal-order__product-name {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .agent-personal-order__product-meta {
+    margin: 0.2rem 0 0;
+    font-size: 0.82rem;
+    color: rgba(17, 24, 39, 0.58);
+  }
+
+  .agent-personal-order__product-total {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .agent-personal-order__product-details {
+    display: grid;
+    gap: 0.65rem;
+    margin: 0.85rem 0 0;
+  }
+
+  .agent-personal-order__product-details div {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .agent-personal-order__product-details dt {
+    color: rgba(17, 24, 39, 0.45);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .agent-personal-order__product-details dd {
+    margin: 0;
+    color: #111827;
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .agent-personal-order__product-original {
+    margin-left: 0.35rem;
+    color: #b45309;
+    font-size: 0.82em;
+    font-weight: 700;
+  }
+
+  .agent-personal-order__pending-note {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem;
+    margin: 0 0 0.85rem;
+    color: #92400e;
+    font-size: 0.86rem;
+  }
+
+  .agent-personal-order__pending-note strong {
+    color: #b45309;
+  }
+
+  .agent-personal-order__payment-item,
+  .agent-personal-order__timeline-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .agent-personal-order__payment-item--pending {
+    background: #fffbeb;
+  }
+
+  .agent-personal-order__payment-item strong,
+  .agent-personal-order__timeline-copy strong {
+    display: block;
+    color: #111827;
+    font-size: 0.9rem;
+  }
+
+  .agent-personal-order__payment-item span,
+  .agent-personal-order__timeline-copy span {
+    display: block;
+    margin-top: 0.15rem;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.8rem;
+  }
+
+  .agent-personal-order__payment-pending-label {
+    color: #b45309 !important;
+    font-weight: 600;
+  }
+
+  .agent-personal-order__payment-amount {
+    color: #111827;
+    font-size: 0.95rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .agent-personal-order__timeline-copy {
+    min-width: 0;
+  }
+
+  .agent-personal-order__timeline-item time {
+    flex-shrink: 0;
+    color: rgba(17, 24, 39, 0.58);
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 640px) {
+    .agent-personal-order__tab-scroll {
+      max-height: 18rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .agent-personal-order__amount-card {
+      padding: 1.5rem 1.25rem;
+    }
+
+    .agent-personal-order__details-card {
+      padding: 1.15rem 1.25rem;
+    }
+
+    .agent-personal-order__tab-scroll {
+      max-height: 20rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .agent-personal-order__tab-scroll {
+      max-height: 24rem;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .agent-personal-order__timeline-item {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.35rem;
+    }
+  }
+
+  .agent-personal-order-payment-sheet__balance {
+    margin: 0;
+    margin-right: auto;
+    color: #6b7280;
+    font-size: 0.92rem;
+    line-height: 1.4;
+  }
+
+  .agent-personal-order-payment-sheet__balance strong {
+    color: #111827;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+</style>

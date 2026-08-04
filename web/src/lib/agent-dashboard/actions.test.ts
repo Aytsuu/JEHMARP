@@ -713,4 +713,39 @@ describe("executeAgentAction", () => {
       },
     })).rejects.toThrow("Unable to distribute received payment.");
   });
+
+  it("parses personal order conversion actions", () => {
+    const formData = new FormData();
+    formData.set("action", "convert-personal-order-to-distribution");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+
+    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
+      success: true,
+      action: {
+        type: "convert-personal-order-to-distribution",
+        agentId,
+        orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      },
+    });
+  });
+
+  it("converts personal orders through the distribution RPC", async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      error: null,
+    }));
+
+    const result = await executeAgentAction({ rpc } as never, {
+      type: "convert-personal-order-to-distribution",
+      agentId,
+      orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    });
+
+    expect(rpc).toHaveBeenCalledWith("convert_personal_order_to_distribution_order", {
+      target_order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    });
+    expect(result).toEqual({
+      redirectPath: "/agent/orders/multi-customers/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    });
+  });
 });

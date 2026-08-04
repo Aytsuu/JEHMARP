@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  attachCustomerBlockMessage,
   buildAgentOrderProductDistributions,
   canAttachCustomerToAgentOrder,
   canDecreaseAgentOrderItemQuantity,
@@ -107,6 +108,10 @@ describe("agent-order-distribution", () => {
       order_status: "pending_order",
       customer_order: [],
     })).toBe(false);
+    expect(attachCustomerBlockMessage({
+      order_status: "pending_order",
+      customer_order: [],
+    })).toBe("This distribution order is awaiting admin approval.");
 
     expect(canAttachCustomerToAgentOrder({
       order_status: "closed",

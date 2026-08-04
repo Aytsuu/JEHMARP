@@ -23,6 +23,84 @@ export function isAgentMyStandaloneOrder(
   return isAgentMyOrder(order, agent);
 }
 
+export type PersonalOrderDistributionConversionBlockReason =
+  | "Not convertible"
+  | "Converted"
+  | "Already linked"
+  | "Closed"
+  | "Has payment record"
+  | "No items";
+
+const agentConvertibleOrderKinds = new Set(["customer", "personal"]);
+
+export function getPersonalOrderDistributionConversionBlockReason(
+  order: Pick<
+    AgentOrder,
+    | "order_kind"
+    | "parent_order_id"
+    | "converted_at"
+    | "order_status"
+    | "customer_order_item"
+    | "payment"
+    | "agent_received_payment"
+  >,
+): PersonalOrderDistributionConversionBlockReason | null {
+  if (order.order_kind && !agentConvertibleOrderKinds.has(order.order_kind)) {
+    return "Not convertible";
+  }
+
+  if (order.converted_at) {
+    return "Converted";
+  }
+
+  if (order.parent_order_id) {
+    return "Already linked";
+  }
+
+  if (order.order_status === "closed") {
+    return "Closed";
+  }
+
+  if ((order.payment?.length ?? 0) > 0 || (order.agent_received_payment?.length ?? 0) > 0) {
+    return "Has payment record";
+  }
+
+  if (order.customer_order_item.length === 0) {
+    return "No items";
+  }
+
+  return null;
+}
+
+export function canConvertPersonalOrderToDistribution(
+  order: Parameters<typeof getPersonalOrderDistributionConversionBlockReason>[0],
+) {
+  return getPersonalOrderDistributionConversionBlockReason(order) === null;
+}
+
+export function personalOrderDistributionConversionBlockMessage(
+  reason: PersonalOrderDistributionConversionBlockReason | null,
+) {
+  switch (reason) {
+    case null:
+      return null;
+    case "Has payment record":
+      return "This order already has a payment record, so it cannot be converted.";
+    case "Closed":
+      return "Closed orders cannot be converted.";
+    case "No items":
+      return "Orders without products cannot be converted.";
+    case "Already linked":
+      return "This order is already linked to a distribution order.";
+    case "Converted":
+      return "This order was already converted to a distribution order.";
+    case "Not convertible":
+      return "Only standalone customer or personal agent orders can be converted.";
+    default:
+      return "This order cannot be converted right now.";
+  }
+}
+
 export function fullName(customer: { first_name: string; last_name: string } | null) {
   return customer ? `${customer.first_name} ${customer.last_name}` : "Unassigned customer";
 }

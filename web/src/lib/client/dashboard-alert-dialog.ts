@@ -148,6 +148,33 @@ function bindAlertDialog(dialog: HTMLElement) {
   });
 }
 
+export function openAlertDialogFromTrigger(trigger: HTMLElement) {
+  const dialogId = trigger.dataset.openAlertDialog;
+  if (!dialogId) {
+    return false;
+  }
+
+  if (
+    trigger instanceof HTMLButtonElement &&
+    trigger.disabled
+  ) {
+    return false;
+  }
+
+  if (trigger.getAttribute("aria-disabled") === "true") {
+    return false;
+  }
+
+  const dialog = document.getElementById(dialogId);
+  if (!(dialog instanceof HTMLElement) || !dialog.matches("[data-alert-dialog]")) {
+    return false;
+  }
+
+  bindAlertDialog(dialog);
+  openAlertDialog(dialog, trigger);
+  return true;
+}
+
 export function initDashboardAlertDialogs() {
   const dashboardWindow = window as Window & {
     dashboardAlertDialogsInitialized?: boolean;
@@ -172,19 +199,8 @@ export function initDashboardAlertDialogs() {
       return;
     }
 
-    const dialogId = openTrigger.dataset.openAlertDialog;
-    if (!dialogId) {
-      return;
-    }
-
-    const dialog = document.getElementById(dialogId);
-    if (!(dialog instanceof HTMLElement) || !dialog.matches("[data-alert-dialog]")) {
-      return;
-    }
-
     event.preventDefault();
-    bindAlertDialog(dialog);
-    openAlertDialog(dialog, openTrigger);
+    openAlertDialogFromTrigger(openTrigger);
   });
 
   document.addEventListener("keydown", (event) => {

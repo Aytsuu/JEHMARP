@@ -1,10 +1,13 @@
 ---
 import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
+import AgentPersonalOrderDetail from "@/components/agent/AgentPersonalOrderDetail.astro";
 import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
+import ActionMenu from "@/components/ActionMenu.astro";
 import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
 import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
 import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
+import AlertDialog from "@/components/ui/AlertDialog.astro";
 import Tab from "@/components/ui/Tab.astro";
 import TabPanel from "@/components/ui/TabPanel.astro";
 import Tabs from "@/components/ui/Tabs.astro";
@@ -19,11 +22,13 @@ import {
   formatCurrency,
   formatDate,
   fullName,
+  getPersonalOrderDistributionConversionBlockReason,
   isAgentMyOrder,
   orderBalance,
   orderExpectedCommission,
   orderPaymentTotal,
   orderTotal,
+  personalOrderDistributionConversionBlockMessage,
 } from "@/lib/agent-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
@@ -86,11 +91,14 @@ const backLabel = order.parent_order_id
   ? "Back to distribution order"
   : "Back to orders";
 const parentAgentOrder = order.parent_order_id
-  ? data.agentOrders.find((cluster) => cluster.id === order.parent_order_id) ?? null
+  ? (data.agentOrders.find((cluster) => cluster.id === order.parent_order_id) ??
+    null)
   : null;
 const orderNavigationEntries = parentAgentOrder
   ? buildOrderDetailNavEntries({
-      orders: parentAgentOrder.customer_order.filter(isAdminOrderDetailNavOrder),
+      orders: parentAgentOrder.customer_order.filter(
+        isAdminOrderDetailNavOrder,
+      ),
       currentOrderId: order.id,
       buildHref: (entry) => `/agent/orders/${entry.id}`,
     })
@@ -111,6 +119,11 @@ const canRecordAgentPayment = remainingRecordableBalance > 0;
 const todayDate = manilaDateInputValue();
 const todayTime = manilaTimeInputValue();
 const productCount = order.customer_order_item.length;
+const isPersonalOrderPage = !order.parent_order_id;
+const personalOrderConversionBlockReason = isPersonalOrderPage
+  ? getPersonalOrderDistributionConversionBlockReason(order)
+  : null;
+const canConvertPersonalOrder = personalOrderConversionBlockReason === null;
 
 const customerDisplayName = order.customer ? fullName(order.customer) : "Guest";
 const customerViewHref = order.customer?.id
@@ -169,179 +182,243 @@ const timelineItems = [
 );
 ---
 
-<AgentRecordPageLayout
-  title={`${orderCode} - JEHMARP`}
-  description="Agent customer order details, products, payments, and timeline."
-  heading={orderCode}
-  feedback={feedback}
-  dashboardData={data}
-  backUrl={backUrl}
-  backLabel={backLabel}
->
-  {
-    parentAgentOrder && (
-      <OrderDetailNav
-        slot="heading-title"
-        currentCode={orderCode}
-        entries={orderNavigationEntries}
-        menuLabel="Other customer orders in this distribution order"
-        titleClass="admin-notifications-page__title"
-      />
-    )
-  }
-  <ul slot="heading-meta" class="record-meta" aria-label="Order date">
-    <li class="record-meta__item">
-      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-        <line x1="16" y1="2" x2="16" y2="6"></line>
-        <line x1="8" y1="2" x2="8" y2="6"></line>
-        <line x1="3" y1="10" x2="21" y2="10"></line>
-      </svg>
-      <span class="record-meta__text">{formatDate(order.created_at)}</span>
-    </li>
-    <li class="record-meta__item">
-      <span class="record-meta__text">{formatOrderSource(order.source)}</span>
-    </li>
-  </ul>
-
-  <div slot="heading-aside" class="record-heading-badges">
-    <StatusBadge
-      kind="order"
-      status={order.order_status}
-      label={autoCapitalize(order.order_status)}
-    />
-    <StatusBadge
-      kind="payment"
-      status={order.payment_status}
-      label={autoCapitalize(order.payment_status)}
-    />
-  </div>
-
-  <div class="agent-record-content flex max-w-full flex-col gap-4 md:gap-8">
-    <div class="grid grid-cols-1 gap-3 md:gap-4">
-      <div class="detail-field">
-        <AgentOrderCalculationSummary
-          paid={paidTotal}
-          commission={commissionTotal}
-          grossTotal={grossTotal}
-          variant="customer"
-        />
-        {
-          pendingAgentReceivedTotal > 0 && (
-            <p class="detail-field-note">
-              {formatCurrency(pendingAgentReceivedTotal)} pending admin confirmation
-            </p>
-          )
-        }
-      </div>
-
-      <div class="detail-field">
-        <div class="detail-field__header">
-          <span class="detail-field-label">Customer</span>
-          {
-            customerViewHref ? (
-              <a href={customerViewHref} class="detail-field-view-link">
-                View details
-              </a>
-            ) : null
-          }
-        </div>
-        <p class="detail-field-value detail-field-value--name">{customerDisplayName}</p>
-        <dl class="customer-detail-list">
-          <div>
-            <dt>Release</dt>
-            <dd>{formatDate(order.release_date ?? null)}</dd>
-          </div>
-          <div>
-            <dt>Phone</dt>
-            <dd>
-              {
-                order.customer?.phone_number ? (
-                  <a href={`tel:${order.customer.phone_number}`}>
-                    {order.customer.phone_number}
-                  </a>
-                ) : (
-                  "No phone on file"
-                )
-              }
-            </dd>
-          </div>
-          <div>
-            <dt>Email</dt>
-            <dd>
-              {
-                order.customer?.email ? (
-                  <a href={`mailto:${order.customer.email}`}>{order.customer.email}</a>
-                ) : (
-                  "No email on file"
-                )
-              }
-            </dd>
-          </div>
-          <div>
-            <dt>Address</dt>
-            <dd>{order.customer?.address?.trim() || "No address on file"}</dd>
-          </div>
-        </dl>
-        <div class="detail-field-links">
-          <a href={orderSlipPdfHref} target="_blank" rel="noreferrer">
-            Order slip PDF
-          </a>
-          {
-            order.invoice.length > 0 ? (
-              <a href={salesInvoicePdfHref} target="_blank" rel="noreferrer">
-                Sales invoice PDF
-              </a>
-            ) : null
-          }
-        </div>
-      </div>
-    </div>
-
-    <Tabs
-      ariaLabel="Order detail sections"
-      listClass="ui-tabs__list--stretch md:hidden"
-      panelsClass="agent-order-tab-panels flex flex-col gap-8"
+{
+  isPersonalOrderPage ? (
+    <AgentRecordPageLayout
+      title={`${orderCode} - JEHMARP`}
+      description="Agent personal order details, products, payments, and timeline."
+      heading={orderCode}
+      feedback={feedback}
+      dashboardData={data}
+      backUrl={backUrl}
+      backLabel={backLabel}
     >
-      <Tab
-        slot="tabs"
-        target="products"
-        active={isOrderDetailTabActive("products")}
+      <ActionMenu
+        slot="heading-aside"
+        id="agent-personal-order-actions-menu"
+        menuLabel="Order actions"
+        triggerIcon="horizontal"
+        triggerClass="agent-personal-order__action-menu-trigger"
+        items={[
+          {
+            label: "Distribute Order",
+            dataAction: "convert-to-distribution",
+            openAlertDialog: "convert-personal-order-distribution-dialog",
+            alertDialogForm: "convert-personal-order-distribution-form",
+          },
+        ]}
+      />
+      <AgentPersonalOrderDetail
+        order={order}
+        orderCode={orderCode}
+        orderAmount={grossTotal}
+        orderQuantityKey={orderQuantityKey}
+        productCount={productCount}
+        timelineItems={timelineItems}
+        orderSlipPdfHref={orderSlipPdfHref}
+        todayDate={todayDate}
+        todayTime={todayTime}
+        canRecordAgentPayment={canRecordAgentPayment}
+        remainingRecordableBalance={remainingRecordableBalance}
+        pendingAgentReceivedTotal={pendingAgentReceivedTotal}
+        pendingAgentReceivedPayments={pendingAgentReceivedPayments}
+        isOrderDetailTabActive={isOrderDetailTabActive}
+      />
+      <form
+        id="convert-personal-order-distribution-form"
+        method="post"
+        class="sr-only"
+        data-astro-reload
       >
-        Products ({productCount})
-      </Tab>
-      <Tab
-        slot="tabs"
-        target="payment-record"
-        active={isOrderDetailTabActive("payment-record")}
-      >
-        Payment
-      </Tab>
-      <Tab
-        slot="tabs"
-        target="timeline"
-        active={isOrderDetailTabActive("timeline")}
-      >
-        Timeline
-      </Tab>
+        <input
+          type="hidden"
+          name="action"
+          value="convert-personal-order-to-distribution"
+        />
+        <input type="hidden" name="orderId" value={order.id} />
+      </form>
+      <AlertDialog
+        id="convert-personal-order-distribution-dialog"
+        title="Convert to distribution order?"
+        description={
+          canConvertPersonalOrder
+            ? `This will turn ${orderCode} into a distribution order. An admin must approve it before you can attach customer orders.`
+            : `This order cannot be converted right now.${personalOrderDistributionConversionBlockMessage(personalOrderConversionBlockReason) ? ` ${personalOrderDistributionConversionBlockMessage(personalOrderConversionBlockReason)}` : ""}`
+        }
+        confirmLabel="Proceed"
+        actionsVariant="conversion"
+        confirmDisabled={!canConvertPersonalOrder}
+      />
+    </AgentRecordPageLayout>
+  ) : (
+    <AgentRecordPageLayout
+      title={`${orderCode} - JEHMARP`}
+      description="Agent customer order details, products, payments, and timeline."
+      heading={orderCode}
+      feedback={feedback}
+      dashboardData={data}
+      backUrl={backUrl}
+      backLabel={backLabel}
+    >
+      {parentAgentOrder && (
+        <OrderDetailNav
+          slot="heading-title"
+          currentCode={orderCode}
+          entries={orderNavigationEntries}
+          menuLabel="Other customer orders in this distribution order"
+          titleClass="admin-notifications-page__title"
+        />
+      )}
+      <ul slot="heading-meta" class="record-meta" aria-label="Order date">
+        <li class="record-meta__item">
+          <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+          <span class="record-meta__text">{formatDate(order.created_at)}</span>
+        </li>
+        <li class="record-meta__item">
+          <span class="record-meta__text">
+            {formatOrderSource(order.source)}
+          </span>
+        </li>
+      </ul>
 
-      <TabPanel
-        slot="panels"
-        target="products"
-        active={isOrderDetailTabActive("products")}
-        variant="plain"
-        class="record-section agent-order-tab-panel"
-        aria-label={`Products (${productCount})`}
-      >
-        <h2 class="record-section__title">Products</h2>
-        {
-          productCount === 0 ? (
-            <p class="empty-state">No products on this order.</p>
-          ) : (
-            <>
-              <div class="grid gap-3 md:hidden">
-                {
-                  order.customer_order_item.map((item) => {
+      <div slot="heading-aside" class="record-heading-badges">
+        <StatusBadge
+          kind="order"
+          status={order.order_status}
+          label={autoCapitalize(order.order_status)}
+        />
+        <StatusBadge
+          kind="payment"
+          status={order.payment_status}
+          label={autoCapitalize(order.payment_status)}
+        />
+      </div>
+
+      <div class="agent-record-content flex max-w-full flex-col gap-4 md:gap-8">
+        <div class="grid grid-cols-1 gap-3 md:gap-4">
+          <div class="detail-field">
+            <AgentOrderCalculationSummary
+              paid={paidTotal}
+              commission={commissionTotal}
+              grossTotal={grossTotal}
+              variant="customer"
+            />
+            {pendingAgentReceivedTotal > 0 && (
+              <p class="detail-field-note">
+                {formatCurrency(pendingAgentReceivedTotal)} pending admin
+                confirmation
+              </p>
+            )}
+          </div>
+
+          <div class="detail-field">
+            <div class="detail-field__header">
+              <span class="detail-field-label">Customer</span>
+              {customerViewHref ? (
+                <a href={customerViewHref} class="detail-field-view-link">
+                  View details
+                </a>
+              ) : null}
+            </div>
+            <p class="detail-field-value detail-field-value--name">
+              {customerDisplayName}
+            </p>
+            <dl class="customer-detail-list">
+              <div>
+                <dt>Release</dt>
+                <dd>{formatDate(order.release_date ?? null)}</dd>
+              </div>
+              <div>
+                <dt>Phone</dt>
+                <dd>
+                  {order.customer?.phone_number ? (
+                    <a href={`tel:${order.customer.phone_number}`}>
+                      {order.customer.phone_number}
+                    </a>
+                  ) : (
+                    "No phone on file"
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Email</dt>
+                <dd>
+                  {order.customer?.email ? (
+                    <a href={`mailto:${order.customer.email}`}>
+                      {order.customer.email}
+                    </a>
+                  ) : (
+                    "No email on file"
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>Address</dt>
+                <dd>
+                  {order.customer?.address?.trim() || "No address on file"}
+                </dd>
+              </div>
+            </dl>
+            <div class="detail-field-links">
+              <a href={orderSlipPdfHref} target="_blank" rel="noreferrer">
+                Order slip PDF
+              </a>
+              {order.invoice.length > 0 ? (
+                <a href={salesInvoicePdfHref} target="_blank" rel="noreferrer">
+                  Sales invoice PDF
+                </a>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <Tabs
+          ariaLabel="Order detail sections"
+          listClass="ui-tabs__list--stretch md:hidden"
+          panelsClass="agent-order-tab-panels flex flex-col gap-8"
+        >
+          <Tab
+            slot="tabs"
+            target="products"
+            active={isOrderDetailTabActive("products")}
+          >
+            Products ({productCount})
+          </Tab>
+          <Tab
+            slot="tabs"
+            target="payment-record"
+            active={isOrderDetailTabActive("payment-record")}
+          >
+            Payment
+          </Tab>
+          <Tab
+            slot="tabs"
+            target="timeline"
+            active={isOrderDetailTabActive("timeline")}
+          >
+            Timeline
+          </Tab>
+
+          <TabPanel
+            slot="panels"
+            target="products"
+            active={isOrderDetailTabActive("products")}
+            variant="plain"
+            class="record-section agent-order-tab-panel"
+            aria-label={`Products (${productCount})`}
+          >
+            <h2 class="record-section__title">Products</h2>
+            {productCount === 0 ? (
+              <p class="empty-state">No products on this order.</p>
+            ) : (
+              <>
+                <div class="grid gap-3 md:hidden">
+                  {order.customer_order_item.map((item) => {
                     const quantity = item[orderQuantityKey];
                     const subtotal = quantity * item.unit_price;
 
@@ -369,14 +446,13 @@ const timelineItems = [
                             </dt>
                             <dd class="text-[0.9rem] font-semibold text-gray-900">
                               {quantity} {item.product?.unit_label ?? ""}
-                              {
-                                orderQuantityKey === "final_quantity" &&
-                                  item.partial_quantity !== item.final_quantity && (
-                                    <span class="pending-indicator">
-                                      Orig. {item.partial_quantity}
-                                    </span>
-                                  )
-                              }
+                              {orderQuantityKey === "final_quantity" &&
+                                item.partial_quantity !==
+                                  item.final_quantity && (
+                                  <span class="pending-indicator">
+                                    Orig. {item.partial_quantity}
+                                  </span>
+                                )}
                             </dd>
                           </div>
                           <div>
@@ -399,32 +475,32 @@ const timelineItems = [
                         </dl>
                       </article>
                     );
-                  })
-                }
-              </div>
+                  })}
+                </div>
 
-              <DashboardTableBoard class="dashboard-table-board--record-detail hidden md:flex">
-                <table class="agent-customers-table agent-order-products-table dashboard-table">
-                  <thead>
-                    <tr>
-                      <DashboardTableNumberHeader />
-                      <th scope="col">Product</th>
-                      <th scope="col">Quantity</th>
-                      <th scope="col">Unit price</th>
-                      <th scope="col">Subtotal</th>
-                      <th scope="col">Details</th>
-                      <th scope="col">Commission</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {
-                      order.customer_order_item.map((item, index) => {
+                <DashboardTableBoard class="dashboard-table-board--record-detail hidden md:flex">
+                  <table class="agent-customers-table agent-order-products-table dashboard-table">
+                    <thead>
+                      <tr>
+                        <DashboardTableNumberHeader />
+                        <th scope="col">Product</th>
+                        <th scope="col">Quantity</th>
+                        <th scope="col">Unit price</th>
+                        <th scope="col">Subtotal</th>
+                        <th scope="col">Details</th>
+                        <th scope="col">Commission</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {order.customer_order_item.map((item, index) => {
                         const quantity = item[orderQuantityKey];
                         const subtotal = quantity * item.unit_price;
 
                         return (
                           <tr>
-                            <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
+                            <td class="dashboard-table__number-column">
+                              {dashboardTableRowNumber(null, index)}
+                            </td>
                             <td>
                               {item.product?.name ?? "Missing product"}
                               <span class="agent-order-products-table__meta">
@@ -434,14 +510,13 @@ const timelineItems = [
                             </td>
                             <td>
                               {quantity} {item.product?.unit_label ?? ""}
-                              {
-                                orderQuantityKey === "final_quantity" &&
-                                  item.partial_quantity !== item.final_quantity && (
-                                    <span class="agent-order-products-table__meta">
-                                      Orig. {item.partial_quantity}
-                                    </span>
-                                  )
-                              }
+                              {orderQuantityKey === "final_quantity" &&
+                                item.partial_quantity !==
+                                  item.final_quantity && (
+                                  <span class="agent-order-products-table__meta">
+                                    Orig. {item.partial_quantity}
+                                  </span>
+                                )}
                             </td>
                             <td>{formatCurrency(item.unit_price)}</td>
                             <td>{formatCurrency(subtotal)}</td>
@@ -454,202 +529,210 @@ const timelineItems = [
                             </td>
                           </tr>
                         );
-                      })
+                      })}
+                    </tbody>
+                  </table>
+                </DashboardTableBoard>
+              </>
+            )}
+          </TabPanel>
+
+          <TabPanel
+            slot="panels"
+            target="payment-record"
+            active={isOrderDetailTabActive("payment-record")}
+            variant="plain"
+            class="record-section agent-order-tab-panel"
+            aria-label="Payment record"
+          >
+            <h2 class="record-section__title">Payment record</h2>
+
+            {pendingAgentReceivedPayments.length > 0 && (
+              <div class="pending-payment-notice">
+                <strong>{formatCurrency(pendingAgentReceivedTotal)}</strong>
+                <span>awaiting admin confirmation</span>
+              </div>
+            )}
+
+            <form method="post" class="agent-payment-form">
+              <input type="hidden" name="action" value="record-agent-payment" />
+              <input type="hidden" name="orderId" value={order.id} />
+              <div class="agent-payment-form__grid">
+                <label>
+                  <span>Amount</span>
+                  <input
+                    type="number"
+                    name="amount"
+                    min="0.01"
+                    step="0.01"
+                    max={
+                      canRecordAgentPayment
+                        ? remainingRecordableBalance
+                        : undefined
                     }
-                  </tbody>
-                </table>
-              </DashboardTableBoard>
-            </>
-          )
-        }
-      </TabPanel>
+                    value={
+                      canRecordAgentPayment
+                        ? remainingRecordableBalance.toFixed(2)
+                        : undefined
+                    }
+                    disabled={!canRecordAgentPayment}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Method</span>
+                  <select
+                    name="paymentMethod"
+                    disabled={!canRecordAgentPayment}
+                    required
+                  >
+                    <option value="">Select method</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Check">Check</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Payment terms</span>
+                  <select
+                    name="paymentTerms"
+                    disabled={!canRecordAgentPayment}
+                    required
+                  >
+                    <option value="">Select payment terms</option>
+                    <option value="Cash on Delivery (COD)">
+                      Cash on Delivery (COD)
+                    </option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Gcash">Gcash</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Date</span>
+                  <input
+                    type="date"
+                    name="paymentDate"
+                    value={todayDate}
+                    disabled={!canRecordAgentPayment}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Time</span>
+                  <input
+                    type="time"
+                    name="paymentTime"
+                    value={todayTime}
+                    disabled={!canRecordAgentPayment}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>Reference</span>
+                  <input
+                    type="text"
+                    name="referenceNumber"
+                    disabled={!canRecordAgentPayment}
+                  />
+                </label>
+              </div>
+              <label class="agent-payment-form__notes">
+                <span>Notes</span>
+                <textarea
+                  name="notes"
+                  rows="2"
+                  disabled={!canRecordAgentPayment}
+                />
+              </label>
+              <button type="submit" disabled={!canRecordAgentPayment}>
+                Submit for admin confirmation
+              </button>
+            </form>
 
-      <TabPanel
-        slot="panels"
-        target="payment-record"
-        active={isOrderDetailTabActive("payment-record")}
-        variant="plain"
-        class="record-section agent-order-tab-panel"
-        aria-label="Payment record"
-      >
-        <h2 class="record-section__title">Payment record</h2>
-
-        {
-          pendingAgentReceivedPayments.length > 0 && (
-            <div class="pending-payment-notice">
-              <strong>{formatCurrency(pendingAgentReceivedTotal)}</strong>
-              <span>awaiting admin confirmation</span>
-            </div>
-          )
-        }
-
-        <form method="post" class="agent-payment-form">
-          <input type="hidden" name="action" value="record-agent-payment" />
-          <input type="hidden" name="orderId" value={order.id} />
-          <div class="agent-payment-form__grid">
-            <label>
-              <span>Amount</span>
-              <input
-                type="number"
-                name="amount"
-                min="0.01"
-                step="0.01"
-                max={canRecordAgentPayment ? remainingRecordableBalance : undefined}
-                value={canRecordAgentPayment
-                  ? remainingRecordableBalance.toFixed(2)
-                  : undefined}
-                disabled={!canRecordAgentPayment}
-                required
-              />
-            </label>
-            <label>
-              <span>Method</span>
-              <select
-                name="paymentMethod"
-                disabled={!canRecordAgentPayment}
-                required
-              >
-                <option value="">Select method</option>
-                <option value="Cash">Cash</option>
-                <option value="Check">Check</option>
-              </select>
-            </label>
-            <label>
-              <span>Payment terms</span>
-              <select
-                name="paymentTerms"
-                disabled={!canRecordAgentPayment}
-                required
-              >
-                <option value="">Select payment terms</option>
-                <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Gcash">Gcash</option>
-              </select>
-            </label>
-            <label>
-              <span>Date</span>
-              <input
-                type="date"
-                name="paymentDate"
-                value={todayDate}
-                disabled={!canRecordAgentPayment}
-                required
-              />
-            </label>
-            <label>
-              <span>Time</span>
-              <input
-                type="time"
-                name="paymentTime"
-                value={todayTime}
-                disabled={!canRecordAgentPayment}
-                required
-              />
-            </label>
-            <label>
-              <span>Reference</span>
-              <input
-                type="text"
-                name="referenceNumber"
-                disabled={!canRecordAgentPayment}
-              />
-            </label>
-          </div>
-          <label class="agent-payment-form__notes">
-            <span>Notes</span>
-            <textarea
-              name="notes"
-              rows="2"
-              disabled={!canRecordAgentPayment}
-            ></textarea>
-          </label>
-          <button type="submit" disabled={!canRecordAgentPayment}>
-            Submit for admin confirmation
-          </button>
-        </form>
-
-        {
-          pendingAgentReceivedPayments.length > 0 && (
-            <ul class="payment-history-list">
-              {
-                pendingAgentReceivedPayments.map((payment) => (
+            {pendingAgentReceivedPayments.length > 0 && (
+              <ul class="payment-history-list">
+                {pendingAgentReceivedPayments.map((payment) => (
                   <li class="payment-history-list__item payment-history-list__item--pending">
                     <div>
                       <strong>{payment.payment_method}</strong>
                       <span>
-                        {formatDate(payment.payment_date)} • {payment.payment_terms}
+                        {formatDate(payment.payment_date)} •{" "}
+                        {payment.payment_terms}
                       </span>
                     </div>
                     <div class="payment-history-list__amount">
                       {formatCurrency(payment.amount)}
                     </div>
                   </li>
-                ))
-              }
-            </ul>
-          )
-        }
+                ))}
+              </ul>
+            )}
 
-        {
-          order.payment.length === 0 ? (
-            <p class="empty-state">No confirmed payments recorded yet.</p>
-          ) : (
-            <ul class="payment-history-list">
-              {
-                order.payment.map((payment) => (
+            {order.payment.length === 0 ? (
+              <p class="empty-state">No confirmed payments recorded yet.</p>
+            ) : (
+              <ul class="payment-history-list">
+                {order.payment.map((payment) => (
                   <li class="payment-history-list__item">
                     <div>
                       <strong>{payment.payment_method}</strong>
                       <span>
-                        {formatDate(payment.payment_date)} • {payment.payment_terms}
+                        {formatDate(payment.payment_date)} •{" "}
+                        {payment.payment_terms}
                       </span>
                     </div>
                     <div class="payment-history-list__amount">
                       {formatCurrency(payment.amount)}
                     </div>
                   </li>
-                ))
-              }
-            </ul>
-          )
-        }
-      </TabPanel>
+                ))}
+              </ul>
+            )}
+          </TabPanel>
 
-      <TabPanel
-        slot="panels"
-        target="timeline"
-        active={isOrderDetailTabActive("timeline")}
-        variant="plain"
-        class="record-section agent-order-tab-panel"
-        aria-label="Order timeline"
-      >
-        <h2 class="record-section__title">Timeline</h2>
-        {
-          timelineItems.length === 0 ? (
-            <p class="empty-state">No timeline events yet.</p>
-          ) : (
-            <ul class="timeline-list">
-              {
-                timelineItems.map((item) => (
+          <TabPanel
+            slot="panels"
+            target="timeline"
+            active={isOrderDetailTabActive("timeline")}
+            variant="plain"
+            class="record-section agent-order-tab-panel"
+            aria-label="Order timeline"
+          >
+            <h2 class="record-section__title">Timeline</h2>
+            {timelineItems.length === 0 ? (
+              <p class="empty-state">No timeline events yet.</p>
+            ) : (
+              <ul class="timeline-list">
+                {timelineItems.map((item) => (
                   <li class="timeline-list__item">
                     <div class="timeline-list__copy">
                       <strong>{item.title}</strong>
                       <span>{item.meta}</span>
                     </div>
-                    <time datetime={item.timestamp}>{formatDate(item.timestamp)}</time>
+                    <time datetime={item.timestamp}>
+                      {formatDate(item.timestamp)}
+                    </time>
                   </li>
-                ))
-              }
-            </ul>
-          )
-        }
-      </TabPanel>
-    </Tabs>
-  </div>
-</AgentRecordPageLayout>
+                ))}
+              </ul>
+            )}
+          </TabPanel>
+        </Tabs>
+      </div>
+    </AgentRecordPageLayout>
+  )
+}
 
 <style>
+  :global(.agent-personal-order__action-menu-trigger) {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  :global(.agent-personal-order__action-menu-trigger svg) {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
   .record-heading-badges {
     display: flex;
     flex-wrap: wrap;

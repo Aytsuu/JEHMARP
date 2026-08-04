@@ -1,6 +1,20 @@
 import { isAgentMobilePrimaryRoute, isAgentNavActive } from "@/lib/dashboard/agent-navigation";
 
 const AGENT_MOBILE_QUERY = "(max-width: 47.99rem)";
+const APP_VIEWPORT_HEIGHT_VAR = "--app-viewport-height";
+
+export function syncAppViewportHeight(
+  viewportHeight = window.visualViewport?.height ?? window.innerHeight,
+) {
+  document.documentElement.style.setProperty(
+    APP_VIEWPORT_HEIGHT_VAR,
+    `${Math.round(viewportHeight)}px`,
+  );
+}
+
+export function resetAppViewportHeightForTests() {
+  document.documentElement.style.removeProperty(APP_VIEWPORT_HEIGHT_VAR);
+}
 
 export function isAgentRoute(pathname = window.location.pathname) {
   return pathname.startsWith("/agent");
@@ -51,12 +65,36 @@ function resetAgentMobileScroll() {
   document.querySelector<HTMLElement>(".dashboard-main")?.scrollTo(0, 0);
 }
 
+function initAgentViewportHeightSync() {
+  const dashboardWindow = window as Window & {
+    agentViewportHeightInitialized?: boolean;
+  };
+  if (dashboardWindow.agentViewportHeightInitialized) return;
+  dashboardWindow.agentViewportHeightInitialized = true;
+
+  const mediaQuery = window.matchMedia(AGENT_MOBILE_QUERY);
+  const syncIfNeeded = () => {
+    if (!isAgentRoute() || !mediaQuery.matches) return;
+    syncAppViewportHeight();
+  };
+
+  syncIfNeeded();
+  window.visualViewport?.addEventListener("resize", syncIfNeeded);
+  window.visualViewport?.addEventListener("scroll", syncIfNeeded);
+  window.addEventListener("resize", syncIfNeeded);
+  mediaQuery.addEventListener("change", syncIfNeeded);
+  document.addEventListener("astro:page-load", syncIfNeeded);
+  document.addEventListener("astro:after-swap", syncIfNeeded);
+}
+
 export function initAgentMobileNavigation() {
   const dashboardWindow = window as Window & {
     agentMobileNavigationInitialized?: boolean;
   };
   if (dashboardWindow.agentMobileNavigationInitialized) return;
   dashboardWindow.agentMobileNavigationInitialized = true;
+
+  initAgentViewportHeightSync();
 
   document.addEventListener(
     "click",

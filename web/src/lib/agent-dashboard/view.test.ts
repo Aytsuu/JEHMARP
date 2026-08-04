@@ -7,8 +7,10 @@ import {
   agentOrderTotal,
   buildAgentPaymentSummary,
   buildAgentSummary,
+  canConvertPersonalOrderToDistribution,
   formatCurrency,
   formatPaymentStatus,
+  getPersonalOrderDistributionConversionBlockReason,
   isAgentMyOrder,
   isAgentMyStandaloneOrder,
   orderBalance,
@@ -289,5 +291,68 @@ describe("agent dashboard calculations", () => {
 
   it("formats Philippine peso values consistently", () => {
     expect(formatCurrency(1250)).toBe("₱1,250.00");
+  });
+});
+
+describe("personal order distribution conversion", () => {
+  it("allows eligible personal orders to convert", () => {
+    const order = createOrder({
+      order_kind: "personal",
+      payment_status: "unpaid",
+      payment: [],
+      agent_received_payment: [],
+    });
+
+    expect(getPersonalOrderDistributionConversionBlockReason(order)).toBeNull();
+    expect(canConvertPersonalOrderToDistribution(order)).toBe(true);
+  });
+
+  it("allows eligible customer orders owned by the agent to convert", () => {
+    const order = createOrder({
+      order_kind: "customer",
+      payment_status: "partial",
+      payment: [],
+      agent_received_payment: [],
+    });
+
+    expect(getPersonalOrderDistributionConversionBlockReason(order)).toBeNull();
+    expect(canConvertPersonalOrderToDistribution(order)).toBe(true);
+  });
+
+  it("blocks distribution orders", () => {
+    const order = createOrder({
+      order_kind: "distribution",
+      payment: [],
+      agent_received_payment: [],
+    });
+
+    expect(getPersonalOrderDistributionConversionBlockReason(order)).toBe("Not convertible");
+  });
+
+  it("blocks orders with payment activity", () => {
+    const order = createOrder({
+      order_kind: "personal",
+      payment_status: "unpaid",
+      agent_received_payment: [
+        {
+          id: "payment-1",
+          order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+          agent_id: agentId,
+          amount: 100,
+          payment_method: "Cash",
+          payment_terms: "Cash on Delivery (COD)",
+          payment_date: "2026-07-01",
+          reference_number: null,
+          notes: null,
+          status: "pending_admin_confirmation",
+          confirmed_at: null,
+          created_at: "2026-07-01T00:00:00.000Z",
+          updated_at: "2026-07-01T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(getPersonalOrderDistributionConversionBlockReason(order)).toBe("Has payment record");
+    expect(canConvertPersonalOrderToDistribution(order)).toBe(false);
   });
 });

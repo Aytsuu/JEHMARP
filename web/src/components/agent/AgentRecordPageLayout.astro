@@ -151,8 +151,31 @@ const isAgentPrimaryPage = isAgentMobilePrimaryRoute(Astro.url.pathname);
 <style>
   .admin-notifications-page__heading-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.85rem;
+  }
+
+  .admin-notifications-page__heading-row:has(.admin-notifications-page__heading-meta) {
+    align-items: flex-start;
+  }
+
+  .admin-notifications-page__heading-row:has(.admin-notifications-page__heading-meta) .route-back-button {
+    margin-top: 0.15rem;
+  }
+
+  .admin-notifications-page__heading-row:not(:has(.admin-notifications-page__heading-meta))
+    .admin-notifications-page__title {
+    line-height: 2.5rem;
+  }
+
+  .admin-notifications-page__heading-row:not(:has(.admin-notifications-page__heading-meta))
+    .admin-notifications-page__heading-aside {
+    align-self: center;
+    padding-top: 0;
+  }
+
+  .admin-notifications-page__heading-main--with-aside {
+    align-items: center;
   }
 
   .admin-notifications-page__heading-main {

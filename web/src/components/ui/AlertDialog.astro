@@ -6,6 +6,8 @@ type Props = {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "default" | "danger";
+  actionsVariant?: "default" | "conversion";
+  confirmDisabled?: boolean;
 };
 
 const {
@@ -15,6 +17,8 @@ const {
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   variant = "default",
+  actionsVariant = "default",
+  confirmDisabled = false,
 } = Astro.props;
 
 const titleId = `${id}-title`;
@@ -46,7 +50,16 @@ const descriptionId = `${id}-description`;
       <slot />
     </div>
     <footer class="alert-dialog__actions">
-      <button type="button" class="alert-dialog__button alert-dialog__button--secondary" data-alert-dialog-cancel>
+      <button
+        type="button"
+        class:list={[
+          "alert-dialog__button",
+          actionsVariant === "conversion"
+            ? "alert-dialog__button--ghost"
+            : "alert-dialog__button--secondary",
+        ]}
+        data-alert-dialog-cancel
+      >
         {cancelLabel}
       </button>
       <button
@@ -58,6 +71,7 @@ const descriptionId = `${id}-description`;
             : "alert-dialog__button--primary",
         ]}
         data-alert-dialog-confirm
+        disabled={confirmDisabled || undefined}
       >
         {confirmLabel}
       </button>

@@ -643,6 +643,7 @@ function linkedCustomerOrdersLabel(count: number) {
 
   document.addEventListener("DOMContentLoaded", bootCreateOrderSheet);
   document.addEventListener("astro:after-swap", bootCreateOrderSheet);
+  document.addEventListener("astro:page-load", bootCreateOrderSheet);
   if (document.readyState === "complete" || document.readyState === "interactive") {
     bootCreateOrderSheet();
   }

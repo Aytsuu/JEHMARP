@@ -28,7 +28,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
 <html lang="en" style="font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" transition:persist />
@@ -108,6 +108,18 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         ];
         if (primaryRoutes.includes(location.pathname)) {
           document.body.classList.add("dashboard-body--agent-mobile-primary");
+        }
+
+        if (window.matchMedia("(max-width: 47.99rem)").matches) {
+          const syncAgentViewportHeight = () => {
+            const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            document.documentElement.style.setProperty("--app-viewport-height", `${Math.round(height)}px`);
+          };
+
+          syncAgentViewportHeight();
+          window.visualViewport?.addEventListener("resize", syncAgentViewportHeight);
+          window.visualViewport?.addEventListener("scroll", syncAgentViewportHeight);
+          window.addEventListener("resize", syncAgentViewportHeight);
         }
       }
     </script>
