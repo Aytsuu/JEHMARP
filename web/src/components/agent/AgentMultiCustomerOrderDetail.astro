@@ -7,7 +7,7 @@ import TabPanel from "@/components/ui/TabPanel.astro";
 import Tabs from "@/components/ui/Tabs.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
-import type { AgentOrder } from "@/lib/agent-dashboard/data";
+import type { AgentOrder, AgentOrderCluster, AgentOrderClusterItem } from "@/lib/agent-dashboard/data";
 import {
   formatCurrency,
   formatDate,
@@ -55,8 +55,8 @@ type OrderStatusCounts = {
   paid: number;
 };
 
-type Props = {
-  agentOrder: AgentOrder;
+interface Props {
+  agentOrder: AgentOrderCluster;
   agentOrderCode: string;
   productCount: number;
   customerCount: number;
@@ -72,7 +72,7 @@ type Props = {
   todayDate: string;
   todayTime: string;
   isOrderDetailTabActive: (tab: "products" | "customers") => boolean;
-};
+}
 
 const {
   agentOrder,
@@ -281,7 +281,7 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
           ) : (
             <ul class="agent-multi-order__product-list">
               {
-                agentOrder.agent_order_item.map((item) => {
+                agentOrder.agent_order_item.map((item: AgentOrderClusterItem) => {
                   const unitPrice = item.product?.default_price ?? 0;
                   const distribution = getAgentOrderProductDistribution(
                     agentOrder,
@@ -375,7 +375,7 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
           ) : (
             <ul class="agent-multi-order__customer-list">
               {
-                agentOrder.customer_order.map((order) => {
+                agentOrder.customer_order.map((order: AgentOrder) => {
                   const quantityKey = orderQuantityKey(order);
                   const grossTotal = orderTotal(order, quantityKey);
                   const orderCommission = orderExpectedCommission(order);
@@ -467,7 +467,7 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
           <p class="agent-multi-order-remittance-sheet__customer-orders-label">Customer orders</p>
           <ul class="agent-multi-order__remittance-order-list">
             {
-              agentOrder.customer_order.map((order) => {
+              agentOrder.customer_order.map((order: AgentOrder) => {
                 const quantityKey = orderQuantityKey(order);
                 const grossTotal = orderTotal(order, quantityKey);
                 const orderPaid = orderPaymentTotal(order);
