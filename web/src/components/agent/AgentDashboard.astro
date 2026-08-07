@@ -1,33 +1,455 @@
 ---
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
-import { formatCurrency } from "@/lib/agent-dashboard/view";
+import {
+  buildAgentMonthlyPerformance,
+  buildAgentRemittanceSummary,
+  buildAgentTotalCommissionEarned,
+  formatAgentPerformanceTrend,
+  formatAgentRemittanceDetail,
+  formatCurrency,
+} from "@/lib/agent-dashboard/view";
 
 type Props = {
   data: AgentDashboardData;
 };
 
 const { data } = Astro.props;
+const totalCommissionEarned = buildAgentTotalCommissionEarned(data.orders, data.agent);
+const remittance = buildAgentRemittanceSummary(data.orders, data.agent);
+const remittanceDetail = formatAgentRemittanceDetail(
+  remittance.outstandingOrderCount,
+  remittance.outstandingCustomerCount,
+);
+const performance = buildAgentMonthlyPerformance(data.orders, data.agent);
+const performanceTrend = formatAgentPerformanceTrend(performance);
+const chartMaxAmount = Math.max(...performance.months.map((month) => month.amount), 1);
+const chartDescription = performance.months
+  .map((month) => `${month.label}: ${formatCurrency(month.amount)}`)
+  .join(", ");
 ---
 
-<section class="admin-summary-grid" aria-label="Agent dashboard summary">
-  <article class="admin-summary-card">
-    <h2>Monthly Earnings</h2>
-    <p>{formatCurrency(data.summary.monthlyEarnings)}</p>
-    <a href="/agent/earnings">Review earnings</a>
-  </article>
-  <article class="admin-summary-card">
-    <h2>Customers</h2>
-    <p>{data.summary.assignedCustomers}</p>
-    <a href="/agent/customers">View customers</a>
-  </article>
-  <article class="admin-summary-card">
-    <h2>Submitted Orders</h2>
-    <p>{data.summary.submittedOrders}</p>
-    <a href="/agent/orders">Manage orders</a>
-  </article>
-  <article class="admin-summary-card">
-    <h2>Outstanding Balance</h2>
-    <p>{formatCurrency(data.summary.outstandingBalance)}</p>
-    <a href="/agent/earnings">Review earnings</a>
+<section class="agent-dashboard" aria-label="Agent dashboard summary">
+  <div class="agent-dashboard__cards">
+    <article class="agent-dashboard__commission-card" aria-label="Total commission earned">
+      <p class="agent-dashboard__card-label">Total commission earned</p>
+      <p class="agent-dashboard__card-amount">{formatCurrency(totalCommissionEarned)}</p>
+      <a href="/agent/earnings" class="agent-dashboard__card-link">
+        Review earnings <span aria-hidden="true">→</span>
+      </a>
+    </article>
+
+    <article class="agent-dashboard__remittance-card" aria-label="Remaining remittance">
+      <p class="agent-dashboard__card-label agent-dashboard__card-label--dark">Remaining remittance</p>
+      <p class="agent-dashboard__card-amount agent-dashboard__card-amount--dark">
+        {formatCurrency(remittance.remainingRemittance)}
+      </p>
+      <p class="agent-dashboard__card-detail">{remittanceDetail}</p>
+      <a href="/agent/orders" class="agent-dashboard__card-link agent-dashboard__card-link--dark">
+        Go to orders <span aria-hidden="true">→</span>
+      </a>
+    </article>
+  </div>
+
+  <article class="agent-dashboard__performance-card" aria-labelledby="agent-dashboard-performance-title">
+    <div class="agent-dashboard__performance-header">
+      <div class="agent-dashboard__performance-copy">
+        <h2 id="agent-dashboard-performance-title" class="agent-dashboard__performance-title">
+          Your performance
+        </h2>
+        <p class="agent-dashboard__performance-subtitle">Monthly commission earned</p>
+      </div>
+      <p
+        class:list={[
+          "agent-dashboard__trend",
+          `agent-dashboard__trend--${performance.trend}`,
+        ]}
+      >
+        {
+          performance.trend === "up" ? (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+              <polyline points="17 6 23 6 23 12" />
+            </svg>
+          ) : performance.trend === "down" ? (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+              <polyline points="17 18 23 18 23 12" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="14 8 19 12 14 16" />
+            </svg>
+          )
+        }
+        <span>{performanceTrend.summary}</span>
+      </p>
+    </div>
+
+    <div class="agent-dashboard__chart-shell">
+      <div
+        class="agent-dashboard__chart"
+        role="img"
+        aria-label={`Monthly commission performance: ${chartDescription}`}
+      >
+      {
+        performance.months.map((month) => {
+          const barHeight = month.amount > 0
+            ? Math.max((month.amount / chartMaxAmount) * 100, 8)
+            : 4;
+
+          return (
+            <div class="agent-dashboard__chart-item">
+              <div class="agent-dashboard__chart-bar-wrap">
+                <div
+                  class="agent-dashboard__chart-bar"
+                  style={`height: ${barHeight}%`}
+                  title={formatCurrency(month.amount)}
+                >
+                  <span class="sr-only">{formatCurrency(month.amount)}</span>
+                </div>
+              </div>
+              <span class="agent-dashboard__chart-label">{month.label}</span>
+            </div>
+          );
+        })
+      }
+      </div>
+    </div>
   </article>
 </section>
+
+<style>
+  .agent-dashboard {
+    display: grid;
+    gap: 0.85rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .agent-dashboard__cards {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .agent-dashboard__commission-card,
+  .agent-dashboard__remittance-card {
+    min-height: 8.5rem;
+  }
+
+  .agent-dashboard__commission-card,
+  .agent-dashboard__remittance-card,
+  .agent-dashboard__performance-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    min-width: 0;
+    border-radius: 1rem;
+    padding: 1rem 0.9rem;
+  }
+
+  .agent-dashboard__commission-card {
+    background: var(--color-brand-red);
+    color: #ffffff;
+  }
+
+  .agent-dashboard__remittance-card {
+    background: #ffffff;
+    border: 1px solid var(--color-brand-red);
+    color: #111827;
+  }
+
+  .agent-dashboard__performance-card {
+    background: #ffffff;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    color: #111827;
+  }
+
+  .agent-dashboard__card-label {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .agent-dashboard__card-label--dark {
+    color: #6b7280;
+  }
+
+  .agent-dashboard__card-amount {
+    margin: 0.15rem 0 0;
+    font-size: clamp(1.55rem, 6vw, 2.25rem);
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    word-break: break-word;
+  }
+
+  .agent-dashboard__card-amount--dark {
+    color: #111827;
+  }
+
+  .agent-dashboard__card-detail {
+    margin: 0.2rem 0 0;
+    font-size: 0.84rem;
+    line-height: 1.5;
+    color: #6b7280;
+  }
+
+  .agent-dashboard__card-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    align-self: flex-end;
+    width: fit-content;
+    margin-top: auto;
+    padding-top: 0.35rem;
+    margin-left: auto;
+    color: #ffffff;
+    font-size: 0.92rem;
+    font-weight: 500;
+    line-height: 1.3;
+    text-decoration: none;
+  }
+
+  .agent-dashboard__card-link:hover,
+  .agent-dashboard__card-link:focus-visible {
+    text-decoration: underline;
+    outline: none;
+  }
+
+  .agent-dashboard__card-link--dark {
+    color: var(--color-brand-red);
+  }
+
+  .agent-dashboard__performance-card {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .agent-dashboard__performance-header {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .agent-dashboard__performance-copy,
+  .agent-dashboard__trend {
+    min-width: 0;
+  }
+
+  .agent-dashboard__performance-title {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.2;
+    font-weight: 700;
+    color: #111827;
+  }
+
+  .agent-dashboard__performance-subtitle {
+    margin: 0.2rem 0 0;
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: #6b7280;
+  }
+
+  .agent-dashboard__trend {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin: 0;
+    max-width: 100%;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    font-weight: 600;
+  }
+
+  .agent-dashboard__trend span {
+    min-width: 0;
+  }
+
+  .agent-dashboard__trend svg {
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .agent-dashboard__trend--up {
+    color: #15803d;
+  }
+
+  .agent-dashboard__trend--down {
+    color: #b91c1c;
+  }
+
+  .agent-dashboard__trend--flat {
+    color: #6b7280;
+  }
+
+  .agent-dashboard__chart-shell {
+    width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .agent-dashboard__chart {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(2.5rem, 1fr));
+    gap: 0.4rem;
+    align-items: end;
+    min-width: min(100%, 15rem);
+    min-height: 9rem;
+    padding: 0.65rem 0 0;
+  }
+
+  .agent-dashboard__chart-item {
+    display: grid;
+    gap: 0.45rem;
+    min-width: 0;
+    height: 100%;
+  }
+
+  .agent-dashboard__chart-bar-wrap {
+    display: flex;
+    align-items: flex-end;
+    height: 7rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .agent-dashboard__chart-bar {
+    width: 100%;
+    border-radius: 0.45rem 0.45rem 0 0;
+    background: linear-gradient(180deg, #8f2f2f 0%, var(--color-brand-red) 100%);
+  }
+
+  .agent-dashboard__chart-label {
+    font-size: clamp(0.62rem, 2.4vw, 0.72rem);
+    line-height: 1.2;
+    font-weight: 600;
+    color: #6b7280;
+    text-align: center;
+  }
+
+  @media (min-width: 640px) {
+    .agent-dashboard,
+    .agent-dashboard__cards {
+      gap: 1rem;
+    }
+
+    .agent-dashboard__cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .agent-dashboard__commission-card,
+    .agent-dashboard__remittance-card {
+      min-height: 9rem;
+    }
+
+    .agent-dashboard__commission-card,
+    .agent-dashboard__remittance-card,
+    .agent-dashboard__performance-card {
+      padding: 1.25rem 1.1rem;
+    }
+
+    .agent-dashboard__performance-header {
+      grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+      align-items: end;
+      gap: 1rem;
+    }
+
+    .agent-dashboard__trend {
+      justify-self: end;
+    }
+
+    .agent-dashboard__performance-title {
+      font-size: 1.05rem;
+    }
+
+    .agent-dashboard__chart-shell {
+      overflow-x: visible;
+    }
+
+    .agent-dashboard__chart {
+      min-width: 100%;
+      gap: 0.65rem;
+      min-height: 11rem;
+      padding-top: 0.75rem;
+    }
+
+    .agent-dashboard__chart-bar-wrap {
+      height: 9rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .agent-dashboard__card-label {
+      font-size: 0.86rem;
+    }
+
+    .agent-dashboard__card-amount {
+      font-size: clamp(1.85rem, 3.5vw, 2.35rem);
+    }
+
+    .agent-dashboard__card-detail {
+      font-size: 0.88rem;
+    }
+
+    .agent-dashboard__commission-card,
+    .agent-dashboard__remittance-card {
+      min-height: 9.5rem;
+    }
+
+    .agent-dashboard__performance-card {
+      gap: 1rem;
+    }
+
+    .agent-dashboard__chart-label {
+      font-size: 0.72rem;
+    }
+
+    .agent-dashboard__trend {
+      font-size: 0.84rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .agent-dashboard {
+      gap: 1.15rem;
+    }
+
+    .agent-dashboard__cards {
+      gap: 1.15rem;
+    }
+
+    .agent-dashboard__commission-card,
+    .agent-dashboard__remittance-card,
+    .agent-dashboard__performance-card {
+      padding: 1.35rem 1.2rem;
+    }
+
+    .agent-dashboard__performance-title {
+      font-size: 1.1rem;
+    }
+
+    .agent-dashboard__chart {
+      gap: 0.75rem;
+      min-height: 12rem;
+    }
+
+    .agent-dashboard__chart-bar-wrap {
+      height: 10rem;
+    }
+  }
+</style>

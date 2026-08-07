@@ -30,6 +30,8 @@ import {
   formatAgentOrderDistributionStatus,
   getAgentOrderProductDistribution,
   minimumAgentOrderItemQuantity,
+  distributionCustomerOrderStatusBarWidth,
+  distributionCustomerOrderStatusLegend,
 } from "@/lib/agent-order-distribution";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { formatOrderCode } from "@/lib/order-detail-nav";
@@ -182,6 +184,11 @@ const defaultTotalCommission = commissionBreakdown.reduce(
   (sum, item) => sum + item.defaultCommission,
   0,
 );
+
+const customerOrderStatusLegend = distributionCustomerOrderStatusLegend.map((segment) => ({
+  ...segment,
+  count: customerOrderCounts[segment.key],
+}));
 ---
 
 <div
@@ -336,28 +343,42 @@ const defaultTotalCommission = commissionBreakdown.reduce(
           </div>
         </article>
 
-        <article class="agent-order-detail-stat">
-          <h2 class="agent-order-detail-stat__title">Customer Orders</h2>
-          <dl class="agent-order-detail-stat__list">
-            <div class="agent-order-detail-stat__item">
-              <dt>Pending</dt>
-              <dd>{customerOrderCounts.pending}</dd>
-            </div>
-            <div class="agent-order-detail-stat__item">
-              <dt>Unpaid</dt>
-              <dd>{customerOrderCounts.unpaid}</dd>
-            </div>
-            <div class="agent-order-detail-stat__item">
-              <dt>Partial</dt>
-              <dd>{customerOrderCounts.partial}</dd>
-            </div>
-            <div class="agent-order-detail-stat__item">
-              <dt>Paid</dt>
-              <dd>{customerOrderCounts.paid}</dd>
-            </div>
-          </dl>
+        <article class="agent-order-detail-stat agent-order-detail-stat--orders">
+          <h2 class="agent-order-detail-stat__title">Orders</h2>
+          <div
+            class="agent-order-detail-stat__status-bar"
+            role="img"
+            aria-label={`${customerOrderCounts.pending} pending, ${customerOrderCounts.unpaid} unpaid, ${customerOrderCounts.partial} partial, ${customerOrderCounts.paid} paid`}
+          >
+            {
+              customerOrderStatusLegend.map((segment) => (
+                segment.count > 0 && (
+                  <span
+                    class="agent-order-detail-stat__status-bar-segment"
+                    style={`width: ${distributionCustomerOrderStatusBarWidth(segment.count, customerOrderCounts)}; background-color: ${segment.color};`}
+                  />
+                )
+              ))
+            }
+          </div>
+          <hr class="agent-order-detail-stat__orders-divider" />
+          <ul class="agent-order-detail-stat__status-legend">
+            {
+              customerOrderStatusLegend.map((segment) => (
+                <li class="agent-order-detail-stat__status-legend-item">
+                  <span
+                    class="agent-order-detail-stat__status-dot"
+                    style={`background-color: ${segment.color};`}
+                    aria-hidden="true"
+                  />
+                  <span class="agent-order-detail-stat__status-label">{segment.label}</span>
+                  <strong class="agent-order-detail-stat__status-count">{segment.count}</strong>
+                </li>
+              ))
+            }
+          </ul>
           <div class="agent-order-detail-stat__footer">
-            <span>Total</span>
+            <span>Total:</span>
             <strong>{customerOrderCounts.total}</strong>
           </div>
         </article>

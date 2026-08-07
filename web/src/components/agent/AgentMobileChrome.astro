@@ -1,9 +1,6 @@
 ---
 import { agentPrimaryNavItems, isAgentNavActive } from "@/lib/dashboard/agent-navigation";
 import type { DashboardSidebarUnreadBadge } from "@/lib/dashboard/sidebar-navigation";
-import { loadPlatformSettings } from "@/lib/platform-settings";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { resolvePublicStorageUrl } from "@/lib/supabase/storage";
 
 type Props = {
   currentPath: string;
@@ -11,21 +8,7 @@ type Props = {
 };
 
 const { currentPath, sidebarUnreadBadges = {} } = Astro.props;
-const platformSettings = await loadPlatformSettings(createSupabaseAdminClient());
-const brandText = platformSettings.businessProfile.tradeName || "JEHMARP";
-const logoUrl = resolvePublicStorageUrl(platformSettings.businessProfile.logoPath);
 ---
-
-<header class="agent-mobile-header" aria-label="Agent dashboard" transition:persist="agent-mobile-header">
-  <a class="agent-mobile-header__brand" href="/">
-    {logoUrl ? (
-      <img src={logoUrl} alt="" class="site-nav__brand-logo" />
-    ) : (
-      <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
-    )}
-    <span class="agent-mobile-header__brand-text">{brandText}</span>
-  </a>
-</header>
 
 <nav class="agent-mobile-nav" aria-label="Agent navigation" transition:persist="agent-mobile-nav">
   <ul class="agent-mobile-nav__list">

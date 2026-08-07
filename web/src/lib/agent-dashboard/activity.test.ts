@@ -65,6 +65,7 @@ function createAgentDashboardData(): AgentDashboardData {
       display_name: "Agent One",
       contact: "09171234567",
       email: "agent@example.com",
+      address: "Manila",
       status: "active",
     },
     customers: [{

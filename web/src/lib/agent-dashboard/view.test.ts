@@ -5,9 +5,14 @@ import {
   agentOrderCommissionTotal,
   agentOrderRemittanceTotal,
   agentOrderTotal,
+  buildAgentMonthlyPerformance,
   buildAgentPaymentSummary,
+  buildAgentRemittanceSummary,
   buildAgentSummary,
+  buildAgentTotalCommissionEarned,
   canConvertPersonalOrderToDistribution,
+  formatAgentPerformanceTrend,
+  formatAgentRemittanceDetail,
   formatCurrency,
   formatPaymentStatus,
   getPersonalOrderDistributionConversionBlockReason,
@@ -35,6 +40,7 @@ function createAgentProfile(overrides: Partial<AgentProfile> = {}): AgentProfile
     display_name: "NMC Agent",
     contact: "09170000001",
     email: "agent@example.test",
+    address: "Market stall",
     status: "active",
     ...overrides,
   };
@@ -205,6 +211,85 @@ describe("agent dashboard calculations", () => {
       paid: 1,
       refunded: 1,
     });
+  });
+
+  it("calculates lifetime commission earned across agent-owned orders", () => {
+    const agent = createAgentProfile();
+    const orders = [
+      createOrder(),
+      createOrder({
+        id: "668fa41a-9325-4f28-80b7-c4de32451ec1",
+        agent_id: null,
+      }),
+      createOrder({
+        id: "4f1d97bc-6175-4ee7-aa5c-9a26bef2845d",
+        created_at: "2026-06-30T00:00:00.000Z",
+      }),
+    ];
+
+    expect(buildAgentTotalCommissionEarned(orders, agent)).toBe(93.76);
+  });
+
+  it("summarizes remaining remittance by outstanding orders and customers", () => {
+    const agent = createAgentProfile();
+    const orders = [
+      createOrder({
+        payment_status: "paid",
+        payment: [{
+          id: "f31976e6-b478-41b6-9b85-9b830154f962",
+          amount: 400,
+          payment_method: "cash",
+          payment_terms: "Cash on Delivery (COD)",
+          payment_date: "2026-07-03",
+          reference_number: null,
+          notes: null,
+          created_at: "2026-07-03T02:00:00.000Z",
+        }],
+      }),
+      createOrder({
+        id: "668fa41a-9325-4f28-80b7-c4de32451ec1",
+        payment_status: "unpaid",
+        payment: [],
+      }),
+      createOrder({
+        id: "4f1d97bc-6175-4ee7-aa5c-9a26bef2845d",
+        customer_id: "another-customer",
+        payment_status: "partial",
+        payment: [{ id: "pay-1", amount: 100, payment_method: "cash", payment_terms: "full", payment_date: "2026-07-01T00:00:00.000Z", reference_number: null, notes: null, created_at: "2026-07-01T00:00:00.000Z" }],
+      }),
+    ];
+
+    expect(buildAgentRemittanceSummary(orders, agent)).toEqual({
+      remainingRemittance: 700,
+      outstandingOrderCount: 2,
+      outstandingCustomerCount: 2,
+    });
+    expect(formatAgentRemittanceDetail(2, 2)).toBe(
+      "2 orders from 2 customers have not been fully remitted yet.",
+    );
+    expect(formatAgentRemittanceDetail(0, 0)).toBe(
+      "All assigned orders are fully remitted.",
+    );
+  });
+
+  it("builds monthly performance with trend comparison against the previous month", () => {
+    const agent = createAgentProfile();
+    const now = new Date("2026-07-03T10:00:00.000Z");
+    const orders = [
+      createOrder({ created_at: "2026-07-02T00:00:00.000Z" }),
+      createOrder({
+        id: "4f1d97bc-6175-4ee7-aa5c-9a26bef2845d",
+        created_at: "2026-06-15T00:00:00.000Z",
+      }),
+    ];
+
+    const performance = buildAgentMonthlyPerformance(orders, agent, now);
+    expect(performance.currentMonthAmount).toBe(46.88);
+    expect(performance.previousMonthAmount).toBe(46.88);
+    expect(performance.trend).toBe("flat");
+    expect(formatAgentPerformanceTrend(performance).summary).toBe("No change from last month");
+    expect(performance.months).toHaveLength(6);
+    expect(performance.months.at(-1)?.label).toBe("Jul");
   });
 
   it("identifies agent-owned orders by agent assignment instead of customer assignment", () => {

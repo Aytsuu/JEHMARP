@@ -9,6 +9,8 @@ type Props = {
   showSummary?: boolean;
   showPagination?: boolean;
   showPaymentNotice?: boolean;
+  multiple?: boolean;
+  maxSelections?: number;
   class?: string;
 };
 
@@ -22,42 +24,101 @@ const {
   showSummary = true,
   showPagination = true,
   showPaymentNotice = false,
+  multiple = false,
+  maxSelections,
   class: className = "",
 } = Astro.props;
+
+const resolvedPlaceholder = multiple ? (placeholder || "Try searching...") : placeholder;
 ---
 
-<div class:list={["ui-picker", "order-customer-picker", className]} data-customer-picker>
-  <input
-    autocomplete="off"
-    placeholder={placeholder}
-    aria-label={searchLabel}
-    data-customer-search
-    data-customer-search-input
-    disabled={disabled}
-  />
-  <button
-    type="button"
-    class="order-customer-picker__toggle"
-    aria-label={toggleAriaLabel}
-    aria-expanded="false"
-    data-customer-picker-toggle
-    disabled={disabled}
-  >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="18"
-      height="18"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="6 9 12 15 18 9"></polyline>
-    </svg>
-  </button>
+<div
+  class:list={[
+    "ui-picker",
+    "order-customer-picker",
+    multiple && "order-customer-picker--multiple",
+    className,
+  ]}
+  data-customer-picker
+  data-ui-picker-multiple={multiple || undefined}
+  data-ui-picker-max-selections={maxSelections}
+>
+  {
+    multiple ? (
+      <div class="ui-picker__control" data-ui-picker-control>
+        <div class="ui-picker__badges" data-ui-picker-badges></div>
+        <input
+          class="ui-picker__search"
+          autocomplete="off"
+          placeholder={resolvedPlaceholder}
+          aria-label={searchLabel}
+          data-customer-search
+          data-customer-search-input
+          data-ui-picker-search
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          class="order-customer-picker__toggle"
+          aria-label={toggleAriaLabel}
+          aria-expanded="false"
+          data-customer-picker-toggle
+          disabled={disabled}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+      </div>
+    ) : (
+      <input
+        autocomplete="off"
+        placeholder={resolvedPlaceholder}
+        aria-label={searchLabel}
+        data-customer-search
+        data-customer-search-input
+        disabled={disabled}
+      />
+    )
+  }
+  {
+    !multiple && (
+      <button
+        type="button"
+        class="order-customer-picker__toggle"
+        aria-label={toggleAriaLabel}
+        aria-expanded="false"
+        data-customer-picker-toggle
+        disabled={disabled}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+    )
+  }
   <div class="order-customer-picker__menu" hidden data-customer-picker-menu>
     {
       showSummary && (

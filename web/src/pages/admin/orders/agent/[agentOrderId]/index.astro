@@ -29,6 +29,7 @@ import {
 } from "@/lib/admin-dashboard/view";
 import {
   buildAttachCustomerProductOptions,
+  buildDistributionCustomerOrderStatusCounts,
   canAttachCustomerToAgentOrder,
 } from "@/lib/agent-order-distribution";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
@@ -133,18 +134,7 @@ const pendingPaymentConfirmationTotal = pendingPaymentConfirmations.reduce(
   0,
 );
 const customerOrderCounts = {
-  pending: agentOrder.customer_order.filter(
-    (order) => order.order_status === "pending",
-  ).length,
-  unpaid: agentOrder.customer_order.filter(
-    (order) => order.payment_status === "unpaid",
-  ).length,
-  partial: agentOrder.customer_order.filter(
-    (order) => order.payment_status === "partial",
-  ).length,
-  paid: agentOrder.customer_order.filter(
-    (order) => order.payment_status === "paid",
-  ).length,
+  ...buildDistributionCustomerOrderStatusCounts(agentOrder.customer_order),
   total: agentOrder.customer_order.length,
 };
 const orderFilters = parseAdminOrderFilters(Astro.url);

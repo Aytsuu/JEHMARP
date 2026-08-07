@@ -1,6 +1,7 @@
 ---
 import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
 import Button from "@/components/ui/Button.astro";
+import Picker from "@/components/ui/Picker.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import Tab from "@/components/ui/Tab.astro";
 import TabPanel from "@/components/ui/TabPanel.astro";
@@ -146,24 +147,42 @@ const statusLegend = [
   },
 ] as const;
 
+type RemittanceOrderOption = {
+  id: string;
+  label: string;
+  meta: string;
+  searchText: string;
+  disabled: boolean;
+};
+
 const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, remittanceBalance);
+const remittanceOrderOptions: RemittanceOrderOption[] = agentOrder.customer_order.map((order: AgentOrder) => {
+  const quantityKey = orderQuantityKey(order);
+  const grossTotal = orderTotal(order, quantityKey);
+  const orderPaid = orderPaymentTotal(order);
+  const pendingAgentReceived = pendingAgentPaymentTotal(order);
+  const remainingBalance = Math.max(grossTotal - orderPaid - pendingAgentReceived, 0);
+  const customerName = order.customer ? fullName(order.customer) : "Guest";
+  const balanceLabel = formatCurrency(remainingBalance);
+
+  return {
+    id: order.id,
+    label: customerName,
+    meta: `Balance ${balanceLabel}`,
+    searchText: `${customerName} ${balanceLabel}`.toLowerCase(),
+    disabled: remainingBalance <= 0 || !canRecordRemittance,
+  };
+});
 ---
 
 <div class="agent-multi-order flex w-full max-w-full flex-col gap-4 sm:gap-5 lg:gap-6">
   <section class="agent-multi-order__summary-card" aria-label="Order summary">
-    <div class="agent-multi-order__summary-head">
-      <h2 class="agent-multi-order__summary-title">Summary</h2>
-      <button
-        type="button"
-        class="agent-multi-order__remit-action"
-        data-open-create-sheet
-        data-sheet-target="#agent-multi-order-remittance-sheet"
-        disabled={!canRecordRemittance}
-        aria-label="Add remittance"
-      >
-        Add Remittance <span aria-hidden="true">→</span>
-      </button>
+    <div class="agent-multi-order__balance-block">
+      <p class="agent-multi-order__balance-label">Balance</p>
+      <p class="agent-multi-order__balance-amount">{formatCurrency(remittanceBalance)}</p>
     </div>
+    <hr class="agent-multi-order__summary-divider" />
+    <h2 class="agent-multi-order__summary-title">Summary</h2>
     <dl class="agent-multi-order__summary-rows">
       <div class="agent-multi-order__summary-row">
         <dt>Paid</dt>
@@ -183,9 +202,18 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
       </div>
     </dl>
     <hr class="agent-multi-order__summary-divider" />
-    <p class="agent-multi-order__summary-balance">
-      Balance: <strong>{formatCurrency(remittanceBalance)}</strong>
-    </p>
+    <div class="agent-multi-order__summary-footer">
+      <button
+        type="button"
+        class="agent-multi-order__remit-action"
+        data-open-create-sheet
+        data-sheet-target="#agent-multi-order-remittance-sheet"
+        disabled={!canRecordRemittance}
+        aria-label="Add remittance"
+      >
+        Add Remittance <span aria-hidden="true">→</span>
+      </button>
+    </div>
   </section>
 
   <section class="agent-multi-order__details-card" aria-label="Order details">
@@ -218,7 +246,12 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
   </section>
 
   <section class="agent-multi-order__orders-card" aria-label="Customer orders overview">
-    <h2 class="agent-multi-order__orders-title">Orders</h2>
+    <div class="agent-multi-order__orders-head">
+      <h2 class="agent-multi-order__orders-title">Orders</h2>
+      <span class="agent-multi-order__orders-total" aria-label={`${customerCount} total orders`}>
+        {customerCount}
+      </span>
+    </div>
     <div
       class="agent-multi-order__status-bar"
       role="img"
@@ -464,44 +497,44 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
     {
       customerCount > 0 && (
         <div class="agent-multi-order-remittance-sheet__customer-orders">
-          <p class="agent-multi-order-remittance-sheet__customer-orders-label">Customer orders</p>
-          <ul class="agent-multi-order__remittance-order-list">
+          <div class="field-row agent-multi-order-remittance-sheet__customer-orders-field">
+            <span>Customer orders</span>
+            <Picker
+              multiple
+              disabled={!canRecordRemittance}
+              placeholder="Try searching..."
+              searchLabel="Search customer orders"
+              toggleAriaLabel="Show customer orders"
+              summaryText="Search or select customer orders for this remittance."
+              emptyMessage="No matching customer orders."
+              showSummary={false}
+              showPagination={false}
+            />
+          </div>
+          <template data-remittance-order-picker-template>
             {
-              agentOrder.customer_order.map((order: AgentOrder) => {
-                const quantityKey = orderQuantityKey(order);
-                const grossTotal = orderTotal(order, quantityKey);
-                const orderPaid = orderPaymentTotal(order);
-                const pendingAgentReceived = pendingAgentPaymentTotal(order);
-                const remainingBalance = Math.max(
-                  grossTotal - orderPaid - pendingAgentReceived,
-                  0,
-                );
-                const canSelect = remainingBalance > 0;
-                const customerName = order.customer
-                  ? fullName(order.customer)
-                  : "Guest";
-
-                return (
-                  <li class="agent-multi-order__remittance-order-item">
-                    <label class="agent-multi-order__remittance-order-label">
-                      <input
-                        type="checkbox"
-                        value={order.id}
-                        data-remittance-order-checkbox
-                        disabled={!canSelect || !canRecordRemittance}
-                      />
-                      <span class="agent-multi-order__remittance-order-copy">
-                        <strong>{customerName}</strong>
-                        <span>
-                          Balance {formatCurrency(remainingBalance)}
-                        </span>
-                      </span>
-                    </label>
-                  </li>
-                );
-              })
+              remittanceOrderOptions.map((option: RemittanceOrderOption) => (
+                <label
+                  class="order-customer-picker__option ui-picker__option--checkbox"
+                  data-ui-picker-option
+                  data-ui-picker-option-value={option.id}
+                  data-ui-picker-option-label={option.label}
+                  data-ui-picker-option-search={option.searchText}
+                  data-ui-picker-option-disabled={option.disabled ? "true" : undefined}
+                >
+                  <input
+                    type="checkbox"
+                    class="ui-picker__option-checkbox"
+                    value={option.id}
+                    data-ui-picker-option-checkbox
+                    disabled={option.disabled}
+                  />
+                  <span class="order-customer-picker__option-name">{option.label}</span>
+                  <span class="order-customer-picker__option-type">{option.meta}</span>
+                </label>
+              ))
             }
-          </ul>
+          </template>
         </div>
       )
     }
@@ -592,59 +625,67 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
 />
 
 <script>
+  import { initUiPicker } from "@/lib/client/ui-picker";
+
+  let remittancePicker: ReturnType<typeof initUiPicker> | null = null;
+
+  function initRemittancePicker() {
+    const form = document.querySelector<HTMLFormElement>("[data-agent-remittance-form]");
+    if (!form) return null;
+
+    const selectedOrderInputContainer = form.querySelector<HTMLElement>(
+      "[data-selected-remittance-order-inputs]",
+    );
+    const optionTemplate = form.querySelector<HTMLTemplateElement>(
+      "[data-remittance-order-picker-template]",
+    );
+    if (!optionTemplate) return null;
+
+    return initUiPicker({
+      root: form,
+      optionTemplate,
+      multiple: true,
+      hiddenInputContainer: selectedOrderInputContainer,
+      hiddenInputName: "orderId",
+    });
+  }
+
   function initAgentRemittanceForm() {
     const form = document.querySelector<HTMLFormElement>("[data-agent-remittance-form]");
     if (!form || form.dataset.agentRemittanceInitialized === "true") return;
     form.dataset.agentRemittanceInitialized = "true";
 
-    const selectedOrderInputContainer = form.querySelector<HTMLElement>(
-      "[data-selected-remittance-order-inputs]",
-    );
-    const selectedOrderIds: string[] = [];
-
-    const syncSelectedOrderInputs = () => {
-      if (!selectedOrderInputContainer) return;
-
-      selectedOrderInputContainer.replaceChildren(
-        ...selectedOrderIds.map((selectedOrderId) => {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = "orderId";
-          input.value = selectedOrderId;
-          return input;
-        }),
-      );
-    };
-
-    form.addEventListener("change", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLInputElement)) return;
-      if (!target.matches("[data-remittance-order-checkbox]")) return;
-
-      const existingIndex = selectedOrderIds.indexOf(target.value);
-
-      if (target.checked && existingIndex === -1) {
-        selectedOrderIds.push(target.value);
-      }
-
-      if (!target.checked && existingIndex !== -1) {
-        selectedOrderIds.splice(existingIndex, 1);
-      }
-
-      syncSelectedOrderInputs();
-    });
+    remittancePicker = initRemittancePicker();
 
     form.addEventListener("submit", (event) => {
-      if (selectedOrderIds.length === 0) {
+      if ((remittancePicker?.getSelectedValues().length ?? 0) === 0) {
         event.preventDefault();
         window.alert("Select at least one customer order for this remittance.");
       }
     });
   }
 
+  function ensureRemittancePickerOnSheetOpen() {
+    const picker = document.querySelector<HTMLElement>(
+      "[data-agent-remittance-form] [data-customer-picker]",
+    );
+    if (!picker || picker.dataset.uiPickerInitialized === "true") return;
+    remittancePicker = initRemittancePicker();
+  }
+
   initAgentRemittanceForm();
   document.addEventListener("astro:after-swap", initAgentRemittanceForm);
   document.addEventListener("astro:page-load", initAgentRemittanceForm);
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest('[data-sheet-target="#agent-multi-order-remittance-sheet"]')) return;
+      window.requestAnimationFrame(ensureRemittancePickerOnSheetOpen);
+    },
+    true,
+  );
 </script>
 
 <style>
@@ -663,12 +704,36 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
     letter-spacing: -0.01em;
   }
 
-  .agent-multi-order__summary-head {
+  .agent-multi-order__balance-block {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .agent-multi-order__balance-label {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .agent-multi-order__balance-amount {
+    margin: 0;
+    font-size: clamp(1.65rem, 5vw, 2.15rem);
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    word-break: break-word;
+  }
+
+  .agent-multi-order__summary-title {
+    margin-bottom: 0.75rem;
+  }
+
+  .agent-multi-order__summary-footer {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.85rem;
+    justify-content: flex-end;
   }
 
   .agent-multi-order__summary-rows {
@@ -709,18 +774,6 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
     border-top-color: rgba(17, 24, 39, 0.1);
   }
 
-  .agent-multi-order__summary-balance {
-    margin: 0;
-    font-size: 0.95rem;
-    font-weight: 500;
-    text-align: center;
-  }
-
-  .agent-multi-order__summary-balance strong {
-    font-size: 1.05rem;
-    font-weight: 700;
-  }
-
   .agent-multi-order__remit-action {
     display: inline-flex;
     align-items: center;
@@ -752,9 +805,15 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
     text-decoration: none;
   }
 
-  .agent-multi-order__orders-card,
-  .agent-multi-order__details-card {
+  .agent-multi-order__orders-card {
     border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 1rem;
+    background: transparent;
+    padding: 1rem;
+  }
+
+  .agent-multi-order__details-card {
+    border: 1px solid var(--color-brand-red);
     border-radius: 1rem;
     background: transparent;
     padding: 1rem;
@@ -786,7 +845,21 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
   }
 
   .agent-multi-order__orders-title {
-    margin: 0 0 0.85rem;
+    color: #111827;
+  }
+
+  .agent-multi-order__orders-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.85rem;
+  }
+
+  .agent-multi-order__orders-total {
+    flex-shrink: 0;
+    font-size: 0.95rem;
+    font-weight: 700;
     color: #111827;
   }
 
@@ -956,67 +1029,14 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
     margin-bottom: 0.75rem;
   }
 
-  .agent-multi-order__remittance-order-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.55rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .agent-multi-order__remittance-order-item {
-    border: 1px solid rgba(17, 24, 39, 0.08);
-    border-radius: 0.75rem;
-    background: #ffffff;
-  }
-
-  .agent-multi-order__remittance-order-label {
-    display: flex;
-    align-items: flex-start;
-    gap: 0.65rem;
-    padding: 0.75rem 0.85rem;
-    cursor: pointer;
-  }
-
-  .agent-multi-order__remittance-order-label input {
-    margin-top: 0.2rem;
-    width: 1rem;
-    height: 1rem;
-    accent-color: var(--color-brand-red);
-  }
-
-  .agent-multi-order__remittance-order-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    min-width: 0;
-  }
-
-  .agent-multi-order__remittance-order-copy strong {
-    color: #111827;
-    font-size: 0.9rem;
-  }
-
-  .agent-multi-order__remittance-order-copy span {
-    color: rgba(17, 24, 39, 0.58);
-    font-size: 0.8rem;
-    font-weight: 600;
-  }
-
   .agent-multi-order-remittance-sheet__customer-orders {
     display: grid;
     gap: 0.65rem;
     margin-bottom: 1rem;
   }
 
-  .agent-multi-order-remittance-sheet__customer-orders-label {
+  .agent-multi-order-remittance-sheet__customer-orders-field {
     margin: 0;
-    color: #6b7280;
-    font-size: 0.82rem;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
   }
 
   .agent-multi-order-remittance-sheet__balance {
@@ -1040,12 +1060,41 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
       padding: 1.15rem 1.1rem;
     }
 
+    .agent-multi-order__balance-label {
+      font-size: 0.86rem;
+    }
+
+    .agent-multi-order__summary-title,
+    .agent-multi-order__orders-title {
+      font-size: 1rem;
+    }
+
+    .agent-multi-order__orders-total {
+      font-size: 1rem;
+    }
+
+    .agent-multi-order__status-legend {
+      gap: 0.65rem 1.25rem;
+    }
+
     .agent-multi-order__tab-scroll {
       max-height: 18rem;
     }
   }
 
   @media (min-width: 768px) {
+    .agent-multi-order__summary-row dt {
+      font-size: 0.9rem;
+    }
+
+    .agent-multi-order__summary-row dd {
+      font-size: 1rem;
+    }
+
+    .agent-multi-order__status-legend {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
     .agent-multi-order__tab-scroll {
       max-height: 20rem;
     }
@@ -1057,6 +1106,12 @@ const remittancePaymentStatus = deriveRemittancePaymentStatus(paid, receivable, 
   }
 
   @media (min-width: 1024px) {
+    .agent-multi-order__summary-card,
+    .agent-multi-order__orders-card,
+    .agent-multi-order__details-card {
+      padding: 1.25rem 1.15rem;
+    }
+
     .agent-multi-order__tab-scroll {
       max-height: 22rem;
     }

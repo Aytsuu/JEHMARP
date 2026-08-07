@@ -99,6 +99,11 @@ const { data } = Astro.props;
 
   .agent-customers__list {
     margin-top: 0.85rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .agent-customers__toolbar :global(.table-filters__search) {
+    width: 100%;
   }
 
   .agent-customers__pagination {
@@ -190,9 +195,35 @@ const { data } = Astro.props;
     color: #111827;
   }
 
-  @media (min-width: 48rem) {
+  @media (min-width: 640px) {
     .agent-customers-card__name {
       font-size: 1.05rem;
+    }
+
+    .agent-customers-card__details {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 1rem;
+    }
+
+    .agent-customers__toolbar :global(.table-filters__search) {
+      max-width: 20rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .agent-customers__list {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .agent-customers__list {
+      gap: 1.1rem;
+    }
+
+    .agent-customers-card {
+      gap: 1rem;
     }
   }
 </style>

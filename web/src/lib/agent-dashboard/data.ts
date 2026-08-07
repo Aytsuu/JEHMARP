@@ -195,6 +195,7 @@ export type AgentProfile = {
   display_name: string;
   contact: string | null;
   email: string | null;
+  address: string;
   status: "active" | "inactive" | "suspended";
 };
 
@@ -386,7 +387,7 @@ export async function loadAgentDashboardData(
   const supabase = createSupabaseServerClient(context);
   const agent = await loadAgentProfile(supabase, userId);
   const [customers, products, agentOrders, registrationLinks, orders] = await Promise.all([
-    loadAssignedCustomers(supabase),
+    loadAssignedCustomers(supabase, agent),
     loadActiveProducts(supabase),
     loadAccessibleAgentOrders(supabase),
     loadAgentRegistrationLinks(supabase),
@@ -453,17 +454,21 @@ async function loadAgentProfile(supabase: SupabaseServerClient, userId: string) 
   ) as AgentProfile;
 }
 
-async function loadAssignedCustomers(supabase: SupabaseServerClient) {
+async function loadAssignedCustomers(
+  supabase: SupabaseServerClient,
+  agent: Pick<AgentProfile, "id" | "customer_id">,
+) {
   const { data, error } = await supabase
     .from("customer")
     .select(customerWithProfileSelect)
+    .eq("assigned_agent_id", agent.id)
     .order("created_at", { ascending: false });
 
   if (error) throwLoadError("Unable to load assigned customers.", error);
 
-  return ((data ?? []) as Parameters<typeof mapCustomerWithProfile>[0][]).map((row) =>
-    mapCustomerWithProfile(row),
-  ) as AgentCustomer[];
+  return ((data ?? []) as Parameters<typeof mapCustomerWithProfile>[0][])
+    .map((row) => mapCustomerWithProfile(row) as AgentCustomer)
+    .filter((customer) => customer.id !== agent.customer_id);
 }
 
 async function loadActiveProducts(supabase: SupabaseServerClient) {
