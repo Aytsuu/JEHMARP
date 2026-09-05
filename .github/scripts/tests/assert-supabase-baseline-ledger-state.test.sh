@@ -34,6 +34,20 @@ write_archived_versions_fixture() {
   printf '%s\n' "${ARCHIVED_VERSIONS[@]}" > "$output_file"
 }
 
+prepare_cutover_fixture_repo() {
+  local prefix_repo="$1"
+  local checkpoint="${prefix_repo}/supabase/_archived_migrations/20260802_checkpoint_prebaseline"
+
+  mkdir -p "${prefix_repo}/supabase/migrations" "${prefix_repo}/.github/config" "${prefix_repo}/.github/scripts" "${checkpoint}"
+  cp "${REPOSITORY_ROOT}/.github/config/baseline-compaction-20260802.manifest" "${prefix_repo}/.github/config/"
+  cp "$ARCHIVED_VERSIONS_FILE" "${prefix_repo}/.github/config/baseline-compaction-20260802.archived-versions.txt"
+  cp -r "${REPOSITORY_ROOT}/supabase/_archived_migrations/20260802_checkpoint_prebaseline/." "$checkpoint/"
+  printf '%s\n' '-- baseline' > "${prefix_repo}/supabase/migrations/${BASELINE_VERSION}_baseline_schema.sql"
+}
+
+cutover_repo="${FIXTURE_DIR}/cutover-repo"
+prepare_cutover_fixture_repo "$cutover_repo"
+
 run_guard() {
   local expected_status="$1"
   local connection_args=("${@:2}")
@@ -58,7 +72,7 @@ run_guard() {
 archived_list_file="${FIXTURE_DIR}/archived-only.txt"
 write_migration_list_fixture "$archived_list_file" "${ARCHIVED_VERSIONS[@]}"
 
-output="$(run_guard 1 --linked --migration-list-file "$archived_list_file")"
+output="$(BASELINE_LEDGER_REPO_ROOT="$cutover_repo" run_guard 1 --linked --migration-list-file "$archived_list_file")"
 if ! printf '%s\n' "$output" | grep -Fq "Reconcile Supabase Baseline"; then
   echo "Expected archived-checkpoint rejection to name Reconcile Supabase Baseline." >&2
   printf '%s\n' "$output" >&2
@@ -69,7 +83,7 @@ if ! printf '%s\n' "$output" | grep -Fq "target: staging"; then
   exit 1
 fi
 
-output_prod="$(run_guard 1 --linked --migration-list-file "$archived_list_file" --target production)"
+output_prod="$(BASELINE_LEDGER_REPO_ROOT="$cutover_repo" run_guard 1 --linked --migration-list-file "$archived_list_file" --target production)"
 if ! printf '%s\n' "$output_prod" | grep -Fq "target: production"; then
   echo "Expected archived-checkpoint rejection to name target production." >&2
   exit 1
@@ -86,7 +100,7 @@ fi
 baseline_list_file="${FIXTURE_DIR}/baseline-only.txt"
 write_migration_list_fixture "$baseline_list_file" "$BASELINE_VERSION"
 
-output="$(run_guard 0 --linked --migration-list-file "$baseline_list_file")"
+output="$(BASELINE_LEDGER_REPO_ROOT="$cutover_repo" run_guard 0 --linked --migration-list-file "$baseline_list_file")"
 if ! printf '%s\n' "$output" | grep -Fq "Remote migration ledger matches the active baseline (${BASELINE_VERSION})"; then
   echo "Expected baseline-only ledger to permit db push." >&2
   printf '%s\n' "$output" >&2
@@ -96,7 +110,7 @@ fi
 empty_list_file="${FIXTURE_DIR}/empty.txt"
 write_migration_list_fixture "$empty_list_file"
 
-output="$(run_guard 1 --linked --migration-list-file "$empty_list_file")"
+output="$(BASELINE_LEDGER_REPO_ROOT="$cutover_repo" run_guard 1 --linked --migration-list-file "$empty_list_file")"
 if ! printf '%s\n' "$output" | grep -Fq "does not match the archived checkpoint or the active baseline state"; then
   echo "Expected empty remote ledger to fail closed as drift." >&2
   printf '%s\n' "$output" >&2
@@ -106,7 +120,7 @@ fi
 mixed_list_file="${FIXTURE_DIR}/mixed.txt"
 write_migration_list_fixture "$mixed_list_file" "$BASELINE_VERSION" "${ARCHIVED_VERSIONS[0]}"
 
-output="$(run_guard 1 --linked --migration-list-file "$mixed_list_file")"
+output="$(BASELINE_LEDGER_REPO_ROOT="$cutover_repo" run_guard 1 --linked --migration-list-file "$mixed_list_file")"
 if ! printf '%s\n' "$output" | grep -Fq "does not match the archived checkpoint or the active baseline state"; then
   echo "Expected mixed remote ledger to fail closed as drift." >&2
   printf '%s\n' "$output" >&2
@@ -128,7 +142,8 @@ exit 99
 EOF
 chmod +x "${mock_bin}/supabase"
 output="$(
-  PATH="${mock_bin}:$PATH" \
+  BASELINE_LEDGER_REPO_ROOT="$cutover_repo" \
+    PATH="${mock_bin}:$PATH" \
     bash "$SCRIPT_PATH" --linked 2>&1
 )"
 if ! printf '%s\n' "$output" | grep -Fq "Remote migration ledger matches the active baseline (${BASELINE_VERSION})"; then
@@ -150,7 +165,8 @@ exit 99
 EOF
 chmod +x "${mock_bin}/supabase"
 output="$(
-  PATH="${mock_bin}:$PATH" \
+  BASELINE_LEDGER_REPO_ROOT="$cutover_repo" \
+    PATH="${mock_bin}:$PATH" \
     bash "$SCRIPT_PATH" --db-url "postgresql://example.test/db" 2>&1
 )"
 if ! printf '%s\n' "$output" | grep -Fq "Remote migration ledger matches the active baseline (${BASELINE_VERSION})"; then
@@ -166,7 +182,7 @@ secret_probe="${FIXTURE_DIR}/secret-probe.txt"
 } > "${secret_probe}.tmp"
 mv "${secret_probe}.tmp" "$secret_probe"
 
-output="$(run_guard 1 --linked --migration-list-file "$secret_probe")"
+output="$(BASELINE_LEDGER_REPO_ROOT="$cutover_repo" run_guard 1 --linked --migration-list-file "$secret_probe")"
 if printf '%s\n' "$output" | grep -Eiq 'postgresql://|password='; then
   echo "Failure output must not echo secret-bearing fixture content." >&2
   printf '%s\n' "$output" >&2
@@ -174,18 +190,69 @@ if printf '%s\n' "$output" | grep -Eiq 'postgresql://|password='; then
 fi
 
 prefix_repo="${FIXTURE_DIR}/prefix-repo"
-checkpoint="${prefix_repo}/supabase/_archived_migrations/20260802_checkpoint_prebaseline"
-mkdir -p "${prefix_repo}/supabase/migrations" "${prefix_repo}/.github/config" "${prefix_repo}/.github/scripts" "${checkpoint}"
-cp "${REPOSITORY_ROOT}/.github/config/baseline-compaction-20260802.manifest" "${prefix_repo}/.github/config/"
-cp "$ARCHIVED_VERSIONS_FILE" "${prefix_repo}/.github/config/baseline-compaction-20260802.archived-versions.txt"
-cp -r "${REPOSITORY_ROOT}/supabase/_archived_migrations/20260802_checkpoint_prebaseline/." "$checkpoint/"
-printf '%s\n' '-- baseline' > "${prefix_repo}/supabase/migrations/${BASELINE_VERSION}_baseline_schema.sql"
+prepare_cutover_fixture_repo "$prefix_repo"
 printf '%s\n' '-- expand' > "${prefix_repo}/supabase/migrations/20260803000000_add_feature.sql"
 
 BASELINE_LEDGER_REPO_ROOT="$prefix_repo" \
   output="$(run_guard 0 --linked --migration-list-file "$baseline_list_file" --policy active-prefix)"
 if ! printf '%s\n' "$output" | grep -Fq "valid applied prefix"; then
   echo "Expected active-prefix policy to accept baseline-only remote ledger with newer local migrations." >&2
+  printf '%s\n' "$output" >&2
+  exit 1
+fi
+
+subsequence_repo="${FIXTURE_DIR}/subsequence-repo"
+prepare_cutover_fixture_repo "$subsequence_repo"
+printf '%s\n' '-- expand 030' > "${subsequence_repo}/supabase/migrations/20260803000000_add_feature.sql"
+printf '%s\n' '-- expand 040' > "${subsequence_repo}/supabase/migrations/20260804000000_add_filters.sql"
+printf '%s\n' '-- expand 041 skipped on staging' > "${subsequence_repo}/supabase/migrations/20260804000001_dedupe.sql"
+printf '%s\n' '-- expand 042' > "${subsequence_repo}/supabase/migrations/20260804000002_set_approval.sql"
+
+staging_skip_list_file="${FIXTURE_DIR}/staging-skip-041.txt"
+write_migration_list_fixture "$staging_skip_list_file" \
+  "$BASELINE_VERSION" \
+  "20260803000000" \
+  "20260804000000" \
+  "20260804000002"
+
+BASELINE_LEDGER_REPO_ROOT="$subsequence_repo" \
+  output="$(run_guard 0 --linked --migration-list-file "$staging_skip_list_file" --policy active-prefix)"
+if ! printf '%s\n' "$output" | grep -Fq "valid applied prefix"; then
+  echo "Expected active-prefix policy to accept remote ledger that skipped an unapplied local migration." >&2
+  printf '%s\n' "$output" >&2
+  exit 1
+fi
+
+removed_from_repo_repo="${FIXTURE_DIR}/removed-from-repo"
+prepare_cutover_fixture_repo "$removed_from_repo_repo"
+printf '%s\n' '-- expand 030' > "${removed_from_repo_repo}/supabase/migrations/20260803000000_add_feature.sql"
+printf '%s\n' '-- expand 040' > "${removed_from_repo_repo}/supabase/migrations/20260804000000_add_filters.sql"
+printf '%s\n' '-- expand 042' > "${removed_from_repo_repo}/supabase/migrations/20260804000002_set_approval.sql"
+
+orphan_remote_list_file="${FIXTURE_DIR}/orphan-remote-041.txt"
+write_migration_list_fixture "$orphan_remote_list_file" \
+  "$BASELINE_VERSION" \
+  "20260803000000" \
+  "20260804000000" \
+  "20260804000001"
+
+BASELINE_LEDGER_REPO_ROOT="$removed_from_repo_repo" \
+  output="$(run_guard 1 --linked --migration-list-file "$orphan_remote_list_file" --policy active-prefix)"
+if ! printf '%s\n' "$output" | grep -Fq "does not match the archived checkpoint or the active baseline state"; then
+  echo "Expected remote-only removed migration versions to fail until production ledger repair." >&2
+  printf '%s\n' "$output" >&2
+  exit 1
+fi
+
+unknown_remote_list_file="${FIXTURE_DIR}/unknown-remote-version.txt"
+write_migration_list_fixture "$unknown_remote_list_file" \
+  "$BASELINE_VERSION" \
+  "20990101000000"
+
+BASELINE_LEDGER_REPO_ROOT="$subsequence_repo" \
+  output="$(run_guard 1 --linked --migration-list-file "$unknown_remote_list_file" --policy active-prefix)"
+if ! printf '%s\n' "$output" | grep -Fq "does not match the archived checkpoint or the active baseline state"; then
+  echo "Expected unknown remote versions to fail closed under active-prefix policy." >&2
   printf '%s\n' "$output" >&2
   exit 1
 fi
