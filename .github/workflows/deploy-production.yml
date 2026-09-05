@@ -4,6 +4,43 @@ on:
   push:
     branches:
       - main
+    paths:
+      # Production release workflow and every helper it directly or transitively executes.
+      - ".github/workflows/deploy-production.yml"
+      - ".github/scripts/supabase-link-retry.sh"
+      - ".github/scripts/detect-pending-high-risk-migrations.sh"
+      - ".github/scripts/supabase-advisors-retry.sh"
+      - ".github/scripts/validate-migration-phase-metadata.sh"
+      - ".github/scripts/migration-diff-lib.sh"
+      - ".github/scripts/migration-baseline-compaction.sh"
+      - ".github/scripts/supabase-db-push-remote.sh"
+      - ".github/scripts/cloudflare-worker-canary.sh"
+      - ".github/scripts/resolve-worker-name.sh"
+      - ".github/scripts/resolve-production-base-url.sh"
+      - ".github/scripts/run-canary-smoke.sh"
+      - ".github/scripts/production-smoke.sh"
+      - ".github/scripts/authenticated-smoke.sh"
+      - ".github/scripts/smoke-lib.sh"
+      - ".github/scripts/canary-observe-and-guard.sh"
+      - ".github/scripts/manual-production-auth-gate.sh"
+      - ".github/scripts/canary-rollback.sh"
+      - ".github/scripts/verify-version-affinity.sh"
+
+      # Worker source, static assets, build configuration, and deployment configuration.
+      - "web/src/**"
+      - "web/public/**"
+      - "web/scripts/render-production-env.sh"
+      - "web/astro.config.mjs"
+      - "web/wrangler.jsonc"
+      - "web/package.json"
+      - "web/package-lock.json"
+      - "web/tsconfig.json"
+
+      # Inputs that this workflow validates and can apply to production Supabase.
+      - "supabase/config.toml"
+      - "supabase/migrations/**"
+      - "supabase/_archived_migrations/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
