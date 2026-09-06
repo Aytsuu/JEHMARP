@@ -4557,7 +4557,25 @@ describe("formatAdminActionFeedback", () => {
     expect(formatAdminActionFeedback(url)).toEqual({
       status: "Order marked as read.",
       error: undefined,
+      registrationLink: undefined,
+      registrationLinkExpiresAt: undefined,
+      registrationLinkDuration: undefined,
       cleanPath: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?page=2#error-anchor",
+    });
+  });
+
+  it("returns registration link feedback with a clean reload URL", () => {
+    const url = new URL(
+      "https://jehmarp.example/admin/customers?status=Registration%20link%20created.&registrationLink=https%3A%2F%2Fjehmarp.example%2Fcustomer-registration%2Fabc123&registrationLinkExpiresAt=2026-09-07T10%3A00%3A00.000Z&registrationLinkDuration=1h",
+    );
+
+    expect(formatAdminActionFeedback(url)).toEqual({
+      status: "Registration link created.",
+      error: undefined,
+      registrationLink: "https://jehmarp.example/customer-registration/abc123",
+      registrationLinkExpiresAt: "2026-09-07T10:00:00.000Z",
+      registrationLinkDuration: "1h",
+      cleanPath: "/admin/customers",
     });
   });
 
@@ -4567,6 +4585,9 @@ describe("formatAdminActionFeedback", () => {
     expect(formatAdminActionFeedback(url)).toEqual({
       status: undefined,
       error: undefined,
+      registrationLink: undefined,
+      registrationLinkExpiresAt: undefined,
+      registrationLinkDuration: undefined,
       cleanPath: undefined,
     });
   });

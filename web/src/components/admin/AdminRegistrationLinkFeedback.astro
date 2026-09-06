@@ -1,0 +1,89 @@
+---
+import type { RegistrationLinkDuration } from "@/lib/admin-dashboard/actions";
+import { formatRegistrationLinkExpiryFeedback } from "@/lib/admin-dashboard/actions";
+
+type Props = {
+  message: string;
+  registrationLink: string;
+  expiresAt: string;
+  duration: RegistrationLinkDuration;
+};
+
+const { message, registrationLink, expiresAt, duration } = Astro.props;
+const expiryText = formatRegistrationLinkExpiryFeedback(expiresAt, duration);
+---
+
+<div
+  class="status-message admin-registration-link-feedback"
+  role="status"
+  tabindex="-1"
+  data-admin-registration-link-feedback
+>
+  <p class="admin-registration-link-feedback__message">{message}</p>
+  <p class="admin-registration-link-feedback__expiry">{expiryText}</p>
+  <div class="admin-registration-link-feedback__link-row">
+    <a
+      class="admin-registration-link-feedback__link"
+      href={registrationLink}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {registrationLink}
+    </a>
+    <button
+      type="button"
+      class="admin-registration-link-feedback__copy"
+      data-copy-registration-link-feedback
+      data-copy-value={registrationLink}
+      aria-label="Copy registration link"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+    </button>
+  </div>
+  <p class="admin-registration-link-feedback__copied" data-registration-link-feedback-copied hidden>
+    Copied.
+  </p>
+</div>
+
+<script>
+  function initAdminRegistrationLinkFeedback() {
+    const feedback = document.querySelector<HTMLElement>("[data-admin-registration-link-feedback]");
+    if (!feedback || feedback.dataset.initialized === "true") return;
+    feedback.dataset.initialized = "true";
+
+    const copyButton = feedback.querySelector<HTMLButtonElement>(
+      "[data-copy-registration-link-feedback]",
+    );
+    const copiedText = feedback.querySelector<HTMLElement>(
+      "[data-registration-link-feedback-copied]",
+    );
+
+    copyButton?.addEventListener("click", async () => {
+      const value = copyButton.dataset.copyValue ?? "";
+      if (!value) return;
+
+      await navigator.clipboard.writeText(value);
+      if (copiedText) copiedText.hidden = false;
+    });
+
+    feedback.scrollIntoView({ behavior: "smooth", block: "center" });
+    feedback.focus({ preventScroll: true });
+  }
+
+  initAdminRegistrationLinkFeedback();
+  document.addEventListener("astro:after-swap", initAdminRegistrationLinkFeedback);
+</script>

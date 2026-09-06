@@ -350,3 +350,11 @@ function findRegistrationAgentMatch(
 function hashRegistrationToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
+
+export function buildCustomerRegistrationLinkPath(token: string) {
+  return `/customer-registration/${token}`;
+}
+
+export function buildCustomerRegistrationLinkUrl(baseUrl: string, token: string) {
+  return new URL(buildCustomerRegistrationLinkPath(token), baseUrl).toString();
+}

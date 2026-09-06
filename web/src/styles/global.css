@@ -5144,6 +5144,83 @@
     @apply border-green-700 bg-green-50 text-green-950;
   }
 
+  .admin-registration-link-feedback {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .admin-registration-link-feedback__message {
+    margin: 0;
+  }
+
+  .admin-registration-link-feedback__expiry {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+
+  .admin-registration-link-feedback__link-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  .admin-registration-link-feedback__link {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
+  .admin-registration-link-feedback__copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #14532d;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 400;
+    cursor: pointer;
+    transition: color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .admin-registration-link-feedback__copy svg {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+    flex-shrink: 0;
+  }
+
+  .admin-registration-link-feedback__copy:hover:not(:disabled),
+  .admin-registration-link-feedback__copy:focus-visible {
+    background: transparent;
+    color: var(--color-brand-red);
+    outline: none;
+    opacity: 1;
+  }
+
+  .admin-registration-link-feedback__copied {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
   .error-message {
     @apply border-red-700 bg-red-50 text-red-950;
   }
@@ -9033,7 +9110,13 @@
     letter-spacing: normal;
   }
 
-  :is(#create-product-sheet, #create-order-sheet, #create-customer-sheet, #create-agent-sheet)
+  :is(
+      #create-product-sheet,
+      #create-order-sheet,
+      #create-customer-sheet,
+      #create-customer-registration-link-sheet,
+      #create-agent-sheet
+    )
     :is(label.field-row--split, .field-row.field-row--split):has(
       input:required:not(:disabled),
       select:required:not(:disabled),
@@ -9211,13 +9294,13 @@
     }
   }
 
-  #create-customer-sheet .customer-create-form__grid {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form__grid {
     grid-template-columns: 1fr !important;
     gap: 2rem;
   }
 
-  #create-customer-sheet .customer-create-form label.field-row--split,
-  #create-customer-sheet .customer-create-form .field-row--split {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split,
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row--split {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 0.5rem;
@@ -9226,13 +9309,13 @@
     width: 100%;
   }
 
-  #create-customer-sheet .customer-create-form .field-row__meta {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__meta {
     display: grid;
     gap: 0.2rem;
     min-width: 0;
   }
 
-  #create-customer-sheet .customer-create-form .field-row__label {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__label {
     font-size: 0.825rem;
     font-weight: 700;
     text-transform: none;
@@ -9240,7 +9323,7 @@
     color: var(--color-brand-muted-black);
   }
 
-  #create-customer-sheet .customer-create-form .field-row__description {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__description {
     margin: 0;
     font-size: 0.8rem;
     line-height: 1.45;
@@ -9250,27 +9333,27 @@
     letter-spacing: normal;
   }
 
-  #create-customer-sheet .customer-create-form label.field-row--split > :not(.field-row__meta),
-  #create-customer-sheet .customer-create-form .field-row__control {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split > :not(.field-row__meta),
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__control {
     grid-column: 1;
     grid-row: auto;
     min-width: 0;
     width: 100%;
   }
 
-  #create-customer-sheet .customer-create-form label.field-row--split > textarea,
-  #create-customer-sheet .customer-create-form .field-row__control textarea {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split > textarea,
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__control textarea {
     align-self: start;
   }
 
-  #create-customer-sheet .customer-create-form .checkbox-row.field-row--split {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 0.5rem;
     align-items: start;
   }
 
-  #create-customer-sheet .customer-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split input[type="checkbox"] {
     width: 1.25rem;
     height: 1.25rem;
     min-width: 1.25rem;
@@ -9281,7 +9364,7 @@
     cursor: pointer;
   }
 
-  #create-customer-sheet .customer-create-form .customer-create-form__checkbox-control {
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .customer-create-form__checkbox-control {
     display: flex;
     align-items: center;
     width: 100%;
@@ -9294,30 +9377,30 @@
   }
 
   @media (min-width: 40rem) {
-    #create-customer-sheet .customer-create-form label.field-row--split,
-    #create-customer-sheet .customer-create-form .field-row--split,
-    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split {
       grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
       gap: 0.5rem 1.15rem;
     }
 
-    #create-customer-sheet .customer-create-form .field-row__meta {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__meta {
       align-self: start;
     }
 
-    #create-customer-sheet .customer-create-form label.field-row--split > :not(.field-row__meta),
-    #create-customer-sheet .customer-create-form .field-row__control {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split > :not(.field-row__meta),
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__control {
       grid-column: 2;
       grid-row: 1;
       align-self: start;
     }
 
-    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split input[type="checkbox"] {
       grid-column: unset;
       grid-row: unset;
     }
 
-    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split .customer-create-form__checkbox-control {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split .customer-create-form__checkbox-control {
       grid-column: 2;
       grid-row: 1;
       align-self: start;
@@ -9325,18 +9408,18 @@
   }
 
   @media (min-width: 48rem) {
-    #create-customer-sheet .customer-create-form label.field-row--split,
-    #create-customer-sheet .customer-create-form .field-row--split,
-    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split {
       grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
       gap: 0.5rem 1.3rem;
     }
   }
 
   @media (min-width: 64rem) {
-    #create-customer-sheet .customer-create-form label.field-row--split,
-    #create-customer-sheet .customer-create-form .field-row--split,
-    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split {
       grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
       gap: 0.55rem 1.45rem;
     }
