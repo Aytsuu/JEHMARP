@@ -1587,7 +1587,7 @@ describe("markUnreadAdminResellerApplicationsRead", () => {
     mocks.createSupabaseServerClient.mockReturnValue({ from });
 
     await markUnreadAdminResellerApplicationsRead(
-      { cookies: {}, request: new Request("https://example.test/admin/reseller-applications") },
+      createActionContext(new FormData()) as unknown as Parameters<typeof markUnreadAdminResellerApplicationsRead>[0],
       adminUserId,
     );
 
