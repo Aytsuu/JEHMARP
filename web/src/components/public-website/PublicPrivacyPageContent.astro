@@ -1,0 +1,202 @@
+---
+import type { PlatformSettings } from "@/lib/platform-settings";
+import { formatPrivacyNoticeEffectiveDate } from "@/lib/platform-settings/privacy-notice";
+
+type Props = {
+  settings: PlatformSettings;
+};
+
+const { settings } = Astro.props;
+const notice = settings.privacyNotice;
+const effectiveDateLabel = formatPrivacyNoticeEffectiveDate(notice.effectiveDate);
+const tradeName = settings.businessProfile.tradeName || "JEHMARP";
+---
+
+<article class="privacy-notice">
+  <p class="privacy-notice__lead">
+    This Privacy &amp; Data Privacy Notice explains how {tradeName} ("we", "us", or "our"),
+    through {notice.controllerLegalName}, collects, uses, stores, shares, and protects personal
+    data when you use our public website, place orders, submit inquiries, apply as a reseller,
+    or access authorized accounts.
+  </p>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Personal Information Controller</h2>
+    <p>
+      <strong>{notice.controllerLegalName}</strong><br />
+      {notice.philippineBusinessAddress}
+    </p>
+    <p>
+      Privacy and data protection contact:{" "}
+      <a href={`mailto:${notice.privacyContactEmail}`}>{notice.privacyContactEmail}</a>
+    </p>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">What personal data we collect</h2>
+    <ul>
+      <li>Customer and order details such as name, contact number, email address, delivery address, order items, notes, and payment references.</li>
+      <li>Contact inquiry details such as name, email, phone number, and message content.</li>
+      <li>Reseller application details such as business information, contact details, and supporting statements you submit.</li>
+      <li>Account and agent data such as login email, profile details, role information, and activity needed to administer authorized access.</li>
+      <li>Technical and security data such as IP address, browser user agent, session identifiers, anti-bot challenge results, and related security logs.</li>
+    </ul>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Why we use personal data</h2>
+    <p>We process personal data for the following purposes:</p>
+    <ul>
+      <li>Order fulfilment, customer support, and delivery coordination.</li>
+      <li>Reseller application review and related business assessment.</li>
+      <li>Responding to contact inquiries and service requests.</li>
+      <li>Account administration, authentication, and authorized dashboard access.</li>
+      <li>Session handling, fraud prevention, anti-spam controls, and website security.</li>
+      <li>Operational recordkeeping, service improvement, and compliance with legal obligations.</li>
+    </ul>
+    <p>
+      We rely on appropriate processing grounds under the Philippine Data Privacy Act, including
+      contract performance, legitimate interests in operating and securing our services, legal
+      obligations, and consent where required. We do not treat a general privacy notice
+      acknowledgement as blanket consent for all processing, and required order, account, inquiry,
+      reseller, or security processing does not depend on optional marketing consent.
+    </p>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Who may receive personal data</h2>
+    <p>We may share personal data only as needed with:</p>
+    <ul>
+      <li>Authorized JEHMARP personnel who require access for their work.</li>
+      <li>Cloudflare Workers, Turnstile, and KV for application hosting, security challenges, and session-related storage.</li>
+      <li>Supabase for authentication, database, and storage services.</li>
+      <li>Upstash for rate limiting and abuse-prevention controls.</li>
+      <li>Resend for transactional email delivery.</li>
+      <li>Regulators, advisers, or service providers when required by law or to protect rights and safety.</li>
+    </ul>
+    <p>
+      Some service providers may process data outside the Philippines. When that happens, we remain
+      accountable for personal data under our control and require appropriate safeguards through
+      contracts and vendor management.
+    </p>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Retention</h2>
+    <ul>
+      <li><strong class="privacy-notice__label">Contact inquiries:</strong> {notice.retentionInquiries}</li>
+      <li><strong class="privacy-notice__label">Reseller applications:</strong> {notice.retentionResellerApplications}</li>
+      <li><strong class="privacy-notice__label">Orders and related records:</strong> {notice.retentionOrders}</li>
+      <li><strong class="privacy-notice__label">Accounts and authorized user records:</strong> {notice.retentionAccounts}</li>
+      <li><strong class="privacy-notice__label">Security logs:</strong> {notice.retentionSecurityLogs}</li>
+      <li><strong class="privacy-notice__label">Backups:</strong> {notice.retentionBackups}</li>
+    </ul>
+    <p>We retain personal data only for as long as needed for the purposes above, unless a longer period is required or permitted by law.</p>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Your data subject rights</h2>
+    <p>
+      Under the Data Privacy Act, you may have rights to be informed, access, object, rectify,
+      erase or block, data portability, file a complaint, and damages, subject to
+      applicable law and exceptions. To exercise these rights, contact us at{" "}
+      <a href={`mailto:${notice.privacyContactEmail}`}>{notice.privacyContactEmail}</a>.
+      We may need to verify your identity before responding.
+    </p>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Security safeguards</h2>
+    <p>
+      We use administrative, technical, and organizational safeguards appropriate to the nature of
+      the data we process, including access controls, encrypted transport where supported,
+      environment separation, anti-bot checks, and monitoring of operational systems. No method of
+      transmission or storage is completely secure, so we cannot guarantee absolute security.
+    </p>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Breach response</h2>
+    <p>
+      If we become aware of a personal data breach that requires notification, we will assess the
+      incident, take containment and remediation steps, and notify affected individuals and the
+      National Privacy Commission when required by law. Report suspected incidents to{" "}
+      <a href={`mailto:${notice.privacyContactEmail}`}>{notice.privacyContactEmail}</a>.
+    </p>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Cookies and similar technologies</h2>
+    <p>
+      This release uses only necessary cookies and similar technologies needed to operate the
+      website securely. These include session and security storage used to keep authorized users
+      signed in and protect forms, and Cloudflare Turnstile challenge data used to reduce automated
+      abuse. We do not use optional analytics, advertising tags, or marketing pixels in this
+      release.
+    </p>
+  </section>
+
+  <section class="privacy-notice__section">
+    <h2 class="privacy-notice__heading">Updates to this notice</h2>
+    <p>
+      Version {notice.noticeVersion} · Effective {effectiveDateLabel}. We may update this notice
+      when our practices, services, or legal requirements change. Material updates will be posted
+      on this page with a revised version and effective date.
+    </p>
+  </section>
+</article>
+
+<style>
+  .privacy-notice {
+    display: grid;
+    gap: 1.5rem;
+    max-width: 48rem;
+    color: #1f2937;
+    line-height: 1.7;
+  }
+
+  .privacy-notice__lead {
+    margin: 0;
+    font-size: 1.05rem;
+  }
+
+  .privacy-notice__section {
+    display: grid;
+    gap: 0.75rem;
+    padding-top: 0.25rem;
+  }
+
+  .privacy-notice__heading {
+    margin: 0;
+    padding: 0 0 0.5rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-brand-red, #661818);
+  }
+
+  .privacy-notice p,
+  .privacy-notice ul {
+    margin: 0;
+  }
+
+  .privacy-notice ul {
+    padding-left: 1.25rem;
+  }
+
+  .privacy-notice li + li {
+    margin-top: 0.35rem;
+  }
+
+  .privacy-notice__label {
+    color: #111827;
+    font-weight: 700;
+  }
+
+  .privacy-notice a {
+    color: var(--color-brand-red, #b91c1c);
+    text-decoration: underline;
+  }
+</style>

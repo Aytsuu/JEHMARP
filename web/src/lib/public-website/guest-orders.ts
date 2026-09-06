@@ -9,6 +9,7 @@ import {
   sendOperationalNotificationEmail,
 } from "@/lib/platform-settings/operational-notification-email";
 import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
+import { validatePrivacyNoticeAcknowledgement } from "@/lib/platform-settings/privacy-notice";
 import {
   loadGuestOrderTrackingNumber,
   buildCustomerTrackPageUrl,
@@ -66,7 +67,10 @@ export type GuestOrderParseResult =
       errors: string[];
     };
 
-export function parseGuestOrderFormData(formData: FormData): GuestOrderParseResult {
+export function parseGuestOrderFormData(
+  formData: FormData,
+  options: { requirePrivacyAcknowledgement?: boolean } = {},
+): GuestOrderParseResult {
   const customerResult = customerSchema.safeParse({
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
@@ -81,6 +85,13 @@ export function parseGuestOrderFormData(formData: FormData): GuestOrderParseResu
     ...itemResult.errors,
     ...(turnstileToken === "" ? ["Please complete the verification challenge."] : []),
   ];
+  const privacyAckError = validatePrivacyNoticeAcknowledgement(
+    formData,
+    options.requirePrivacyAcknowledgement ?? false,
+  );
+  if (privacyAckError) {
+    errors.push(privacyAckError);
+  }
 
   if (!customerResult.success || itemResult.items.length === 0 || errors.length > 0) {
     return {

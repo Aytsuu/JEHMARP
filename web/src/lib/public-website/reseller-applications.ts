@@ -6,6 +6,7 @@ import {
 } from "@/lib/public-website/edge-function-response";
 import { deliverResellerPriceListEmailIfConfigured } from "@/lib/public-website/reseller-price-list-email";
 import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
+import { validatePrivacyNoticeAcknowledgement } from "@/lib/platform-settings/privacy-notice";
 
 export const plannedTransactionTypeLabels = {
   retail_resale: "Retail resale",
@@ -78,6 +79,7 @@ export type ResellerApplicationFeedback =
 
 export function parseResellerApplicationFormData(
   formData: FormData,
+  options: { requirePrivacyAcknowledgement?: boolean } = {},
 ): ResellerApplicationParseResult {
   const result = resellerApplicationSchema.safeParse({
     name: formData.get("name"),
@@ -95,6 +97,14 @@ export function parseResellerApplicationFormData(
       success: false,
       errors: result.error.issues.map((issue) => issue.message),
     };
+  }
+
+  const privacyAckError = validatePrivacyNoticeAcknowledgement(
+    formData,
+    options.requirePrivacyAcknowledgement ?? false,
+  );
+  if (privacyAckError) {
+    return { success: false, errors: [privacyAckError] };
   }
 
   return {

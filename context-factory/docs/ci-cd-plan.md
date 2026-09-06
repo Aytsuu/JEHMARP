@@ -619,6 +619,13 @@ other mismatch; resolve the drift first.
   endpoints, Storage buckets, and third-party credentials separate.
 - Record the staging and production migration status, Worker version ID, canary
   metrics, approvals, and rollback decision in every release summary.
+- Before the first production release that includes the Philippine Privacy &
+  Data Privacy Notice, an authorized administrator must enter and verify all
+  required privacy-notice values in **Admin → Settings → Privacy notice**
+  (controller identity, Philippine address, privacy/DPO email, notice version,
+  effective date, and retention periods). Do not publish until legal/DPO review
+  is complete; incomplete configuration keeps `/privacy` and the footer link
+  hidden.
 
 ## Required Workflow Files
 

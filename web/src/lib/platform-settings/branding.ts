@@ -1,6 +1,14 @@
 import type { BusinessProfileSettings } from "./types";
 import { DEFAULT_BRAND_LINES } from "./defaults";
 
+export const DEFAULT_FOOTER_BRAND_DESCRIPTION =
+  "Fresh pork and chicken from a faith-guided, family-run meatshop serving Compostela and Consolacion.";
+
+type FooterBrandSection = {
+  type: string;
+  content?: Record<string, unknown>;
+};
+
 export function getBrandLines(profile?: Partial<BusinessProfileSettings> | null): string[] {
   if (!profile) return [...DEFAULT_BRAND_LINES];
   const tradeName = profile.tradeName?.trim() || DEFAULT_BRAND_LINES[0];
@@ -12,4 +20,12 @@ export function getBrandLines(profile?: Partial<BusinessProfileSettings> | null)
       ? phone
       : `Cell #: ${phone}`;
   return [tradeName, address, phoneLine];
+}
+
+export function resolveFooterBrandDescription(sections: FooterBrandSection[]): string {
+  const about = sections.find((section) => section.type === "about");
+  const summary =
+    typeof about?.content?.summary === "string" ? about.content.summary.trim() : "";
+
+  return summary || DEFAULT_FOOTER_BRAND_DESCRIPTION;
 }

@@ -62,7 +62,7 @@ describe("buildOrderSlipPdf", () => {
 
     expect(text.startsWith("%PDF-1.4")).toBe(true);
     expect(text).toContain("ORDER SLIP");
-    expect(text).toContain("Meat and Poultry Products");
+    expect(text).toContain("JEHMARP");
     expect(text).toContain("Seller: Ana Agent");
     expect(text).toContain("Maria Santos");
     expect(text).toContain("Pork Belly");

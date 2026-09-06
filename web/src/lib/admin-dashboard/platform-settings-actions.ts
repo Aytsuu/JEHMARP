@@ -3,6 +3,7 @@ import {
   normalizeBusinessProfile,
   normalizeDefaults,
   normalizeNotifications,
+  normalizePrivacyNotice,
   savePlatformSettings,
 } from "@/lib/platform-settings";
 import { syncContactDetailsFromBusinessProfile } from "@/lib/platform-settings/contact-sync";
@@ -102,11 +103,16 @@ export type PlatformSettingsAdminAction =
       logoFile: ProductImageFile | null;
       removeLogo: boolean;
     }
+  | {
+      type: "save-platform-settings-privacy";
+      privacyNotice: ReturnType<typeof normalizePrivacyNotice>;
+    }
   | { type: "change-admin-password"; currentPassword: string; newPassword: string; confirmPassword: string }
   | { type: "send-agent-password-reset"; agentId: string };
 
 const PLATFORM_ACTIONS = [
   "save-platform-settings-general",
+  "save-platform-settings-privacy",
   "change-admin-password",
   "send-agent-password-reset",
 ] as const;
@@ -172,6 +178,29 @@ export function parsePlatformSettingsAdminAction(actionName: string, formData: F
         removeLogo: formData.get("removeLogo") === "on",
       };
     }
+    case "save-platform-settings-privacy": {
+      const privacyContactEmail = optionalEmail(formData, "privacyContactEmail");
+      if (!privacyContactEmail) {
+        throw new Error("privacyContactEmail must be a valid email.");
+      }
+
+      return {
+        type: "save-platform-settings-privacy",
+        privacyNotice: normalizePrivacyNotice({
+          controllerLegalName: requiredString(formData, "controllerLegalName"),
+          philippineBusinessAddress: requiredString(formData, "philippineBusinessAddress"),
+          privacyContactEmail,
+          noticeVersion: requiredString(formData, "noticeVersion"),
+          effectiveDate: requiredString(formData, "effectiveDate"),
+          retentionInquiries: requiredString(formData, "retentionInquiries"),
+          retentionResellerApplications: requiredString(formData, "retentionResellerApplications"),
+          retentionOrders: requiredString(formData, "retentionOrders"),
+          retentionAccounts: requiredString(formData, "retentionAccounts"),
+          retentionSecurityLogs: requiredString(formData, "retentionSecurityLogs"),
+          retentionBackups: requiredString(formData, "retentionBackups"),
+        }),
+      };
+    }
     case "change-admin-password": {
       const currentPassword = requiredString(formData, "currentPassword");
       const newPassword = requiredString(formData, "newPassword");
@@ -194,6 +223,8 @@ export function getPlatformSettingsActionSuccessMessage(action: PlatformSettings
   switch (action.type) {
     case "save-platform-settings-general":
       return "Settings saved.";
+    case "save-platform-settings-privacy":
+      return "Privacy notice settings saved.";
     case "change-admin-password":
       return "Password updated.";
     case "send-agent-password-reset":
@@ -212,6 +243,9 @@ export async function executePlatformSettingsAdminAction(
   switch (action.type) {
     case "save-platform-settings-general":
       return executeGeneralSettingsSave(adminClient, action, adminUserId);
+    case "save-platform-settings-privacy":
+      await savePlatformSettings(adminClient, { privacyNotice: action.privacyNotice }, adminUserId);
+      return;
     case "change-admin-password":
       await executeAdminPasswordChange(supabase, action, options.adminEmail);
       return;

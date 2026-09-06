@@ -13,9 +13,9 @@ describe("resolveTransactionalEmailFrom", () => {
 
   it("falls back to business profile identity when Resend from is unset", () => {
     expect(resolveTransactionalEmailFrom({
-      tradeName: "Meat and Poultry Products",
+      tradeName: "JEHMARP",
       primaryEmail: "orders@example.com",
-    })).toBe("Meat and Poultry Products <orders@example.com>");
+    })).toBe("JEHMARP <orders@example.com>");
   });
 
   it("returns null when no sender can be resolved", () => {

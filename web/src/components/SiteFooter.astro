@@ -5,6 +5,9 @@ import {
   getSectionEntries,
 } from "@/lib/public-website/content";
 import { toAdminContentPreviewHref } from "@/lib/public-website/admin-content-preview";
+import { loadPlatformSettings, resolvePrivacyNoticeHref } from "@/lib/platform-settings";
+import { getBrandLines, resolveFooterBrandDescription } from "@/lib/platform-settings/branding";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Props = {
   previewRoot?: string;
@@ -21,7 +24,14 @@ function isDisabledGuestAction(href: string) {
   return disableGuestActions && href === "/login";
 }
 
-const content = await getPublicPageContent(Astro, "contact");
+const [content, homeContent, settings] = await Promise.all([
+  getPublicPageContent(Astro, "contact"),
+  getPublicPageContent(Astro, "home"),
+  loadPlatformSettings(createSupabaseAdminClient()),
+]);
+const siteTitle = getBrandLines(settings.businessProfile)[0];
+const brandDescription = resolveFooterBrandDescription(homeContent.sections);
+const privacyNoticeHref = previewRoot ? null : resolvePrivacyNoticeHref(settings);
 const detailsSection = content.sections.find(
   (section) => section.type === "contact_details",
 );
@@ -78,9 +88,9 @@ function toEmailLink(value: string) {
     <div class="footer-columns">
       <!-- Column 1: Brand & Socials -->
       <div class="footer-column" aria-labelledby="footer-brand">
-        <h2 id="footer-brand" class="footer-column__brand-title">JEHMARP</h2>
+        <h2 id="footer-brand" class="footer-column__brand-title">{siteTitle}</h2>
         <p class="footer-column__brand-desc">
-          Fresh pork and chicken from a faith-guided, family-run meatshop serving Compostela and Consolacion.
+          {brandDescription}
         </p>
         <div class="footer-column__socials" aria-label="Social media links">
           <a href="#" class="footer-column__social-link" aria-label="Facebook">
@@ -182,10 +192,9 @@ function toEmailLink(value: string) {
 
   <div class="site-footer__bottom">
     <div class="site-footer__bottom-inner">
-      <p>Copyright &copy; {new Date().getFullYear()} JEHMARP PH. All rights reserved.</p>
+      <p>Copyright &copy; {new Date().getFullYear()} {siteTitle}. All rights reserved.</p>
       <div class="site-footer__bottom-links">
-        <a href="#">Terms &amp; Conditions</a>
-        <a href="#">Privacy Policy</a>
+        {privacyNoticeHref && <a href={linkHref(privacyNoticeHref)}>Privacy &amp; Data Privacy Notice</a>}
       </div>
     </div>
   </div>

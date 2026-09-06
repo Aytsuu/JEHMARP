@@ -1,0 +1,68 @@
+---
+import { PRIVACY_NOTICE_ACK_FIELD, PRIVACY_NOTICE_PATH } from "@/lib/platform-settings/privacy-notice";
+import type { PrivacyCollectionPurpose } from "@/lib/public-website/privacy-collection-notice";
+import { getPrivacyCollectionPurposeText } from "@/lib/public-website/privacy-collection-notice";
+
+type Props = {
+  purpose: PrivacyCollectionPurpose;
+  privacyHref?: string | null;
+  requireAcknowledgement?: boolean;
+};
+
+const { purpose, privacyHref, requireAcknowledgement = false } = Astro.props;
+const href = privacyHref ?? PRIVACY_NOTICE_PATH;
+---
+
+{
+  requireAcknowledgement && (
+    <div class="privacy-collection-notice" data-privacy-collection-notice>
+      <p>
+        {getPrivacyCollectionPurposeText(purpose)}
+        {" "}
+        Read our <a href={href}>Privacy &amp; Data Privacy Notice</a> for more information about
+        how we handle personal data.
+      </p>
+      <label class="privacy-collection-notice__ack">
+        <input
+          type="checkbox"
+          name={PRIVACY_NOTICE_ACK_FIELD}
+          value="true"
+          required
+        />
+        <span>I confirm that I have read the Privacy &amp; Data Privacy Notice.</span>
+      </label>
+    </div>
+  )
+}
+
+<style>
+  .privacy-collection-notice {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    background: #f9fafb;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: #374151;
+  }
+
+  .privacy-collection-notice a {
+    color: var(--color-brand-red, #b91c1c);
+    font-weight: 600;
+    text-decoration: underline;
+  }
+
+  .privacy-collection-notice__ack {
+    display: flex;
+    gap: 0.6rem;
+    align-items: flex-start;
+    margin: 0;
+    cursor: pointer;
+  }
+
+  .privacy-collection-notice__ack input {
+    margin-top: 0.2rem;
+  }
+</style>

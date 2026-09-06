@@ -18,6 +18,14 @@ describe("mergePlatformSettings", () => {
     const next = mergePlatformSettings(current, { businessProfile: { phone: "0999" } });
     expect(next.businessProfile.phone).toBe("0999");
   });
+
+  it("merges nested privacy notice fields", () => {
+    const current = normalizePlatformSettings({});
+    const next = mergePlatformSettings(current, {
+      privacyNotice: { controllerLegalName: "JEHMARP Meatshop" },
+    });
+    expect(next.privacyNotice.controllerLegalName).toBe("JEHMARP Meatshop");
+  });
 });
 
 describe("resolveNotificationEmails", () => {

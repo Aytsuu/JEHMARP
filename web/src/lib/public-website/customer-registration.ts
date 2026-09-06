@@ -13,6 +13,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   deliverNewCustomerTrackingNotification,
 } from "@/lib/public-website/customer-tracking";
+import { validatePrivacyNoticeAcknowledgement } from "@/lib/platform-settings/privacy-notice";
 
 type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
@@ -58,6 +59,7 @@ export type CustomerRegistrationParseResult =
 
 export function parseCustomerRegistrationFormData(
   formData: FormData,
+  options: { requirePrivacyAcknowledgement?: boolean } = {},
 ): CustomerRegistrationParseResult {
   const result = customerRegistrationSchema.safeParse({
     agentCode: readAgentIdentifier(formData),
@@ -73,6 +75,14 @@ export function parseCustomerRegistrationFormData(
       success: false,
       errors: result.error.issues.map((issue) => issue.message),
     };
+  }
+
+  const privacyAckError = validatePrivacyNoticeAcknowledgement(
+    formData,
+    options.requirePrivacyAcknowledgement ?? false,
+  );
+  if (privacyAckError) {
+    return { success: false, errors: [privacyAckError] };
   }
 
   try {

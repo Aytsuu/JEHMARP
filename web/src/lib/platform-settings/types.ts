@@ -50,12 +50,27 @@ export type NotificationsSettings = {
   routes: NotificationRoute[];
 };
 
+export type PrivacyNoticeSettings = {
+  controllerLegalName: string;
+  philippineBusinessAddress: string;
+  privacyContactEmail: string;
+  noticeVersion: string;
+  effectiveDate: string;
+  retentionInquiries: string;
+  retentionResellerApplications: string;
+  retentionOrders: string;
+  retentionAccounts: string;
+  retentionSecurityLogs: string;
+  retentionBackups: string;
+};
+
 export type PlatformSettings = {
   businessProfile: BusinessProfileSettings;
   documentPayment: DocumentPaymentSettings;
   defaults: DefaultsSettings;
   notifications: NotificationsSettings;
   documentNumbering: DocumentNumberingSettings;
+  privacyNotice: PrivacyNoticeSettings;
 };
 
 export type PlatformSettingsPatch = {
@@ -64,6 +79,7 @@ export type PlatformSettingsPatch = {
   defaults?: Partial<DefaultsSettings>;
   notifications?: Partial<NotificationsSettings>;
   documentNumbering?: Partial<DocumentNumberingSettings>;
+  privacyNotice?: Partial<PrivacyNoticeSettings>;
 };
 
 export type DocumentLogoImage = {

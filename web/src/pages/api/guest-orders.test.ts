@@ -3,6 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const parseGuestOrderFormData = vi.fn();
 const submitGuestOrder = vi.fn();
+const loadPrivacyAcknowledgementRequirement = vi.fn(async () => false);
+
+vi.mock("@/lib/public-website/privacy-collection-notice", () => ({
+  loadPrivacyAcknowledgementRequirement,
+}));
 
 vi.mock("@/lib/public-website/guest-orders", () => ({
   parseGuestOrderFormData,
@@ -13,6 +18,8 @@ describe("POST /api/guest-orders", () => {
   beforeEach(() => {
     parseGuestOrderFormData.mockReset();
     submitGuestOrder.mockReset();
+    loadPrivacyAcknowledgementRequirement.mockReset();
+    loadPrivacyAcknowledgementRequirement.mockResolvedValue(false);
   });
 
   it("rejects form submissions from untrusted origins before parsing or submitting the order", async () => {

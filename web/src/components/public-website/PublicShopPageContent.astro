@@ -1,5 +1,6 @@
 ---
 import FormSubmissionFeedback from "@/components/ui/FormSubmissionFeedback.astro";
+import PrivacyCollectionNotice from "@/components/public-website/PrivacyCollectionNotice.astro";
 import { GUEST_ORDER_FEEDBACK_PARAMS } from "@/lib/client/form-submission-feedback-url";
 import { isAdminContentPreviewPath } from "@/lib/public-website/admin-content-preview";
 import {
@@ -16,6 +17,8 @@ type Props = {
   orderMessage: string | null;
   turnstileSiteKey: string | null;
   returnPath?: string;
+  privacyHref?: string | null;
+  requirePrivacyAcknowledgement?: boolean;
 };
 
 const {
@@ -25,6 +28,8 @@ const {
   orderMessage,
   turnstileSiteKey,
   returnPath,
+  privacyHref = null,
+  requirePrivacyAcknowledgement = false,
 } = Astro.props;
 
 const disableFormSubmission = returnPath
@@ -592,6 +597,11 @@ const orderErrorMessage =
     </fieldset>
 
     <div class="shop-guest-order-form__footer">
+      <PrivacyCollectionNotice
+        purpose="guest-order"
+        privacyHref={privacyHref}
+        requireAcknowledgement={requirePrivacyAcknowledgement}
+      />
       <div class="turnstile-container shop-guest-order-form__turnstile">
         {
           turnstileSiteKey ? (

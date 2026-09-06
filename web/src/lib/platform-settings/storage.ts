@@ -28,6 +28,7 @@ function cloneDefaults(): PlatformSettings {
     defaults: { ...DEFAULT_PLATFORM_SETTINGS.defaults },
     notifications: { routes: DEFAULT_PLATFORM_SETTINGS.notifications.routes.map((route) => ({ ...route })) },
     documentNumbering: { ...DEFAULT_PLATFORM_SETTINGS.documentNumbering },
+    privacyNotice: { ...DEFAULT_PLATFORM_SETTINGS.privacyNotice },
   };
 }
 

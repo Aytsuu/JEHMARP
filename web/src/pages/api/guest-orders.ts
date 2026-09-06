@@ -1,6 +1,7 @@
 import type { APIRoute } from "astro";
 
 import { parseGuestOrderFormData, submitGuestOrder } from "@/lib/public-website/guest-orders";
+import { loadPrivacyAcknowledgementRequirement } from "@/lib/public-website/privacy-collection-notice";
 import { resolveFormReturnPath } from "@/lib/public-website/admin-content-preview";
 import { getClientIp } from "@/lib/security/client-ip";
 import { isTrustedFormOrigin } from "@/lib/security/form-origin";
@@ -13,7 +14,8 @@ export const POST: APIRoute = async ({ request, redirect, url }) => {
   }
 
   const formData = await request.formData();
-  const parsed = parseGuestOrderFormData(formData);
+  const requirePrivacyAcknowledgement = await loadPrivacyAcknowledgementRequirement();
+  const parsed = parseGuestOrderFormData(formData, { requirePrivacyAcknowledgement });
   const returnPath = resolveFormReturnPath(formData, "/shop");
 
   if (!parsed.success) {

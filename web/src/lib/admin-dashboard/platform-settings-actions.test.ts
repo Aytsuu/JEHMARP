@@ -30,7 +30,49 @@ vi.mock("@/lib/supabase/storage", () => ({
 describe("platform settings admin actions", () => {
   it("detects platform settings action names", () => {
     expect(isPlatformSettingsAdminAction("save-platform-settings-general")).toBe(true);
+    expect(isPlatformSettingsAdminAction("save-platform-settings-privacy")).toBe(true);
     expect(isPlatformSettingsAdminAction("save-customer")).toBe(false);
+  });
+
+  it("parses privacy notice settings form data", () => {
+    const formData = new FormData();
+    formData.set("controllerLegalName", "JEHMARP Meatshop");
+    formData.set("philippineBusinessAddress", "Brgy. Tolo-Tolo, Consolacion, Cebu");
+    formData.set("privacyContactEmail", "privacy@jehmarp.ph");
+    formData.set("noticeVersion", "1.0");
+    formData.set("effectiveDate", "2026-09-06");
+    formData.set("retentionInquiries", "24 months");
+    formData.set("retentionResellerApplications", "36 months");
+    formData.set("retentionOrders", "7 years");
+    formData.set("retentionAccounts", "active + 24 months");
+    formData.set("retentionSecurityLogs", "12 months");
+    formData.set("retentionBackups", "30 days");
+
+    const action = parsePlatformSettingsAdminAction("save-platform-settings-privacy", formData);
+    expect(action.type).toBe("save-platform-settings-privacy");
+
+    if (action.type === "save-platform-settings-privacy") {
+      expect(action.privacyNotice.privacyContactEmail).toBe("privacy@jehmarp.ph");
+      expect(action.privacyNotice.effectiveDate).toBe("2026-09-06");
+    }
+  });
+
+  it("rejects privacy settings without a valid contact email", () => {
+    const formData = new FormData();
+    formData.set("controllerLegalName", "JEHMARP Meatshop");
+    formData.set("philippineBusinessAddress", "Cebu");
+    formData.set("privacyContactEmail", "not-an-email");
+    formData.set("noticeVersion", "1.0");
+    formData.set("effectiveDate", "2026-09-06");
+    formData.set("retentionInquiries", "24 months");
+    formData.set("retentionResellerApplications", "36 months");
+    formData.set("retentionOrders", "7 years");
+    formData.set("retentionAccounts", "active + 24 months");
+    formData.set("retentionSecurityLogs", "12 months");
+    formData.set("retentionBackups", "30 days");
+
+    expect(() => parsePlatformSettingsAdminAction("save-platform-settings-privacy", formData))
+      .toThrow("privacyContactEmail must be a valid email.");
   });
 
   it("parses general settings form data", () => {

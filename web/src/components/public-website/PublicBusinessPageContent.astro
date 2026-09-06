@@ -1,5 +1,6 @@
 ---
 import FormSubmissionFeedback from "@/components/ui/FormSubmissionFeedback.astro";
+import PrivacyCollectionNotice from "@/components/public-website/PrivacyCollectionNotice.astro";
 import { RESELLER_APPLICATION_FEEDBACK_PARAMS } from "@/lib/client/form-submission-feedback-url";
 import { isAdminContentPreviewPath } from "@/lib/public-website/admin-content-preview";
 import {
@@ -11,9 +12,17 @@ type Props = {
   feedback: ResellerApplicationFeedback | null;
   turnstileSiteKey: string | null;
   returnPath?: string;
+  privacyHref?: string | null;
+  requirePrivacyAcknowledgement?: boolean;
 };
 
-const { feedback, turnstileSiteKey, returnPath } = Astro.props;
+const {
+  feedback,
+  turnstileSiteKey,
+  returnPath,
+  privacyHref = null,
+  requirePrivacyAcknowledgement = false,
+} = Astro.props;
 const plannedTransactionOptions = Object.entries(plannedTransactionTypeLabels);
 const disableFormSubmission = returnPath
   ? isAdminContentPreviewPath(returnPath)
@@ -188,6 +197,12 @@ const previewSubmissionTitle = "Submissions are disabled in content preview";
             <textarea id="message" name="message" maxlength="1000"></textarea>
           </div>
         </fieldset>
+
+        <PrivacyCollectionNotice
+          purpose="reseller-application"
+          privacyHref={privacyHref}
+          requireAcknowledgement={requirePrivacyAcknowledgement}
+        />
 
         <div class="turnstile-container">
           {

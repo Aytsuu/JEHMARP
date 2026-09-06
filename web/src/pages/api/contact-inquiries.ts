@@ -5,6 +5,7 @@ import {
   parseContactInquiryFormData,
   submitContactInquiry,
 } from "@/lib/public-website/contact-inquiries";
+import { loadPrivacyAcknowledgementRequirement } from "@/lib/public-website/privacy-collection-notice";
 import { EdgeFunctionRequestError } from "@/lib/public-website/edge-function-response";
 import { getClientIp } from "@/lib/security/client-ip";
 import { logDevelopmentFormSubmitError } from "@/lib/request-logger";
@@ -13,7 +14,8 @@ export const prerender = false;
 
 export const POST: APIRoute = async ({ request, redirect }) => {
   const formData = await request.formData();
-  const parsed = parseContactInquiryFormData(formData);
+  const requirePrivacyAcknowledgement = await loadPrivacyAcknowledgementRequirement();
+  const parsed = parseContactInquiryFormData(formData, { requirePrivacyAcknowledgement });
   const returnPath = resolveFormReturnPath(formData, "/contact");
 
   if (!parsed.success) {

@@ -1,8 +1,12 @@
 ---
 import PageShell from "@/components/PageShell.astro";
 import Layout from "@/layouts/Layout.astro";
+import PrivacyCollectionNotice from "@/components/public-website/PrivacyCollectionNotice.astro";
 import { getLoginErrorMessage, getSignedInUser } from "@/lib/auth";
 import { getPublicEnv } from "@/lib/env";
+import { getPrivacyCollectionContext } from "@/lib/public-website/privacy-collection-notice";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const user = await getSignedInUser(Astro);
 
@@ -12,6 +16,8 @@ if (user) {
 
 const errorMessage = getLoginErrorMessage(Astro.url.searchParams.get("error"));
 const { turnstileSiteKey } = getPublicEnv();
+const settings = await loadPlatformSettings(createSupabaseAdminClient());
+const privacyContext = getPrivacyCollectionContext(settings);
 ---
 
 <Layout
@@ -60,6 +66,12 @@ const { turnstileSiteKey } = getPublicEnv();
             autocomplete="current-password"
           />
         </div>
+
+        <PrivacyCollectionNotice
+          purpose="login"
+          privacyHref={privacyContext.privacyHref}
+          requireAcknowledgement={privacyContext.requireAcknowledgement}
+        />
 
         <div class="turnstile-container">
           {
