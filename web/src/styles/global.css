@@ -8944,6 +8944,24 @@
     color: var(--color-brand-muted-black);
   }
 
+  .drawer-sheet__body form label .field-row__label,
+  .drawer-sheet__body form label .field-row__description {
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  :is(#create-product-sheet, #create-order-sheet, #create-customer-sheet, #create-agent-sheet)
+    :is(label.field-row--split, .field-row.field-row--split):has(
+      input:required:not(:disabled),
+      select:required:not(:disabled),
+      textarea:required:not(:disabled)
+    )
+    .field-row__label::after {
+    content: " *";
+    color: var(--color-brand-red);
+    font-weight: 700;
+  }
+
   .drawer-sheet__body .order-create-form label.order-mode-option>span {
     font-size: inherit;
     font-weight: inherit;
@@ -9017,6 +9035,479 @@
 
   .product-create-form__grid {
     grid-template-columns: 1fr !important;
+  }
+
+  #create-product-sheet .product-create-form__grid {
+    gap: 2rem;
+  }
+
+  #create-product-sheet .product-create-form label.field-row--split,
+  #create-product-sheet .product-create-form .field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-product-sheet .product-create-form .field-row__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  #create-product-sheet .product-create-form .field-row__label {
+    font-size: 0.825rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-brand-muted-black);
+  }
+
+  #create-product-sheet .product-create-form .field-row__description {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: rgba(75, 85, 99, 0.82);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  #create-product-sheet .product-create-form label.field-row--split > :not(.field-row__meta),
+  #create-product-sheet .product-create-form .field-row__control {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-product-sheet .product-create-form label.field-row--split > textarea,
+  #create-product-sheet .product-create-form .field-row__control textarea {
+    align-self: start;
+  }
+
+  @media (min-width: 40rem) {
+    #create-product-sheet .product-create-form label.field-row--split,
+    #create-product-sheet .product-create-form .field-row--split {
+      grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.15rem;
+    }
+
+    #create-product-sheet .product-create-form .field-row__meta {
+      align-self: start;
+    }
+
+    #create-product-sheet .product-create-form label.field-row--split > :not(.field-row__meta),
+    #create-product-sheet .product-create-form .field-row__control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+
+    #create-product-sheet .product-create-form label.field-row--split > textarea,
+    #create-product-sheet .product-create-form .field-row__control .product-image-picker {
+      align-self: start;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    #create-product-sheet .product-create-form label.field-row--split,
+    #create-product-sheet .product-create-form .field-row--split {
+      grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    #create-product-sheet .product-create-form label.field-row--split,
+    #create-product-sheet .product-create-form .field-row--split {
+      grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+      gap: 0.55rem 1.45rem;
+    }
+  }
+
+  #create-customer-sheet .customer-create-form__grid {
+    grid-template-columns: 1fr !important;
+    gap: 2rem;
+  }
+
+  #create-customer-sheet .customer-create-form label.field-row--split,
+  #create-customer-sheet .customer-create-form .field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-customer-sheet .customer-create-form .field-row__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  #create-customer-sheet .customer-create-form .field-row__label {
+    font-size: 0.825rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-brand-muted-black);
+  }
+
+  #create-customer-sheet .customer-create-form .field-row__description {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: rgba(75, 85, 99, 0.82);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  #create-customer-sheet .customer-create-form label.field-row--split > :not(.field-row__meta),
+  #create-customer-sheet .customer-create-form .field-row__control {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-customer-sheet .customer-create-form label.field-row--split > textarea,
+  #create-customer-sheet .customer-create-form .field-row__control textarea {
+    align-self: start;
+  }
+
+  #create-customer-sheet .customer-create-form .checkbox-row.field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+  }
+
+  #create-customer-sheet .customer-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    min-width: 1.25rem;
+    min-height: 1.25rem;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--color-brand-red);
+    cursor: pointer;
+  }
+
+  #create-customer-sheet .customer-create-form .customer-create-form__checkbox-control {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(102, 24, 24, 0.15);
+    border-radius: 0.5rem;
+    background-color: #ffffff;
+    box-sizing: border-box;
+  }
+
+  @media (min-width: 40rem) {
+    #create-customer-sheet .customer-create-form label.field-row--split,
+    #create-customer-sheet .customer-create-form .field-row--split,
+    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.15rem;
+    }
+
+    #create-customer-sheet .customer-create-form .field-row__meta {
+      align-self: start;
+    }
+
+    #create-customer-sheet .customer-create-form label.field-row--split > :not(.field-row__meta),
+    #create-customer-sheet .customer-create-form .field-row__control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+
+    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+      grid-column: unset;
+      grid-row: unset;
+    }
+
+    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split .customer-create-form__checkbox-control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    #create-customer-sheet .customer-create-form label.field-row--split,
+    #create-customer-sheet .customer-create-form .field-row--split,
+    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    #create-customer-sheet .customer-create-form label.field-row--split,
+    #create-customer-sheet .customer-create-form .field-row--split,
+    #create-customer-sheet .customer-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+      gap: 0.55rem 1.45rem;
+    }
+  }
+
+  #create-agent-sheet .agent-sheet-create-form__grid {
+    grid-template-columns: 1fr !important;
+    gap: 2rem;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form label.field-row--split,
+  #create-agent-sheet .agent-sheet-create-form .field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form .field-row__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form .field-row__label {
+    font-size: 0.825rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-brand-muted-black);
+  }
+
+  #create-agent-sheet .agent-sheet-create-form .field-row__description {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: rgba(75, 85, 99, 0.82);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form label.field-row--split > :not(.field-row__meta),
+  #create-agent-sheet .agent-sheet-create-form .field-row__control {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form label.field-row--split > textarea,
+  #create-agent-sheet .agent-sheet-create-form .field-row__control textarea {
+    align-self: start;
+  }
+
+  @media (min-width: 40rem) {
+    #create-agent-sheet .agent-sheet-create-form label.field-row--split,
+    #create-agent-sheet .agent-sheet-create-form .field-row--split {
+      grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.15rem;
+    }
+
+    #create-agent-sheet .agent-sheet-create-form .field-row__meta {
+      align-self: start;
+    }
+
+    #create-agent-sheet .agent-sheet-create-form label.field-row--split > :not(.field-row__meta),
+    #create-agent-sheet .agent-sheet-create-form .field-row__control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    #create-agent-sheet .agent-sheet-create-form label.field-row--split,
+    #create-agent-sheet .agent-sheet-create-form .field-row--split {
+      grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    #create-agent-sheet .agent-sheet-create-form label.field-row--split,
+    #create-agent-sheet .agent-sheet-create-form .field-row--split {
+      grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+      gap: 0.55rem 1.45rem;
+    }
+  }
+
+  #create-order-sheet .order-create-form {
+    gap: 1.75rem;
+  }
+
+  #create-order-sheet .order-create-form__fields {
+    display: grid;
+    gap: 2rem;
+    min-width: 0;
+  }
+
+  #create-order-sheet .order-create-section__header {
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(75, 85, 99, 0.22);
+  }
+
+  #create-order-sheet .order-create-section__title {
+    flex: 0 0 auto;
+    width: auto;
+    font-size: 0.825rem;
+    font-weight: 700;
+    color: var(--color-brand-muted-black);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  #create-order-sheet .order-create-section__title::before,
+  #create-order-sheet .order-create-section__title::after {
+    display: none;
+  }
+
+  #create-order-sheet .order-create-section__header .order-create-form__add-item {
+    flex-shrink: 0;
+  }
+
+  #create-order-sheet .order-create-form label.field-row--split,
+  #create-order-sheet .order-create-form .field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-order-sheet .order-create-form .field-row__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  #create-order-sheet .order-create-form .field-row__label {
+    font-size: 0.825rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-brand-muted-black);
+  }
+
+  #create-order-sheet .order-create-form .field-row__description {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: rgba(75, 85, 99, 0.82);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  #create-order-sheet .order-create-form label.field-row--split > :not(.field-row__meta),
+  #create-order-sheet .order-create-form .field-row__control {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-order-sheet .order-create-form label.field-row--split > textarea,
+  #create-order-sheet .order-create-form .field-row__control textarea {
+    align-self: start;
+  }
+
+  #create-order-sheet .order-create-form .checkbox-row.field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+  }
+
+  #create-order-sheet .order-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    min-width: 1.25rem;
+    min-height: 1.25rem;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--color-brand-red);
+    cursor: pointer;
+  }
+
+  #create-order-sheet .order-create-form .order-create-form__checkbox-control {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(102, 24, 24, 0.15);
+    border-radius: 0.5rem;
+    background-color: #ffffff;
+    box-sizing: border-box;
+  }
+
+  #create-order-sheet .order-item-accordion__fields {
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 40rem) {
+    #create-order-sheet .order-create-form label.field-row--split,
+    #create-order-sheet .order-create-form .field-row--split,
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.15rem;
+    }
+
+    #create-order-sheet .order-create-form .field-row__meta {
+      align-self: start;
+    }
+
+    #create-order-sheet .order-create-form label.field-row--split > :not(.field-row__meta),
+    #create-order-sheet .order-create-form .field-row__control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+      grid-column: unset;
+      grid-row: unset;
+    }
+
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split .order-create-form__checkbox-control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    #create-order-sheet .order-create-form label.field-row--split,
+    #create-order-sheet .order-create-form .field-row--split,
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    #create-order-sheet .order-create-form label.field-row--split,
+    #create-order-sheet .order-create-form .field-row--split,
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+      gap: 0.55rem 1.45rem;
+    }
   }
 
   .product-create-form {

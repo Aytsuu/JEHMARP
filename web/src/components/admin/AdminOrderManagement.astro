@@ -74,8 +74,12 @@ function linkedCustomerOrdersLabel(count: number) {
 
       <section class="order-create-section">
         <div class="order-create-section__body">
-          <div class="admin-form-grid order-create-form__existing-customer-grid">
-            <div class="field-row">
+          <div class="field-row field-row--split">
+            <div class="field-row__meta">
+              <span class="field-row__label">Existing</span>
+              <span class="field-row__description">Search for an existing customer or agent.</span>
+            </div>
+            <div class="field-row__control">
               <Picker showPaymentNotice />
               <input type="hidden" name="customerId" data-customer-id />
               <input type="hidden" name="agentId" data-agent-order-agent-id />
@@ -86,49 +90,102 @@ function linkedCustomerOrdersLabel(count: number) {
 
       <section class="order-create-section">
         <div class="order-create-section__body">
-          <div class="admin-form-grid">
-            <label class="field-row" hidden data-agent-order-fields>
-              <span>Order type</span>
-              <select name="agentOrderType" data-agent-order-type disabled>
-                <option value="personal">Personal</option>
-                <option value="distribution">Distribution</option>
-              </select>
-            </label>
-          </div>
+          <label class="field-row field-row--split" hidden data-agent-order-fields>
+            <span class="field-row__meta">
+              <span class="field-row__label">Order Type</span>
+            </span>
+            <select name="agentOrderType" data-agent-order-type disabled>
+              <option value="personal">Personal</option>
+              <option value="distribution">Distribution</option>
+            </select>
+          </label>
         </div>
       </section>
 
       <section class="order-create-section" data-new-customer-fields>
-        <h3 class="order-create-section__title">Customer details</h3>
-        <div class="order-create-section__body">
-          <div class="admin-form-grid order-create-form__customer-grid">
-            <div class="order-create-form__name-row">
-              <label class="field-row"><span>First name</span><input name="firstName" required data-customer-first-name /></label>
-              <label class="field-row"><span>Last name</span><input name="lastName" required data-customer-last-name /></label>
-            </div>
-            <label class="field-row"><span>Phone number</span><input name="phoneNumber" required data-customer-phone-number /></label>
-            <label class="field-row"><span>Email</span><input name="email" type="email" data-customer-email /></label>
-            <label class="field-row">
-              <span>Agent</span>
-              <select name="assignedAgentId" data-customer-assigned-agent-id>
-                <option value="">None</option>
-                {data.agents.map((agent) => (
-                  <option value={agent.id}>{agent.display_name}</option>
-                ))}
-              </select>
-            </label>
-            <label class="checkbox-row">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Customer Details</h3>
+        </div>
+        <div class="order-create-section__body order-create-form__fields">
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">First Name</span>
+            </span>
+            <input name="firstName" required data-customer-first-name />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Last Name</span>
+            </span>
+            <input name="lastName" required data-customer-last-name />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Phone Number</span>
+            </span>
+            <input name="phoneNumber" required data-customer-phone-number />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Email</span>
+            </span>
+            <input name="email" type="email" data-customer-email />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Address</span>
+            </span>
+            <textarea name="address" required data-customer-address></textarea>
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Assigned Agent</span>
+            </span>
+            <select name="assignedAgentId" data-customer-assigned-agent-id>
+              <option value="">None</option>
+              {data.agents.map((agent) => (
+                <option value={agent.id}>{agent.display_name}</option>
+              ))}
+            </select>
+          </label>
+          <label class="checkbox-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Reseller?</span>
+              <span class="field-row__description">Uses reseller pricing when applicable.</span>
+            </span>
+            <span class="field-row__control order-create-form__checkbox-control">
               <input name="isReseller" type="checkbox" data-customer-is-reseller />
-              <span>Reseller customer</span>
-            </label>
-          </div>
-          <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
+            </span>
+          </label>
         </div>
       </section>
 
       <section class="order-create-section">
         <div class="order-create-section__header">
-          <h3 class="order-create-section__title">Order items</h3>
+          <h3 class="order-create-section__title">Order Items</h3>
+          <button
+            type="button"
+            class="order-create-form__add-item"
+            data-add-order-item
+            disabled={!canCreateOrder}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.25"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14"></path>
+              <path d="M5 12h14"></path>
+            </svg>
+            <span>Add Item</span>
+          </button>
         </div>
         <div class="order-create-section__body">
           <div class="order-item-list" data-order-items>
@@ -161,8 +218,10 @@ function linkedCustomerOrdersLabel(count: number) {
                 </svg>
               </button>
               <div class="order-item-accordion__fields" data-order-item-row>
-                <label class="field-row">
-                  <span>Product</span>
+                <label class="field-row field-row--split">
+                  <span class="field-row__meta">
+                    <span class="field-row__label">Product</span>
+                  </span>
                   <select name="productId" required disabled={activeProducts.length === 0} data-order-product-select>
                     <option value="">Select product</option>
                     {activeProducts.map((product) => (
@@ -177,58 +236,42 @@ function linkedCustomerOrdersLabel(count: number) {
                     ))}
                   </select>
                 </label>
-                <label class="field-row">
-                  <span>Quantity</span>
+                <label class="field-row field-row--split">
+                  <span class="field-row__meta">
+                    <span class="field-row__label">Quantity</span>
+                  </span>
                   <input name="quantity" type="number" min="0.001" step="0.001" required />
                 </label>
-                <label class="field-row">
-                  <span>Details</span>
-                  <textarea name="addDetails" placeholder="Cut, packing, or delivery notes"></textarea>
+                <label class="field-row field-row--split">
+                  <span class="field-row__meta">
+                    <span class="field-row__label">Details</span>
+                    <span class="field-row__description">Cut, packing, or delivery notes.</span>
+                  </span>
+                  <textarea name="addDetails" placeholder="Optional item notes"></textarea>
                 </label>
               </div>
             </Accordion>
           </div>
-          <button
-            type="button"
-            class="order-create-form__add-item"
-            data-add-order-item
-            disabled={!canCreateOrder}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.25"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 5v14"></path>
-              <path d="M5 12h14"></path>
-            </svg>
-            <span>Add Item</span>
-          </button>
+        </div>
+      </section>
 
-          <div class="order-create-section order-create-section--subblock">
-            <div class="order-create-section__header">
-              <h3 class="order-create-section__title">Release</h3>
-            </div>
-            <div class="order-create-section__body">
-              <div class="order-create-form__field-pair">
-                <label class="field-row">
-                  <span>Release date</span>
-                  <input name="releaseDate" type="date" required data-release-date />
-                </label>
-                <label class="field-row">
-                  <span>Release time</span>
-                  <input name="releaseTime" type="time" required data-release-time />
-                </label>
-              </div>
-            </div>
-          </div>
+      <section class="order-create-section">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Release</h3>
+        </div>
+        <div class="order-create-section__body order-create-form__fields">
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Date</span>
+            </span>
+            <input name="releaseDate" type="date" required data-release-date />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Time</span>
+            </span>
+            <input name="releaseTime" type="time" required data-release-time />
+          </label>
         </div>
       </section>
 
@@ -281,8 +324,10 @@ function linkedCustomerOrdersLabel(count: number) {
           </summary>
           <div class="ui-accordion__content">
             <div class="order-item-accordion__fields" data-order-item-row>
-              <label class="field-row">
-                <span>Product</span>
+              <label class="field-row field-row--split">
+                <span class="field-row__meta">
+                  <span class="field-row__label">Product</span>
+                </span>
                 <select name="productId" required disabled={activeProducts.length === 0} data-order-product-select>
                   <option value="">Select product</option>
                   {activeProducts.map((product) => (
@@ -297,13 +342,18 @@ function linkedCustomerOrdersLabel(count: number) {
                   ))}
                 </select>
               </label>
-              <label class="field-row">
-                <span>Quantity</span>
+              <label class="field-row field-row--split">
+                <span class="field-row__meta">
+                  <span class="field-row__label">Quantity</span>
+                </span>
                 <input name="quantity" type="number" min="0.001" step="0.001" required />
               </label>
-              <label class="field-row">
-                <span>Details</span>
-                <textarea name="addDetails" placeholder="Cut, packing, or delivery notes"></textarea>
+              <label class="field-row field-row--split">
+                <span class="field-row__meta">
+                  <span class="field-row__label">Details</span>
+                  <span class="field-row__description">Cut, packing, or delivery notes.</span>
+                </span>
+                <textarea name="addDetails" placeholder="Optional item notes"></textarea>
               </label>
             </div>
           </div>
@@ -314,44 +364,56 @@ function linkedCustomerOrdersLabel(count: number) {
         <div class="order-create-section__header">
           <h3 class="order-create-section__title">Payment</h3>
         </div>
-        <div class="order-create-section__body order-create-form__payment-fields">
-          <label class="field-row">
-            <span>Amount received</span>
+        <div class="order-create-section__body order-create-form__fields order-create-form__payment-fields">
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Amount Received</span>
+              <span class="field-row__description">Optional payment recorded when the order is created.</span>
+            </span>
             <input name="downpaymentAmount" type="number" min="0.01" step="0.01" data-downpayment-amount />
           </label>
-          <div class="order-create-form__field-pair">
-            <label class="field-row">
-              <span>Payment method</span>
-              <select name="downpaymentMethod" data-downpayment-method>
-                <option value="Cash">Cash</option>
-                <option value="Check">Check</option>
-              </select>
-            </label>
-            <label class="field-row">
-              <span>Payment terms</span>
-              <select name="downpaymentTerms" data-downpayment-terms>
-                <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Gcash">Gcash</option>
-              </select>
-            </label>
-          </div>
-          <div class="order-create-form__field-pair">
-            <label class="field-row">
-              <span>Payment date</span>
-              <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
-            </label>
-            <label class="field-row">
-              <span>Payment time</span>
-              <input name="downpaymentTime" type="time" value={defaultTime} data-downpayment-time />
-            </label>
-          </div>
-          <label class="field-row">
-            <span>Reference</span>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Method</span>
+            </span>
+            <select name="downpaymentMethod" data-downpayment-method>
+              <option value="Cash">Cash</option>
+              <option value="Check">Check</option>
+            </select>
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Terms</span>
+            </span>
+            <select name="downpaymentTerms" data-downpayment-terms>
+              <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Gcash">Gcash</option>
+            </select>
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Date</span>
+            </span>
+            <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Time</span>
+            </span>
+            <input name="downpaymentTime" type="time" value={defaultTime} data-downpayment-time />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Reference</span>
+              <span class="field-row__description">Check number, transfer reference, or receipt ID.</span>
+            </span>
             <input name="downpaymentReferenceNumber" data-downpayment-reference />
           </label>
-          <label class="field-row">
-            <span>Payment notes</span>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Notes</span>
+            </span>
             <textarea name="downpaymentNotes" rows="2" data-downpayment-notes></textarea>
           </label>
         </div>

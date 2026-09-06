@@ -31,22 +31,44 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
 ---
 
 <section id="admin-customers" class="admin-panel" aria-labelledby="admin-customers-title">
-  <Sheet id="create-customer-sheet" width="34rem">
+  <Sheet id="create-customer-sheet" width="42rem">
     <div slot="header" class="agent-create-sheet__header-copy">
       <h3 class="drawer-sheet__title" data-sheet-title>Create Customer</h3>
       <p class="agent-create-sheet__header-description">
         Add an existing customer record and set the unpaid-order credit cap used during order creation.
       </p>
     </div>
-    <form id="create-customer-form" method="post" class="admin-form agent-create-form" aria-label="Create customer" data-astro-reload>
+    <form id="create-customer-form" method="post" class="admin-form agent-create-form customer-create-form" aria-label="Create customer" data-astro-reload>
       <input type="hidden" name="action" value="save-customer" />
-      <div class="admin-form-grid agent-create-form__grid">
-        <label class="field-row"><span>First name</span><input name="firstName" required autocomplete="given-name" /></label>
-        <label class="field-row"><span>Last name</span><input name="lastName" required autocomplete="family-name" /></label>
-        <label class="field-row"><span>Phone number</span><input name="phoneNumber" required inputmode="tel" autocomplete="tel" /></label>
-        <label class="field-row"><span>Email</span><input name="email" type="email" autocomplete="email" /></label>
-        <label class="field-row">
-          <span>Assigned agent</span>
+      <div class="admin-form-grid agent-create-form__grid customer-create-form__grid">
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">First Name</span>
+          </span>
+          <input name="firstName" required autocomplete="given-name" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Last Name</span>
+          </span>
+          <input name="lastName" required autocomplete="family-name" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Phone Number</span>
+          </span>
+          <input name="phoneNumber" required inputmode="tel" autocomplete="tel" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Email</span>
+          </span>
+          <input name="email" type="email" autocomplete="email" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Assigned Agent</span>
+          </span>
           <select name="assignedAgentId">
             <option value="">None</option>
             {data.agents.map((agent) => (
@@ -57,12 +79,28 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             ))}
           </select>
         </label>
-        <label class="field-row"><span>Credit limit</span><input name="creditLimit" type="number" min="0" step="1" value={data.defaultCustomerCreditLimit} required /></label>
-        <label class="checkbox-row">
-          <input name="isReseller" type="checkbox" />
-          <span>Reseller customer</span>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Credit Limit</span>
+            <span class="field-row__description">Unpaid-order credit cap used during order creation.</span>
+          </span>
+          <input name="creditLimit" type="number" min="0" step="1" value={data.defaultCustomerCreditLimit} required />
         </label>
-        <label class="field-row"><span>Address</span><textarea name="address" required rows="3"></textarea></label>
+        <label class="checkbox-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Reseller?</span>
+            <span class="field-row__description">Uses reseller pricing when applicable.</span>
+          </span>
+          <span class="field-row__control customer-create-form__checkbox-control">
+            <input name="isReseller" type="checkbox" />
+          </span>
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Address</span>
+          </span>
+          <textarea name="address" required rows="3"></textarea>
+        </label>
       </div>
     </form>
     <div slot="footer" class="agent-create-sheet__footer">
