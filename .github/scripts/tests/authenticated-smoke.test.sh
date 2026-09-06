@@ -59,6 +59,10 @@ curl() {
       echo "Authenticated smoke login did not send cf-turnstile-response." >&2
       return 97
     fi
+    if [[ "$*" != *"privacyNoticeAcknowledged=true"* ]]; then
+      echo "Authenticated smoke login did not send privacy notice acknowledgement." >&2
+      return 96
+    fi
     printf '302|https://example.test/dashboard'
     return 0
   fi
