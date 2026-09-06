@@ -29,6 +29,7 @@ import {
   formatAdminActionFeedback,
   getAllowedNextOrderStatuses,
   handleAdminDashboardAction,
+  markUnreadAdminResellerApplicationsRead,
   markViewedResellerApplicationsRead,
   parseAdminActionFormData,
   parseViewedResellerApplicationIds,
@@ -1573,6 +1574,30 @@ describe("markViewedResellerApplicationsRead", () => {
     });
     expect(inFilter).toHaveBeenCalledWith("id", [applicationId]);
     expect(eq).toHaveBeenCalledWith("application_status", "submitted");
+  });
+});
+
+describe("markUnreadAdminResellerApplicationsRead", () => {
+  it("marks all submitted unread reseller applications", async () => {
+    const is = vi.fn(async () => ({ error: null }));
+    const eq = vi.fn(() => ({ is }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+
+    mocks.createSupabaseServerClient.mockReturnValue({ from });
+
+    await markUnreadAdminResellerApplicationsRead(
+      { cookies: {}, request: new Request("https://example.test/admin/reseller-applications") },
+      adminUserId,
+    );
+
+    expect(from).toHaveBeenCalledWith("reseller_application");
+    expect(update).toHaveBeenCalledWith({
+      admin_read_at: expect.any(String),
+      admin_read_by: adminUserId,
+    });
+    expect(eq).toHaveBeenCalledWith("application_status", "submitted");
+    expect(is).toHaveBeenCalledWith("admin_read_at", null);
   });
 });
 

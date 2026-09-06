@@ -651,6 +651,21 @@ export async function markUnreadAdminInquiriesRead(
   }
 }
 
+export async function markUnreadAdminResellerApplicationsRead(
+  context: Pick<APIContext, "cookies" | "request">,
+  adminUserId: string,
+) {
+  const { error } = await createSupabaseServerClient(context)
+    .from("reseller_application")
+    .update(adminReadPayload(adminUserId))
+    .eq("application_status", "submitted")
+    .is("admin_read_at", null);
+
+  if (error) {
+    throw new Error("Unable to mark reseller applications as read.");
+  }
+}
+
 export async function markUnreadAdminOrdersRead(
   context: Pick<APIContext, "cookies" | "request">,
   adminUserId: string,
