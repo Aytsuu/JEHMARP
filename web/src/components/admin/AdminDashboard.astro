@@ -1,5 +1,6 @@
 ---
 import AdminCharts from "@/components/admin/AdminCharts";
+import YearlyOrderActivityHeatmap from "@/components/admin/YearlyOrderActivityHeatmap.astro";
 import MetricTrend from "@/components/ui/MetricTrend.astro";
 import DashboardModal from "@/components/dashboard/DashboardModal.astro";
 import { buildAdminAnalytics } from "@/lib/admin-dashboard/analytics";
@@ -166,7 +167,11 @@ const numberFormatter = new Intl.NumberFormat("en-PH");
     <div class="admin-charts-shell__panel"></div>
     <div class="admin-charts-shell__panel admin-charts-shell__panel--compact"></div>
   </div>
-  <AdminCharts client:idle analytics={analytics} />
+  <div class="admin-charts-root flex flex-col gap-[0.85rem]">
+    <AdminCharts client:idle analytics={analytics} section="beforeHeatmap" />
+    <YearlyOrderActivityHeatmap activity={analytics.yearlyOrderActivity} />
+    <AdminCharts client:idle analytics={analytics} section="afterHeatmap" />
+  </div>
 </section>
 
 <script>

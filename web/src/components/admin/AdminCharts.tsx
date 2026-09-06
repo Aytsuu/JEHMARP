@@ -21,31 +21,18 @@ import type { TooltipContentProps } from "recharts";
 import type {
   AdminAnalytics,
   SalesPeriodMetric,
-  WeeklyProductOrderProductMetric,
 } from "@/lib/admin-dashboard/analytics";
-import DashboardTableEmptyStateContent from "@/components/dashboard/DashboardTableEmptyStateContent";
 
 interface AdminChartsProps {
   analytics: AdminAnalytics;
+  section?: "beforeHeatmap" | "afterHeatmap";
 }
 
 type TooltipFormatter = (value: number) => string;
-type RecentActivityTab = "customers" | "orders" | "inquiries" | "resellers";
 
 type ChartTooltipProps = Omit<TooltipContentProps, "formatter"> & {
   valueFormatter?: TooltipFormatter;
 };
-
-type WeeklyProductChartRow = {
-  label: string;
-  fullLabel: string;
-  date: string;
-  previousDate: string;
-  totalQuantity: number;
-  previousTotalQuantity: number;
-  quantityDifference: number;
-  products: WeeklyProductOrderProductMetric[];
-} & Record<string, string | number | WeeklyProductOrderProductMetric[]>;
 
 type OrderStatusPieRow = {
   name: string;
@@ -54,22 +41,6 @@ type OrderStatusPieRow = {
 };
 
 const pesoPrefix = "\u20B1";
-const weeklyProductColors = [
-  "#661818",
-  "#ecb55d",
-  "#2563eb",
-  "#10b981",
-  "#f97316",
-  "#7c3aed",
-  "#0f766e",
-  "#be123c",
-];
-const recentActivityTabs: { id: RecentActivityTab; label: string }[] = [
-  { id: "customers", label: "Customers" },
-  { id: "orders", label: "Orders" },
-  { id: "inquiries", label: "Inquiries" },
-  { id: "resellers", label: "Reseller Applications" },
-];
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-PH", {
@@ -80,68 +51,6 @@ function formatCurrency(value: number) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en-PH").format(value);
-}
-
-function formatQuantity(value: number) {
-  return new Intl.NumberFormat("en-PH", {
-    maximumFractionDigits: 3,
-  }).format(value);
-}
-
-function formatSignedQuantity(value: number) {
-  if (value > 0) return `+${formatQuantity(value)}`;
-  if (value < 0) return `-${formatQuantity(Math.abs(value))}`;
-
-  return "0";
-}
-
-function formatDate(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  }).format(date);
-}
-
-function RecentActivityColGroup() {
-  return (
-    <colgroup>
-      <col className="admin-recent-activity-table__col-number" />
-      <col className="admin-recent-activity-table__col-data" span={5} />
-      <col className="admin-recent-activity-table__col-action" />
-    </colgroup>
-  );
-}
-
-function RecentActivityCell({
-  children,
-  className = "",
-  title,
-}: {
-  children: React.ReactNode;
-  className?: string;
-  title?: string;
-}) {
-  const resolvedTitle =
-    title ?? (typeof children === "string" ? children : undefined);
-
-  return (
-    <td className={className}>
-      <span
-        className="admin-recent-activity-table__cell-text"
-        title={resolvedTitle}
-      >
-        {children}
-      </span>
-    </td>
-  );
 }
 
 function CustomTooltipContent({
@@ -180,84 +89,6 @@ function CustomTooltipContent({
 
 function CurrencyTooltip(props: TooltipContentProps) {
   return <CustomTooltipContent {...props} valueFormatter={formatCurrency} />;
-}
-
-function WeeklyProductTooltip({ active, payload }: TooltipContentProps) {
-  if (!active || !payload || payload.length === 0) {
-    return null;
-  }
-
-  const row = payload[0]?.payload as WeeklyProductChartRow | undefined;
-
-  if (!row) return null;
-
-  return (
-    <div className="max-w-[280px] rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-md">
-      <div className="mb-2">
-        <p className="font-semibold text-gray-900">{row.fullLabel}</p>
-        <p className="text-xs text-gray-500">
-          {formatQuantity(row.totalQuantity)} ordered this week
-          {row.quantityDifference !== 0
-            ? ` · ${formatSignedQuantity(row.quantityDifference)} vs previous week`
-            : ""}
-        </p>
-      </div>
-      {row.products.length > 0 ? (
-        <div className="space-y-1">
-          {row.products.map((product) => (
-            <div
-              key={product.productId}
-              className="flex items-center justify-between gap-4"
-            >
-              <span className="truncate text-gray-700">{product.label}</span>
-              <span className="shrink-0 font-semibold text-gray-900">
-                {formatQuantity(product.currentQuantity)}
-                {product.quantityDifference !== 0 && (
-                  <small
-                    className={`ml-1 font-bold ${product.quantityDifference > 0
-                        ? "text-emerald-700"
-                        : "text-red-700"
-                      }`}
-                  >
-                    {formatSignedQuantity(product.quantityDifference)}
-                  </small>
-                )}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-gray-500">No products ordered.</p>
-      )}
-    </div>
-  );
-}
-
-function TrendArrow({ value }: { value: number }) {
-  if (value === 0) {
-    return null;
-  }
-
-  return (
-    <span
-      className={`inline-flex h-6 w-6 items-center justify-center rounded-full ${value > 0 ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"
-        }`}
-      aria-hidden="true"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        className={`h-4 w-4 ${value < 0 ? "rotate-180" : ""}`}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M12 19V5" />
-        <path d="m5 12 7-7 7 7" />
-      </svg>
-    </span>
-  );
 }
 
 function renderOrderStatusPieSector(props: PieSectorShapeProps) {
@@ -340,10 +171,11 @@ function hasSalesTrendData(data: SalesPeriodMetric[]) {
   return data.some((period) => period.grossSales > 0 || period.orderCount > 0);
 }
 
-export default function AdminCharts({ analytics }: AdminChartsProps) {
+export default function AdminCharts({
+  analytics,
+  section = "beforeHeatmap",
+}: AdminChartsProps) {
   const [salesPeriod, setSalesPeriod] = useState<"day" | "month">("month");
-  const [recentActivityTab, setRecentActivityTab] =
-    useState<RecentActivityTab>("customers");
   const [selectedAgentLabel, setSelectedAgentLabel] = useState<string | null>(
     analytics.salesByAgent.length > 0 ? analytics.salesByAgent[0].label : null,
   );
@@ -358,42 +190,6 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
   const salesData =
     salesPeriod === "day" ? analytics.salesByDay : analytics.salesByMonth;
   const hasRevenueTrendData = hasSalesTrendData(salesData);
-  const weeklyProductSeries = analytics.weeklyProductOrders.productSeries.map(
-    (series, index) => ({
-      ...series,
-      key: `product_${index}`,
-      color: weeklyProductColors[index % weeklyProductColors.length],
-    }),
-  );
-  const weeklyProductChartData: WeeklyProductChartRow[] =
-    analytics.weeklyProductOrders.days.map((day) => {
-      const productValues = weeklyProductSeries.reduce<Record<string, number>>(
-        (values, series) => {
-          const product = day.products.find(
-            (item) => item.productId === series.productId,
-          );
-
-          return {
-            ...values,
-            [series.key]: product?.currentQuantity ?? 0,
-          };
-        },
-        {},
-      );
-
-      return {
-        label: day.shortLabel,
-        fullLabel: day.label,
-        date: day.date,
-        previousDate: day.previousDate,
-        totalQuantity: day.totalQuantity,
-        previousTotalQuantity: day.previousTotalQuantity,
-        quantityDifference: day.quantityDifference,
-        products: day.products,
-        ...productValues,
-      };
-    });
-  const weeklyPeakDay = analytics.weeklyProductOrders.peakDay;
   const orderStatusOverview = analytics.orderStatusOverview;
   const orderStatusPieData: OrderStatusPieRow[] = orderStatusOverview.statuses
     .filter((status) => status.count > 0)
@@ -432,10 +228,9 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
     ]
     : [];
 
-  return (
-    <div className="admin-charts-root flex flex-col gap-[0.85rem]">
-      <>
-        <div className="order-1 grid grid-cols-1 gap-[0.85rem] xl:grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)]">
+  if (section === "beforeHeatmap") {
+    return (
+      <div className="order-1 grid grid-cols-1 gap-[0.85rem] xl:grid-cols-[minmax(0,2fr)_minmax(22rem,1fr)]">
           <div className="rounded-xl border border-gray-300 bg-white p-6">
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -643,129 +438,11 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
             ) : null}
           </div>
         </div>
+    );
+  }
 
-        <div className="order-3 rounded-xl border border-gray-300 bg-white p-6">
-          <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h3 className="text-lg font-bold text-gray-900">
-                Weekly Product Orders
-              </h3>
-              <p className="text-sm text-gray-500">
-                Product quantities ordered this week compared with the same weekdays last week
-              </p>
-            </div>
-            <div className="w-full rounded-lg border border-gray-200 bg-gray-50 p-4 lg:w-[320px]">
-              <span className="text-xs font-bold uppercase text-gray-500">
-                Peak day this week
-              </span>
-              <div className="mt-2 flex items-center justify-between gap-4">
-                <div>
-                  <strong className="block text-xl text-gray-900">
-                    {weeklyPeakDay.label}
-                  </strong>
-                  <span className="text-sm text-gray-500">
-                    {formatQuantity(weeklyPeakDay.totalQuantity)} ordered
-                  </span>
-                </div>
-                {weeklyPeakDay.quantityDifference !== 0 && (
-                  <div
-                    className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-extrabold ${weeklyPeakDay.quantityDifference > 0
-                        ? "bg-emerald-50 text-emerald-700"
-                        : "bg-red-50 text-red-700"
-                      }`}
-                  >
-                    <TrendArrow value={weeklyPeakDay.quantityDifference} />
-                    {formatSignedQuantity(weeklyPeakDay.quantityDifference)}
-                  </div>
-                )}
-              </div>
-              <p className="mt-2 text-xs text-gray-500">
-                Compared with {weeklyPeakDay.previousDate}
-              </p>
-            </div>
-          </div>
-
-          {weeklyProductSeries.length > 0 ? (
-            <>
-              <div className="h-[360px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={weeklyProductChartData}
-                    margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#f3f4f6"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="label"
-                      stroke="#9ca3af"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                    />
-                    <YAxis
-                      stroke="#9ca3af"
-                      fontSize={12}
-                      tickLine={false}
-                      axisLine={false}
-                      tickFormatter={(value: number) => formatQuantity(value)}
-                    />
-                    <Tooltip content={WeeklyProductTooltip} />
-                    <Legend />
-                    {weeklyProductSeries.map((series) => (
-                      <Bar
-                        key={series.key}
-                        dataKey={series.key}
-                        name={series.label}
-                        stackId="products"
-                        fill={series.color}
-                        radius={[4, 4, 0, 0]}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-7">
-                {analytics.weeklyProductOrders.days.map((day) => (
-                  <div
-                    key={day.date}
-                    className="rounded-lg border border-gray-200 bg-gray-50 p-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-bold text-gray-700">
-                        {day.shortLabel}
-                      </span>
-                      {day.quantityDifference !== 0 && (
-                        <span
-                          className={`inline-flex items-center gap-1 text-xs font-extrabold ${day.quantityDifference > 0
-                              ? "text-emerald-700"
-                              : "text-red-700"
-                            }`}
-                        >
-                          <TrendArrow value={day.quantityDifference} />
-                          {formatSignedQuantity(day.quantityDifference)}
-                        </span>
-                      )}
-                    </div>
-                    <strong className="mt-2 block text-lg text-gray-900">
-                      {formatQuantity(day.totalQuantity)}
-                    </strong>
-                    <span className="text-xs text-gray-500">
-                      Previous {formatQuantity(day.previousTotalQuantity)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex min-h-[220px] items-center justify-center rounded-lg border border-dashed border-gray-300 text-sm text-gray-500">
-              No product orders found for this week or the previous week.
-            </div>
-          )}
-        </div>
-
+  return (
+    <>
         <div className="order-4 grid grid-cols-1 gap-[0.85rem] lg:grid-cols-2">
           <div className="rounded-xl border border-gray-300 bg-white p-6">
             <h3 className="mb-1 text-lg font-bold text-gray-900">Top Products</h3>
@@ -865,366 +542,6 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
             </div>
           </div>
         </div>
-      </>
-
-      <div className="admin-recent-activity-card order-2 rounded-xl border border-gray-300 bg-white p-6">
-        <div className="mb-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <h3 className="mb-1 text-lg font-bold text-gray-900">Recent Activity</h3>
-            <p className="text-sm text-gray-500">
-              Latest customers, orders, inquiries, and reseller applications
-            </p>
-          </div>
-          <div
-            className="inline-flex w-fit max-w-full overflow-x-auto rounded-lg border border-gray-300 bg-gray-50 p-1"
-            role="tablist"
-            aria-label="Recent activity"
-          >
-            {recentActivityTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={recentActivityTab === tab.id}
-                onClick={() => setRecentActivityTab(tab.id)}
-                className={`chart-tab-btn whitespace-nowrap ${recentActivityTab === tab.id
-                    ? "active shadow-sm"
-                    : "!text-gray-600 hover:!text-gray-900 hover:bg-gray-200/50"
-                  }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="table-wrap admin-recent-activity-table-wrap">
-          {recentActivityTab === "customers" && (
-            <table className="admin-recent-activity-table">
-              <RecentActivityColGroup />
-              <thead>
-                <tr>
-                  <th
-                    className="dashboard-table__number-column"
-                    aria-hidden="true"
-                  />
-                  <th scope="col">Name</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Phone</th>
-                  <th scope="col">Type</th>
-                  <th scope="col">Registered</th>
-                  <th
-                    className="dashboard-table__actions-column"
-                    aria-hidden="true"
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.recentCustomers.length > 0 ? (
-                  analytics.recentCustomers.map((customer, index) => (
-                    <tr key={customer.id} className="hover:bg-gray-50/50">
-                      <td className="dashboard-table__number-column">
-                        {index + 1}
-                      </td>
-                      <RecentActivityCell
-                        className="font-semibold text-gray-900"
-                        title={`${customer.first_name} ${customer.last_name}`}
-                      >
-                        {customer.first_name} {customer.last_name}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-gray-700"
-                        title={customer.email || "No email"}
-                      >
-                        {customer.email || (
-                          <span className="text-gray-400">No email</span>
-                        )}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-gray-700"
-                        title={customer.phone_number}
-                      >
-                        {customer.phone_number}
-                      </RecentActivityCell>
-                      <RecentActivityCell>
-                        <span
-                          className={`admin-recent-activity-table__badge ${customer.is_reseller
-                              ? "admin-recent-activity-table__badge--warning"
-                              : "admin-recent-activity-table__badge--info"
-                            }`}
-                        >
-                          {customer.is_reseller ? "Reseller" : "Retail"}
-                        </span>
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-sm text-gray-500"
-                        title={formatDate(customer.created_at)}
-                      >
-                        {formatDate(customer.created_at)}
-                      </RecentActivityCell>
-                      <td className="dashboard-table__actions-column">
-                        <a
-                          href={`/admin/customers/${customer.id}`}
-                          className="admin-recent-activity-table__action"
-                          title="View Profile"
-                        >
-                          View Profile
-                        </a>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7}>
-                      <DashboardTableEmptyStateContent message="No recent customers found" />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {recentActivityTab === "orders" && (
-            <table className="admin-recent-activity-table">
-              <RecentActivityColGroup />
-              <thead>
-                <tr>
-                  <th
-                    className="dashboard-table__number-column"
-                    aria-hidden="true"
-                  />
-                  <th scope="col">Customer</th>
-                  <th scope="col">Order Status</th>
-                  <th scope="col">Payment Status</th>
-                  <th scope="col">Total</th>
-                  <th scope="col">Submitted</th>
-                  <th
-                    className="dashboard-table__actions-column"
-                    aria-hidden="true"
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.recentOrders.length > 0 ? (
-                  analytics.recentOrders.map((order, index) => (
-                    <tr key={order.id} className="hover:bg-gray-50/50">
-                      <td className="dashboard-table__number-column">
-                        {index + 1}
-                      </td>
-                      <RecentActivityCell
-                        className="font-semibold text-gray-900"
-                        title={order.customerName}
-                      >
-                        {order.customerName}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="capitalize text-gray-700"
-                        title={order.orderStatus}
-                      >
-                        {order.orderStatus}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="capitalize text-gray-700"
-                        title={order.paymentStatus}
-                      >
-                        {order.paymentStatus}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="font-semibold text-gray-900"
-                        title={formatCurrency(order.grossSales)}
-                      >
-                        {formatCurrency(order.grossSales)}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-sm text-gray-500"
-                        title={formatDate(order.createdAt)}
-                      >
-                        {formatDate(order.createdAt)}
-                      </RecentActivityCell>
-                      <td className="dashboard-table__actions-column">
-                        <a
-                          href={`/admin/orders/customer/${order.id}`}
-                          className="admin-recent-activity-table__action"
-                          title="View Order"
-                        >
-                          View Order
-                        </a>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7}>
-                      <DashboardTableEmptyStateContent message="No recent orders found" />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {recentActivityTab === "inquiries" && (
-            <table className="admin-recent-activity-table">
-              <RecentActivityColGroup />
-              <thead>
-                <tr>
-                  <th
-                    className="dashboard-table__number-column"
-                    aria-hidden="true"
-                  />
-                  <th scope="col">Name</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Phone</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Received</th>
-                  <th
-                    className="dashboard-table__actions-column"
-                    aria-hidden="true"
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.recentInquiries.length > 0 ? (
-                  analytics.recentInquiries.map((inquiry, index) => (
-                    <tr key={inquiry.id} className="hover:bg-gray-50/50">
-                      <td className="dashboard-table__number-column">
-                        {index + 1}
-                      </td>
-                      <RecentActivityCell
-                        className="font-semibold text-gray-900"
-                        title={inquiry.name}
-                      >
-                        {inquiry.name}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-gray-700"
-                        title={inquiry.email ?? undefined}
-                      >
-                        {inquiry.email ?? (
-                          <span className="text-gray-400">No email</span>
-                        )}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-gray-700"
-                        title={inquiry.phone_number || "No phone"}
-                      >
-                        {inquiry.phone_number || (
-                          <span className="text-gray-400">No phone</span>
-                        )}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="capitalize text-gray-700"
-                        title={inquiry.inquiry_status}
-                      >
-                        {inquiry.inquiry_status}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-sm text-gray-500"
-                        title={formatDate(inquiry.created_at)}
-                      >
-                        {formatDate(inquiry.created_at)}
-                      </RecentActivityCell>
-                      <td className="dashboard-table__actions-column">
-                        <a
-                          href="/admin/inquiries"
-                          className="admin-recent-activity-table__action"
-                          title="Review"
-                        >
-                          Review
-                        </a>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7}>
-                      <DashboardTableEmptyStateContent message="No recent inquiries found" />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-
-          {recentActivityTab === "resellers" && (
-            <table className="admin-recent-activity-table">
-              <RecentActivityColGroup />
-              <thead>
-                <tr>
-                  <th
-                    className="dashboard-table__number-column"
-                    aria-hidden="true"
-                  />
-                  <th scope="col">Name</th>
-                  <th scope="col">Email</th>
-                  <th scope="col">Contact</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Submitted</th>
-                  <th
-                    className="dashboard-table__actions-column"
-                    aria-hidden="true"
-                  />
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.recentResellerApplications.length > 0 ? (
-                  analytics.recentResellerApplications.map((application, index) => (
-                    <tr key={application.id} className="hover:bg-gray-50/50">
-                      <td className="dashboard-table__number-column">
-                        {index + 1}
-                      </td>
-                      <RecentActivityCell
-                        className="font-semibold text-gray-900"
-                        title={application.name}
-                      >
-                        {application.name}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-gray-700"
-                        title={application.email}
-                      >
-                        {application.email}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-gray-700"
-                        title={application.contact_number}
-                      >
-                        {application.contact_number}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="capitalize text-gray-700"
-                        title={application.application_status}
-                      >
-                        {application.application_status}
-                      </RecentActivityCell>
-                      <RecentActivityCell
-                        className="text-sm text-gray-500"
-                        title={formatDate(application.created_at)}
-                      >
-                        {formatDate(application.created_at)}
-                      </RecentActivityCell>
-                      <td className="dashboard-table__actions-column">
-                        <a
-                          href="/admin/reseller-applications"
-                          className="admin-recent-activity-table__action"
-                          title="Review"
-                        >
-                          Review
-                        </a>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7}>
-                      <DashboardTableEmptyStateContent message="No recent reseller applications found" />
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
 
       <div className="order-5 rounded-xl border border-gray-300 bg-white p-6">
         <h3 className="mb-1 text-lg font-bold text-gray-900">
@@ -1326,6 +643,6 @@ export default function AdminCharts({ analytics }: AdminChartsProps) {
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

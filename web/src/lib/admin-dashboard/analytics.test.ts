@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAdminAnalytics, buildMetricTrend } from "./analytics";
+import {
+  buildAdminAnalytics,
+  buildMetricTrend,
+  orderActivityCellOpacity,
+} from "./analytics";
 
 import type { AdminDashboardData, AdminOrder, AdminOrderItem } from "./data";
 
@@ -82,90 +86,48 @@ describe("buildAdminAnalytics", () => {
       { label: "chicken", quantitySold: 1, grossSales: 90 },
       { label: "pork", quantitySold: 1, grossSales: 30 },
     ]);
-    expect(analytics.weeklyProductOrders.peakDay).toEqual({
-      label: "Saturday",
-      shortLabel: "Sat",
-      date: "2026-07-04",
-      previousDate: "2026-06-27",
-      totalQuantity: 3,
-      previousTotalQuantity: 0,
-      quantityDifference: 3,
+    expect(analytics.yearlyOrderActivity.defaultYear).toBe(2026);
+    expect(analytics.yearlyOrderActivity.availableYears).toEqual([2026]);
+    expect(analytics.yearlyOrderActivity.years[2026]).toEqual({
+      year: 2026,
+      totalOrders: 3,
+      maxOrderCount: 1,
+      months: expect.arrayContaining([
+        expect.objectContaining({ month: 6, label: "Jun" }),
+        expect.objectContaining({ month: 7, label: "Jul" }),
+      ]),
     });
-    expect(analytics.weeklyProductOrders.productSeries).toEqual([
-      { productId: "product-chicken", label: "Chicken Thigh" },
-      { productId: "product-pork", label: "Pork Belly" },
-    ]);
-    expect(analytics.weeklyProductOrders.days.map((day) => ({
-      label: day.label,
-      totalQuantity: day.totalQuantity,
-      previousTotalQuantity: day.previousTotalQuantity,
-      quantityDifference: day.quantityDifference,
-      products: day.products,
-    }))).toEqual([
-      { label: "Monday", totalQuantity: 0, previousTotalQuantity: 0, quantityDifference: 0, products: [] },
-      { label: "Tuesday", totalQuantity: 0, previousTotalQuantity: 0, quantityDifference: 0, products: [] },
-      { label: "Wednesday", totalQuantity: 0, previousTotalQuantity: 0, quantityDifference: 0, products: [] },
-      { label: "Thursday", totalQuantity: 0, previousTotalQuantity: 0, quantityDifference: 0, products: [] },
-      {
-        label: "Friday",
-        totalQuantity: 2,
-        previousTotalQuantity: 0,
-        quantityDifference: 2,
-        products: [
-          {
-            productId: "product-chicken",
-            label: "Chicken Thigh",
-            currentQuantity: 1,
-            previousQuantity: 0,
-            quantityDifference: 1,
-          },
-          {
-            productId: "product-pork",
-            label: "Pork Belly",
-            currentQuantity: 1,
-            previousQuantity: 0,
-            quantityDifference: 1,
-          },
-        ],
-      },
-      {
-        label: "Saturday",
-        totalQuantity: 3,
-        previousTotalQuantity: 0,
-        quantityDifference: 3,
-        products: [
-          {
-            productId: "product-chicken",
-            label: "Chicken Thigh",
-            currentQuantity: 2,
-            previousQuantity: 0,
-            quantityDifference: 2,
-          },
-          {
-            productId: "product-pork",
-            label: "Pork Belly",
-            currentQuantity: 1,
-            previousQuantity: 0,
-            quantityDifference: 1,
-          },
-        ],
-      },
-      {
-        label: "Sunday",
-        totalQuantity: 0,
-        previousTotalQuantity: 1,
-        quantityDifference: -1,
-        products: [
-          {
-            productId: "product-pork",
-            label: "Pork Belly",
-            currentQuantity: 0,
-            previousQuantity: 1,
-            quantityDifference: -1,
-          },
-        ],
-      },
-    ]);
+
+    const june = analytics.yearlyOrderActivity.years[2026].months.find((month) => month.month === 6);
+    const july = analytics.yearlyOrderActivity.years[2026].months.find((month) => month.month === 7);
+
+    expect(june?.cells.find((cell) => cell.date === "2026-06-28")).toEqual({
+      date: "2026-06-28",
+      dayOfMonth: 28,
+      orderCount: 1,
+      isPadding: false,
+    });
+    expect(july?.cells.find((cell) => cell.date === "2026-07-03")).toEqual({
+      date: "2026-07-03",
+      dayOfMonth: 3,
+      orderCount: 1,
+      isPadding: false,
+    });
+    expect(july?.cells.find((cell) => cell.date === "2026-07-04")).toEqual({
+      date: "2026-07-04",
+      dayOfMonth: 4,
+      orderCount: 1,
+      isPadding: false,
+    });
+    expect(july?.cells.find((cell) => cell.date === "2026-07-01")).toEqual({
+      date: "2026-07-01",
+      dayOfMonth: 1,
+      orderCount: 0,
+      isPadding: false,
+    });
+    expect(orderActivityCellOpacity(0, 5)).toBe(0);
+    expect(orderActivityCellOpacity(1, 5)).toBeGreaterThan(0);
+    expect(orderActivityCellOpacity(5, 5)).toBe(1);
     expect(analytics.salesByAgent).toEqual([
       {
         label: "JEHMARP Agent",
@@ -201,16 +163,6 @@ describe("buildAdminAnalytics", () => {
         ],
       },
     ]);
-    expect(analytics.recentOrders[0]).toEqual({
-      id: "order-1",
-      customerName: "Assigned Customer",
-      orderStatus: "processing",
-      paymentStatus: "partial",
-      grossSales: 200,
-      createdAt: "2026-07-04T09:00:00.000Z",
-    });
-    expect(analytics.recentInquiries[0]?.name).toBe("Contact Lead");
-    expect(analytics.recentResellerApplications[0]?.name).toBe("Reseller Lead");
   });
 
   it("keeps closed unpaid orders in outstanding balance but not receivables", () => {

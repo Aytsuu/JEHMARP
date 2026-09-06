@@ -13,11 +13,8 @@ import { formatOrderCode } from "@/lib/order-detail-nav";
 
 import type {
   AdminAgentOrder,
-  AdminContactInquiry,
-  AdminCustomer,
   AdminDashboardData,
   AdminOrder,
-  AdminResellerApplication,
 } from "./data";
 
 export type DashboardMetricTrend = {
@@ -60,34 +57,31 @@ export type ProductSalesMetric = {
   grossSales: number;
 };
 
-export type WeeklyProductOrderProductMetric = {
-  productId: string;
-  label: string;
-  currentQuantity: number;
-  previousQuantity: number;
-  quantityDifference: number;
+export type YearlyOrderActivityCellMetric = {
+  date: string | null;
+  dayOfMonth: number | null;
+  orderCount: number;
+  isPadding: boolean;
 };
 
-export type WeeklyProductOrderDayMetric = {
+export type YearlyOrderActivityMonthMetric = {
   label: string;
-  shortLabel: string;
-  date: string;
-  previousDate: string;
-  totalQuantity: number;
-  previousTotalQuantity: number;
-  quantityDifference: number;
-  products: WeeklyProductOrderProductMetric[];
+  month: number;
+  rows: number;
+  cells: YearlyOrderActivityCellMetric[];
 };
 
-export type WeeklyProductOrderSeriesMetric = {
-  productId: string;
-  label: string;
+export type YearlyOrderActivityYearMetric = {
+  year: number;
+  maxOrderCount: number;
+  totalOrders: number;
+  months: YearlyOrderActivityMonthMetric[];
 };
 
-export type WeeklyProductOrdersMetric = {
-  days: WeeklyProductOrderDayMetric[];
-  peakDay: Omit<WeeklyProductOrderDayMetric, "products">;
-  productSeries: WeeklyProductOrderSeriesMetric[];
+export type YearlyOrderActivityMetric = {
+  defaultYear: number;
+  availableYears: number[];
+  years: Record<number, YearlyOrderActivityYearMetric>;
 };
 
 export type AgentSalesMetric = {
@@ -123,15 +117,6 @@ export type PendingCustomerBalanceMetric = {
   orders: PendingCustomerBalanceOrderMetric[];
 };
 
-export type RecentOrderMetric = {
-  id: string;
-  customerName: string;
-  orderStatus: AdminOrder["order_status"];
-  paymentStatus: AdminOrder["payment_status"];
-  grossSales: number;
-  createdAt: string;
-};
-
 export type OrderStatusOverviewMetric = {
   key: "pending_order" | "pending_customers" | "processing" | "closed";
   label: string;
@@ -165,28 +150,41 @@ export type AdminAnalytics = {
   orderStatusOverview: OrderStatusOverview;
   topProducts: ProductSalesMetric[];
   salesByCategory: ProductSalesMetric[];
-  weeklyProductOrders: WeeklyProductOrdersMetric;
+  yearlyOrderActivity: YearlyOrderActivityMetric;
   salesByAgent: AgentSalesMetric[];
   pendingCustomerBalances: PendingCustomerBalanceMetric[];
-  recentOrders: RecentOrderMetric[];
-  recentInquiries: AdminContactInquiry[];
-  recentResellerApplications: AdminResellerApplication[];
-  recentCustomers: AdminCustomer[];
 };
 
 const orderStatuses = ["pending", "processing", "closed"] as const;
 
 const paymentStatuses = ["unpaid", "partial", "paid", "refunded"] as const;
 
-const weekDayLabels = [
-  { label: "Monday", shortLabel: "Mon" },
-  { label: "Tuesday", shortLabel: "Tue" },
-  { label: "Wednesday", shortLabel: "Wed" },
-  { label: "Thursday", shortLabel: "Thu" },
-  { label: "Friday", shortLabel: "Fri" },
-  { label: "Saturday", shortLabel: "Sat" },
-  { label: "Sunday", shortLabel: "Sun" },
+const monthShortLabels = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ] as const;
+
+export function orderActivityCellOpacity(orderCount: number, maxOrderCount: number): number {
+  if (orderCount <= 0 || maxOrderCount <= 0) {
+    return 0;
+  }
+
+  const minOpacity = 0.22;
+  const maxOpacity = 1;
+  const normalized = orderCount / maxOrderCount;
+
+  return minOpacity + (maxOpacity - minOpacity) * normalized;
+}
 
 function isCompletedPaidOrder(order: AdminOrder): boolean {
   return order.order_status === "closed" && order.payment_status === "paid";
@@ -346,13 +344,9 @@ export function buildAdminAnalytics(
     orderStatusOverview: buildOrderStatusOverview(data, now),
     topProducts: buildProductSales(data, completedPaidOrders).slice(0, 5),
     salesByCategory: buildCategorySales(data, completedPaidOrders),
-    weeklyProductOrders: buildWeeklyProductOrders(data, now),
+    yearlyOrderActivity: buildYearlyOrderActivity(data, now),
     salesByAgent: buildAgentSales(data),
     pendingCustomerBalances: buildPendingCustomerBalances(data),
-    recentOrders: buildRecentOrders(data),
-    recentInquiries: byNewest(data.contactInquiries).slice(0, 5),
-    recentResellerApplications: byNewest(data.resellerApplications).slice(0, 5),
-    recentCustomers: byNewest(data.customers).slice(0, 5),
   };
 }
 
@@ -600,102 +594,112 @@ function buildAgentSales(data: AdminDashboardData): AgentSalesMetric[] {
   return Array.from(metrics.values()).sort((left, right) => right.grossSales - left.grossSales);
 }
 
-function buildWeeklyProductOrders(
+function buildYearlyOrderActivity(
   data: AdminDashboardData,
   now: Date,
-): WeeklyProductOrdersMetric {
-  const weekStart = startOfUtcWeek(now);
-  const previousWeekStart = addUtcDays(weekStart, -7);
-  const currentQuantities = buildWeeklyProductQuantityMap(data, weekStart);
-  const previousQuantities = buildWeeklyProductQuantityMap(data, previousWeekStart);
-  const productIds = Array.from(new Set([
-    ...Array.from(currentQuantities.values()).flatMap((products) => Array.from(products.keys())),
-    ...Array.from(previousQuantities.values()).flatMap((products) => Array.from(products.keys())),
-  ])).sort((left, right) => productName(data, left).localeCompare(productName(data, right)));
-
-  const days = weekDayLabels.map((dayLabel, dayIndex) => {
-    const date = addUtcDays(weekStart, dayIndex);
-    const previousDate = addUtcDays(previousWeekStart, dayIndex);
-    const dateKey = dayIdentifier(date);
-    const previousDateKey = dayIdentifier(previousDate);
-    const currentProducts = currentQuantities.get(dateKey) ?? new Map<string, number>();
-    const previousProducts = previousQuantities.get(previousDateKey) ?? new Map<string, number>();
-    const products = productIds
-      .map((productId) => {
-        const currentQuantity = roundQuantity(currentProducts.get(productId) ?? 0);
-        const previousQuantity = roundQuantity(previousProducts.get(productId) ?? 0);
-
-        return {
-          productId,
-          label: productName(data, productId),
-          currentQuantity,
-          previousQuantity,
-          quantityDifference: roundQuantity(currentQuantity - previousQuantity),
-        };
-      })
-      .filter((product) => product.currentQuantity > 0 || product.previousQuantity > 0);
-    const totalQuantity = roundQuantity(products.reduce((total, product) => total + product.currentQuantity, 0));
-    const previousTotalQuantity = roundQuantity(products.reduce((total, product) => total + product.previousQuantity, 0));
-
-    return {
-      label: dayLabel.label,
-      shortLabel: dayLabel.shortLabel,
-      date: dateKey,
-      previousDate: previousDateKey,
-      totalQuantity,
-      previousTotalQuantity,
-      quantityDifference: roundQuantity(totalQuantity - previousTotalQuantity),
-      products,
-    };
-  });
-  const peakDay = days.reduce((peak, day) => (
-    day.totalQuantity > peak.totalQuantity ? day : peak
-  ), days[0]);
+): YearlyOrderActivityMetric {
+  const dailyCounts = buildDailyOrderCounts(data);
+  const defaultYear = now.getUTCFullYear();
+  const availableYears = buildAvailableYears(dailyCounts, defaultYear);
+  const years = availableYears.reduce<Record<number, YearlyOrderActivityYearMetric>>(
+    (result, year) => ({
+      ...result,
+      [year]: buildYearlyOrderActivityYear(year, dailyCounts),
+    }),
+    {},
+  );
 
   return {
-    days,
-    peakDay: {
-      label: peakDay.label,
-      shortLabel: peakDay.shortLabel,
-      date: peakDay.date,
-      previousDate: peakDay.previousDate,
-      totalQuantity: peakDay.totalQuantity,
-      previousTotalQuantity: peakDay.previousTotalQuantity,
-      quantityDifference: peakDay.quantityDifference,
-    },
-    productSeries: productIds.map((productId) => ({
-      productId,
-      label: productName(data, productId),
-    })),
+    defaultYear,
+    availableYears,
+    years,
   };
 }
 
-function buildWeeklyProductQuantityMap(
-  data: AdminDashboardData,
-  weekStart: Date,
-): Map<string, Map<string, number>> {
-  const weekEnd = addUtcDays(weekStart, 7);
-  const metrics = new Map<string, Map<string, number>>();
+function buildDailyOrderCounts(data: AdminDashboardData): Map<string, number> {
+  const counts = new Map<string, number>();
 
   for (const order of data.orders) {
-    const orderDate = new Date(order.created_at);
-
-    if (orderDate < weekStart || orderDate >= weekEnd) continue;
-
-    const dateKey = dayIdentifier(orderDate);
-    const currentDay = metrics.get(dateKey) ?? new Map<string, number>();
-
-    for (const item of order.customer_order_item) {
-      currentDay.set(
-        item.product_id,
-        roundQuantity((currentDay.get(item.product_id) ?? 0) + item.final_quantity),
-      );
-    }
-
-    metrics.set(dateKey, currentDay);
+    const dateKey = dayIdentifier(new Date(order.created_at));
+    counts.set(dateKey, (counts.get(dateKey) ?? 0) + 1);
   }
 
-  return metrics;
+  return counts;
+}
+
+function buildAvailableYears(
+  dailyCounts: Map<string, number>,
+  defaultYear: number,
+): number[] {
+  const years = new Set<number>([defaultYear]);
+
+  for (const dateKey of dailyCounts.keys()) {
+    years.add(Number(dateKey.slice(0, 4)));
+  }
+
+  return Array.from(years).sort((left, right) => right - left);
+}
+
+function buildYearlyOrderActivityYear(
+  year: number,
+  dailyCounts: Map<string, number>,
+): YearlyOrderActivityYearMetric {
+  let maxOrderCount = 0;
+  let totalOrders = 0;
+  const months = monthShortLabels.map((label, monthIndex) => {
+    const month = monthIndex + 1;
+    const firstDay = new Date(Date.UTC(year, monthIndex, 1));
+    const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+    const startPadding = (firstDay.getUTCDay() + 6) % 7;
+    const cells: YearlyOrderActivityCellMetric[] = [];
+
+    for (let index = 0; index < startPadding; index += 1) {
+      cells.push({
+        date: null,
+        dayOfMonth: null,
+        orderCount: 0,
+        isPadding: true,
+      });
+    }
+
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      const orderCount = dailyCounts.get(date) ?? 0;
+
+      maxOrderCount = Math.max(maxOrderCount, orderCount);
+      totalOrders += orderCount;
+
+      cells.push({
+        date,
+        dayOfMonth: day,
+        orderCount,
+        isPadding: false,
+      });
+    }
+
+    while (cells.length % 7 !== 0) {
+      cells.push({
+        date: null,
+        dayOfMonth: null,
+        orderCount: 0,
+        isPadding: true,
+      });
+    }
+
+    return {
+      label,
+      month,
+      rows: cells.length / 7,
+      cells,
+    };
+  });
+
+  return {
+    year,
+    maxOrderCount,
+    totalOrders,
+    months,
+  };
 }
 
 function buildPendingCustomerBalances(data: AdminDashboardData): PendingCustomerBalanceMetric[] {
@@ -764,17 +768,6 @@ function buildPendingCustomerBalances(data: AdminDashboardData): PendingCustomer
     ));
 }
 
-function buildRecentOrders(data: AdminDashboardData): RecentOrderMetric[] {
-  return byNewest(data.orders).slice(0, 5).map((order) => ({
-    id: order.id,
-    customerName: fullName(order.customer ?? data.customers.find((customer) => customer.id === order.customer_id) ?? null),
-    orderStatus: order.order_status,
-    paymentStatus: order.payment_status,
-    grossSales: roundCurrency(orderTotal(order, "final_quantity")),
-    createdAt: order.created_at,
-  }));
-}
-
 function getAnalyticsAgentId(order: AdminOrder): string | null {
   return order.agent_id
     ?? order.agent?.id
@@ -824,27 +817,6 @@ function dayIdentifier(value: Date): string {
   return value.toISOString().slice(0, 10);
 }
 
-function startOfUtcWeek(value: Date): Date {
-  const start = new Date(Date.UTC(
-    value.getUTCFullYear(),
-    value.getUTCMonth(),
-    value.getUTCDate(),
-  ));
-  const dayOffset = (start.getUTCDay() + 6) % 7;
-
-  start.setUTCDate(start.getUTCDate() - dayOffset);
-
-  return start;
-}
-
-function addUtcDays(value: Date, days: number): Date {
-  const result = new Date(value);
-
-  result.setUTCDate(result.getUTCDate() + days);
-
-  return result;
-}
-
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
@@ -855,10 +827,4 @@ function roundQuantity(value: number): number {
 
 function byLabel(left: { label: string }, right: { label: string }): number {
   return left.label.localeCompare(right.label);
-}
-
-function byNewest<T extends { created_at: string }>(items: T[]): T[] {
-  return [...items].sort((left, right) => (
-    new Date(right.created_at).getTime() - new Date(left.created_at).getTime()
-  ));
 }
