@@ -85,6 +85,14 @@
     overflow: visible;
   }
 
+  [data-public-site-preview] .public-site-preview__main {
+    padding-top: var(--public-site-header-height);
+  }
+
+  [data-public-site-preview] .public-site-preview__main > .home-hero:first-child {
+    margin-top: calc(-1 * var(--public-site-header-height));
+  }
+
   [data-public-site-preview] .public-site-preview__nav-anchor {
     position: sticky;
     top: 0;
