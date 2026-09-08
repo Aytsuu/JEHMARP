@@ -29,6 +29,7 @@ import {
   formatAdminActionFeedback,
   getAllowedNextOrderStatuses,
   handleAdminDashboardAction,
+  markUnreadAdminResellerApplicationsRead,
   markViewedResellerApplicationsRead,
   parseAdminActionFormData,
   parseViewedResellerApplicationIds,
@@ -184,6 +185,9 @@ describe("parseAdminActionFormData", () => {
           payment_status: "unpaid",
           release_date: combineDateAndTime("2026-07-18", "09:30"),
           submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          created_at: expect.any(String),
           updated_at: expect.any(String),
         },
         payment: null,
@@ -337,6 +341,9 @@ describe("parseAdminActionFormData", () => {
           payment_status: "unpaid",
           release_date: combineDateAndTime("2026-07-18", "11:15"),
           submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          created_at: expect.any(String),
           updated_at: expect.any(String),
         },
         payment: null,
@@ -380,6 +387,9 @@ describe("parseAdminActionFormData", () => {
           payment_status: "unpaid",
           release_date: combineDateAndTime("2026-07-18", "11:15"),
           submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          created_at: expect.any(String),
           updated_at: expect.any(String),
         },
         payment: null,
@@ -498,6 +508,9 @@ describe("parseAdminActionFormData", () => {
           payment_status: "unpaid",
           release_date: combineDateAndTime("2026-07-18", "09:30"),
           submitted_by: adminUserId,
+          approved_by: adminUserId,
+          approved_at: expect.any(String),
+          created_at: expect.any(String),
           updated_at: expect.any(String),
         },
         payment: null,
@@ -1561,6 +1574,30 @@ describe("markViewedResellerApplicationsRead", () => {
     });
     expect(inFilter).toHaveBeenCalledWith("id", [applicationId]);
     expect(eq).toHaveBeenCalledWith("application_status", "submitted");
+  });
+});
+
+describe("markUnreadAdminResellerApplicationsRead", () => {
+  it("marks all submitted unread reseller applications", async () => {
+    const is = vi.fn(async () => ({ error: null }));
+    const eq = vi.fn(() => ({ is }));
+    const update = vi.fn(() => ({ eq }));
+    const from = vi.fn(() => ({ update }));
+
+    mocks.createSupabaseServerClient.mockReturnValue({ from });
+
+    await markUnreadAdminResellerApplicationsRead(
+      createActionContext(new FormData()) as unknown as Parameters<typeof markUnreadAdminResellerApplicationsRead>[0],
+      adminUserId,
+    );
+
+    expect(from).toHaveBeenCalledWith("reseller_application");
+    expect(update).toHaveBeenCalledWith({
+      admin_read_at: expect.any(String),
+      admin_read_by: adminUserId,
+    });
+    expect(eq).toHaveBeenCalledWith("application_status", "submitted");
+    expect(is).toHaveBeenCalledWith("admin_read_at", null);
   });
 });
 
@@ -3283,6 +3320,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3297,7 +3337,7 @@ describe("executeAdminAction", () => {
 
     expect(from).toHaveBeenCalledWith("order");
     expect(from).toHaveBeenCalledWith("order_item");
-    expect(orderInsert).toHaveBeenCalledWith({
+    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
       order_kind: "customer",
       customer_id: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
       agent_id: null,
@@ -3306,8 +3346,11 @@ describe("executeAdminAction", () => {
       payment_status: "unpaid",
       release_date: "2026-07-18T03:15:00.000Z",
       submitted_by: adminUserId,
+      approved_by: adminUserId,
+      approved_at: "2026-07-01T00:00:00.000Z",
+      created_at: "2026-07-01T00:00:00.000Z",
       updated_at: "2026-07-01T00:00:00.000Z",
-    });
+    }));
     expect(itemInsert).toHaveBeenCalledWith([
       {
         order_id: orderId,
@@ -3357,6 +3400,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3371,7 +3417,7 @@ describe("executeAdminAction", () => {
 
     expect(agentSelect).toHaveBeenCalledWith("customer_id");
     expect(agentEq).toHaveBeenCalledWith("id", agentId);
-    expect(orderInsert).toHaveBeenCalledWith({
+    expect(orderInsert).toHaveBeenCalledWith(expect.objectContaining({
       order_kind: "customer",
       customer_id: customerId,
       agent_id: agentId,
@@ -3380,8 +3426,11 @@ describe("executeAdminAction", () => {
       payment_status: "unpaid",
       release_date: "2026-07-18T03:15:00.000Z",
       submitted_by: adminUserId,
+      approved_by: adminUserId,
+      approved_at: "2026-07-01T00:00:00.000Z",
+      created_at: "2026-07-01T00:00:00.000Z",
       updated_at: "2026-07-01T00:00:00.000Z",
-    });
+    }));
     expect(itemInsert).toHaveBeenCalledWith([
       {
         order_id: orderId,
@@ -3423,6 +3472,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3443,6 +3495,9 @@ describe("executeAdminAction", () => {
       order_status: "pending_customers",
       notes: null,
       submitted_by: adminUserId,
+      approved_by: adminUserId,
+      approved_at: expect.any(String),
+      created_at: expect.any(String),
       admin_read_by: adminUserId,
       release_date: "2026-07-18T03:15:00.000Z",
     }));
@@ -3523,6 +3578,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3643,6 +3701,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3711,6 +3772,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3778,6 +3842,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -3870,6 +3937,9 @@ describe("executeAdminAction", () => {
         payment_status: "unpaid",
         release_date: "2026-07-18T03:15:00.000Z",
         submitted_by: adminUserId,
+        approved_by: adminUserId,
+        approved_at: "2026-07-01T00:00:00.000Z",
+        created_at: "2026-07-01T00:00:00.000Z",
         updated_at: "2026-07-01T00:00:00.000Z",
       },
       items: [
@@ -4487,7 +4557,25 @@ describe("formatAdminActionFeedback", () => {
     expect(formatAdminActionFeedback(url)).toEqual({
       status: "Order marked as read.",
       error: undefined,
+      registrationLink: undefined,
+      registrationLinkExpiresAt: undefined,
+      registrationLinkDuration: undefined,
       cleanPath: "/admin/orders/customer/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb?page=2#error-anchor",
+    });
+  });
+
+  it("returns registration link feedback with a clean reload URL", () => {
+    const url = new URL(
+      "https://jehmarp.example/admin/customers?status=Registration%20link%20created.&registrationLink=https%3A%2F%2Fjehmarp.example%2Fcustomer-registration%2Fabc123&registrationLinkExpiresAt=2026-09-07T10%3A00%3A00.000Z&registrationLinkDuration=1h",
+    );
+
+    expect(formatAdminActionFeedback(url)).toEqual({
+      status: "Registration link created.",
+      error: undefined,
+      registrationLink: "https://jehmarp.example/customer-registration/abc123",
+      registrationLinkExpiresAt: "2026-09-07T10:00:00.000Z",
+      registrationLinkDuration: "1h",
+      cleanPath: "/admin/customers",
     });
   });
 
@@ -4497,6 +4585,9 @@ describe("formatAdminActionFeedback", () => {
     expect(formatAdminActionFeedback(url)).toEqual({
       status: undefined,
       error: undefined,
+      registrationLink: undefined,
+      registrationLinkExpiresAt: undefined,
+      registrationLinkDuration: undefined,
       cleanPath: undefined,
     });
   });

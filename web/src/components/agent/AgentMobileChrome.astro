@@ -10,13 +10,6 @@ type Props = {
 const { currentPath, sidebarUnreadBadges = {} } = Astro.props;
 ---
 
-<header class="agent-mobile-header" aria-label="Agent dashboard" transition:persist="agent-mobile-header">
-  <a class="agent-mobile-header__brand" href="/">
-    <span class="site-nav__brand-mark" aria-hidden="true">Logo</span>
-    <span class="agent-mobile-header__brand-text">JEHMARP</span>
-  </a>
-</header>
-
 <nav class="agent-mobile-nav" aria-label="Agent navigation" transition:persist="agent-mobile-nav">
   <ul class="agent-mobile-nav__list">
     {

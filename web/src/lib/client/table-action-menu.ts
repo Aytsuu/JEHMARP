@@ -1,3 +1,5 @@
+import { openAlertDialogFromTrigger } from "./dashboard-alert-dialog";
+
 let activeMenu: HTMLElement | null = null;
 
 const initializedDocuments = new WeakSet<Document>();
@@ -218,7 +220,16 @@ function handleDocumentClick(event: MouseEvent) {
 
   const menuAction = target.closest<HTMLElement>(".table-action-menu__item");
   if (menuAction) {
-    closeMenu(menuAction.closest<HTMLElement>("[data-table-action-menu]"));
+    const menu = menuAction.closest<HTMLElement>("[data-table-action-menu]");
+    const openedAlertDialog = openAlertDialogFromTrigger(menuAction);
+
+    closeMenu(menu ?? null);
+
+    if (openedAlertDialog) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+
     return;
   }
 

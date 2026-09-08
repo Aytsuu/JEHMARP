@@ -15,7 +15,7 @@ function portalModalToBody(modal: HTMLElement) {
   }
 }
 
-function openDashboardModal(modal: HTMLElement) {
+export function openDashboardModal(modal: HTMLElement) {
   const panel = modal.querySelector<HTMLElement>("[data-dashboard-modal-panel]");
   if (!panel) return;
 
@@ -53,7 +53,7 @@ function closeOpenDashboardModals() {
     });
 }
 
-function bindDashboardModal(modal: HTMLElement) {
+export function bindDashboardModal(modal: HTMLElement) {
   if (modal.dataset.dashboardModalInitialized === "true") return;
   modal.dataset.dashboardModalInitialized = "true";
 

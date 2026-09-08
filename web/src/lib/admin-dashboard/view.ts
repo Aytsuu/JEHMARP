@@ -102,6 +102,11 @@ export function formatDate(value: string | null) {
   return formatDateTime(value);
 }
 
+export function pendingCustomerOrdersAwaitingLabel(count: number) {
+  const orderLabel = count === 1 ? "order" : "orders";
+  return `${count} customer ${orderLabel} awaiting`;
+}
+
 export function formatSalePaymentSummary(paymentCount: number) {
   const count = Number.isFinite(paymentCount) ? Math.max(0, Math.trunc(paymentCount)) : 0;
 
@@ -226,6 +231,19 @@ export function agentOrderReceivableTotal(order: AdminAgentOrder) {
   );
 }
 
+export function agentOrderPaidTotal(order: AdminAgentOrder) {
+  return roundCurrency(
+    order.customer_order.reduce((total, child) => total + orderPaymentTotal(child), 0),
+  );
+}
+
+export function agentOrderRemainingReceivable(order: AdminAgentOrder) {
+  return Math.max(
+    roundCurrency(agentOrderReceivableTotal(order) - agentOrderPaidTotal(order)),
+    0,
+  );
+}
+
 export function agentOrderPaymentStatus(
   order: Pick<AdminAgentOrder, "customer_order">,
 ): AdminOrder["payment_status"] {
@@ -321,7 +339,11 @@ export function getCustomerOrderDistributionConversionBlockReason(
     return "Not promoted";
   }
 
-  if (order.parent_order_id && order.converted_at) {
+  if (order.order_kind === "distribution") {
+    return "Converted";
+  }
+
+  if (order.converted_at) {
     return "Converted";
   }
 

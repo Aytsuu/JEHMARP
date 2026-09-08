@@ -15,6 +15,7 @@ SMOKE_TURNSTILE_RESPONSE="${SMOKE_TURNSTILE_RESPONSE:-}"
 AUTH_SMOKE_TURNSTILE_MODE="${AUTH_SMOKE_TURNSTILE_MODE:-test}"
 AUTH_SMOKE_TARGET_ENV="${AUTH_SMOKE_TARGET_ENV:-}"
 TURNSTILE_TEST_RESPONSE="1x0000000000000000000000000000000AA"
+PRIVACY_NOTICE_ACK_FIELD="privacyNoticeAcknowledged"
 
 usage() {
   cat <<'EOF'
@@ -139,6 +140,8 @@ login_dashboard_user() {
   if [ -n "$turnstile_token" ]; then
     curl_args+=(-F "cf-turnstile-response=${turnstile_token}")
   fi
+
+  curl_args+=(-F "${PRIVACY_NOTICE_ACK_FIELD}=true")
 
   smoke_append_common_curl_headers curl_args
 

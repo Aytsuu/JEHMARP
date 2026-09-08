@@ -3,7 +3,8 @@ import Accordion from "@/components/ui/Accordion.astro";
 import ActionMenu from "@/components/ActionMenu.astro";
 import Button from "@/components/ui/Button.astro";
 import Sheet from "@/components/ui/Sheet.astro";
-import OrderCustomerPicker from "@/components/order/OrderCustomerPicker.astro";
+import Picker from "@/components/ui/Picker.astro";
+import Tooltip from "@/components/ui/Tooltip.astro";
 import type { AdminOrderManagementData } from "@/lib/admin-dashboard/data";
 import ViewButton from "@/components/ViewButton.astro";
 import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
@@ -18,6 +19,7 @@ import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import {
   formatCurrency,
   formatDate,
+  pendingCustomerOrdersAwaitingLabel,
 } from "@/lib/admin-dashboard/view";
 import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { formatOrderCode } from "@/lib/order-detail-nav";
@@ -46,10 +48,10 @@ function isPendingCustomerOrderRow(order: (typeof orderRows)[number]) {
   return order.row_type === "customer" && order.status === "pending";
 }
 
-function pendingCustomerOrderLabel(count: number) {
+function linkedCustomerOrdersLabel(count: number) {
   return count === 1
-    ? "1 customer order awaiting acceptance"
-    : `${count} customer orders awaiting acceptance`;
+    ? "1 linked customer order in this agent order"
+    : `${count} linked customer orders in this agent order`;
 }
 ---
 
@@ -72,9 +74,13 @@ function pendingCustomerOrderLabel(count: number) {
 
       <section class="order-create-section">
         <div class="order-create-section__body">
-          <div class="admin-form-grid order-create-form__existing-customer-grid">
-            <div class="field-row">
-              <OrderCustomerPicker showPaymentNotice />
+          <div class="field-row field-row--split">
+            <div class="field-row__meta">
+              <span class="field-row__label">Existing</span>
+              <span class="field-row__description">Search for an existing customer or agent.</span>
+            </div>
+            <div class="field-row__control">
+              <Picker showPaymentNotice />
               <input type="hidden" name="customerId" data-customer-id />
               <input type="hidden" name="agentId" data-agent-order-agent-id />
             </div>
@@ -84,49 +90,102 @@ function pendingCustomerOrderLabel(count: number) {
 
       <section class="order-create-section">
         <div class="order-create-section__body">
-          <div class="admin-form-grid">
-            <label class="field-row" hidden data-agent-order-fields>
-              <span>Order type</span>
-              <select name="agentOrderType" data-agent-order-type disabled>
-                <option value="personal">Personal</option>
-                <option value="distribution">Distribution</option>
-              </select>
-            </label>
-          </div>
+          <label class="field-row field-row--split" hidden data-agent-order-fields>
+            <span class="field-row__meta">
+              <span class="field-row__label">Order Type</span>
+            </span>
+            <select name="agentOrderType" data-agent-order-type disabled>
+              <option value="personal">Personal</option>
+              <option value="distribution">Distribution</option>
+            </select>
+          </label>
         </div>
       </section>
 
       <section class="order-create-section" data-new-customer-fields>
-        <h3 class="order-create-section__title">Customer details</h3>
-        <div class="order-create-section__body">
-          <div class="admin-form-grid order-create-form__customer-grid">
-            <div class="order-create-form__name-row">
-              <label class="field-row"><span>First name</span><input name="firstName" required data-customer-first-name /></label>
-              <label class="field-row"><span>Last name</span><input name="lastName" required data-customer-last-name /></label>
-            </div>
-            <label class="field-row"><span>Phone number</span><input name="phoneNumber" required data-customer-phone-number /></label>
-            <label class="field-row"><span>Email</span><input name="email" type="email" data-customer-email /></label>
-            <label class="field-row">
-              <span>Agent</span>
-              <select name="assignedAgentId" data-customer-assigned-agent-id>
-                <option value="">None</option>
-                {data.agents.map((agent) => (
-                  <option value={agent.id}>{agent.display_name}</option>
-                ))}
-              </select>
-            </label>
-            <label class="checkbox-row">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Customer Details</h3>
+        </div>
+        <div class="order-create-section__body order-create-form__fields">
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">First Name</span>
+            </span>
+            <input name="firstName" required data-customer-first-name />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Last Name</span>
+            </span>
+            <input name="lastName" required data-customer-last-name />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Phone Number</span>
+            </span>
+            <input name="phoneNumber" required data-customer-phone-number />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Email</span>
+            </span>
+            <input name="email" type="email" data-customer-email />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Address</span>
+            </span>
+            <textarea name="address" required data-customer-address></textarea>
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Assigned Agent</span>
+            </span>
+            <select name="assignedAgentId" data-customer-assigned-agent-id>
+              <option value="">None</option>
+              {data.agents.map((agent) => (
+                <option value={agent.id}>{agent.display_name}</option>
+              ))}
+            </select>
+          </label>
+          <label class="checkbox-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Reseller?</span>
+              <span class="field-row__description">Uses reseller pricing when applicable.</span>
+            </span>
+            <span class="field-row__control order-create-form__checkbox-control">
               <input name="isReseller" type="checkbox" data-customer-is-reseller />
-              <span>Reseller customer</span>
-            </label>
-          </div>
-          <label class="field-row"><span>Address</span><textarea name="address" required data-customer-address></textarea></label>
+            </span>
+          </label>
         </div>
       </section>
 
       <section class="order-create-section">
         <div class="order-create-section__header">
-          <h3 class="order-create-section__title">Order items</h3>
+          <h3 class="order-create-section__title">Order Items</h3>
+          <button
+            type="button"
+            class="order-create-form__add-item"
+            data-add-order-item
+            disabled={!canCreateOrder}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.25"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14"></path>
+              <path d="M5 12h14"></path>
+            </svg>
+            <span>Add Item</span>
+          </button>
         </div>
         <div class="order-create-section__body">
           <div class="order-item-list" data-order-items>
@@ -159,8 +218,10 @@ function pendingCustomerOrderLabel(count: number) {
                 </svg>
               </button>
               <div class="order-item-accordion__fields" data-order-item-row>
-                <label class="field-row">
-                  <span>Product</span>
+                <label class="field-row field-row--split">
+                  <span class="field-row__meta">
+                    <span class="field-row__label">Product</span>
+                  </span>
                   <select name="productId" required disabled={activeProducts.length === 0} data-order-product-select>
                     <option value="">Select product</option>
                     {activeProducts.map((product) => (
@@ -175,58 +236,42 @@ function pendingCustomerOrderLabel(count: number) {
                     ))}
                   </select>
                 </label>
-                <label class="field-row">
-                  <span>Quantity</span>
+                <label class="field-row field-row--split">
+                  <span class="field-row__meta">
+                    <span class="field-row__label">Quantity</span>
+                  </span>
                   <input name="quantity" type="number" min="0.001" step="0.001" required />
                 </label>
-                <label class="field-row">
-                  <span>Details</span>
-                  <textarea name="addDetails" placeholder="Cut, packing, or delivery notes"></textarea>
+                <label class="field-row field-row--split">
+                  <span class="field-row__meta">
+                    <span class="field-row__label">Details</span>
+                    <span class="field-row__description">Cut, packing, or delivery notes.</span>
+                  </span>
+                  <textarea name="addDetails" placeholder="Optional item notes"></textarea>
                 </label>
               </div>
             </Accordion>
           </div>
-          <button
-            type="button"
-            class="order-create-form__add-item"
-            data-add-order-item
-            disabled={!canCreateOrder}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2.25"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M12 5v14"></path>
-              <path d="M5 12h14"></path>
-            </svg>
-            <span>Add Item</span>
-          </button>
+        </div>
+      </section>
 
-          <div class="order-create-section order-create-section--subblock">
-            <div class="order-create-section__header">
-              <h3 class="order-create-section__title">Release</h3>
-            </div>
-            <div class="order-create-section__body">
-              <div class="order-create-form__field-pair">
-                <label class="field-row">
-                  <span>Release date</span>
-                  <input name="releaseDate" type="date" required data-release-date />
-                </label>
-                <label class="field-row">
-                  <span>Release time</span>
-                  <input name="releaseTime" type="time" required data-release-time />
-                </label>
-              </div>
-            </div>
-          </div>
+      <section class="order-create-section">
+        <div class="order-create-section__header">
+          <h3 class="order-create-section__title">Release</h3>
+        </div>
+        <div class="order-create-section__body order-create-form__fields">
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Date</span>
+            </span>
+            <input name="releaseDate" type="date" required data-release-date />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Time</span>
+            </span>
+            <input name="releaseTime" type="time" required data-release-time />
+          </label>
         </div>
       </section>
 
@@ -279,8 +324,10 @@ function pendingCustomerOrderLabel(count: number) {
           </summary>
           <div class="ui-accordion__content">
             <div class="order-item-accordion__fields" data-order-item-row>
-              <label class="field-row">
-                <span>Product</span>
+              <label class="field-row field-row--split">
+                <span class="field-row__meta">
+                  <span class="field-row__label">Product</span>
+                </span>
                 <select name="productId" required disabled={activeProducts.length === 0} data-order-product-select>
                   <option value="">Select product</option>
                   {activeProducts.map((product) => (
@@ -295,13 +342,18 @@ function pendingCustomerOrderLabel(count: number) {
                   ))}
                 </select>
               </label>
-              <label class="field-row">
-                <span>Quantity</span>
+              <label class="field-row field-row--split">
+                <span class="field-row__meta">
+                  <span class="field-row__label">Quantity</span>
+                </span>
                 <input name="quantity" type="number" min="0.001" step="0.001" required />
               </label>
-              <label class="field-row">
-                <span>Details</span>
-                <textarea name="addDetails" placeholder="Cut, packing, or delivery notes"></textarea>
+              <label class="field-row field-row--split">
+                <span class="field-row__meta">
+                  <span class="field-row__label">Details</span>
+                  <span class="field-row__description">Cut, packing, or delivery notes.</span>
+                </span>
+                <textarea name="addDetails" placeholder="Optional item notes"></textarea>
               </label>
             </div>
           </div>
@@ -312,44 +364,56 @@ function pendingCustomerOrderLabel(count: number) {
         <div class="order-create-section__header">
           <h3 class="order-create-section__title">Payment</h3>
         </div>
-        <div class="order-create-section__body order-create-form__payment-fields">
-          <label class="field-row">
-            <span>Amount received</span>
+        <div class="order-create-section__body order-create-form__fields order-create-form__payment-fields">
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Amount Received</span>
+              <span class="field-row__description">Optional payment recorded when the order is created.</span>
+            </span>
             <input name="downpaymentAmount" type="number" min="0.01" step="0.01" data-downpayment-amount />
           </label>
-          <div class="order-create-form__field-pair">
-            <label class="field-row">
-              <span>Payment method</span>
-              <select name="downpaymentMethod" data-downpayment-method>
-                <option value="Cash">Cash</option>
-                <option value="Check">Check</option>
-              </select>
-            </label>
-            <label class="field-row">
-              <span>Payment terms</span>
-              <select name="downpaymentTerms" data-downpayment-terms>
-                <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
-                <option value="Bank Transfer">Bank Transfer</option>
-                <option value="Gcash">Gcash</option>
-              </select>
-            </label>
-          </div>
-          <div class="order-create-form__field-pair">
-            <label class="field-row">
-              <span>Payment date</span>
-              <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
-            </label>
-            <label class="field-row">
-              <span>Payment time</span>
-              <input name="downpaymentTime" type="time" value={defaultTime} data-downpayment-time />
-            </label>
-          </div>
-          <label class="field-row">
-            <span>Reference</span>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Method</span>
+            </span>
+            <select name="downpaymentMethod" data-downpayment-method>
+              <option value="Cash">Cash</option>
+              <option value="Check">Check</option>
+            </select>
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Terms</span>
+            </span>
+            <select name="downpaymentTerms" data-downpayment-terms>
+              <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Gcash">Gcash</option>
+            </select>
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Date</span>
+            </span>
+            <input name="downpaymentDate" type="date" value={new Date().toISOString().slice(0, 10)} data-downpayment-date />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Time</span>
+            </span>
+            <input name="downpaymentTime" type="time" value={defaultTime} data-downpayment-time />
+          </label>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Reference</span>
+              <span class="field-row__description">Check number, transfer reference, or receipt ID.</span>
+            </span>
             <input name="downpaymentReferenceNumber" data-downpayment-reference />
           </label>
-          <label class="field-row">
-            <span>Payment notes</span>
+          <label class="field-row field-row--split">
+            <span class="field-row__meta">
+              <span class="field-row__label">Notes</span>
+            </span>
             <textarea name="downpaymentNotes" rows="2" data-downpayment-notes></textarea>
           </label>
         </div>
@@ -364,12 +428,12 @@ function pendingCustomerOrderLabel(count: number) {
     </div>
   </Sheet>
 
-  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table">
+  <div class="order-management-controls">
     <div class="table-filters order-management-toolbar">
       <form
         method="get"
         action="/admin/orders"
-        class="order-filter-form"
+        class="order-filter-form order-filter-form--quad"
         data-order-filter-form
         data-current-filter-query={filterQuery}
         aria-label="Filter orders"
@@ -448,6 +512,19 @@ function pendingCustomerOrderLabel(count: number) {
       </div>
     </div>
 
+    {!canCreateOrder && (
+      <section class="order-management-notice" aria-live="polite">
+        <p class="order-management-notice__copy">
+          You cannot create an order until at least one product exists.{" "}
+          <a href="/admin/products?create=product" class="order-management-notice__action">
+            Create a product
+          </a>
+        </p>
+      </section>
+    )}
+  </div>
+
+  <div data-interactive-table data-server-pagination="true" class="dashboard-interactive-table dashboard-interactive-table--orders-content">
     <div data-order-table-shell class="dashboard-interactive-table__surface">
       <DashboardTableBoard>
         <table class="dashboard-table">
@@ -498,35 +575,17 @@ function pendingCustomerOrderLabel(count: number) {
                     <span class="order-customer-cell">
                       <span class="order-customer-cell__name">{order.customer_label}</span>
                     {order.linked_customer_count !== null && (
-                      <span
-                        class="order-customer-count"
-                        tabindex="0"
-                        aria-label={`${order.linked_customer_count} linked customer orders in this agent order`}
-                        title="Linked customer orders in this agent order"
-                        data-tooltip="Linked customer orders in this agent order"
-                      >
-                        {order.linked_customer_count}
-                      </span>
+                      <Tooltip text={linkedCustomerOrdersLabel(order.linked_customer_count)}>
+                        <span class="order-customer-count">
+                          {order.linked_customer_count}
+                        </span>
+                      </Tooltip>
                     )}
                     </span>
                   </td>
                   <td>{order.source_label}</td>
                   <td>
-                    <span class="order-status-cell">
-                      <StatusBadge kind="order" status={order.status} label={autoCapitalize(order.status)} />
-                      {
-                        order.row_type === "agent"
-                          && (order.pending_customer_order_count ?? 0) > 0 && (
-                          <span
-                            class="order-pending-customer-badge"
-                            title={pendingCustomerOrderLabel(order.pending_customer_order_count ?? 0)}
-                            aria-label={pendingCustomerOrderLabel(order.pending_customer_order_count ?? 0)}
-                          >
-                            {order.pending_customer_order_count} pending
-                          </span>
-                        )
-                      }
-                    </span>
+                    <StatusBadge kind="order" status={order.status} label={autoCapitalize(order.status)} />
                   </td>
                   <td>
                     {order.payment_status ? (
@@ -554,7 +613,30 @@ function pendingCustomerOrderLabel(count: number) {
                           </button>
                         </form>
                       ) : (
-                        <ViewButton href={order.href} data-astro-prefetch="false" />
+                        <div class="order-table-actions">
+                          <ViewButton href={order.href} data-astro-prefetch="false" />
+                          {
+                            order.row_type === "agent"
+                              && (order.pending_customer_order_count ?? 0) > 0 && (
+                              <Tooltip
+                                text={pendingCustomerOrdersAwaitingLabel(order.pending_customer_order_count ?? 0)}
+                                interactive
+                              >
+                                <button
+                                  type="button"
+                                  class="order-pending-customers-action"
+                                  data-open-pending-customer-orders-modal
+                                  data-distribution-order-id={order.id}
+                                  data-distribution-label={order.customer_label}
+                                  data-pending-customer-order-count={order.pending_customer_order_count ?? 0}
+                                  aria-label={pendingCustomerOrdersAwaitingLabel(order.pending_customer_order_count ?? 0)}
+                                >
+                                  {order.pending_customer_order_count}
+                                </button>
+                              </Tooltip>
+                            )
+                          }
+                        </div>
                       )
                     }
                   </td>
@@ -623,6 +705,7 @@ function pendingCustomerOrderLabel(count: number) {
 
   document.addEventListener("DOMContentLoaded", bootCreateOrderSheet);
   document.addEventListener("astro:after-swap", bootCreateOrderSheet);
+  document.addEventListener("astro:page-load", bootCreateOrderSheet);
   if (document.readyState === "complete" || document.readyState === "interactive") {
     bootCreateOrderSheet();
   }
@@ -685,24 +768,91 @@ function pendingCustomerOrderLabel(count: number) {
     min-height: 2.35rem;
   }
 
-  .order-status-cell {
-    display: inline-flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.4rem;
+  .order-management-notice {
+    margin: 0;
+    color: #92400e;
   }
 
-  .order-pending-customer-badge {
+  .order-management-notice__copy {
+    margin: 0;
+    line-height: 1.55;
+    font-size: 0.92rem;
+  }
+
+  .order-management-notice__action {
+    color: var(--color-brand-red);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  .order-management-notice__action:hover,
+  .order-management-notice__action:focus-visible {
+    color: #551313;
+    outline: none;
+  }
+
+  .order-table-actions {
     display: inline-flex;
     align-items: center;
+    gap: 0.5rem;
+    vertical-align: middle;
+  }
+
+  .order-table-actions > a,
+  .order-table-actions > button,
+  .order-table-actions > .dashboard-tooltip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    margin: 0;
+    vertical-align: middle;
+  }
+
+  .order-table-actions > a svg {
+    display: block;
+  }
+
+  .order-table-actions > .dashboard-tooltip--interactive {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+  }
+
+  .order-pending-customers-action {
+    box-sizing: border-box;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    max-width: 30px;
+    min-height: 30px;
+    max-height: 30px;
+    flex: 0 0 30px;
+    border: none;
     border-radius: 999px;
-    background: #fff7ed;
-    border: 1px solid rgba(180, 83, 9, 0.22);
-    color: #b45309;
-    font-size: 0.72rem;
-    font-weight: 700;
+    background: #e16b16;
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 500;
     line-height: 1;
-    padding: 0.28rem 0.5rem;
-    white-space: nowrap;
+    padding: 0;
+    margin: 0;
+    text-transform: none;
+    letter-spacing: 0;
+    overflow: hidden;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+  }
+
+  .order-pending-customers-action:hover,
+  .order-pending-customers-action:focus-visible {
+    background: #c95d12;
+    color: #ffffff;
+  }
+
+  .order-pending-customers-action:focus-visible {
+    outline: 2px solid rgb(225 107 22 / 0.55);
+    outline-offset: 2px;
   }
 </style>

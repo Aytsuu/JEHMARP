@@ -19,7 +19,7 @@ function initAgentRecordFragmentTables(section: HTMLElement) {
   const tableConfigs = [
     {
       formSelector: "[data-agent-record-orders-filter-form]",
-      cacheKey: `agent-record-orders-${agentId}-v2`,
+      cacheKey: `agent-record-orders-${agentId}-v3`,
       tableShellSelector: "[data-agent-record-orders-table-shell]",
       skeletonTemplateSelector: "[data-agent-record-orders-filter-skeleton]",
       filterKeys: ["tab", "search", "orderType", "source", "orderStatus", "paymentStatus"] as const,

@@ -171,8 +171,71 @@ const customerTabTableProps = {
   }
 
   <div class="customer-record-cards">
-    <article class="customer-record-card">
-      <h2 class="customer-record-card__title">Contact information</h2>
+    <article class="customer-record-card customer-record-card--contact">
+      <div class="customer-record-card__header">
+        <h2 class="customer-record-card__title">Contact information</h2>
+        <button
+          type="button"
+          class="customer-record-card__edit-trigger table-cell-trigger"
+          data-open-cell-popover
+          aria-label={`Edit contact information for ${agent.display_name}`}
+        >
+          <span class="sr-only">Edit contact information</span>
+        </button>
+        <Popover
+          title={`Edit contact: ${agent.display_name}`}
+          formDataAttributes={{ "data-astro-reload": "" }}
+        >
+          <input type="hidden" name="action" value="update-agent" />
+          <input type="hidden" name="agentId" value={agent.id} />
+          <input type="hidden" name="firstName" value={agent.first_name} />
+          <input type="hidden" name="lastName" value={agent.last_name} />
+          <input type="hidden" name="status" value={agent.status} />
+          <label>
+            <span>Employee ID</span>
+            <input
+              name="employeeId"
+              value={agent.employee_id ?? ""}
+              autocomplete="off"
+            />
+          </label>
+          <label>
+            <span>Email</span>
+            <input
+              name="email"
+              type="email"
+              value={agent.email ?? ""}
+              autocomplete="email"
+            />
+          </label>
+          <label>
+            <span>Contact number</span>
+            <input
+              name="contact"
+              type="tel"
+              value={agent.contact ?? ""}
+              inputmode="numeric"
+              pattern="[0-9]{11}"
+              minlength="11"
+              maxlength="11"
+              required
+              autocomplete="tel"
+              data-digits-only
+            />
+          </label>
+          <label>
+            <span>Address</span>
+            <textarea name="address" rows="3">{agent.address ?? ""}</textarea>
+          </label>
+          <button
+            slot="footer"
+            type="submit"
+            class="ui-popover__button-primary"
+          >
+            Save changes
+          </button>
+        </Popover>
+      </div>
       <dl
         class="customer-record-card__list customer-record-card__list--contact"
       >
@@ -912,6 +975,10 @@ const customerTabTableProps = {
   }
 
   .customer-record-card--status .customer-record-card__title {
+    margin-bottom: 0;
+  }
+
+  .customer-record-card--contact .customer-record-card__title {
     margin-bottom: 0;
   }
 

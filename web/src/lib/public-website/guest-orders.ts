@@ -3,12 +3,13 @@ import { createHash } from "node:crypto";
 
 import { getServerEnv } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { loadPlatformSettings } from "@/lib/platform-settings";
+import { loadPlatformSettings, type PlatformSettings } from "@/lib/platform-settings";
 import {
   resolveOperationalNotificationRecipients,
   sendOperationalNotificationEmail,
 } from "@/lib/platform-settings/operational-notification-email";
 import { verifyTurnstileToken } from "@/lib/public-website/turnstile";
+import { validatePrivacyNoticeAcknowledgement } from "@/lib/platform-settings/privacy-notice";
 import {
   loadGuestOrderTrackingNumber,
   buildCustomerTrackPageUrl,
@@ -16,6 +17,7 @@ import {
 import {
   sendCustomerTrackingNumberEmail,
 } from "@/lib/public-website/customer-tracking-email";
+import { resolveTransactionalEmailFrom } from "@/lib/public-website/transactional-email";
 
 const customerSchema = z.object({
   firstName: z.string().trim().min(1, "First name is required.").max(100),
@@ -65,7 +67,10 @@ export type GuestOrderParseResult =
       errors: string[];
     };
 
-export function parseGuestOrderFormData(formData: FormData): GuestOrderParseResult {
+export function parseGuestOrderFormData(
+  formData: FormData,
+  options: { requirePrivacyAcknowledgement?: boolean } = {},
+): GuestOrderParseResult {
   const customerResult = customerSchema.safeParse({
     firstName: formData.get("firstName"),
     lastName: formData.get("lastName"),
@@ -80,6 +85,13 @@ export function parseGuestOrderFormData(formData: FormData): GuestOrderParseResu
     ...itemResult.errors,
     ...(turnstileToken === "" ? ["Please complete the verification challenge."] : []),
   ];
+  const privacyAckError = validatePrivacyNoticeAcknowledgement(
+    formData,
+    options.requirePrivacyAcknowledgement ?? false,
+  );
+  if (privacyAckError) {
+    errors.push(privacyAckError);
+  }
 
   if (!customerResult.success || itemResult.items.length === 0 || errors.length > 0) {
     return {
@@ -136,11 +148,18 @@ export async function submitGuestOrder(
     }
 
     const orderId = data;
+    const settings = await loadPlatformSettings(supabase);
     const trackingNumber = await loadGuestOrderTrackingNumber(orderId, supabase);
     const trackingEmailStatus = await deliverGuestOrderTrackingEmail(
-      payload, trackingNumber, options.siteOrigin, fetcher,
+      payload, trackingNumber, options.siteOrigin, fetcher, settings,
     );
-    await notifyAdminsOfGuestOrder({ supabase, orderId, payload, fetch: fetcher });
+    await notifyAdminsOfGuestOrder({
+      supabase,
+      orderId,
+      payload,
+      fetch: fetcher,
+      settings,
+    });
 
     return {
       orderId,
@@ -162,11 +181,18 @@ async function deliverGuestOrderTrackingEmail(
   trackingNumber: string,
   siteOrigin: string | undefined,
   fetcher: typeof fetch,
+  settings: PlatformSettings,
 ): Promise<GuestOrderSubmitResult["trackingEmailStatus"]> {
   if (!payload.customer.email || !siteOrigin) {
     return "skipped";
   }
 
+  const env = getServerEnv();
+  const from = resolveTransactionalEmailFrom({
+    resellerPriceListFrom: env.resellerPriceListFrom,
+    tradeName: settings.businessProfile.tradeName,
+    primaryEmail: settings.businessProfile.primaryEmail,
+  });
   const recipientName = `${payload.customer.firstName} ${payload.customer.lastName}`.trim();
   const emailResult = await sendCustomerTrackingNumberEmail(
     payload.customer.email,
@@ -176,7 +202,7 @@ async function deliverGuestOrderTrackingEmail(
       trackPageUrl: buildCustomerTrackPageUrl(siteOrigin),
       includeOrderSubmittedNote: true,
     },
-    { fetch: fetcher },
+    { fetch: fetcher, from },
   );
 
   if (emailResult.status === "failed") {
@@ -191,9 +217,9 @@ async function notifyAdminsOfGuestOrder(options: {
   orderId: string;
   payload: GuestOrderPayload;
   fetch: typeof fetch;
+  settings: PlatformSettings;
 }) {
-  const settings = await loadPlatformSettings(options.supabase);
-  const recipients = resolveOperationalNotificationRecipients("new_order", settings);
+  const recipients = resolveOperationalNotificationRecipients("new_order", options.settings);
   if (recipients.length === 0) return;
   const customerName = `${options.payload.customer.firstName} ${options.payload.customer.lastName}`.trim();
   const result = await sendOperationalNotificationEmail({

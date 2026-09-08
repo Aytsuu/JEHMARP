@@ -9,10 +9,24 @@ import { loadDocumentPdfLayoutOptions } from "@/lib/platform-settings/document-l
 
 export type BulkOrderSelection = {
   id: string;
-  rowType: "agent" | "customer";
+  rowType: "distributed" | "personal";
 };
 
-const selectionPattern = /^(agent|customer):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+const selectionPattern = /^(distributed|personal|agent|customer):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i;
+
+function normalizeBulkOrderRowType(value: string): BulkOrderSelection["rowType"] | null {
+  const normalized = value.toLowerCase();
+
+  if (normalized === "distributed" || normalized === "agent") {
+    return "distributed";
+  }
+
+  if (normalized === "personal" || normalized === "customer") {
+    return "personal";
+  }
+
+  return null;
+}
 
 export function parseBulkOrderSelections(values: string[]): BulkOrderSelection[] {
   const selections: BulkOrderSelection[] = [];
@@ -22,7 +36,9 @@ export function parseBulkOrderSelections(values: string[]): BulkOrderSelection[]
     const match = selectionPattern.exec(value.trim());
     if (!match) continue;
 
-    const rowType = match[1].toLowerCase() as BulkOrderSelection["rowType"];
+    const rowType = normalizeBulkOrderRowType(match[1]);
+    if (!rowType) continue;
+
     const id = match[2];
     const key = `${rowType}:${id}`;
 
@@ -42,7 +58,7 @@ export async function resolveCustomerOrdersForBulkDocuments(
   const seenOrderIds = new Set<string>();
 
   for (const selection of selections) {
-    if (selection.rowType === "customer") {
+    if (selection.rowType === "personal") {
       if (!seenOrderIds.has(selection.id)) {
         seenOrderIds.add(selection.id);
         orderIds.push(selection.id);

@@ -4,10 +4,21 @@ import Layout from "@/layouts/Layout.astro";
 import PublicShopPageContent from "@/components/public-website/PublicShopPageContent.astro";
 import { listOrderablePublicProducts } from "@/lib/public-website/shop";
 import { getPublicEnv } from "@/lib/env";
+import { getPrivacyCollectionContext } from "@/lib/public-website/privacy-collection-notice";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const products = await listOrderablePublicProducts();
+const settings = await loadPlatformSettings(createSupabaseAdminClient());
+const privacyContext = getPrivacyCollectionContext(settings);
 const orderStatus = Astro.url.searchParams.get("order");
-const orderEmailSent = Astro.url.searchParams.get("email") === "1";
+const orderEmailStatus = (() => {
+  const email = Astro.url.searchParams.get("email");
+  if (email === "1") return "sent";
+  if (email === "failed") return "failed";
+  if (email === "unavailable") return "unavailable";
+  return null;
+})();
 const orderMessage = Astro.url.searchParams.get("message");
 const { turnstileSiteKey } = getPublicEnv();
 ---
@@ -20,9 +31,11 @@ const { turnstileSiteKey } = getPublicEnv();
     <PublicShopPageContent
       products={products}
       orderStatus={orderStatus}
-      orderEmailSent={orderEmailSent}
+      orderEmailStatus={orderEmailStatus}
       orderMessage={orderMessage}
       turnstileSiteKey={turnstileSiteKey ?? null}
+      privacyHref={privacyContext.privacyHref}
+      requirePrivacyAcknowledgement={privacyContext.requireAcknowledgement}
     />
   </PageShell>
 </Layout>

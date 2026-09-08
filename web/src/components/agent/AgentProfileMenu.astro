@@ -42,9 +42,7 @@ function isProfileSectionActive(href: string) {
                 {
                   item.href === "/agent/earnings"
                     ? "Track commissions and payout history"
-                    : item.href === "/agent/activity"
-                      ? "Review recent orders, payments, and customer updates"
-                      : "Manage your reseller profile and preferences"
+                    : "Review recent orders, payments, and customer updates"
                 }
               </small>
             </span>
@@ -61,9 +59,19 @@ function isProfileSectionActive(href: string) {
 </section>
 
 <style>
+  .agent-profile-menu {
+    width: 100%;
+    min-width: 0;
+  }
+
   .agent-profile-menu__list {
-    display: grid;
-    gap: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .agent-profile-menu__list > * + * {
+    border-top: 1px solid #e5e7eb;
   }
 
   .agent-profile-menu__form {
@@ -76,28 +84,24 @@ function isProfileSectionActive(href: string) {
     align-items: center;
     gap: 0.85rem;
     width: 100%;
-    padding: 1rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 0.75rem;
-    background: #ffffff;
+    padding: 1rem 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     color: inherit;
     text-align: left;
     text-decoration: none;
     cursor: pointer;
-    transition:
-      border-color 0.2s ease,
-      background-color 0.2s ease;
+    transition: background-color 0.2s ease;
   }
 
   .agent-profile-menu__item:hover,
   .agent-profile-menu__item:focus-visible {
-    border-color: rgba(102, 24, 24, 0.22);
     outline: none;
   }
 
-  .agent-profile-menu__item--active {
-    border-color: rgba(102, 24, 24, 0.28);
-    background: #fffdf8;
+  .agent-profile-menu__item--active strong {
+    color: var(--color-brand-red);
   }
 
   .agent-profile-menu__item--action {
@@ -107,10 +111,10 @@ function isProfileSectionActive(href: string) {
     justify-content: initial;
     gap: 0.85rem;
     width: 100%;
-    padding: 1rem;
-    border: 1px solid #f3d0d0;
-    border-radius: 0.75rem;
-    background: #fffafa;
+    padding: 1rem 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
     color: inherit;
     font: inherit;
     font-size: inherit;
@@ -121,7 +125,7 @@ function isProfileSectionActive(href: string) {
 
   .agent-profile-menu__item--action:hover:not(:disabled),
   .agent-profile-menu__item--action:focus-visible {
-    background: #fffafa;
+    background: transparent;
     color: inherit;
   }
 
@@ -158,5 +162,29 @@ function isProfileSectionActive(href: string) {
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+  }
+
+  @media (min-width: 640px) {
+    .agent-profile-menu__item,
+    .agent-profile-menu__item--action {
+      padding: 1.05rem 0;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .agent-profile-menu__copy strong {
+      font-size: 1rem;
+    }
+
+    .agent-profile-menu__copy small {
+      font-size: 0.84rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .agent-profile-menu__item,
+    .agent-profile-menu__item--action {
+      padding: 1.1rem 0;
+    }
   }
 </style>

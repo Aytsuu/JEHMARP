@@ -2,6 +2,7 @@ import type {
   AdminAgent,
   AdminAgentOrder,
   AdminAgentReceivedPayment,
+  AdminAgentRemittanceRecord,
   AdminCustomer,
   AdminOrder,
   AdminProduct,
@@ -20,7 +21,7 @@ import {
   agentOrderCommissionTotal,
   agentOrderPaymentStatus,
   agentOrderReceivableTotal,
-  agentOrderTotal,
+  agentOrderRemainingReceivable,
   formatCurrency,
   fullName,
   orderBalance,
@@ -38,9 +39,17 @@ export type AgentRecordTab =
   | "customers"
   | "previous-orders";
 
-export type AgentRecordOrderType = "customer" | "agent";
+export type AgentRecordOrderType = "personal" | "distributed";
 
-export const agentRecordOrderTypes = ["customer", "agent"] as const;
+export const agentRecordOrderTypes = ["personal", "distributed"] as const;
+
+export function isAgentRecordPersonalOrder(order: AdminOrder) {
+  return !order.converted_at && !order.parent_order_id;
+}
+
+export function agentRecordPersonalOrders(customerOrders: AdminOrder[]) {
+  return customerOrders.filter(isAgentRecordPersonalOrder);
+}
 
 export type AgentRecordFilters = AdminOrderFilters & {
   orderType?: AgentRecordOrderType;
@@ -66,7 +75,8 @@ export type AgentRecordOrderRow = {
   source_label: string;
   order_status: string;
   payment_status: string;
-  amount: number;
+  order_total: number;
+  remaining_receivable: number;
   href: string;
 };
 
@@ -118,8 +128,12 @@ export function parseAgentRecordFilters(url: URL): AgentRecordFilters {
   const filters: AgentRecordFilters = { ...parseAdminOrderFilters(url) };
   const orderType = url.searchParams.get("orderType");
 
-  if (orderType === "customer" || orderType === "agent") {
+  if (orderType === "personal" || orderType === "distributed") {
     filters.orderType = orderType;
+  } else if (orderType === "customer") {
+    filters.orderType = "personal";
+  } else if (orderType === "agent") {
+    filters.orderType = "distributed";
   }
 
   return filters;
@@ -142,33 +156,35 @@ export function buildAgentRecordOrderRows(
   agentOrders: AdminAgentOrder[],
   agentReturnTo: string,
 ): AgentRecordOrderRow[] {
-  const customerRows = customerOrders.map((order) => ({
+  const personalRows = agentRecordPersonalOrders(customerOrders).map((order) => ({
     id: order.id,
     created_at: order.created_at,
-    order_type: "customer" as const,
-    order_type_label: "Customer",
+    order_type: "personal" as const,
+    order_type_label: "Personal",
     source: order.source,
     source_label: formatOrderSource(order.source),
     order_status: order.order_status,
     payment_status: order.payment_status,
-    amount: orderBalance(order),
+    order_total: orderReceivableTotal(order, "final_quantity"),
+    remaining_receivable: orderBalance(order),
     href: `/admin/orders/customer/${order.id}?returnTo=${agentReturnTo}`,
   }));
 
-  const agentRows = agentOrders.map((order) => ({
+  const distributedRows = agentOrders.map((order) => ({
     id: order.id,
     created_at: order.created_at,
-    order_type: "agent" as const,
-    order_type_label: "Agent",
+    order_type: "distributed" as const,
+    order_type_label: "Distributed",
     source: null,
-    source_label: "Agent order",
+    source_label: "Distributed order",
     order_status: order.order_status,
     payment_status: agentOrderPaymentStatus(order),
-    amount: agentOrderTotal(order),
+    order_total: agentOrderReceivableTotal(order),
+    remaining_receivable: agentOrderRemainingReceivable(order),
     href: `/admin/orders/agent/${order.id}?returnTo=${agentReturnTo}`,
   }));
 
-  return [...customerRows, ...agentRows].sort(
+  return [...personalRows, ...distributedRows].sort(
     (left, right) =>
       new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
   );
@@ -185,7 +201,7 @@ export function filterAgentRecordOrderRows(
       return false;
     }
 
-    if (filters.source && (row.order_type !== "customer" || row.source !== filters.source)) {
+    if (filters.source && (row.order_type !== "personal" || row.source !== filters.source)) {
       return false;
     }
 
@@ -224,10 +240,11 @@ export function agentRecordOrderCounts(
   customerOrders: AdminOrder[],
   agentOrders: AdminAgentOrder[],
 ) {
+  const personalOrders = agentRecordPersonalOrders(customerOrders);
   const customerCounts = {
-    pending: customerOrders.filter((order) => order.order_status === "pending").length,
-    processing: customerOrders.filter((order) => order.order_status === "processing").length,
-    closed: customerOrders.filter((order) => order.order_status === "closed").length,
+    pending: personalOrders.filter((order) => order.order_status === "pending").length,
+    processing: personalOrders.filter((order) => order.order_status === "processing").length,
+    closed: personalOrders.filter((order) => order.order_status === "closed").length,
   };
   const agentPending = agentOrders.filter(
     (order) => order.order_status === "pending_customers" || order.order_status === "pending_order",
@@ -236,7 +253,7 @@ export function agentRecordOrderCounts(
   const agentClosed = agentOrders.filter((order) => order.order_status === "closed").length;
 
   return {
-    total: customerOrders.length + agentOrders.length,
+    total: personalOrders.length + agentOrders.length,
     pending: customerCounts.pending + agentPending,
     processing: customerCounts.processing + agentProcessing,
     closed: customerCounts.closed + agentClosed,
@@ -550,6 +567,7 @@ export function buildAgentReceivableSegments(
     receivable: roundCurrency(
       (customerPendingSegment?.receivable ?? 0) + pendingAgentContribution.amount,
     ),
+    tooltip: customerPendingSegment?.tooltip ?? "",
   };
 
   return attachAgentReceivableTooltips(
@@ -562,35 +580,11 @@ export function buildAgentReceivableSegments(
 }
 
 export function agentRecordPaymentsSubmitted(
-  agentId: string,
-  customerOrders: AdminOrder[],
-  agentOrders: AdminAgentOrder[],
+  remittanceRecords: AdminAgentRemittanceRecord[],
 ) {
-  const seenPaymentIds = new Set<string>();
-  let total = 0;
-
-  const addOrderPayments = (order: AdminOrder) => {
-    for (const payment of order.agent_received_payment ?? []) {
-      if (payment.agent_id !== agentId || seenPaymentIds.has(payment.id)) {
-        continue;
-      }
-
-      seenPaymentIds.add(payment.id);
-      total += payment.amount;
-    }
-  };
-
-  for (const order of customerOrders) {
-    addOrderPayments(order);
-  }
-
-  for (const agentOrder of agentOrders) {
-    for (const customerOrder of agentOrder.customer_order) {
-      addOrderPayments(customerOrder);
-    }
-  }
-
-  return roundCurrency(total);
+  return roundCurrency(
+    remittanceRecords.reduce((total, record) => total + record.payment.amount, 0),
+  );
 }
 
 export function agentAccountLabel(status: AdminAgent["status"]) {
@@ -778,6 +772,7 @@ export function buildAgentPerformanceQuickStats(
   agentOrders: AdminAgentOrder[],
   products: Pick<AdminProduct, "id" | "category">[],
   agentReturnTo: string,
+  remittanceRecords: AdminAgentRemittanceRecord[] = [],
 ): AgentPerformanceQuickStats {
   const scopedCustomerOrders = collectAgentCustomerOrders(customerOrders, agentOrders);
   const categoryByProductId = new Map(
@@ -789,6 +784,9 @@ export function buildAgentPerformanceQuickStats(
     agentOrders,
     agentReturnTo,
   );
+  const resolvedRemittanceRecords = remittanceRecords.length > 0
+    ? remittanceRecords
+    : collectAgentRemittanceRecords(agentId, scopedCustomerOrders, agentOrders);
 
   return {
     kgSold: roundQuantity(
@@ -801,11 +799,7 @@ export function buildAgentPerformanceQuickStats(
       agentOrders,
       categoryByProductId,
     ),
-    remittance: buildAgentRemittancePerformance(
-      agentId,
-      scopedCustomerOrders,
-      agentOrders,
-    ),
+    remittance: buildAgentRemittancePerformance(resolvedRemittanceRecords),
     commissionEntries,
     commissionEarnedTotal: roundCurrency(
       commissionEntries.reduce((total, entry) => total + entry.amount, 0),
@@ -988,15 +982,8 @@ function buildTopSoldCategory(
 }
 
 function buildAgentRemittancePerformance(
-  agentId: string,
-  customerOrders: AdminOrder[],
-  agentOrders: AdminAgentOrder[],
+  remittanceRecords: AdminAgentRemittanceRecord[],
 ): AgentRemittancePerformance {
-  const remittanceRecords = collectAgentRemittanceRecords(
-    agentId,
-    customerOrders,
-    agentOrders,
-  );
   const confirmedRecords = remittanceRecords.filter(
     (record) => record.payment.status === "confirmed",
   );
@@ -1107,7 +1094,8 @@ function collectAgentRemittanceRecords(
 
   const addOrderPayments = (order: AdminOrder) => {
     for (const payment of order.agent_received_payment ?? []) {
-      if (payment.agent_id !== agentId || seenPaymentIds.has(payment.id)) {
+      const paymentAgentId = payment.agent_id ?? payment.agent?.id ?? null;
+      if (paymentAgentId !== agentId || seenPaymentIds.has(payment.id)) {
         continue;
       }
 
@@ -1155,7 +1143,9 @@ function resolveAgentOrderCommissionEarnedDate(agentOrder: AdminAgentOrder) {
   return latestPaymentDate ?? agentOrder.sale_date ?? agentOrder.updated_at ?? agentOrder.created_at;
 }
 
-function resolveOrderAnchorDate(order: AdminOrder) {
+function resolveOrderAnchorDate(
+  order: Pick<AdminOrder, "sale_date" | "created_at">,
+) {
   return order.sale_date ?? order.created_at;
 }
 

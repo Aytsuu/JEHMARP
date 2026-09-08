@@ -1,6 +1,7 @@
 ---
 import AdminContentEditable from "@/components/admin/AdminContentEditable.astro";
 import FormSubmissionFeedback from "@/components/ui/FormSubmissionFeedback.astro";
+import PrivacyCollectionNotice from "@/components/public-website/PrivacyCollectionNotice.astro";
 import { CONTACT_INQUIRY_FEEDBACK_PARAMS } from "@/lib/client/form-submission-feedback-url";
 import {
   getSectionFieldEntries,
@@ -18,9 +19,19 @@ type Props = {
   turnstileSiteKey: string | null;
   returnPath?: string;
   contentEditing?: AdminContentEditingContext;
+  privacyHref?: string | null;
+  requirePrivacyAcknowledgement?: boolean;
 };
 
-const { content, feedback, turnstileSiteKey, returnPath, contentEditing } = Astro.props;
+const {
+  content,
+  feedback,
+  turnstileSiteKey,
+  returnPath,
+  contentEditing,
+  privacyHref = null,
+  requirePrivacyAcknowledgement = false,
+} = Astro.props;
 
 const disableFormSubmission = returnPath
   ? isAdminContentPreviewPath(returnPath)
@@ -146,6 +157,12 @@ function getIconTypeFromLabel(label: string) {
             ></textarea>
           </div>
         </fieldset>
+
+        <PrivacyCollectionNotice
+          purpose="contact-inquiry"
+          privacyHref={privacyHref}
+          requireAcknowledgement={requirePrivacyAcknowledgement}
+        />
 
         <div class="turnstile-container">
           {

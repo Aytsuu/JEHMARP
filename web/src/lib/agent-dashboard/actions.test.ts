@@ -371,7 +371,7 @@ describe("parseAgentActionFormData", () => {
     });
   });
 
-  it("rejects attach-agent-order-customer actions for unassigned customers", () => {
+  it("allows attach-agent-order-customer actions for unassigned existing customers", () => {
     const formData = new FormData();
     formData.set("action", "attach-agent-order-customer");
     formData.set("agentOrderId", "11111111-1111-4111-8111-111111111111");
@@ -392,8 +392,27 @@ describe("parseAgentActionFormData", () => {
     );
 
     expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
-      success: false,
-      errors: ["Selected customer is not assigned to this agent."],
+      success: true,
+      action: {
+        type: "attach-agent-order-customer",
+        agentOrderId: "11111111-1111-4111-8111-111111111111",
+        entries: [
+          {
+            customer: {
+              type: "existing",
+              customerId: "b10bb955-d8b1-4a26-a6e2-928fd33949e1",
+            },
+            items: [
+              {
+                productId: "4f65578f-3f1f-4216-9fc2-013ef06661d1",
+                quantity: 2,
+                addDetails: null,
+              },
+            ],
+          },
+        ],
+        requireApproval: true,
+      },
     });
   });
 });
@@ -693,5 +712,40 @@ describe("executeAgentAction", () => {
         notes: null,
       },
     })).rejects.toThrow("Unable to distribute received payment.");
+  });
+
+  it("parses personal order conversion actions", () => {
+    const formData = new FormData();
+    formData.set("action", "convert-personal-order-to-distribution");
+    formData.set("orderId", "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb");
+
+    expect(parseAgentActionFormData(formData, agentUserId, agentId, new Set())).toEqual({
+      success: true,
+      action: {
+        type: "convert-personal-order-to-distribution",
+        agentId,
+        orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      },
+    });
+  });
+
+  it("converts personal orders through the distribution RPC", async () => {
+    const rpc = vi.fn(() => Promise.resolve({
+      data: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+      error: null,
+    }));
+
+    const result = await executeAgentAction({ rpc } as never, {
+      type: "convert-personal-order-to-distribution",
+      agentId,
+      orderId: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    });
+
+    expect(rpc).toHaveBeenCalledWith("convert_personal_order_to_distribution_order", {
+      target_order_id: "49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    });
+    expect(result).toEqual({
+      redirectPath: "/agent/orders/multi-customers/49d07a2e-a8bb-4dc9-8df5-8ee5464286fb",
+    });
   });
 });

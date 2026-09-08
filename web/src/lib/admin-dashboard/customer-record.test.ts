@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AdminOrder } from "./data";
 import {
   buildCustomerPaymentRows,
+  buildCustomerReceivableSegments,
   filterCustomerPaymentRows,
   parseCustomerRecordTab,
 } from "./customer-record";
@@ -21,6 +22,59 @@ function createOrder(
 describe("parseCustomerRecordTab", () => {
   it("recognizes the payments tab", () => {
     expect(parseCustomerRecordTab("payments")).toBe("payments");
+  });
+});
+
+describe("buildCustomerReceivableSegments", () => {
+  it("adds source breakdown tooltips for each receivable segment", () => {
+    const segments = buildCustomerReceivableSegments([
+      {
+        id: "order-pending",
+        source: "guest_shop",
+        order_status: "pending",
+        payment_status: "unpaid",
+        customer_order_item: [
+          {
+            final_quantity: 2,
+            unit_price: 100,
+          },
+        ],
+        payment: [],
+      } as unknown as AdminOrder,
+      {
+        id: "order-unpaid",
+        source: "admin_manual",
+        order_status: "processing",
+        payment_status: "unpaid",
+        customer_order_item: [
+          {
+            final_quantity: 1,
+            unit_price: 250,
+          },
+        ],
+        payment: [],
+      } as unknown as AdminOrder,
+    ]);
+
+    expect(segments).toHaveLength(2);
+    expect(segments.find((segment) => segment.bucket === "pending")).toEqual(
+      expect.objectContaining({
+        receivable: 200,
+        tooltip: expect.stringContaining("Shop:"),
+      }),
+    );
+    expect(segments.find((segment) => segment.bucket === "unpaid")).toEqual(
+      expect.objectContaining({
+        receivable: 250,
+        tooltip: expect.stringContaining("Manual:"),
+      }),
+    );
+    expect(segments.find((segment) => segment.bucket === "pending")?.tooltip).toContain(
+      "Pending",
+    );
+    expect(segments.find((segment) => segment.bucket === "unpaid")?.tooltip).toContain(
+      "Unpaid",
+    );
   });
 });
 

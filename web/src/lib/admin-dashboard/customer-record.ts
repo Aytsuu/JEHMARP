@@ -10,6 +10,7 @@ import {
   orderPaymentTotal,
   orderReceivableTotal,
   orderTotal,
+  formatCurrency,
 } from "@/lib/admin-dashboard/view";
 
 function roundCurrency(value: number) {
@@ -26,6 +27,7 @@ export type CustomerReceivableSegment = {
   invoiceCount: number;
   receivable: number;
   color: string;
+  tooltip: string;
 };
 
 export type CustomerSalesRow = {
@@ -78,6 +80,94 @@ const receivableBucketMeta: Array<{
   { bucket: "unpaid", label: "Unpaid", color: "#dc2626" },
   { bucket: "pending", label: "Pending", color: "#6b7280" },
 ];
+
+function invoiceCountLabel(count: number) {
+  return `${count} invoice${count === 1 ? "" : "s"}`;
+}
+
+function receivableSegmentLabel(bucket: CustomerReceivableBucket) {
+  return receivableBucketMeta.find((entry) => entry.bucket === bucket)?.label ?? bucket;
+}
+
+function receivableAmountForOrder(order: AdminOrder, bucket: CustomerReceivableBucket) {
+  if (bucket === "paid" || bucket === "pending") {
+    return orderReceivableTotal(order, "final_quantity");
+  }
+
+  return orderBalance(order);
+}
+
+function orderMatchesReceivableBucket(
+  order: AdminOrder,
+  bucket: CustomerReceivableBucket,
+) {
+  if (bucket === "pending") {
+    return order.order_status === "pending";
+  }
+
+  if (order.order_status === "pending") {
+    return false;
+  }
+
+  if (bucket === "paid") {
+    return order.payment_status === "paid";
+  }
+
+  if (bucket === "partial") {
+    return order.payment_status === "partial";
+  }
+
+  return order.payment_status !== "paid" && order.payment_status !== "partial";
+}
+
+function sumCustomerOrdersBySourceForBucket(
+  orders: AdminOrder[],
+  bucket: CustomerReceivableBucket,
+) {
+  const totalsBySource = new Map<string, { amount: number; count: number }>();
+
+  for (const order of orders) {
+    if (!orderMatchesReceivableBucket(order, bucket)) {
+      continue;
+    }
+
+    const sourceLabel = formatOrderSource(order.source);
+    const current = totalsBySource.get(sourceLabel) ?? { amount: 0, count: 0 };
+
+    totalsBySource.set(sourceLabel, {
+      amount: roundCurrency(current.amount + receivableAmountForOrder(order, bucket)),
+      count: current.count + 1,
+    });
+  }
+
+  return Array.from(totalsBySource.entries())
+    .map(([label, totals]) => ({
+      label,
+      amount: totals.amount,
+      count: totals.count,
+    }))
+    .sort((left, right) => right.amount - left.amount);
+}
+
+function buildCustomerReceivableSegmentTooltip(
+  bucket: CustomerReceivableBucket,
+  orders: AdminOrder[],
+) {
+  const segmentLabel = receivableSegmentLabel(bucket);
+  const lines = sumCustomerOrdersBySourceForBucket(orders, bucket);
+
+  if (lines.length === 0) {
+    return `No ${segmentLabel.toLowerCase()} orders.`;
+  }
+
+  return [
+    segmentLabel,
+    ...lines.map(
+      (line) =>
+        `${line.label}: ${formatCurrency(line.amount)} (${invoiceCountLabel(line.count)})`,
+    ),
+  ].join("\n");
+}
 
 export function parseCustomerRecordTab(value: string | null): CustomerRecordTab {
   if (value === "sales" || value === "invoices" || value === "payments") {
@@ -160,6 +250,7 @@ export function buildCustomerReceivableSegments(orders: AdminOrder[]): CustomerR
       color,
       invoiceCount: buckets[bucket].count,
       receivable: roundCurrency(buckets[bucket].receivable),
+      tooltip: buildCustomerReceivableSegmentTooltip(bucket, orders),
     }))
     .filter((segment) => segment.receivable > 0 || segment.invoiceCount > 0)
     .sort((left, right) => right.receivable - left.receivable);

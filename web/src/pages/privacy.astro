@@ -1,0 +1,24 @@
+---
+import PageShell from "@/components/PageShell.astro";
+import Layout from "@/layouts/Layout.astro";
+import PublicPrivacyPageContent from "@/components/public-website/PublicPrivacyPageContent.astro";
+import { isPrivacyNoticePublishable, loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
+export const prerender = false;
+
+const settings = await loadPlatformSettings(createSupabaseAdminClient());
+
+if (!isPrivacyNoticePublishable(settings)) {
+  return new Response("Not Found", { status: 404 });
+}
+---
+
+<Layout
+  title="Privacy & Data Privacy Notice - JEHMARP"
+  description="How JEHMARP collects, uses, stores, and protects personal data under the Philippine Data Privacy Act."
+>
+  <PageShell title="Privacy & Data Privacy Notice">
+    <PublicPrivacyPageContent settings={settings} />
+  </PageShell>
+</Layout>

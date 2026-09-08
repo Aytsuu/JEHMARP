@@ -196,7 +196,7 @@ print_drift_message() {
   if [ "$LEDGER_POLICY" = "staging-cutover" ]; then
     echo "  - exactly one remote version: ${baseline_version}" >&2
   else
-    echo "  - a valid applied prefix of the active migrations beginning with ${baseline_version}" >&2
+    echo "  - a valid ordered subsequence of the active migrations beginning with ${baseline_version}" >&2
   fi
   echo "Remote versions:" >&2
   cat "$remote_versions_file" >&2
@@ -239,6 +239,62 @@ remote_is_valid_active_prefix() {
   done
 
   return 0
+}
+
+remote_is_valid_active_subsequence() {
+  local remote_versions_file="$1"
+  local active_versions_file="$2"
+  local remote_count
+  local active_count
+  local remote_index=1
+  local active_index=1
+  local remote_version=""
+  local active_version=""
+  local matched=false
+
+  remote_count="$(wc -l < "$remote_versions_file" | tr -d ' ')"
+  active_count="$(wc -l < "$active_versions_file" | tr -d ' ')"
+
+  if [ "$remote_count" -eq 0 ]; then
+    return 1
+  fi
+
+  if [ "$(sed -n '1p' "$remote_versions_file")" != "$(sed -n '1p' "$active_versions_file")" ]; then
+    return 1
+  fi
+
+  while [ "$remote_index" -le "$remote_count" ]; do
+    remote_version="$(sed -n "${remote_index}p" "$remote_versions_file")"
+    matched=false
+
+    while [ "$active_index" -le "$active_count" ]; do
+      active_version="$(sed -n "${active_index}p" "$active_versions_file")"
+      active_index=$((active_index + 1))
+      if [ "$remote_version" = "$active_version" ]; then
+        matched=true
+        break
+      fi
+    done
+
+    if [ "$matched" = "false" ]; then
+      return 1
+    fi
+
+    remote_index=$((remote_index + 1))
+  done
+
+  return 0
+}
+
+remote_matches_active_ledger_policy() {
+  local remote_versions_file="$1"
+  local active_versions_file="$2"
+
+  if remote_is_valid_active_prefix "$remote_versions_file" "$active_versions_file"; then
+    return 0
+  fi
+
+  remote_is_valid_active_subsequence "$remote_versions_file" "$active_versions_file"
 }
 
 tmp_dir="$(mktemp -d)"
@@ -287,7 +343,7 @@ if [ "$LEDGER_POLICY" = "staging-cutover" ]; then
     exit 0
   fi
 else
-  if remote_is_valid_active_prefix "$remote_versions_file" "$active_versions_file"; then
+  if remote_matches_active_ledger_policy "$remote_versions_file" "$active_versions_file"; then
     echo "Remote migration ledger matches a valid applied prefix of the active migrations; db push planning may proceed."
     exit 0
   fi

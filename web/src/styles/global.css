@@ -32,6 +32,13 @@
 @layer base {
   :root {
     --public-site-header-height: 5rem;
+    --app-viewport-height: 100vh;
+  }
+
+  @supports (height: 100dvh) {
+    :root {
+      --app-viewport-height: 100dvh;
+    }
   }
 
   html {
@@ -1389,6 +1396,19 @@
     min-width: 0;
   }
 
+  .order-filter-form--paired {
+    grid-template-columns: minmax(22rem, 2.25fr) minmax(9rem, 0.65fr);
+  }
+
+  .order-filter-form--quad {
+    grid-template-columns:
+      minmax(22rem, 1.5fr) minmax(9rem, 0.65fr) minmax(10rem, 0.75fr) minmax(10rem, 0.75fr);
+  }
+
+  .product-filter-form--triple {
+    grid-template-columns: minmax(22rem, 1.5fr) minmax(9rem, 0.7fr) minmax(10rem, 0.8fr);
+  }
+
   .product-filter-form__reset,
   .order-filter-form__reset {
     min-height: 2.35rem;
@@ -2621,7 +2641,7 @@
   .dashboard-body:has([data-agent-notifications-page]),
   .dashboard-body:has([data-admin-record-page]),
   .dashboard-body:has([data-dashboard-record-page]) {
-    height: 100vh;
+    height: var(--app-viewport-height);
     overflow: hidden;
   }
 
@@ -2629,7 +2649,7 @@
   .dashboard-frame:has([data-agent-notifications-page]),
   .dashboard-frame:has([data-admin-record-page]),
   .dashboard-frame:has([data-dashboard-record-page]) {
-    height: 100vh;
+    height: var(--app-viewport-height);
     min-height: 0;
     overflow: hidden;
   }
@@ -2642,7 +2662,7 @@
     flex-direction: column;
     height: 100%;
     min-height: 0;
-    max-height: 100vh;
+    max-height: var(--app-viewport-height);
     overflow: hidden;
     padding: 0;
   }
@@ -2714,6 +2734,7 @@
     gap: 1rem;
     min-width: 0;
     max-width: 100%;
+    overflow-x: clip;
   }
 
   .admin-notifications-page .status-message,
@@ -2931,135 +2952,6 @@
     gap: var(--dashboard-card-gap, 0.85rem);
   }
 
-  .admin-recent-activity-card {
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
-  }
-
-  .table-wrap.admin-recent-activity-table-wrap {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .admin-recent-activity-table {
-    width: 100%;
-    max-width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-  }
-
-  .admin-recent-activity-table__col-number {
-    width: 3.5%;
-  }
-
-  .admin-recent-activity-table__col-data {
-    width: 17.3%;
-  }
-
-  .admin-recent-activity-table__col-action {
-    width: 10%;
-  }
-
-  .admin-recent-activity-table th,
-  .admin-recent-activity-table td {
-    box-sizing: border-box;
-    min-width: 0;
-    max-width: 0;
-    padding: 0.5rem 0.7rem;
-    vertical-align: middle;
-    overflow: hidden;
-    font-size: 0.9rem;
-    font-weight: 500;
-    line-height: 1.42;
-    color: #2e2e2e;
-    border-right: 1px solid #e5e7eb;
-  }
-
-  .admin-recent-activity-table thead th {
-    background: #f3f4f6;
-    border-bottom: 1px solid #e5e7eb;
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .admin-recent-activity-table tbody td {
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
-  }
-
-  .admin-recent-activity-table th.dashboard-table__number-column,
-  .admin-recent-activity-table td.dashboard-table__number-column {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-    text-align: center;
-    color: #6b7280;
-    font-size: 0.82rem;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-  }
-
-  .admin-recent-activity-table th.dashboard-table__actions-column,
-  .admin-recent-activity-table td.dashboard-table__actions-column {
-    padding-right: 0.7rem;
-    text-align: start;
-  }
-
-  .admin-recent-activity-table__cell-text {
-    display: block;
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .admin-recent-activity-table__badge {
-    display: inline-flex;
-    align-items: center;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    border-radius: 9999px;
-    padding: 0.125rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    vertical-align: top;
-  }
-
-  .admin-recent-activity-table__badge--warning {
-    background: #fef3c7;
-    color: #92400e;
-  }
-
-  .admin-recent-activity-table__badge--info {
-    background: #dbeafe;
-    color: #1e40af;
-  }
-
-  .admin-recent-activity-table__action {
-    display: block;
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 0.875rem;
-    font-weight: 700;
-    color: #661818;
-    text-decoration: none;
-    text-align: start;
-  }
-
-  .admin-recent-activity-table__action:hover {
-    text-decoration: underline;
-  }
-
   @keyframes dashboard-skeleton-shimmer {
     0% {
       background-position: 100% 0;
@@ -3133,6 +3025,17 @@
   .dashboard-tooltip {
     position: relative;
     cursor: help;
+  }
+
+  .dashboard-tooltip--interactive {
+    display: inline-flex;
+    vertical-align: middle;
+    cursor: inherit;
+    pointer-events: none;
+  }
+
+  .dashboard-tooltip--interactive > * {
+    pointer-events: auto;
   }
 
   .dashboard-floating-tooltip {
@@ -3492,11 +3395,27 @@
     font-size: 0.88rem;
     font-weight: 600;
     line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
     cursor: pointer;
     transition:
       background-color 0.2s ease,
       border-color 0.2s ease,
       color 0.2s ease;
+  }
+
+  .alert-dialog__button--ghost {
+    background: transparent;
+    border-color: transparent;
+    color: #374151;
+  }
+
+  .alert-dialog__button--ghost:hover:not(:disabled),
+  .alert-dialog__button--ghost:focus-visible:not(:disabled) {
+    background: transparent;
+    border-color: transparent;
+    color: var(--color-brand-red);
+    outline: none;
   }
 
   .alert-dialog__button--secondary {
@@ -3702,6 +3621,211 @@
     color: #ffffff !important;
   }
 
+  .yearly-order-activity {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  .yearly-order-activity__summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #4b5563;
+  }
+
+  .yearly-order-activity__legend {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem 0.875rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: #6b7280;
+  }
+
+  .yearly-order-activity__legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  .yearly-order-activity__legend-swatch {
+    width: 0.875rem;
+    height: 0.875rem;
+    border-radius: 0.125rem;
+    border: 1px solid rgba(17, 24, 39, 0.08);
+  }
+
+  .yearly-order-activity__calendar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    min-width: 0;
+  }
+
+  @media (min-width: 768px) {
+    .yearly-order-activity__calendar {
+      gap: 1.25rem;
+    }
+  }
+
+  .yearly-order-activity__half-year {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  @media (min-width: 768px) {
+    .yearly-order-activity__half-year {
+      gap: 0.75rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .yearly-order-activity__half-year {
+      gap: 1rem;
+    }
+  }
+
+  @media (max-width: 639px) {
+    .yearly-order-activity__half-year {
+      display: flex;
+      overflow-x: auto;
+      gap: 0.625rem;
+      padding-bottom: 0.25rem;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  .yearly-order-activity__month {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  @media (max-width: 639px) {
+    .yearly-order-activity__month {
+      flex: 0 0 auto;
+      width: 3.25rem;
+    }
+  }
+
+  .yearly-order-activity__month-label {
+    display: block;
+    margin: 0 0 0.75rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  @media (min-width: 640px) {
+    .yearly-order-activity__month-label {
+      font-size: 0.75rem;
+      margin-bottom: 0.875rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .yearly-order-activity__month-label {
+      font-size: 0.8125rem;
+      margin-bottom: 1rem;
+    }
+  }
+
+  .yearly-order-activity__grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  @media (min-width: 640px) {
+    .yearly-order-activity__grid {
+      gap: 4px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .yearly-order-activity__grid {
+      gap: 5px;
+    }
+  }
+
+  .yearly-order-activity__cell-tooltip {
+    display: block;
+    line-height: 0;
+    cursor: pointer;
+  }
+
+  .yearly-order-activity__cell-tooltip .yearly-order-activity__cell {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  .yearly-order-activity__cell {
+    width: 0.625rem;
+    height: 0.625rem;
+    aspect-ratio: 1 / 1;
+    border-radius: 3px;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  @media (min-width: 640px) {
+    .yearly-order-activity__cell {
+      width: 0.75rem;
+      height: 0.75rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .yearly-order-activity__cell {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .yearly-order-activity__cell {
+      width: 100%;
+      height: auto;
+      min-height: 1.125rem;
+    }
+  }
+
+  .yearly-order-activity__cell-tooltip:hover .yearly-order-activity__cell {
+    transform: scale(1.12);
+    box-shadow: 0 0 0 1px rgba(102, 24, 24, 0.25);
+  }
+
+  .yearly-order-activity__cell.is-padding {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .yearly-order-activity__empty {
+    display: flex;
+    min-height: 12rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.5rem;
+    border: 1px dashed #d1d5db;
+    padding: 1.5rem;
+    text-align: center;
+    font-size: 0.875rem;
+    color: #6b7280;
+  }
+
   .admin-card,
   .admin-form {
     @apply border border-gray-300 bg-white p-4;
@@ -3786,23 +3910,61 @@
   }
 
   .dashboard-interactive-table>.table-filters,
+  .dashboard-interactive-table>.product-management-toolbar,
   .dashboard-interactive-table>.order-management-toolbar,
-  .dashboard-interactive-table>.product-management-toolbar {
+  .order-management-controls>.order-management-toolbar {
     flex-shrink: 0;
     margin-bottom: 0;
     padding: 0 var(--dashboard-page-inset-x) 0.75rem;
     display: flex;
     align-items: end;
-    gap: 0.75rem;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: nowrap;
     border-bottom: 1px solid #e5e7eb;
     background: #ffffff;
   }
 
+  .order-management-controls:has(.order-management-notice)>.order-management-toolbar {
+    border-bottom: none;
+    padding-bottom: 0.35rem;
+  }
+
+  .order-management-controls {
+    flex-shrink: 0;
+    background: #ffffff;
+  }
+
+  .order-management-controls .order-management-notice {
+    margin: 0;
+    padding: 1rem var(--dashboard-page-inset-x);
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .dashboard-interactive-table--orders-content {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .dashboard-interactive-table>.product-management-toolbar .product-filter-form,
+  .dashboard-interactive-table>.order-management-toolbar .order-filter-form,
+  .order-management-controls>.order-management-toolbar .order-filter-form {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .dashboard-interactive-table>.product-management-toolbar .product-management-toolbar__actions,
+  .dashboard-interactive-table>.order-management-toolbar .order-management-toolbar__actions,
+  .order-management-controls>.order-management-toolbar .order-management-toolbar__actions {
+    flex: 0 0 auto;
+  }
+
   .dashboard-interactive-table>.table-filters .table-filters__search,
-  .dashboard-interactive-table>.order-management-toolbar .order-filter-form__field--search {
+  .dashboard-interactive-table>.product-management-toolbar .product-filter-form__field--search,
+  .dashboard-interactive-table>.order-management-toolbar .order-filter-form__field--search,
+  .order-management-controls>.order-management-toolbar .order-filter-form__field--search {
     flex: 1;
-    min-width: 15rem;
+    min-width: 22rem;
+    max-width: 40rem;
   }
 
   .dashboard-interactive-table__surface {
@@ -3918,19 +4080,81 @@
     row-gap: 1.25rem;
     height: auto;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
     grid-template-rows: auto auto auto;
   }
 
   .dashboard-interactive-table.customer-record-table>.table-filters,
-  .dashboard-interactive-table.customer-record-table>.order-management-toolbar {
+  .dashboard-interactive-table.customer-record-table>.table-filters.order-management-toolbar,
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.table-filters,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.table-filters.order-management-toolbar,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: flex-end;
     margin-bottom: 0;
     padding: 0;
     border-bottom: 0;
     background: transparent;
+    gap: 0.75rem;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar .order-filter-form,
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar .product-filter-form,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar .order-filter-form,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar .product-filter-form {
+    display: flex;
+    flex: 0 0 100%;
+    flex-wrap: nowrap;
+    align-items: end;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior: contain;
+  }
+
+  .dashboard-interactive-table.customer-record-table .order-filter-form__field,
+  .dashboard-interactive-table.customer-record-table .product-filter-form__field,
+  .customer-record-page .dashboard-interactive-table.customer-record-table .order-filter-form__field,
+  .customer-record-page .dashboard-interactive-table.customer-record-table .product-filter-form__field {
+    flex: 0 1 9rem;
+    min-width: 9rem;
+  }
+
+  .dashboard-interactive-table.customer-record-table .order-filter-form__field--search,
+  .dashboard-interactive-table.customer-record-table .product-filter-form__field--search,
+  .customer-record-page .dashboard-interactive-table.customer-record-table .order-filter-form__field--search,
+  .customer-record-page .dashboard-interactive-table.customer-record-table .product-filter-form__field--search {
+    flex: 1 1 14rem;
+    min-width: 12rem;
+    max-width: 22rem;
+  }
+
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar .order-management-toolbar__actions,
+  .dashboard-interactive-table.customer-record-table>.order-management-toolbar .product-management-toolbar__actions,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar .order-management-toolbar__actions,
+  .customer-record-page .dashboard-interactive-table.customer-record-table>.order-management-toolbar .product-management-toolbar__actions {
+    flex: 0 0 100%;
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
   }
 
   .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__surface {
     flex: none;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
     height: var(--customer-record-table-fixed-height);
     min-height: var(--customer-record-table-fixed-height);
     max-height: var(--customer-record-table-fixed-height);
@@ -3942,6 +4166,8 @@
   .dashboard-interactive-table.customer-record-table .dashboard-table-board {
     height: 100%;
     min-height: 0;
+    min-width: 0;
+    max-width: 100%;
     overflow: auto;
     overscroll-behavior: contain;
   }
@@ -3991,6 +4217,8 @@
   }
 
   .dashboard-interactive-table.customer-record-table .dashboard-interactive-table__footer {
+    min-width: 0;
+    max-width: 100%;
     min-height: 0;
     border-top: 0;
     background: transparent;
@@ -4009,6 +4237,17 @@
     --customer-record-table-row-height: 3rem;
     --customer-record-table-visible-rows: 10;
     --customer-record-table-fixed-height: calc(var(--customer-record-table-row-height) * (var(--customer-record-table-visible-rows) + 1));
+  }
+
+  .customer-record-page {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .customer-record-page .ui-tab-panel--plain {
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
   }
 
   .agent-order-detail-page {
@@ -4069,9 +4308,13 @@
     min-width: 0;
   }
 
-  .agent-order-detail-stat__item dd a {
-    color: inherit;
-    text-decoration: none;
+  .agent-order-detail-stat__truncate {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .agent-order-detail-stat__item dd a.agent-order-detail-stat__agent-link {
@@ -4086,10 +4329,6 @@
   .agent-order-detail-stat__item dd a.agent-order-detail-stat__agent-link:focus-visible {
     color: #551313;
     outline: none;
-  }
-
-  .agent-order-detail-stat__item dd a:hover {
-    color: var(--color-brand-red);
   }
 
   .agent-order-detail-stat__item--commission dd {
@@ -4152,6 +4391,62 @@
   .agent-order-detail-stat__footer strong {
     color: #111827;
     font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .agent-order-detail-stat--orders {
+    gap: 0;
+  }
+
+  .agent-order-detail-stat__status-bar {
+    display: flex;
+    overflow: hidden;
+    width: 100%;
+    min-height: 0.55rem;
+    border-radius: 999px;
+    background: #f3f4f6;
+  }
+
+  .agent-order-detail-stat__status-bar-segment {
+    display: block;
+    min-width: 0;
+    height: 0.55rem;
+  }
+
+  .agent-order-detail-stat__orders-divider {
+    margin: 0.9rem 0;
+    border: 0;
+    border-top: 1px solid rgba(17, 24, 39, 0.1);
+  }
+
+  .agent-order-detail-stat__status-legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.55rem 1rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .agent-order-detail-stat__status-legend-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.55rem;
+    color: rgba(17, 24, 39, 0.72);
+    font-size: 0.88rem;
+    font-weight: 600;
+  }
+
+  .agent-order-detail-stat__status-dot {
+    width: 0.65rem;
+    height: 0.65rem;
+    border-radius: 999px;
+  }
+
+  .agent-order-detail-stat__status-count {
+    color: #111827;
+    font-size: 0.92rem;
     font-weight: 700;
   }
 
@@ -4849,6 +5144,83 @@
     @apply border-green-700 bg-green-50 text-green-950;
   }
 
+  .admin-registration-link-feedback {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .admin-registration-link-feedback__message {
+    margin: 0;
+  }
+
+  .admin-registration-link-feedback__expiry {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+  }
+
+  .admin-registration-link-feedback__link-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  .admin-registration-link-feedback__link {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
+  .admin-registration-link-feedback__copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: #14532d;
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 400;
+    cursor: pointer;
+    transition: color 0.2s ease, opacity 0.2s ease;
+  }
+
+  .admin-registration-link-feedback__copy svg {
+    display: block;
+    width: 1.125rem;
+    height: 1.125rem;
+    flex-shrink: 0;
+  }
+
+  .admin-registration-link-feedback__copy:hover:not(:disabled),
+  .admin-registration-link-feedback__copy:focus-visible {
+    background: transparent;
+    color: var(--color-brand-red);
+    outline: none;
+    opacity: 1;
+  }
+
+  .admin-registration-link-feedback__copied {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
   .error-message {
     @apply border-red-700 bg-red-50 text-red-950;
   }
@@ -5024,7 +5396,6 @@
   }
 
   .order-customer-count {
-    position: relative;
     display: inline-flex;
     flex: 0 0 auto;
     min-width: 1.45rem;
@@ -5038,51 +5409,6 @@
     font-size: 0.78rem;
     font-weight: 700;
     line-height: 1;
-  }
-
-  .order-customer-count::after {
-    position: absolute;
-    bottom: calc(100% + 0.5rem);
-    left: 50%;
-    z-index: 20;
-    width: max-content;
-    max-width: 13rem;
-    transform: translateX(-50%);
-    border-radius: 0.375rem;
-    background-color: #111827;
-    color: #ffffff;
-    content: attr(data-tooltip);
-    font-size: 0.75rem;
-    font-weight: 600;
-    line-height: 1.3;
-    opacity: 0;
-    padding: 0.4rem 0.55rem;
-    pointer-events: none;
-    text-align: center;
-    transition: opacity 0.12s ease;
-    white-space: normal;
-  }
-
-  .order-customer-count::before {
-    position: absolute;
-    bottom: calc(100% + 0.25rem);
-    left: 50%;
-    z-index: 21;
-    width: 0.5rem;
-    height: 0.5rem;
-    transform: translateX(-50%) rotate(45deg);
-    background-color: #111827;
-    content: "";
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.12s ease;
-  }
-
-  .order-customer-count:hover::after,
-  .order-customer-count:hover::before,
-  .order-customer-count:focus-visible::after,
-  .order-customer-count:focus-visible::before {
-    opacity: 1;
   }
 
   .pdf-links-container {
@@ -5172,7 +5498,12 @@
     }
 
     .dashboard-sidebar-shell {
+      position: sticky;
+      top: 0;
+      align-self: start;
       width: var(--dashboard-sidebar-width);
+      height: 100vh;
+      height: 100dvh;
       flex-shrink: 0;
       transition: width var(--dashboard-sidebar-transition);
     }
@@ -5188,8 +5519,10 @@
     }
 
     .dashboard-sidebar {
-      @apply sticky top-0 h-screen border-b-0 border-r;
+      @apply border-b-0 border-r;
       width: 100%;
+      height: 100%;
+      min-height: 0;
     }
 
     .dashboard-sidebar__scroll {
@@ -8560,6 +8893,8 @@
     flex-direction: column;
     z-index: 101;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .drawer-sheet--open .drawer-sheet__content {
@@ -8567,6 +8902,7 @@
   }
 
   .drawer-sheet__header {
+    flex-shrink: 0;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
@@ -8614,13 +8950,17 @@
   }
 
   .drawer-sheet__body {
-    flex-grow: 1;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
+    overscroll-behavior: none;
     padding: 1.5rem 2rem;
     min-width: 0;
   }
 
   .drawer-sheet__footer {
+    flex-shrink: 0;
     border-top: 1px solid #e5e7eb;
     padding: 1.25rem 2rem;
     background-color: #ffffff;
@@ -8764,6 +9104,30 @@
     color: var(--color-brand-muted-black);
   }
 
+  .drawer-sheet__body form label .field-row__label,
+  .drawer-sheet__body form label .field-row__description {
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  :is(
+      #create-product-sheet,
+      #create-order-sheet,
+      #create-customer-sheet,
+      #create-customer-registration-link-sheet,
+      #create-agent-sheet
+    )
+    :is(label.field-row--split, .field-row.field-row--split):has(
+      input:required:not(:disabled),
+      select:required:not(:disabled),
+      textarea:required:not(:disabled)
+    )
+    .field-row__label::after {
+    content: " *";
+    color: var(--color-brand-red);
+    font-weight: 700;
+  }
+
   .drawer-sheet__body .order-create-form label.order-mode-option>span {
     font-size: inherit;
     font-weight: inherit;
@@ -8837,6 +9201,479 @@
 
   .product-create-form__grid {
     grid-template-columns: 1fr !important;
+  }
+
+  #create-product-sheet .product-create-form__grid {
+    gap: 2rem;
+  }
+
+  #create-product-sheet .product-create-form label.field-row--split,
+  #create-product-sheet .product-create-form .field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-product-sheet .product-create-form .field-row__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  #create-product-sheet .product-create-form .field-row__label {
+    font-size: 0.825rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-brand-muted-black);
+  }
+
+  #create-product-sheet .product-create-form .field-row__description {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: rgba(75, 85, 99, 0.82);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  #create-product-sheet .product-create-form label.field-row--split > :not(.field-row__meta),
+  #create-product-sheet .product-create-form .field-row__control {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-product-sheet .product-create-form label.field-row--split > textarea,
+  #create-product-sheet .product-create-form .field-row__control textarea {
+    align-self: start;
+  }
+
+  @media (min-width: 40rem) {
+    #create-product-sheet .product-create-form label.field-row--split,
+    #create-product-sheet .product-create-form .field-row--split {
+      grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.15rem;
+    }
+
+    #create-product-sheet .product-create-form .field-row__meta {
+      align-self: start;
+    }
+
+    #create-product-sheet .product-create-form label.field-row--split > :not(.field-row__meta),
+    #create-product-sheet .product-create-form .field-row__control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+
+    #create-product-sheet .product-create-form label.field-row--split > textarea,
+    #create-product-sheet .product-create-form .field-row__control .product-image-picker {
+      align-self: start;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    #create-product-sheet .product-create-form label.field-row--split,
+    #create-product-sheet .product-create-form .field-row--split {
+      grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    #create-product-sheet .product-create-form label.field-row--split,
+    #create-product-sheet .product-create-form .field-row--split {
+      grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+      gap: 0.55rem 1.45rem;
+    }
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form__grid {
+    grid-template-columns: 1fr !important;
+    gap: 2rem;
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split,
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__label {
+    font-size: 0.825rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-brand-muted-black);
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__description {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: rgba(75, 85, 99, 0.82);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split > :not(.field-row__meta),
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__control {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split > textarea,
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__control textarea {
+    align-self: start;
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    min-width: 1.25rem;
+    min-height: 1.25rem;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--color-brand-red);
+    cursor: pointer;
+  }
+
+  :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .customer-create-form__checkbox-control {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(102, 24, 24, 0.15);
+    border-radius: 0.5rem;
+    background-color: #ffffff;
+    box-sizing: border-box;
+  }
+
+  @media (min-width: 40rem) {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.15rem;
+    }
+
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__meta {
+      align-self: start;
+    }
+
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split > :not(.field-row__meta),
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row__control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+      grid-column: unset;
+      grid-row: unset;
+    }
+
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split .customer-create-form__checkbox-control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form label.field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .field-row--split,
+    :is(#create-customer-sheet, #create-customer-registration-link-sheet) .customer-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+      gap: 0.55rem 1.45rem;
+    }
+  }
+
+  #create-agent-sheet .agent-sheet-create-form__grid {
+    grid-template-columns: 1fr !important;
+    gap: 2rem;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form label.field-row--split,
+  #create-agent-sheet .agent-sheet-create-form .field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form .field-row__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form .field-row__label {
+    font-size: 0.825rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-brand-muted-black);
+  }
+
+  #create-agent-sheet .agent-sheet-create-form .field-row__description {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: rgba(75, 85, 99, 0.82);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form label.field-row--split > :not(.field-row__meta),
+  #create-agent-sheet .agent-sheet-create-form .field-row__control {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-agent-sheet .agent-sheet-create-form label.field-row--split > textarea,
+  #create-agent-sheet .agent-sheet-create-form .field-row__control textarea {
+    align-self: start;
+  }
+
+  @media (min-width: 40rem) {
+    #create-agent-sheet .agent-sheet-create-form label.field-row--split,
+    #create-agent-sheet .agent-sheet-create-form .field-row--split {
+      grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.15rem;
+    }
+
+    #create-agent-sheet .agent-sheet-create-form .field-row__meta {
+      align-self: start;
+    }
+
+    #create-agent-sheet .agent-sheet-create-form label.field-row--split > :not(.field-row__meta),
+    #create-agent-sheet .agent-sheet-create-form .field-row__control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    #create-agent-sheet .agent-sheet-create-form label.field-row--split,
+    #create-agent-sheet .agent-sheet-create-form .field-row--split {
+      grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    #create-agent-sheet .agent-sheet-create-form label.field-row--split,
+    #create-agent-sheet .agent-sheet-create-form .field-row--split {
+      grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+      gap: 0.55rem 1.45rem;
+    }
+  }
+
+  #create-order-sheet .order-create-form {
+    gap: 1.75rem;
+  }
+
+  #create-order-sheet .order-create-form__fields {
+    display: grid;
+    gap: 2rem;
+    min-width: 0;
+  }
+
+  #create-order-sheet .order-create-section__header {
+    padding-top: 1.25rem;
+    border-top: 1px solid rgba(75, 85, 99, 0.22);
+  }
+
+  #create-order-sheet .order-create-section__title {
+    flex: 0 0 auto;
+    width: auto;
+    font-size: 0.825rem;
+    font-weight: 700;
+    color: var(--color-brand-muted-black);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  #create-order-sheet .order-create-section__title::before,
+  #create-order-sheet .order-create-section__title::after {
+    display: none;
+  }
+
+  #create-order-sheet .order-create-section__header .order-create-form__add-item {
+    flex-shrink: 0;
+  }
+
+  #create-order-sheet .order-create-form label.field-row--split,
+  #create-order-sheet .order-create-form .field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-order-sheet .order-create-form .field-row__meta {
+    display: grid;
+    gap: 0.2rem;
+    min-width: 0;
+  }
+
+  #create-order-sheet .order-create-form .field-row__label {
+    font-size: 0.825rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-brand-muted-black);
+  }
+
+  #create-order-sheet .order-create-form .field-row__description {
+    margin: 0;
+    font-size: 0.8rem;
+    line-height: 1.45;
+    font-weight: 400;
+    color: rgba(75, 85, 99, 0.82);
+    text-transform: none;
+    letter-spacing: normal;
+  }
+
+  #create-order-sheet .order-create-form label.field-row--split > :not(.field-row__meta),
+  #create-order-sheet .order-create-form .field-row__control {
+    grid-column: 1;
+    grid-row: auto;
+    min-width: 0;
+    width: 100%;
+  }
+
+  #create-order-sheet .order-create-form label.field-row--split > textarea,
+  #create-order-sheet .order-create-form .field-row__control textarea {
+    align-self: start;
+  }
+
+  #create-order-sheet .order-create-form .checkbox-row.field-row--split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.5rem;
+    align-items: start;
+  }
+
+  #create-order-sheet .order-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    min-width: 1.25rem;
+    min-height: 1.25rem;
+    margin: 0;
+    flex-shrink: 0;
+    accent-color: var(--color-brand-red);
+    cursor: pointer;
+  }
+
+  #create-order-sheet .order-create-form .order-create-form__checkbox-control {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(102, 24, 24, 0.15);
+    border-radius: 0.5rem;
+    background-color: #ffffff;
+    box-sizing: border-box;
+  }
+
+  #create-order-sheet .order-item-accordion__fields {
+    gap: 1.5rem;
+  }
+
+  @media (min-width: 40rem) {
+    #create-order-sheet .order-create-form label.field-row--split,
+    #create-order-sheet .order-create-form .field-row--split,
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(7.25rem, 8.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.15rem;
+    }
+
+    #create-order-sheet .order-create-form .field-row__meta {
+      align-self: start;
+    }
+
+    #create-order-sheet .order-create-form label.field-row--split > :not(.field-row__meta),
+    #create-order-sheet .order-create-form .field-row__control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split input[type="checkbox"] {
+      grid-column: unset;
+      grid-row: unset;
+    }
+
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split .order-create-form__checkbox-control {
+      grid-column: 2;
+      grid-row: 1;
+      align-self: start;
+    }
+  }
+
+  @media (min-width: 48rem) {
+    #create-order-sheet .order-create-form label.field-row--split,
+    #create-order-sheet .order-create-form .field-row--split,
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(8.75rem, 10.75rem) minmax(0, 1fr);
+      gap: 0.5rem 1.3rem;
+    }
+  }
+
+  @media (min-width: 64rem) {
+    #create-order-sheet .order-create-form label.field-row--split,
+    #create-order-sheet .order-create-form .field-row--split,
+    #create-order-sheet .order-create-form .checkbox-row.field-row--split {
+      grid-template-columns: minmax(9.5rem, 12rem) minmax(0, 1fr);
+      gap: 0.55rem 1.45rem;
+    }
   }
 
   .product-create-form {
@@ -9282,16 +10119,170 @@
     gap: 1rem;
   }
 
+  .ui-picker,
   .order-customer-picker {
     position: relative;
   }
 
+  .ui-picker[data-open="true"],
   .order-customer-picker[data-open="true"] {
     z-index: 40;
   }
 
-  .order-customer-picker input:not(.table-pagination__page-input) {
+  .order-customer-picker input:not(.table-pagination__page-input):not(.ui-picker__search) {
     padding-right: 3rem !important;
+  }
+
+  .order-customer-picker--multiple .order-customer-picker__toggle {
+    top: 0.625rem;
+    right: 0.55rem;
+    transform: none;
+    z-index: 1;
+  }
+
+  .order-customer-picker--multiple .ui-picker__control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    position: relative;
+    width: 100%;
+    min-width: 0;
+    min-height: 3rem;
+    padding: 0.45rem 2.75rem 0.45rem 0.65rem;
+    border: 1px solid rgba(102, 24, 24, 0.15);
+    border-radius: 0.5rem;
+    background: #ffffff;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .order-customer-picker--multiple .ui-picker__control:focus-within {
+    border-color: var(--color-brand-red);
+    box-shadow: 0 0 0 3px rgba(102, 24, 24, 0.15);
+    outline: none;
+  }
+
+  .order-customer-picker--multiple .ui-picker__search {
+    padding-right: 0 !important;
+  }
+
+  .order-customer-picker--multiple .ui-picker__badges {
+    display: contents;
+  }
+
+  .order-customer-picker--multiple .ui-picker__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    position: relative;
+    z-index: 2;
+    max-width: 100%;
+    flex: 0 1 auto;
+    padding: 0.28rem 0.35rem 0.28rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(102, 24, 24, 0.1);
+    color: var(--color-brand-red);
+    font-size: 0.78rem;
+    line-height: 1.2;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .order-customer-picker--multiple .ui-picker__badge-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .order-customer-picker--multiple .ui-picker__badge-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+    pointer-events: auto;
+  }
+
+  .order-customer-picker--multiple .ui-picker__badge-remove svg {
+    width: 0.75rem;
+    height: 0.75rem;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .order-customer-picker--multiple .ui-picker__badge-remove:hover,
+  .order-customer-picker--multiple .ui-picker__badge-remove:focus-visible {
+    background: rgba(102, 24, 24, 0.12);
+    outline: none;
+  }
+
+  .order-customer-picker--multiple .ui-picker__search {
+    flex: 1 1 7rem;
+    min-width: 6rem;
+    width: auto;
+    max-width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    font: inherit;
+    color: #111827;
+  }
+
+  .order-customer-picker--multiple .ui-picker__search:focus {
+    outline: none;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .order-customer-picker--multiple .order-customer-picker__option.ui-picker__option--checkbox {
+    display: grid;
+    grid-template-columns: 1rem minmax(0, 1fr) auto;
+    align-items: center;
+    justify-content: initial;
+    gap: 0.75rem;
+    cursor: pointer;
+  }
+
+  .order-customer-picker--multiple .ui-picker__option-checkbox {
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    accent-color: var(--color-brand-red);
+  }
+
+  .order-customer-picker--multiple .order-customer-picker__option.ui-picker__option--checkbox .order-customer-picker__option-name {
+    flex: initial;
+    font-weight: 400 !important;
+  }
+
+  .order-customer-picker--multiple .order-customer-picker__option.ui-picker__option--checkbox .order-customer-picker__option-type {
+    flex: 0 0 auto;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  @media (min-width: 640px) {
+    .order-customer-picker--multiple .ui-picker__control {
+      padding-inline: 0.75rem 2.85rem;
+    }
+
+    .order-customer-picker--multiple .ui-picker__badge {
+      font-size: 0.8rem;
+    }
   }
 
   .order-customer-picker__toggle {
@@ -9621,70 +10612,70 @@
   }
 
   @media (max-width: 47.99rem) {
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__header {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__header {
       padding: 0.85rem 0.75rem 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__body {
       padding: 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__footer {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__footer {
       padding: 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-sheet__footer {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-sheet__footer {
       flex-direction: column;
       align-items: stretch;
       gap: 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-sheet__footer button[type="submit"] {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-sheet__footer button[type="submit"] {
       width: 100%;
       margin-top: 0;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__title {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__title {
       font-size: 1.1rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-sheet__header-description {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-sheet__header-description {
       font-size: 0.85rem;
       line-height: 1.4;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-form {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-form {
       gap: 1rem;
       min-width: 0;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section {
       gap: 0.5rem;
       min-width: 0;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__body {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__body {
       gap: 0.75rem;
       min-width: 0;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__body.admin-form-grid {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__body.admin-form-grid {
       grid-template-columns: minmax(0, 1fr);
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__title::before,
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__title::after {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__title::before,
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__title::after {
       display: none;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-section__title {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-section__title {
       gap: 0;
       font-size: 0.82rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body form input,
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body form select,
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .drawer-sheet__body form textarea {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__body form input,
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__body form select,
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .drawer-sheet__body form textarea {
       width: 100%;
       min-width: 0;
       max-width: 100%;
@@ -9693,43 +10684,43 @@
       font-size: 0.9rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .field-row--date {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .field-row--date {
       justify-items: start;
       width: fit-content;
       max-width: 100%;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .field-row--date input[type="date"],
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .field-row--date input[type="datetime-local"] {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .field-row--date input[type="date"],
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .field-row--date input[type="datetime-local"] {
       width: auto;
       max-width: 100%;
       min-width: 0;
       field-sizing: content;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-form label.field-row:not(.field-row--date) {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-form label.field-row:not(.field-row--date) {
       min-width: 0;
       width: 100%;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .ui-accordion__summary {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .ui-accordion__summary {
       padding: 0.75rem;
       gap: 0.5rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .ui-accordion__content {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .ui-accordion__content {
       padding: 0 0.75rem 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-item-accordion__fields {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-item-accordion__fields {
       gap: 0.75rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-item-list {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-item-list {
       gap: 0.65rem;
     }
 
-    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet) .order-create-form__total {
+    :is(#agent-create-order-sheet, #agent-order-attach-customer-sheet, #agent-personal-order-payment-sheet, #agent-multi-order-remittance-sheet) .order-create-form__total {
       width: 100%;
       margin-right: 0;
     }
@@ -9744,6 +10735,7 @@
   html.sheet-open,
   body.sheet-open {
     overflow: hidden;
+    overscroll-behavior: none;
   }
 
   body.sheet-open .dashboard-frame {
@@ -9908,6 +10900,9 @@
     padding: 0.65rem 0.75rem;
     color: #ffffff;
     font: inherit;
+    font-weight: 600;
+    letter-spacing: normal;
+    text-transform: none;
     text-decoration: none;
     text-align: left;
     cursor: pointer;
@@ -9946,7 +10941,130 @@
     margin: 0 auto;
   }
 
-  .agent-mobile-header,
+  .agent-page-brand {
+    margin: 0 0 0.45rem;
+  }
+
+  .agent-page-brand__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    max-width: 100%;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .agent-page-brand__logo,
+  .agent-page-brand__mark {
+    width: 1.2rem;
+    height: 1.2rem;
+    flex-shrink: 0;
+  }
+
+  .agent-page-brand__logo {
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .agent-page-brand__mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px dashed currentColor;
+    border-radius: 50%;
+    font-size: 0.42rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
+    color: #6b7280;
+  }
+
+  .agent-page-brand__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    color: #4b5563;
+  }
+
+  [data-agent-primary-page] .admin-notifications-page__title {
+    font-size: clamp(1.75rem, 2.8vw, 2.35rem);
+    line-height: 1.05;
+  }
+
+  [data-agent-primary-page]
+    .admin-notifications-page__heading-row:not(:has(.admin-notifications-page__heading-meta))
+    .admin-notifications-page__title {
+    line-height: 1.05;
+  }
+
+  [data-agent-primary-page] .admin-notifications-page__header {
+    margin-bottom: 0.85rem;
+  }
+
+  [data-agent-primary-page] .admin-notifications-page__intro {
+    display: none;
+  }
+
+  [data-agent-profile-page].admin-notifications-page,
+  [data-agent-profile-page] .admin-notifications-page__inner {
+    width: 100%;
+    max-width: 40rem;
+    margin-inline: auto;
+    background: #ffffff;
+  }
+
+  [data-agent-profile-page] .admin-notifications-page__content {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  @media (min-width: 640px) {
+    .agent-page-brand {
+      margin-bottom: 0.55rem;
+    }
+
+    .agent-page-brand__logo,
+    .agent-page-brand__mark {
+      width: 1.3rem;
+      height: 1.3rem;
+    }
+
+    .agent-page-brand__name {
+      font-size: 0.72rem;
+    }
+
+    [data-agent-primary-page] .admin-notifications-page__header {
+      margin-bottom: 1rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .agent-page-brand {
+      margin-bottom: 0.6rem;
+    }
+
+    .agent-page-brand__logo,
+    .agent-page-brand__mark {
+      width: 1.35rem;
+      height: 1.35rem;
+    }
+
+    .agent-page-brand__name {
+      font-size: 0.75rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    [data-agent-primary-page] .admin-notifications-page__header {
+      margin-bottom: 1.1rem;
+    }
+  }
+
   .agent-mobile-nav {
     display: none;
     view-transition-name: none;
@@ -9954,7 +11072,6 @@
 
   @media (max-width: 47.99rem) {
     .dashboard-body--agent {
-      --agent-mobile-header-height: 3.5rem;
       --agent-mobile-nav-height: 4.25rem;
       background: #ffffff;
     }
@@ -9965,41 +11082,6 @@
     .dashboard-body--agent .dashboard-main__content--agent,
     .dashboard-body--agent .dashboard-route-skeleton {
       background: #ffffff;
-    }
-
-    .dashboard-body--agent .agent-mobile-header {
-      position: fixed;
-      top: 0;
-      right: 0;
-      left: 0;
-      z-index: 100;
-      display: none;
-      align-items: center;
-      min-height: 3.5rem;
-      padding: 0.65rem 1rem;
-      border-bottom: 1px solid #e5e7eb;
-      background: #ffffff;
-      transform: translateZ(0);
-      backface-visibility: hidden;
-    }
-
-    .dashboard-body--agent.dashboard-body--agent-mobile-primary .agent-mobile-header {
-      display: flex;
-    }
-
-    .dashboard-body--agent .agent-mobile-header__brand {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.65rem;
-      color: inherit;
-      text-decoration: none;
-    }
-
-    .dashboard-body--agent .agent-mobile-header__brand-text {
-      font-size: 0.95rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      color: #111827;
     }
 
     .dashboard-body--agent .agent-mobile-nav {
@@ -10053,7 +11135,6 @@
 
     .dashboard-body--agent .agent-mobile-nav__link--active {
       color: var(--color-brand-red);
-      background: #fff8f8;
     }
 
     .dashboard-body--agent .agent-mobile-nav__icon svg {
@@ -10087,16 +11168,31 @@
       grid-template-columns: minmax(0, 1fr);
     }
 
+    .dashboard-body--agent:has([data-dashboard-record-page]),
+    .dashboard-body--agent:has([data-agent-record-page]) {
+      height: var(--app-viewport-height);
+    }
+
+    .dashboard-body--agent:has([data-dashboard-record-page]) .dashboard-frame,
+    .dashboard-body--agent:has([data-agent-record-page]) .dashboard-frame {
+      height: var(--app-viewport-height);
+    }
+
+    .dashboard-body--agent:has([data-dashboard-record-page]) .dashboard-main,
+    .dashboard-body--agent:has([data-agent-record-page]) .dashboard-main {
+      max-height: var(--app-viewport-height);
+    }
+
     .dashboard-body--agent .dashboard-main {
       display: flex;
       flex-direction: column;
-      min-height: 100dvh;
+      min-height: var(--app-viewport-height);
       padding-top: 0;
       padding-bottom: env(safe-area-inset-bottom, 0);
     }
 
     .dashboard-body--agent.dashboard-body--agent-mobile-primary .dashboard-main {
-      padding-top: var(--agent-mobile-header-height);
+      padding-top: 0;
       padding-bottom: calc(var(--agent-mobile-nav-height) + env(safe-area-inset-bottom, 0));
     }
 
@@ -10104,31 +11200,22 @@
       display: flex;
       flex: 1;
       flex-direction: column;
-      min-height: calc(100dvh - env(safe-area-inset-bottom, 0));
+      min-height: calc(var(--app-viewport-height) - env(safe-area-inset-bottom, 0));
     }
 
     .dashboard-body--agent.dashboard-body--agent-mobile-primary .dashboard-main__content--agent {
-      min-height: calc(100dvh - var(--agent-mobile-header-height) - var(--agent-mobile-nav-height) - env(safe-area-inset-bottom, 0));
+      min-height: calc(
+        var(--app-viewport-height) - var(--agent-mobile-nav-height) -
+          env(safe-area-inset-bottom, 0)
+      );
     }
 
     .dashboard-body--agent .admin-notifications-page__inner {
       max-width: none;
-      padding: 0.75rem;
-    }
-
-    [data-agent-primary-page] .admin-notifications-page__intro {
-      display: none;
-    }
-
-    [data-agent-primary-page] .admin-notifications-page__header {
-      margin-bottom: 0.75rem;
+      padding: 0.75rem 0.75rem calc(0.75rem + env(safe-area-inset-bottom, 0));
     }
 
     .dashboard-body--agent .agent-notifications__list {
-      padding: 0;
-    }
-
-    .dashboard-body--agent .agent-notifications__table>.agent-notifications__toolbar {
       padding: 0;
     }
 
@@ -10429,7 +11516,7 @@
   .dashboard-table td.dashboard-table__actions-column,
   .table-wrap table th.dashboard-table__actions-column,
   .table-wrap table td.dashboard-table__actions-column {
-    width: auto;
+    width: 1%;
     min-width: 2rem;
     max-width: none;
     padding-left: 0.35rem;
@@ -10489,7 +11576,7 @@
 
   .agent-customers-table th.dashboard-table__actions-column,
   .agent-customers-table td.dashboard-table__actions-column {
-    width: auto;
+    width: 1%;
     min-width: 2rem;
     max-width: none;
     padding-left: 0.35rem;
@@ -10662,7 +11749,8 @@
     text-overflow: ellipsis;
   }
 
-  .dashboard-table td>.order-customer-cell>.order-customer-count {
+  .dashboard-table td>.order-customer-cell>.order-customer-count,
+  .dashboard-table td>.order-customer-cell>.dashboard-tooltip {
     flex: 0 0 auto;
   }
 

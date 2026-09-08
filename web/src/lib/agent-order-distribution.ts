@@ -52,6 +52,18 @@ export function canAttachCustomerToAgentOrder(order: AgentOrderAttachEligibility
   return !isAgentOrderCompletedAndPaid(order);
 }
 
+export function attachCustomerBlockMessage(order: AgentOrderAttachEligibilitySource) {
+  if (canAttachCustomerToAgentOrder(order)) {
+    return undefined;
+  }
+
+  if (order.order_status === "pending_order") {
+    return "This distribution order is awaiting admin approval.";
+  }
+
+  return "Completed and paid agent orders cannot accept new customers.";
+}
+
 export function sumApprovedDistributedQuantity(
   agentOrder: AgentOrderDistributionSource,
   productId: string,
@@ -213,4 +225,62 @@ export function buildAttachCustomerProductOptions(input: {
       defaultPrice: product.default_price,
       remainingQuantity: distributionByProductId.get(product.id)?.remainingQuantity ?? 0,
     }));
+}
+
+export type DistributionCustomerOrderStatusCounts = {
+  pending: number;
+  unpaid: number;
+  partial: number;
+  paid: number;
+};
+
+type DistributionCustomerOrderStatusSource = {
+  order_status: string;
+  payment_status: string;
+};
+
+export function buildDistributionCustomerOrderStatusCounts(
+  orders: DistributionCustomerOrderStatusSource[],
+): DistributionCustomerOrderStatusCounts {
+  return orders.reduce<DistributionCustomerOrderStatusCounts>(
+    (counts, order) => {
+      if (order.order_status === "pending") {
+        counts.pending += 1;
+        return counts;
+      }
+
+      if (order.payment_status === "paid") {
+        counts.paid += 1;
+        return counts;
+      }
+
+      if (order.payment_status === "partial") {
+        counts.partial += 1;
+        return counts;
+      }
+
+      counts.unpaid += 1;
+      return counts;
+    },
+    { pending: 0, unpaid: 0, partial: 0, paid: 0 },
+  );
+}
+
+export const distributionCustomerOrderStatusLegend = [
+  { key: "pending", label: "Pending", color: "#f59e0b" },
+  { key: "unpaid", label: "Unpaid", color: "#dc2626" },
+  { key: "partial", label: "Partial", color: "#d97706" },
+  { key: "paid", label: "Paid", color: "#16a34a" },
+] as const;
+
+export function distributionCustomerOrderStatusBarWidth(
+  count: number,
+  counts: DistributionCustomerOrderStatusCounts,
+) {
+  const total = Math.max(
+    counts.pending + counts.unpaid + counts.partial + counts.paid,
+    1,
+  );
+
+  return `${(count / total) * 100}%`;
 }

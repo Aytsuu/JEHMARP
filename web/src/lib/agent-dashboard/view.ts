@@ -23,6 +23,84 @@ export function isAgentMyStandaloneOrder(
   return isAgentMyOrder(order, agent);
 }
 
+export type PersonalOrderDistributionConversionBlockReason =
+  | "Not convertible"
+  | "Converted"
+  | "Already linked"
+  | "Closed"
+  | "Has payment record"
+  | "No items";
+
+const agentConvertibleOrderKinds = new Set(["customer", "personal"]);
+
+export function getPersonalOrderDistributionConversionBlockReason(
+  order: Pick<
+    AgentOrder,
+    | "order_kind"
+    | "parent_order_id"
+    | "converted_at"
+    | "order_status"
+    | "customer_order_item"
+    | "payment"
+    | "agent_received_payment"
+  >,
+): PersonalOrderDistributionConversionBlockReason | null {
+  if (order.order_kind && !agentConvertibleOrderKinds.has(order.order_kind)) {
+    return "Not convertible";
+  }
+
+  if (order.converted_at) {
+    return "Converted";
+  }
+
+  if (order.parent_order_id) {
+    return "Already linked";
+  }
+
+  if (order.order_status === "closed") {
+    return "Closed";
+  }
+
+  if ((order.payment?.length ?? 0) > 0 || (order.agent_received_payment?.length ?? 0) > 0) {
+    return "Has payment record";
+  }
+
+  if (order.customer_order_item.length === 0) {
+    return "No items";
+  }
+
+  return null;
+}
+
+export function canConvertPersonalOrderToDistribution(
+  order: Parameters<typeof getPersonalOrderDistributionConversionBlockReason>[0],
+) {
+  return getPersonalOrderDistributionConversionBlockReason(order) === null;
+}
+
+export function personalOrderDistributionConversionBlockMessage(
+  reason: PersonalOrderDistributionConversionBlockReason | null,
+) {
+  switch (reason) {
+    case null:
+      return null;
+    case "Has payment record":
+      return "This order already has a payment record, so it cannot be converted.";
+    case "Closed":
+      return "Closed orders cannot be converted.";
+    case "No items":
+      return "Orders without products cannot be converted.";
+    case "Already linked":
+      return "This order is already linked to a distribution order.";
+    case "Converted":
+      return "This order was already converted to a distribution order.";
+    case "Not convertible":
+      return "Only standalone customer or personal agent orders can be converted.";
+    default:
+      return "This order cannot be converted right now.";
+  }
+}
+
 export function fullName(customer: { first_name: string; last_name: string } | null) {
   return customer ? `${customer.first_name} ${customer.last_name}` : "Unassigned customer";
 }
@@ -135,6 +213,148 @@ export function orderEarnedCommission(order: AgentOrder) {
   if (invoiceTotal <= 0) return 0;
 
   return roundCurrency(expectedCommission * Math.min(orderPaymentTotal(order) / invoiceTotal, 1));
+}
+
+export function buildAgentTotalCommissionEarned(
+  orders: AgentOrder[],
+  agent: Pick<AgentProfile, "id">,
+) {
+  return roundCurrency(
+    orders
+      .filter((order) => isAgentMyOrder(order, agent))
+      .reduce((total, order) => total + orderEarnedCommission(order), 0),
+  );
+}
+
+export type AgentRemittanceSummary = {
+  remainingRemittance: number;
+  outstandingOrderCount: number;
+  outstandingCustomerCount: number;
+};
+
+export function buildAgentRemittanceSummary(
+  orders: AgentOrder[],
+  agent: Pick<AgentProfile, "id">,
+) {
+  const outstandingOrders = orders
+    .filter((order) => isAgentMyOrder(order, agent))
+    .filter((order) => orderBalance(order) > 0);
+  const customerIds = new Set(
+    outstandingOrders
+      .map((order) => order.customer_id)
+      .filter((customerId): customerId is string => Boolean(customerId)),
+  );
+
+  return {
+    remainingRemittance: roundCurrency(
+      outstandingOrders.reduce((total, order) => total + orderBalance(order), 0),
+    ),
+    outstandingOrderCount: outstandingOrders.length,
+    outstandingCustomerCount: customerIds.size,
+  } satisfies AgentRemittanceSummary;
+}
+
+export function formatAgentRemittanceDetail(
+  orderCount: number,
+  customerCount: number,
+) {
+  if (orderCount === 0) {
+    return "All assigned orders are fully remitted.";
+  }
+
+  const orderLabel = orderCount === 1 ? "order" : "orders";
+  const customerLabel = customerCount === 1 ? "customer" : "customers";
+  const verb = orderCount === 1 ? "has" : "have";
+
+  if (customerCount > 0) {
+    return `${orderCount} ${orderLabel} from ${customerCount} ${customerLabel} ${verb} not been fully remitted yet.`;
+  }
+
+  return `${orderCount} ${orderLabel} ${verb} not been fully remitted yet.`;
+}
+
+export type AgentMonthlyPerformancePoint = {
+  key: string;
+  label: string;
+  amount: number;
+};
+
+export type AgentMonthlyPerformance = {
+  months: AgentMonthlyPerformancePoint[];
+  currentMonthAmount: number;
+  previousMonthAmount: number;
+  trend: "up" | "down" | "flat";
+  changeAmount: number;
+  changePercent: number | null;
+};
+
+export function buildAgentMonthlyPerformance(
+  orders: AgentOrder[],
+  agent: Pick<AgentProfile, "id">,
+  now = new Date(),
+  monthCount = 6,
+): AgentMonthlyPerformance {
+  const myOrders = orders.filter((order) => isAgentMyOrder(order, agent));
+  const months: AgentMonthlyPerformancePoint[] = [];
+
+  for (let index = monthCount - 1; index >= 0; index -= 1) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - index, 1));
+    const key = monthIdentifier(date);
+    const amount = roundCurrency(
+      myOrders
+        .filter((order) => monthIdentifier(new Date(order.created_at)) === key)
+        .reduce((total, order) => total + orderEarnedCommission(order), 0),
+    );
+
+    months.push({
+      key,
+      label: new Intl.DateTimeFormat("en-PH", { month: "short", timeZone: "UTC" }).format(date),
+      amount,
+    });
+  }
+
+  const currentMonthAmount = months.at(-1)?.amount ?? 0;
+  const previousMonthAmount = months.at(-2)?.amount ?? 0;
+  const changeAmount = roundCurrency(currentMonthAmount - previousMonthAmount);
+  const trend = changeAmount > 0 ? "up" : changeAmount < 0 ? "down" : "flat";
+  const changePercent = previousMonthAmount > 0
+    ? roundCurrency((changeAmount / previousMonthAmount) * 100)
+    : null;
+
+  return {
+    months,
+    currentMonthAmount,
+    previousMonthAmount,
+    trend,
+    changeAmount,
+    changePercent,
+  };
+}
+
+export function formatAgentPerformanceTrend(performance: AgentMonthlyPerformance) {
+  const directionLabel = performance.trend === "up"
+    ? "Up"
+    : performance.trend === "down"
+      ? "Down"
+      : "No change";
+  const amountLabel = `${performance.changeAmount >= 0 ? "+" : ""}${formatCurrency(performance.changeAmount)}`;
+  const percentLabel = performance.changePercent === null
+    ? null
+    : `${performance.changePercent >= 0 ? "+" : ""}${performance.changePercent}%`;
+
+  if (performance.trend === "flat") {
+    return {
+      directionLabel,
+      summary: "No change from last month",
+    };
+  }
+
+  return {
+    directionLabel,
+    summary: percentLabel
+      ? `${amountLabel} (${percentLabel}) vs last month`
+      : `${amountLabel} vs last month`,
+  };
 }
 
 export function buildAgentSummary(

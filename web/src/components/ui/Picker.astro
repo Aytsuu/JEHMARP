@@ -1,0 +1,215 @@
+---
+type Props = {
+  disabled?: boolean;
+  placeholder?: string;
+  searchLabel?: string;
+  toggleAriaLabel?: string;
+  summaryText?: string;
+  emptyMessage?: string;
+  showSummary?: boolean;
+  showPagination?: boolean;
+  showPaymentNotice?: boolean;
+  multiple?: boolean;
+  maxSelections?: number;
+  class?: string;
+};
+
+const {
+  disabled = false,
+  placeholder = "Type a customer or agent name",
+  searchLabel = "Search customer or agent",
+  toggleAriaLabel = "Show customer options",
+  summaryText = "Try entering a customer or agent name.",
+  emptyMessage = "No customers or agents found.",
+  showSummary = true,
+  showPagination = true,
+  showPaymentNotice = false,
+  multiple = false,
+  maxSelections,
+  class: className = "",
+} = Astro.props;
+
+const resolvedPlaceholder = multiple ? (placeholder || "Try searching...") : placeholder;
+---
+
+<div
+  class:list={[
+    "ui-picker",
+    "order-customer-picker",
+    multiple && "order-customer-picker--multiple",
+    className,
+  ]}
+  data-customer-picker
+  data-ui-picker-multiple={multiple || undefined}
+  data-ui-picker-max-selections={maxSelections}
+>
+  {
+    multiple ? (
+      <div class="ui-picker__control" data-ui-picker-control>
+        <div class="ui-picker__badges" data-ui-picker-badges></div>
+        <input
+          class="ui-picker__search"
+          autocomplete="off"
+          placeholder={resolvedPlaceholder}
+          aria-label={searchLabel}
+          data-customer-search
+          data-customer-search-input
+          data-ui-picker-search
+          disabled={disabled}
+        />
+        <button
+          type="button"
+          class="order-customer-picker__toggle"
+          aria-label={toggleAriaLabel}
+          aria-expanded="false"
+          data-customer-picker-toggle
+          disabled={disabled}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </button>
+      </div>
+    ) : (
+      <input
+        autocomplete="off"
+        placeholder={resolvedPlaceholder}
+        aria-label={searchLabel}
+        data-customer-search
+        data-customer-search-input
+        disabled={disabled}
+      />
+    )
+  }
+  {
+    !multiple && (
+      <button
+        type="button"
+        class="order-customer-picker__toggle"
+        aria-label={toggleAriaLabel}
+        aria-expanded="false"
+        data-customer-picker-toggle
+        disabled={disabled}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+    )
+  }
+  <div class="order-customer-picker__menu" hidden data-customer-picker-menu>
+    {
+      showSummary && (
+        <p class="order-customer-picker__summary" hidden data-customer-picker-summary>
+          {summaryText}
+        </p>
+      )
+    }
+    <div class="order-customer-picker__options" data-customer-options></div>
+    <p class="order-customer-picker__empty" hidden data-customer-options-empty>
+      {emptyMessage}
+    </p>
+    {
+      showPagination && (
+        <div class="order-customer-picker__footer" hidden data-customer-picker-footer>
+          <span class="table-pagination__record-count" data-customer-picker-total-records></span>
+          <div
+            class="table-pagination table-pagination--controls-only"
+            data-customer-picker-pagination-controls
+            hidden
+          >
+            <div class="table-pagination__controls table-pagination__controls--merged">
+              <button
+                type="button"
+                class="btn-secondary table-pagination__arrow"
+                aria-label="Previous page"
+                data-customer-picker-prev
+              >
+                <svg
+                  class="table-pagination__icon"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m15 18-6-6 6-6"></path>
+                </svg>
+              </button>
+              <div class="table-pagination__page-editor">
+                <span class="table-pagination__page-label">Page</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  pattern="[0-9]*"
+                  class="table-pagination__page-input"
+                  data-customer-picker-page
+                  data-digits-only
+                  value="1"
+                  aria-label="Current page"
+                />
+                <span class="table-pagination__page-total">
+                  of <span data-customer-picker-total>1</span>
+                </span>
+              </div>
+              <button
+                type="button"
+                class="btn-secondary table-pagination__arrow"
+                aria-label="Next page"
+                data-customer-picker-next
+              >
+                <svg
+                  class="table-pagination__icon"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m9 18 6-6-6-6"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+  </div>
+</div>
+{
+  showPaymentNotice && (
+    <p
+      class="order-create-form__existing-customer-notice"
+      hidden
+      data-customer-order-notice
+    ></p>
+  )
+}

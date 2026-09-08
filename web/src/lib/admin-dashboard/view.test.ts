@@ -4,8 +4,10 @@ import type { AdminAgentOrder, AdminOrder } from "./data";
 import {
   agentCustomerBalance,
   agentOrderCommissionTotal,
+  agentOrderPaidTotal,
   agentOrderPaymentStatus,
   agentOrderReceivableTotal,
+  agentOrderRemainingReceivable,
   canConvertPromotedCustomerOrderToDistribution,
   canManageOrderCommissions,
   customerOrderDistributionConversionBlockMessage,
@@ -14,6 +16,7 @@ import {
   formatWholeCurrency,
   formatDateTime,
   formatSalePaymentSummary,
+  pendingCustomerOrdersAwaitingLabel,
   getCustomerOrderDistributionConversionBlockReason,
   isOrderCommissionEffective,
   orderBalance,
@@ -304,6 +307,28 @@ describe("agentOrderReceivableTotal", () => {
   });
 });
 
+describe("agentOrderRemainingReceivable", () => {
+  it("subtracts linked customer order payments from the agent receivable total", () => {
+    const order = {
+      agent_order_item: [
+        {
+          quantity: 3,
+          agent_commission_amount: 20,
+          product: { default_price: 300 },
+        },
+      ],
+      customer_order: [
+        {
+          payment: [{ amount: 200 }],
+        },
+      ],
+    } as AdminAgentOrder;
+
+    expect(agentOrderPaidTotal(order)).toBe(200);
+    expect(agentOrderRemainingReceivable(order)).toBe(680);
+  });
+});
+
 describe("agentOrderPaymentStatus", () => {
   it("aggregates linked customer order payment statuses", () => {
     expect(agentOrderPaymentStatus({ customer_order: [] })).toBe("unpaid");
@@ -520,6 +545,16 @@ describe("formatDateTime", () => {
   it("formats ISO timestamps for the Philippines timezone", () => {
     expect(formatDateTime("2026-07-11T18:54:27.430254+00:00")).toBe("Jul 12, 2026, 2:54 AM");
     expect(formatDateTime(null)).toBe("Not set");
+  });
+});
+
+describe("pendingCustomerOrdersAwaitingLabel", () => {
+  it("uses singular order copy for one pending customer order", () => {
+    expect(pendingCustomerOrdersAwaitingLabel(1)).toBe("1 customer order awaiting");
+  });
+
+  it("uses plural orders copy for multiple pending customer orders", () => {
+    expect(pendingCustomerOrdersAwaitingLabel(3)).toBe("3 customer orders awaiting");
   });
 });
 

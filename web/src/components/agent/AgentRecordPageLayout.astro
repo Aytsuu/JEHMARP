@@ -1,5 +1,6 @@
 ---
 import type { AgentDashboardData } from "@/lib/agent-dashboard/data";
+import AgentPageBrand from "@/components/agent/AgentPageBrand.astro";
 import PageAvailabilityNotice from "@/components/dashboard/PageAvailabilityNotice.astro";
 import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
 import { getAgentUnreadNotificationIds } from "@/lib/agent-dashboard/notifications";
@@ -46,6 +47,8 @@ const hasHeadingMeta = Astro.slots.has("heading-meta");
 const hasHeadingAside = Astro.slots.has("heading-aside");
 const hasHeadingTitle = Astro.slots.has("heading-title");
 const isAgentPrimaryPage = isAgentMobilePrimaryRoute(Astro.url.pathname);
+const isAgentProfilePage = Astro.url.pathname === "/agent/profile";
+const resolvedContentMaxWidth = isAgentProfilePage ? "40rem" : contentMaxWidth;
 ---
 
 <DashboardLayout
@@ -67,12 +70,18 @@ const isAgentPrimaryPage = isAgentMobilePrimaryRoute(Astro.url.pathname);
     data-agent-record-page
     data-agent-notifications-page
     data-agent-primary-page={isAgentPrimaryPage || undefined}
+    data-agent-profile-page={isAgentProfilePage || undefined}
   >
     <div
       class="admin-notifications-page__inner"
-      style={`--notifications-page-max-width: ${contentMaxWidth};`}
+      style={`--notifications-page-max-width: ${resolvedContentMaxWidth};`}
     >
       <header class="admin-notifications-page__header">
+        {
+          isAgentPrimaryPage && (
+            <AgentPageBrand />
+          )
+        }
         <div class="admin-notifications-page__heading-row">
           {backUrl && (
             <RouteBackButton href={backUrl} label={backLabel ?? `Back from ${heading}`} />
@@ -151,8 +160,35 @@ const isAgentPrimaryPage = isAgentMobilePrimaryRoute(Astro.url.pathname);
 <style>
   .admin-notifications-page__heading-row {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 0.85rem;
+  }
+
+  .admin-notifications-page__heading-row:has(.admin-notifications-page__heading-meta) {
+    align-items: flex-start;
+  }
+
+  .admin-notifications-page__heading-row:has(.admin-notifications-page__heading-meta) .route-back-button {
+    margin-top: 0.15rem;
+  }
+
+  .admin-notifications-page__heading-row:not(:has(.admin-notifications-page__heading-meta))
+    .admin-notifications-page__title {
+    line-height: 2.5rem;
+  }
+
+  .admin-notifications-page__heading-row:not(:has(.admin-notifications-page__heading-meta))
+    .admin-notifications-page__heading-aside {
+    align-self: center;
+    padding-top: 0;
+  }
+
+  [data-agent-primary-page] .admin-notifications-page__heading-main--with-aside {
+    align-items: center;
+  }
+
+  .admin-notifications-page__heading-main--with-aside {
+    align-items: center;
   }
 
   .admin-notifications-page__heading-main {

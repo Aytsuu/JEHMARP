@@ -22,6 +22,7 @@ export type AgentProfileUpdateFields = {
   contact: string;
   status: AgentProfileStatus;
   email: string | null;
+  address?: string;
 };
 
 export function parseAgentProfileUpdateFields(formData: FormData): AgentProfileUpdateFields {
@@ -36,6 +37,9 @@ export function parseAgentProfileUpdateFields(formData: FormData): AgentProfileU
     contact: parseContactNumber(requiredString(formData, "contact")),
     status: enumValue(formData, "status", agentStatuses),
     email: optionalEmail(formData, "email"),
+    ...(formData.has("address")
+      ? { address: normalizeFormDataEntry(formData.get("address")) }
+      : {}),
   };
 }
 
@@ -72,6 +76,7 @@ export async function executeAgentProfileUpdate(
     display_name: fields.display_name,
     contact: fields.contact,
     status: fields.status,
+    ...(fields.address !== undefined ? { address: fields.address } : {}),
   });
 
   if (!fields.email || !agent.user_id) {

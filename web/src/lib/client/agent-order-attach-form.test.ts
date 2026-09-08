@@ -64,21 +64,6 @@ function renderAttachForm() {
 
         <button type="button" data-add-customer-entry>Add customer</button>
 
-        <template data-customer-option-template>
-          <button
-            type="button"
-            data-customer-id="customer-1"
-            data-customer-label="Juan Dela Cruz"
-            data-customer-first-name="Juan"
-            data-customer-last-name="Dela Cruz"
-            data-customer-phone-number="09170000000"
-            data-customer-email=""
-            data-customer-address="Manila"
-          >
-            Juan Dela Cruz
-          </button>
-        </template>
-
         <template data-customer-entry-template>
           <details class="customer-entry-accordion" data-customer-entry>
             <summary>
@@ -186,6 +171,8 @@ function setQuantity(entry: HTMLElement, index: number, value: string) {
 function renderedCustomerOption(input: { balance?: string; creditLimit?: string } = {}) {
   const option = document.createElement("button");
   option.type = "button";
+  option.dataset.orderTargetOption = "";
+  option.dataset.orderTargetType = "customer";
   option.dataset.customerId = "customer-1";
   option.dataset.customerLabel = "Juan Dela Cruz";
   option.dataset.customerFirstName = "Juan";
@@ -433,6 +420,37 @@ describe("initAgentOrderAttachForm", () => {
     expect(notice.textContent).toContain("partially paid order");
     expect(notice.textContent).toContain("Overall balance:");
     expect(notice.textContent).toContain("Credit limit:");
+  });
+
+  it("does not warn about credit limit when attaching an order for the distribution agent", () => {
+    renderAttachForm();
+
+    initAgentOrderAttachForm();
+
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    const entry = firstEntry();
+    const form = document.querySelector<HTMLFormElement>("[data-agent-order-attach-form]")!;
+    const option = document.createElement("button");
+    option.type = "button";
+    option.dataset.orderTargetOption = "";
+    option.dataset.orderTargetType = "agent";
+    option.dataset.agentId = "agent-1";
+    option.dataset.customerId = "agent-customer-1";
+    option.dataset.attachCustomerId = "agent-customer-1";
+    option.dataset.customerLabel = "Carlos Agent";
+    option.dataset.customerBalance = "9000";
+    option.dataset.customerCreditLimit = "1000";
+    option.textContent = "Carlos Agent";
+    clickRenderedCustomerOption(entry, option);
+    selectProduct(entry, 0, "product-1");
+    setQuantity(entry, 0, "10");
+
+    const event = new SubmitEvent("submit", { bubbles: true, cancelable: true });
+    form.dispatchEvent(event);
+
+    expect(confirm).not.toHaveBeenCalled();
+
+    confirm.mockRestore();
   });
 
   it("updates each customer total and the footer total when products and quantities change", () => {

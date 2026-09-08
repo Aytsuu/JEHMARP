@@ -30,6 +30,12 @@ function renderPicker() {
         <input data-customer-first-name required />
         <input data-customer-last-name required />
         <input data-customer-phone-number required />
+        <input data-customer-email />
+        <select data-customer-assigned-agent-id>
+          <option value="">None</option>
+          <option value="agent-1">Agent One</option>
+        </select>
+        <input type="checkbox" data-customer-is-reseller />
         <textarea data-customer-address required></textarea>
       </section>
     </form>
@@ -526,6 +532,60 @@ describe("initOrderCustomerPicker", () => {
     });
   });
 
+  it("filters legacy template options when searching without an API endpoint", async () => {
+    vi.useFakeTimers();
+
+    const form = renderPicker();
+    const optionTemplate = document.createElement("template");
+    optionTemplate.setAttribute("data-customer-option-template", "");
+    optionTemplate.innerHTML = `
+      <button
+        type="button"
+        data-customer-id="customer-legacy-1"
+        data-customer-label="Jane Customer"
+        data-customer-first-name="Jane"
+        data-customer-last-name="Customer"
+        data-customer-phone-number="09171234567"
+        data-customer-email="jane@example.test"
+        data-customer-address="Quezon City"
+      >
+        Jane Customer
+      </button>
+      <button
+        type="button"
+        data-customer-id="customer-legacy-2"
+        data-customer-label="John Smith"
+        data-customer-first-name="John"
+        data-customer-last-name="Smith"
+        data-customer-phone-number="09179876543"
+        data-customer-email="john@example.test"
+        data-customer-address="Manila"
+      >
+        John Smith
+      </button>
+    `;
+    form.append(optionTemplate);
+
+    initOrderCustomerPicker({
+      scope: form,
+      customerOptionTemplate: optionTemplate,
+      newCustomerFields: form.querySelector("[data-new-customer-fields]"),
+    });
+
+    const searchInput = form.querySelector<HTMLInputElement>("[data-customer-search]")!;
+    searchInput.value = "jane";
+    searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+    await vi.advanceTimersByTimeAsync(450);
+
+    const options = form.querySelectorAll<HTMLButtonElement>("[data-customer-options] [data-customer-id]");
+
+    expect(options).toHaveLength(1);
+    expect(options[0]?.dataset.customerLabel).toBe("Jane Customer");
+
+    vi.useRealTimers();
+  });
+
   it("selects a customer and populates the customer details section", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -567,5 +627,122 @@ describe("initOrderCustomerPicker", () => {
     expect(form.querySelector<HTMLInputElement>("input[data-customer-last-name]")?.value).toBe("Buyer");
     expect(form.querySelector<HTMLInputElement>("input[data-customer-phone-number]")?.value).toBe("09170000000");
     expect(form.querySelector<HTMLInputElement>("input[data-customer-first-name]")?.disabled).toBe(true);
+  });
+
+  it("keeps optional new-customer fields optional when entering a new customer", () => {
+    const form = renderPicker();
+    initOrderCustomerPicker({
+      scope: form,
+      newCustomerFields: form.querySelector("[data-new-customer-fields]"),
+    });
+
+    const assignedAgentSelect = form.querySelector<HTMLSelectElement>("[data-customer-assigned-agent-id]");
+    const emailInput = form.querySelector<HTMLInputElement>("[data-customer-email]");
+    const isResellerCheckbox = form.querySelector<HTMLInputElement>("[data-customer-is-reseller]");
+
+    expect(assignedAgentSelect?.required).toBe(false);
+    expect(emailInput?.required).toBe(false);
+    expect(isResellerCheckbox?.required).toBe(false);
+
+    assignedAgentSelect!.value = "";
+    expect(assignedAgentSelect!.checkValidity()).toBe(true);
+  });
+
+  it("omits profile type labels when showProfileType is false", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockProfilesResponse({
+        items: [
+          {
+            type: "customer",
+            id: "customer-1",
+            label: "Ana Buyer",
+            firstName: "Ana",
+            lastName: "Buyer",
+            phoneNumber: "09170000000",
+            email: "ana@example.test",
+            address: "Market",
+            assignedAgentId: "",
+            isReseller: false,
+            paymentNotice: "",
+            balance: 0,
+            creditLimit: 1000,
+            creditExceeded: false,
+          },
+        ],
+        customerTotal: 1,
+        agentTotal: 0,
+        totalProfiles: 1,
+        totalPages: 1,
+        hasPagination: false,
+        suggestedCount: 1,
+        scope: "customer",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const form = renderPicker();
+    initOrderCustomerPicker({
+      scope: form,
+      apiEndpoint: "/agent/order-target-profiles.json",
+      profileScope: "customer",
+      showProfileType: false,
+    });
+
+    await vi.waitFor(() => {
+      expect(form.querySelectorAll(".order-customer-picker__option")).toHaveLength(1);
+    });
+
+    const option = form.querySelector(".order-customer-picker__option");
+    expect(option?.querySelector(".order-customer-picker__option-type")).toBeNull();
+    expect(option?.querySelector(".order-customer-picker__option-name")?.textContent).toBe("Ana Buyer");
+  });
+
+  it("uses attachCustomerId when selecting a distribution agent row", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockProfilesResponse({
+        items: [
+          {
+            type: "agent",
+            id: "agent-1",
+            label: "Carlos Agent",
+            phoneNumber: "09171112222",
+            email: "carlos@example.test",
+            attachCustomerId: "agent-customer-1",
+          },
+        ],
+        customerTotal: 0,
+        agentTotal: 1,
+        totalProfiles: 1,
+        totalPages: 1,
+        hasPagination: false,
+        suggestedCount: 1,
+        scope: "customer",
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const form = renderPicker();
+    const picker = initOrderCustomerPicker({
+      scope: form,
+      apiEndpoint: "/admin/order-target-profiles.json",
+      profileScope: "customer",
+      showProfileType: true,
+    });
+
+    await vi.waitFor(() => {
+      expect(form.querySelectorAll(".order-customer-picker__option")).toHaveLength(1);
+    });
+
+    const option = form.querySelector<HTMLButtonElement>('[data-agent-id="agent-1"]');
+    option?.click();
+
+    await vi.waitFor(() => {
+      expect(picker.getSelection().customerId).toBe("agent-customer-1");
+    });
+
+    expect(form.querySelector<HTMLInputElement>("input[data-customer-id]")?.value).toBe("agent-customer-1");
+    expect(option?.querySelector(".order-customer-picker__option-type")?.textContent).toBe("Agent");
   });
 });

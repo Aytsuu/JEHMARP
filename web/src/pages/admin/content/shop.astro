@@ -21,7 +21,13 @@ if (!preview.ready) {
 const shopPath = `${ADMIN_CONTENT_PREVIEW_ROOT}/shop`;
 const products = await listOrderablePublicProducts();
 const orderStatus = Astro.url.searchParams.get("order");
-const orderEmailSent = Astro.url.searchParams.get("email") === "1";
+const orderEmailStatus = (() => {
+  const email = Astro.url.searchParams.get("email");
+  if (email === "1") return "sent";
+  if (email === "failed") return "failed";
+  if (email === "unavailable") return "unavailable";
+  return null;
+})();
 const orderMessage = Astro.url.searchParams.get("message");
 const { turnstileSiteKey } = getPublicEnv();
 ---
@@ -37,7 +43,7 @@ const { turnstileSiteKey } = getPublicEnv();
       <PublicShopPageContent
         products={products}
         orderStatus={orderStatus}
-        orderEmailSent={orderEmailSent}
+        orderEmailStatus={orderEmailStatus}
         orderMessage={orderMessage}
         turnstileSiteKey={turnstileSiteKey ?? null}
         returnPath={shopPath}

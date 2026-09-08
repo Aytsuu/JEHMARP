@@ -1,0 +1,255 @@
+---
+import type { PlatformSettings } from "@/lib/platform-settings";
+import { getPrivacyNoticePublicationIssues } from "@/lib/platform-settings/privacy-notice";
+import Button from "@/components/ui/Button.astro";
+
+type Props = {
+  settings: PlatformSettings;
+};
+
+const { settings } = Astro.props;
+const notice = settings.privacyNotice;
+const publicationIssues = getPrivacyNoticePublicationIssues(settings);
+---
+
+<section class="admin-settings-card" data-admin-settings-privacy>
+  <header class="admin-settings-card__header">
+    <div class="admin-settings-card__heading-row">
+      <div class="admin-settings-card__heading-copy">
+        <h3>Privacy &amp; Data Privacy Notice</h3>
+        <p>
+          Review and update the controller details and retention periods shown on the public
+          notice at <code>/privacy</code>.
+        </p>
+      </div>
+      <Button
+        type="submit"
+        class="admin-settings-card__save-button"
+        data-settings-save-button
+        form="admin-settings-privacy-form"
+        disabled
+      >
+        Save changes
+      </Button>
+    </div>
+    <p class="admin-settings-save-status" data-settings-save-status aria-live="polite" hidden></p>
+  </header>
+
+  {
+    publicationIssues.length > 0 ? (
+      <div class="admin-settings-privacy__status" data-settings-privacy-status="draft">
+        <strong>Notice not published.</strong>
+        <ul>
+          {publicationIssues.map((issue) => <li>{issue}</li>)}
+        </ul>
+      </div>
+    ) : (
+      <div class="admin-settings-privacy__status is-ready" data-settings-privacy-status="ready">
+        <strong>Notice is published.</strong>
+        <p>Visitors can read this notice at <code>/privacy</code>. Save any edits to update the published version.</p>
+      </div>
+    )
+  }
+
+  <form
+    id="admin-settings-privacy-form"
+    class="admin-form admin-settings-form"
+    data-settings-privacy-form
+  >
+    <div class="admin-settings-section-row">
+      <div class="admin-settings-section-row__intro">
+        <h4>Controller identity</h4>
+        <p>Legal entity details shown in the public notice.</p>
+      </div>
+      <div class="admin-settings-section-row__content admin-settings-profile-fields">
+        <label class="field-row">
+          <span>Controller legal name</span>
+          <input name="controllerLegalName" type="text" required value={notice.controllerLegalName} />
+        </label>
+        <label class="field-row">
+          <span>Philippine business address</span>
+          <textarea name="philippineBusinessAddress" rows="3" required>{notice.philippineBusinessAddress}</textarea>
+        </label>
+        <label class="field-row">
+          <span>Privacy / DPO contact email</span>
+          <input
+            name="privacyContactEmail"
+            type="email"
+            autocomplete="email"
+            placeholder="privacy@company.com"
+            required
+            value={notice.privacyContactEmail}
+          />
+        </label>
+      </div>
+    </div>
+
+    <div class="admin-settings-section-row">
+      <div class="admin-settings-section-row__intro">
+        <h4>Notice version</h4>
+        <p>Displayed on the public page and used to track updates.</p>
+      </div>
+      <div class="admin-settings-section-row__content admin-settings-profile-fields">
+        <label class="field-row">
+          <span>Notice version</span>
+          <input name="noticeVersion" type="text" required value={notice.noticeVersion} />
+        </label>
+        <label class="field-row field-row--date">
+          <span>Effective date</span>
+          <input name="effectiveDate" type="date" required value={notice.effectiveDate} />
+        </label>
+      </div>
+    </div>
+
+    <div class="admin-settings-section-row">
+      <div class="admin-settings-section-row__intro">
+        <h4>Retention periods</h4>
+        <p>Plain-language retention statements for each record type.</p>
+      </div>
+      <div class="admin-settings-section-row__content admin-settings-profile-fields">
+        <label class="field-row">
+          <span>Inquiries</span>
+          <textarea name="retentionInquiries" rows="2" required>{notice.retentionInquiries}</textarea>
+        </label>
+        <label class="field-row">
+          <span>Reseller applications</span>
+          <textarea name="retentionResellerApplications" rows="2" required>{notice.retentionResellerApplications}</textarea>
+        </label>
+        <label class="field-row">
+          <span>Orders</span>
+          <textarea name="retentionOrders" rows="2" required>{notice.retentionOrders}</textarea>
+        </label>
+        <label class="field-row">
+          <span>Accounts</span>
+          <textarea name="retentionAccounts" rows="2" required>{notice.retentionAccounts}</textarea>
+        </label>
+        <label class="field-row">
+          <span>Security logs</span>
+          <textarea name="retentionSecurityLogs" rows="2" required>{notice.retentionSecurityLogs}</textarea>
+        </label>
+        <label class="field-row">
+          <span>Backups</span>
+          <textarea name="retentionBackups" rows="2" required>{notice.retentionBackups}</textarea>
+        </label>
+      </div>
+    </div>
+  </form>
+</section>
+
+<script>
+  import { initAdminSettingsPrivacy } from "@/lib/client/admin-settings-privacy-editor";
+
+  function init() {
+    initAdminSettingsPrivacy(document);
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("astro:after-swap", init);
+  if (document.readyState === "complete" || document.readyState === "interactive") {
+    init();
+  }
+</script>
+
+<style>
+  .admin-settings-card {
+    min-width: 0;
+    max-width: 100%;
+    display: grid;
+    gap: 0;
+  }
+
+  .admin-settings-card__header {
+    display: grid;
+    gap: 0.35rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .admin-settings-card__header h3,
+  .admin-settings-card__heading-copy p {
+    margin: 0;
+  }
+
+  .admin-settings-card__header h3 {
+    font-size: 1.2rem;
+    line-height: 1.16;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: #111827;
+  }
+
+  .admin-settings-card__heading-copy p {
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: rgba(75, 85, 99, 0.9);
+  }
+
+  .admin-settings-card__heading-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .admin-settings-card__save-button {
+    flex-shrink: 0;
+    align-self: center;
+  }
+
+  .admin-settings-save-status {
+    margin: 0.75rem 0 0;
+    font-size: 0.8125rem;
+    color: #6b7280;
+  }
+
+  .admin-settings-save-status[data-state="saved"] {
+    color: #15803d;
+  }
+
+  .admin-settings-save-status[data-state="error"] {
+    color: #b91c1c;
+  }
+
+  .admin-settings-form {
+    display: grid;
+    gap: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+  }
+
+  .admin-settings-profile-fields {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .admin-settings-form :global(.field-row) {
+    max-width: 28rem;
+  }
+
+  .admin-settings-privacy__status {
+    margin: 1.25rem 0 0;
+    padding: 0.9rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid #f59e0b;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  .admin-settings-privacy__status.is-ready {
+    border-color: #86efac;
+    background: #f0fdf4;
+    color: #166534;
+  }
+
+  .admin-settings-privacy__status p {
+    margin: 0.35rem 0 0;
+  }
+
+  .admin-settings-privacy__status ul {
+    margin: 0.5rem 0 0;
+    padding-left: 1.2rem;
+  }
+</style>

@@ -4,6 +4,12 @@ import Layout from "@/layouts/Layout.astro";
 import PublicBusinessPageContent from "@/components/public-website/PublicBusinessPageContent.astro";
 import { getPublicEnv } from "@/lib/env";
 import { getResellerApplicationFeedback } from "@/lib/public-website/reseller-applications";
+import { getPrivacyCollectionContext } from "@/lib/public-website/privacy-collection-notice";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
+const settings = await loadPlatformSettings(createSupabaseAdminClient());
+const privacyContext = getPrivacyCollectionContext(settings);
 
 const { turnstileSiteKey } = getPublicEnv();
 const feedback = getResellerApplicationFeedback(Astro.url);
@@ -17,6 +23,8 @@ const feedback = getResellerApplicationFeedback(Astro.url);
     <PublicBusinessPageContent
       feedback={feedback}
       turnstileSiteKey={turnstileSiteKey ?? null}
+      privacyHref={privacyContext.privacyHref}
+      requirePrivacyAcknowledgement={privacyContext.requireAcknowledgement}
     />
   </PageShell>
 </Layout>

@@ -8,11 +8,10 @@
     "dist"
   ],
   "compilerOptions": {
-    "baseUrl": ".",
     "jsx": "react-jsx",
     "paths": {
       "@/*": [
-        "src/*"
+        "./src/*"
       ]
     }
   }

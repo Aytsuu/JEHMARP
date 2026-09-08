@@ -1,3 +1,5 @@
+import { formatSidebarUnreadCount } from "@/lib/dashboard/sidebar-navigation";
+
 export function initDashboardSidebarUnreadBadges() {
   const badges = document.querySelectorAll<HTMLElement>("[data-sidebar-unread-badge]");
 
@@ -28,7 +30,8 @@ export function initDashboardSidebarUnreadBadges() {
     }
 
     const unreadCount = notificationIds.filter((id) => !readIds.includes(id)).length;
-    badge.textContent = String(unreadCount);
+    badge.dataset.unreadCount = String(unreadCount);
+    badge.textContent = formatSidebarUnreadCount(unreadCount);
     badge.hidden = unreadCount < 1;
   });
 

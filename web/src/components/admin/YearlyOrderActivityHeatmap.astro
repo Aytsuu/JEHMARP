@@ -1,0 +1,155 @@
+---
+import Tooltip from "@/components/ui/Tooltip.astro";
+import {
+  orderActivityCellOpacity,
+  type YearlyOrderActivityMetric,
+} from "@/lib/admin-dashboard/analytics";
+
+type Props = {
+  activity: YearlyOrderActivityMetric;
+};
+
+const { activity } = Astro.props;
+const defaultYear = activity.defaultYear;
+const defaultYearData = activity.years[defaultYear];
+
+const BRAND_RED = "102, 24, 24";
+const EMPTY_CELL_COLOR = "#e5e7eb";
+
+const yearRows = defaultYearData
+  ? [
+      { months: defaultYearData.months.slice(0, 6) },
+      { months: defaultYearData.months.slice(6, 12) },
+    ]
+  : [];
+
+function formatActivityDate(date: string) {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return date;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  }).format(parsed);
+}
+
+function formatOrderCount(count: number) {
+  return new Intl.NumberFormat("en-PH").format(count);
+}
+
+function buildCellTooltip(date: string, orderCount: number) {
+  return `${formatActivityDate(date)}: ${formatOrderCount(orderCount)} order${orderCount === 1 ? "" : "s"}`;
+}
+---
+
+<div class="order-3 rounded-xl border border-gray-300 bg-white p-4 sm:p-6">
+  <div class="mb-4 flex flex-col gap-2 sm:mb-6 sm:gap-4">
+    <div>
+      <h3 class="text-lg font-bold text-gray-900">Order Activity</h3>
+      <p class="text-sm text-gray-500">
+        A day-by-day view of orders placed in {defaultYear}. Hover a day for details.
+      </p>
+    </div>
+  </div>
+
+  {
+    defaultYearData ? (
+      <div class="yearly-order-activity">
+        <div class="yearly-order-activity__summary">
+          <span>{formatOrderCount(defaultYearData.totalOrders)} orders</span>
+          <span class="yearly-order-activity__legend" aria-hidden="true">
+            <span class="yearly-order-activity__legend-item">
+              <span
+                class="yearly-order-activity__legend-swatch"
+                style={{ backgroundColor: EMPTY_CELL_COLOR }}
+              />
+              None
+            </span>
+            <span class="yearly-order-activity__legend-item">
+              <span
+                class="yearly-order-activity__legend-swatch"
+                style={{ backgroundColor: `rgba(${BRAND_RED}, 0.35)` }}
+              />
+              Fewer
+            </span>
+            <span class="yearly-order-activity__legend-item">
+              <span
+                class="yearly-order-activity__legend-swatch"
+                style={{ backgroundColor: `rgba(${BRAND_RED}, 1)` }}
+              />
+              More
+            </span>
+          </span>
+        </div>
+
+        <div class="yearly-order-activity__calendar">
+          {
+            yearRows.map((row) => (
+              <div class="yearly-order-activity__half-year">
+                {
+                  row.months.map((month) => (
+                    <div class="yearly-order-activity__month">
+                      <p class="yearly-order-activity__month-label">{month.label}</p>
+                      <div
+                        class="yearly-order-activity__grid"
+                        style={{ gridTemplateRows: `repeat(${month.rows}, minmax(0, 1fr))` }}
+                      >
+                        {
+                          month.cells.map((cell) => {
+                            if (cell.isPadding) {
+                              return (
+                                <span
+                                  class="yearly-order-activity__cell is-padding"
+                                  aria-hidden="true"
+                                />
+                              );
+                            }
+
+                            const opacity = orderActivityCellOpacity(
+                              cell.orderCount,
+                              defaultYearData.maxOrderCount,
+                            );
+                            const tooltipText = cell.date
+                              ? buildCellTooltip(cell.date, cell.orderCount)
+                              : "";
+
+                            return (
+                              <Tooltip
+                                text={tooltipText}
+                                placement="above"
+                                focusable={false}
+                                class="yearly-order-activity__cell-tooltip"
+                              >
+                                <span
+                                  class="yearly-order-activity__cell"
+                                  style={{
+                                    backgroundColor: cell.orderCount > 0
+                                      ? `rgba(${BRAND_RED}, ${opacity})`
+                                      : EMPTY_CELL_COLOR,
+                                  }}
+                                />
+                              </Tooltip>
+                            );
+                          })
+                        }
+                      </div>
+                    </div>
+                  ))
+                }
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    ) : (
+      <div class="yearly-order-activity__empty">
+        No order activity recorded for {defaultYear}.
+      </div>
+    )
+  }
+</div>

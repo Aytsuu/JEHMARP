@@ -1,15 +1,21 @@
 ---
 import Layout from "@/layouts/Layout.astro";
+import PrivacyCollectionNotice from "@/components/public-website/PrivacyCollectionNotice.astro";
 import {
   getCustomerRegistrationLinkState,
   parseCustomerRegistrationFormData,
   submitCustomerRegistration,
 } from "@/lib/public-website/customer-registration";
+import { getPrivacyCollectionContext, loadPrivacyAcknowledgementRequirement } from "@/lib/public-website/privacy-collection-notice";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isTrustedFormOrigin } from "@/lib/security/form-origin";
 
 export const prerender = false;
 
 const token = Astro.params.token ?? "";
+const settings = await loadPlatformSettings(createSupabaseAdminClient());
+const { privacyHref, requireAcknowledgement: requirePrivacyAcknowledgement } = getPrivacyCollectionContext(settings);
 let feedback: { status?: string; error?: string; tracking?: string; emailSent?: boolean } = {
   status: Astro.url.searchParams.get("status") ?? undefined,
   error: Astro.url.searchParams.get("error") ?? undefined,
@@ -26,7 +32,9 @@ if (Astro.request.method === "POST") {
   }
 
   const formData = await Astro.request.formData();
-  const parsed = parseCustomerRegistrationFormData(formData);
+  const parsed = parseCustomerRegistrationFormData(formData, {
+    requirePrivacyAcknowledgement: await loadPrivacyAcknowledgementRequirement(),
+  });
 
   if (!parsed.success) {
     return Astro.redirect(
@@ -160,6 +168,11 @@ const expiresAt = linkState.status === "valid"
             <span>Address</span>
             <textarea name="address" rows="4" required autocomplete="street-address"></textarea>
           </label>
+          <PrivacyCollectionNotice
+            purpose="registration"
+            privacyHref={privacyHref}
+            requireAcknowledgement={requirePrivacyAcknowledgement}
+          />
           <div class="customer-registration-form__actions">
             <button type="submit">Submit Registration</button>
           </div>

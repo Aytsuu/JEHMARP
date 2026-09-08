@@ -9,6 +9,12 @@ import {
   writeDashboardFragmentCache,
 } from "@/lib/client/dashboard-fragment-cache";
 
+function isOptionalNewCustomerField(field: Element) {
+  return field.matches(
+    "[data-customer-assigned-agent-id], [data-customer-email], [data-customer-is-reseller]",
+  );
+}
+
 export type OrderCustomerPickerFieldMap = {
   firstName?: HTMLInputElement | null;
   lastName?: HTMLInputElement | null;
@@ -30,10 +36,12 @@ export type InitOrderCustomerPickerOptions = {
   customerOptionTemplate?: HTMLTemplateElement | null;
   apiEndpoint?: string;
   profileScope?: "customer-agent" | "customer";
+  apiExtraParams?: Record<string, string>;
   cacheKey?: string;
   newCustomerFields?: HTMLElement | null;
   fieldMap?: OrderCustomerPickerFieldMap;
   showPaymentNotice?: boolean;
+  showProfileType?: boolean;
   agentIdInput?: HTMLInputElement | null;
   onChange?: (selection: OrderCustomerPickerSelection) => void;
 };
@@ -46,6 +54,7 @@ function buildProfileCacheQuery(
   page: number,
   search: string,
   scope: "customer-agent" | "customer",
+  extraParams: Record<string, string> = {},
 ) {
   const params = new URLSearchParams();
 
@@ -60,6 +69,12 @@ function buildProfileCacheQuery(
   const normalizedSearch = search.trim();
   if (normalizedSearch.length > 0) {
     params.set("q", normalizedSearch);
+  }
+
+  for (const [key, value] of Object.entries(extraParams)) {
+    if (value.trim().length > 0) {
+      params.set(key, value.trim());
+    }
   }
 
   return params.toString();
@@ -119,10 +134,12 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
     customerOptionTemplate = null,
     apiEndpoint,
     profileScope = "customer-agent",
+    apiExtraParams = {},
     cacheKey = `order-target-profiles-${profileScope}-v1`,
     newCustomerFields = null,
     fieldMap = {},
     showPaymentNotice = false,
+    showProfileType = true,
     agentIdInput = null,
     onChange,
   } = options;
@@ -236,10 +253,14 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
     name.className = "order-customer-picker__option-name";
     name.textContent = profile.label;
 
-    const type = document.createElement("span");
-    type.className = "order-customer-picker__option-type";
-    type.textContent = profile.type === "customer" ? "Customer" : "Agent";
-    button.replaceChildren(name, type);
+    if (showProfileType) {
+      const type = document.createElement("span");
+      type.className = "order-customer-picker__option-type";
+      type.textContent = profile.type === "customer" ? "Customer" : "Agent";
+      button.replaceChildren(name, type);
+    } else {
+      button.replaceChildren(name);
+    }
 
     if (profile.type === "customer") {
       button.dataset.customerId = profile.id;
@@ -258,7 +279,8 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
     }
 
     button.dataset.agentId = profile.id;
-    button.dataset.customerId = "";
+    button.dataset.attachCustomerId = profile.attachCustomerId ?? "";
+    button.dataset.customerId = profile.attachCustomerId ?? "";
     button.dataset.customerPhoneNumber = profile.phoneNumber;
     button.dataset.customerEmail = profile.email;
     button.dataset.customerFirstName = "";
@@ -320,7 +342,7 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
     const generation = ++fetchGeneration;
     const requestedPage = Math.min(Math.max(Math.trunc(page), 1), Math.max(totalPages, 1));
     const requestedSearch = search.trim();
-    const cacheQuery = buildProfileCacheQuery(requestedPage, requestedSearch, profileScope);
+    const cacheQuery = buildProfileCacheQuery(requestedPage, requestedSearch, profileScope, apiExtraParams);
     const cachedResult = readCachedProfiles(cacheKey, cacheQuery);
 
     pendingPage = requestedPage;
@@ -343,6 +365,11 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
     params.set("scope", profileScope);
     if (requestedSearch.length > 0) {
       params.set("q", requestedSearch);
+    }
+    for (const [key, value] of Object.entries(apiExtraParams)) {
+      if (value.trim().length > 0) {
+        params.set(key, value.trim());
+      }
     }
 
     try {
@@ -376,9 +403,21 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
   }
 
   function requestPage(page: number, search = currentSearch) {
+    const normalizedSearch = search.trim();
+
+    if (!useApi) {
+      if (currentSearch === normalizedSearch && getRenderedCustomerOptions().length > 0) {
+        return;
+      }
+
+      currentSearch = normalizedSearch;
+      renderLegacyCustomerOptions(search);
+      return;
+    }
+
     const nextPage = Math.min(Math.max(Math.trunc(page), 1), Math.max(totalPages, 1));
 
-    if (pendingPage === nextPage && currentSearch === search.trim()) {
+    if (pendingPage === nextPage && currentSearch === normalizedSearch) {
       return;
     }
 
@@ -437,8 +476,18 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
   }
 
   function getSelectedOptionElement() {
-    return getRenderedCustomerOptions().find(
+    const byLabel = getRenderedCustomerOptions().find(
       (option) => option.dataset.customerLabel === customerSearch?.value,
+    );
+    if (byLabel) return byLabel;
+
+    const selectedCustomerId = customerIdInput?.value.trim() ?? "";
+    if (!selectedCustomerId) return undefined;
+
+    return getRenderedCustomerOptions().find(
+      (option) =>
+        option.dataset.customerId === selectedCustomerId
+        || option.dataset.attachCustomerId === selectedCustomerId,
     );
   }
 
@@ -447,6 +496,7 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
 
     if (option.dataset.orderTargetType === "agent") {
       const agentId = option.dataset.agentId ?? "";
+      const attachCustomerId = option.dataset.attachCustomerId ?? "";
       if (!agentId) return null;
 
       return {
@@ -455,6 +505,7 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
         label: option.dataset.customerLabel ?? "",
         phoneNumber: option.dataset.customerPhoneNumber ?? "",
         email: option.dataset.customerEmail ?? "",
+        attachCustomerId: attachCustomerId.length > 0 ? attachCustomerId : null,
       };
     }
 
@@ -565,11 +616,12 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
   function getSelection(): OrderCustomerPickerSelection {
     const customerProfile = selectedProfile?.type === "customer" ? selectedProfile : null;
     const agentProfile = selectedProfile?.type === "agent" ? selectedProfile : null;
+    const attachCustomerId = agentProfile?.attachCustomerId ?? "";
 
     return {
       profile: selectedProfile,
-      customerId: customerProfile?.id ?? "",
-      agentId: agentProfile?.id ?? "",
+      customerId: customerProfile?.id ?? attachCustomerId,
+      agentId: agentProfile && attachCustomerId.length === 0 ? agentProfile.id : "",
     };
   }
 
@@ -579,13 +631,27 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
 
     if (matchedProfile) {
       selectedProfile = matchedProfile;
+    } else if (selectedProfile && customerIdInput?.value.trim()) {
+      const selectedCustomerId = customerIdInput.value.trim();
+      const profileStillMatches = selectedProfile.type === "customer"
+        ? selectedProfile.id === selectedCustomerId
+        : (selectedProfile.attachCustomerId ?? "") === selectedCustomerId;
+
+      if (!profileStillMatches || customerSearch?.value.trim() !== selectedProfile.label) {
+        selectedProfile = null;
+      }
     } else if (customerSearch?.value.trim() !== selectedProfile?.label) {
       selectedProfile = null;
     }
 
     const selection = getSelection();
+    const attachCustomerId = selectedProfile?.type === "agent"
+      ? selectedProfile.attachCustomerId ?? ""
+      : "";
     const hasAgentTarget = selection.agentId.length > 0;
-    const selectedCustomerId = hasAgentTarget ? "" : selection.customerId;
+    const selectedCustomerId = attachCustomerId.length > 0
+      ? attachCustomerId
+      : (hasAgentTarget ? "" : selection.customerId);
 
     if (customerIdInput) {
       customerIdInput.value = selectedCustomerId;
@@ -595,6 +661,9 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
     }
 
     if (hasAgentTarget) {
+      fillCustomerFields(null);
+      updateCustomerOrderNotice(null);
+    } else if (selectedProfile?.type === "agent" && attachCustomerId.length > 0) {
       fillCustomerFields(null);
       updateCustomerOrderNotice(null);
     } else if (selectedProfile?.type === "customer") {
@@ -611,7 +680,9 @@ export function initOrderCustomerPicker(options: InitOrderCustomerPickerOptions)
     fields?.forEach((field) => {
       if (field === customerIdInput) return;
       field.disabled = hasAgentTarget || hasExistingCustomer;
-      field.required = !hasAgentTarget && !hasExistingCustomer;
+      field.required = !hasAgentTarget
+        && !hasExistingCustomer
+        && !isOptionalNewCustomerField(field);
     });
     newCustomerFields?.toggleAttribute("hidden", hasAgentTarget);
     newCustomerFields?.toggleAttribute("data-disabled", hasAgentTarget || hasExistingCustomer);

@@ -7,3 +7,4 @@ export * from "./document-payment";
 export * from "./notifications";
 export * from "./document-layout";
 export * from "./operational-notification-email";
+export * from "./privacy-notice";

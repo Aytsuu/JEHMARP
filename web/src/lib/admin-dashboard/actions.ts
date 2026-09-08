@@ -70,11 +70,13 @@ import {
   type ProfileIdentitySupabaseClient,
 } from "@/lib/profile-identity";
 import { logDevelopmentActionError } from "@/lib/request-logger";
+import { buildCustomerRegistrationLinkUrl } from "@/lib/public-website/customer-registration";
 import {
   getRegularCheckNotificationIdsForCustomer,
   upsertAdminNotificationRead,
   upsertAdminNotificationReads,
 } from "./admin-notification-read";
+import { formatDateTime } from "./view";
 import { loadCustomers, loadOrders } from "./data";
 import { getUnpaidOrderCheckNotificationIds } from "./unpaid-order-checks";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -126,6 +128,9 @@ type AdminActionResult = {
   redirectPath?: string;
   statusMessage?: string;
   sectionContent?: Record<string, unknown>;
+  registrationLink?: string;
+  registrationLinkExpiresAt?: string;
+  registrationLinkDuration?: RegistrationLinkDuration;
 };
 type PromotionAuthUser = {
   id: string;
@@ -136,7 +141,15 @@ export type AdminActionFeedback = {
   status?: string;
   error?: string;
   cleanPath?: string;
+  registrationLink?: string;
+  registrationLinkExpiresAt?: string;
+  registrationLinkDuration?: RegistrationLinkDuration;
 };
+
+export const ADMIN_REGISTRATION_LINK_SENT_MESSAGE =
+  "Registration link created and sent to selected agents.";
+export const ADMIN_REGISTRATION_LINK_CREATED_MESSAGE =
+  "Registration link created. Copy and share it with customers when ready.";
 
 const maxProductImageBytes = 2 * 1024 * 1024;
 
@@ -284,6 +297,9 @@ export type AdminAction =
         payment_status: "unpaid";
         release_date: string;
         submitted_by: string;
+        approved_by: string;
+        approved_at: string;
+        created_at: string;
         updated_at: string;
       };
       items: {
@@ -620,6 +636,9 @@ export async function handleAdminDashboardAction(
       redirectPath,
       action: parsed.action.type,
       sectionContent: actionResult?.sectionContent,
+      registrationLink: actionResult?.registrationLink,
+      registrationLinkExpiresAt: actionResult?.registrationLinkExpiresAt,
+      registrationLinkDuration: actionResult?.registrationLinkDuration,
     });
   }
 
@@ -628,6 +647,13 @@ export async function handleAdminDashboardAction(
       redirectPath,
       "status",
       message,
+      actionResult?.registrationLink
+        ? {
+            registrationLink: actionResult.registrationLink,
+            registrationLinkExpiresAt: actionResult.registrationLinkExpiresAt,
+            registrationLinkDuration: actionResult.registrationLinkDuration,
+          }
+        : undefined,
     ),
     303,
   );
@@ -645,6 +671,21 @@ export async function markUnreadAdminInquiriesRead(
 
   if (error) {
     throw new Error("Unable to mark inquiries as read.");
+  }
+}
+
+export async function markUnreadAdminResellerApplicationsRead(
+  context: Pick<APIContext, "cookies" | "request">,
+  adminUserId: string,
+) {
+  const { error } = await createSupabaseServerClient(context)
+    .from("reseller_application")
+    .update(adminReadPayload(adminUserId))
+    .eq("application_status", "submitted")
+    .is("admin_read_at", null);
+
+  if (error) {
+    throw new Error("Unable to mark reseller applications as read.");
   }
 }
 
@@ -957,9 +998,23 @@ export async function executeAdminAction(
     case "apply-customer-orders-payment":
       await executeCustomerOrdersPayment(supabase, action);
       return;
-    case "create-customer-registration-link":
-      await executeCustomerRegistrationLinkCreate(action.payload);
-      return;
+    case "create-customer-registration-link": {
+      const { token, expiresAt } = await executeCustomerRegistrationLinkCreate(action.payload);
+      const expiryFeedback = formatRegistrationLinkExpiryFeedback(expiresAt, action.payload.duration);
+
+      if (action.payload.agent_ids.length > 0) {
+        return {
+          statusMessage: `${ADMIN_REGISTRATION_LINK_SENT_MESSAGE} ${expiryFeedback}`,
+        };
+      }
+
+      return {
+        statusMessage: ADMIN_REGISTRATION_LINK_CREATED_MESSAGE,
+        registrationLink: buildCustomerRegistrationLinkUrl(action.payload.base_url, token),
+        registrationLinkExpiresAt: expiresAt,
+        registrationLinkDuration: action.payload.duration,
+      };
+    }
     case "save-invoice":
       await assertOrderCanGenerateInvoice(supabase, action.payload.order_id);
       await executeTableUpsert(supabase, "invoice", action.invoiceId, action.payload);
@@ -984,6 +1039,7 @@ export async function executeAdminAction(
       await markAllAdminNotificationsRead(supabase, adminUserId);
       return;
     case "save-platform-settings-general":
+    case "save-platform-settings-privacy":
     case "change-admin-password":
     case "send-agent-password-reset": {
       const { data: authData } = await supabase.auth.getUser();
@@ -1020,11 +1076,23 @@ export function getAllowedNextOrderStatuses(
 export function formatAdminActionFeedback(url: URL): AdminActionFeedback {
   const status = normalizeQueryMessage(url.searchParams.get("status"));
   const error = normalizeQueryMessage(url.searchParams.get("error"));
+  const registrationLink = normalizeQueryMessage(url.searchParams.get("registrationLink"));
+  const registrationLinkExpiresAt = normalizeQueryMessage(
+    url.searchParams.get("registrationLinkExpiresAt"),
+  );
+  const registrationLinkDuration = parseRegistrationLinkDuration(
+    url.searchParams.get("registrationLinkDuration"),
+  );
 
   return {
     status,
     error,
-    cleanPath: status || error ? getAdminActionFeedbackCleanPath(url) : undefined,
+    registrationLink,
+    registrationLinkExpiresAt,
+    registrationLinkDuration,
+    cleanPath: status || error || registrationLink || registrationLinkExpiresAt
+      ? getAdminActionFeedbackCleanPath(url)
+      : undefined,
   };
 }
 
@@ -1291,6 +1359,7 @@ function parseAdminActionFormDataOrThrow(
         ? enumValue(formData, "agentOrderType", agentOrderTypes)
         : null;
       const payment = parseCreateOrderPaymentPayload(formData, adminUserId);
+      const timestamp = new Date().toISOString();
 
       if (agentOrderType === "distribution" && payment) {
         throw new Error("Downpayment is not supported for agent distribution orders.");
@@ -1320,7 +1389,10 @@ function parseAdminActionFormDataOrThrow(
           payment_status: "unpaid",
           release_date: requiredDateAndTimeFromFormData(formData, "releaseDate", "releaseTime"),
           submitted_by: adminUserId,
-          updated_at: new Date().toISOString(),
+          approved_by: adminUserId,
+          approved_at: timestamp,
+          created_at: timestamp,
+          updated_at: timestamp,
         },
         items: parseOrderItems(formData),
         payment,
@@ -1544,7 +1616,7 @@ function parseAdminActionFormDataOrThrow(
       return success({
         type: "create-customer-registration-link",
         payload: {
-          agent_ids: requiredUuidList(formData, "agentId"),
+          agent_ids: optionalUuidList(formData, "agentId"),
           duration: enumValue(formData, "duration", registrationLinkDurations),
           base_url: requiredUrlOrigin(formData, "baseUrl"),
           created_by: adminUserId,
@@ -2569,6 +2641,9 @@ async function executeAgentDistributionOrderCreate(
       notes: null,
       release_date: action.payload.release_date,
       submitted_by: action.payload.submitted_by,
+      approved_by: action.payload.submitted_by,
+      approved_at: timestamp,
+      created_at: timestamp,
       admin_read_at: timestamp,
       admin_read_by: action.payload.submitted_by,
       updated_at: timestamp,
@@ -3224,29 +3299,35 @@ async function executeCustomerRegistrationLinkCreate(
   payload: Extract<AdminAction, { type: "create-customer-registration-link" }>["payload"],
 ) {
   const adminClient = createSupabaseAdminClient();
-  const { data: agents, error: agentError } = await adminClient
-    .from("agent")
-    .select("id")
-    .in("id", payload.agent_ids)
-    .eq("status", "active");
 
-  if (agentError) {
-    throw new Error("Unable to validate registration link agents.");
-  }
+  if (payload.agent_ids.length > 0) {
+    const { data: agents, error: agentError } = await adminClient
+      .from("agent")
+      .select("id")
+      .in("id", payload.agent_ids)
+      .eq("status", "active");
 
-  const activeAgentIds = new Set((agents ?? []).map((agent) => String(agent.id)));
+    if (agentError) {
+      throw new Error("Unable to validate registration link agents.");
+    }
 
-  if (activeAgentIds.size !== payload.agent_ids.length) {
-    throw new Error("Registration links can only be sent to active agents.");
+    const activeAgentIds = new Set((agents ?? []).map((agent) => String(agent.id)));
+
+    if (activeAgentIds.size !== payload.agent_ids.length) {
+      throw new Error("Registration links can only be sent to active agents.");
+    }
   }
 
   const token = createRegistrationToken();
+  const expiresAt = new Date(
+    Date.now() + registrationDurationSeconds(payload.duration) * 1000,
+  ).toISOString();
   const { data: link, error: linkError } = await adminClient
     .from("customer_registration_link")
     .insert({
       token,
       token_hash: hashRegistrationToken(token),
-      expires_at: new Date(Date.now() + registrationDurationSeconds(payload.duration) * 1000).toISOString(),
+      expires_at: expiresAt,
       created_by: payload.created_by,
     })
     .select("id")
@@ -3256,17 +3337,21 @@ async function executeCustomerRegistrationLinkCreate(
     throw new Error("Unable to create customer registration link.");
   }
 
-  const { error: linkAgentError } = await adminClient
-    .from("customer_registration_link_agent")
-    .insert(payload.agent_ids.map((agentId) => ({
-      link_id: String(link.id),
-      agent_id: agentId,
-    })));
+  if (payload.agent_ids.length > 0) {
+    const { error: linkAgentError } = await adminClient
+      .from("customer_registration_link_agent")
+      .insert(payload.agent_ids.map((agentId) => ({
+        link_id: String(link.id),
+        agent_id: agentId,
+      })));
 
-  if (linkAgentError) {
-    await adminClient.from("customer_registration_link").delete().eq("id", String(link.id));
-    throw new Error("Unable to notify selected agents about the registration link.");
+    if (linkAgentError) {
+      await adminClient.from("customer_registration_link").delete().eq("id", String(link.id));
+      throw new Error("Unable to notify selected agents about the registration link.");
+    }
   }
+
+  return { token, expiresAt };
 }
 
 async function assertOrderProductsEditableByItemId(
@@ -4126,17 +4211,23 @@ function optionalUuid(formData: FormData, key: string) {
   return value ? uuidSchema.parse(value) : undefined;
 }
 
-function requiredUuidList(formData: FormData, key: string, errorMessage?: string) {
+function optionalUuidList(formData: FormData, key: string) {
   const values = formData
     .getAll(key)
     .map((value) => normalizeFormDataEntry(value))
     .filter((value) => value.length > 0);
 
+  return [...new Set(values.map((value) => uuidSchema.parse(value)))];
+}
+
+function requiredUuidList(formData: FormData, key: string, errorMessage?: string) {
+  const values = optionalUuidList(formData, key);
+
   if (values.length === 0) {
     throw new Error(errorMessage ?? `${toSentenceLabel(key)} is required.`);
   }
 
-  return [...new Set(values.map((value) => uuidSchema.parse(value)))];
+  return values;
 }
 
 function requiredUrlOrigin(formData: FormData, key: string) {
@@ -4593,7 +4684,7 @@ function getActionSuccessMessage(action: AdminAction) {
     case "apply-customer-orders-payment":
       return "Payment distributed to selected orders.";
     case "create-customer-registration-link":
-      return "Registration link created and sent to selected agents.";
+      return ADMIN_REGISTRATION_LINK_SENT_MESSAGE;
     case "save-invoice":
       return "Invoice saved.";
     case "update-inquiry":
@@ -4609,6 +4700,7 @@ function getActionSuccessMessage(action: AdminAction) {
     case "mark-all-admin-notifications-read":
       return "Notifications marked as read.";
     case "save-platform-settings-general":
+    case "save-platform-settings-privacy":
     case "change-admin-password":
     case "send-agent-password-reset":
       return getPlatformSettingsActionSuccessMessage(action);
@@ -4631,10 +4723,41 @@ function getActionRedirectPath(action: AdminAction, fallbackPath: string) {
   return fallbackPath;
 }
 
-function withActionFeedback(path: string, key: "status" | "error", message: string) {
-  const separator = path.includes("?") ? "&" : "?";
+function withActionFeedback(
+  path: string,
+  key: "status" | "error",
+  message: string,
+  extra?: {
+    registrationLink?: string;
+    registrationLinkExpiresAt?: string;
+    registrationLinkDuration?: RegistrationLinkDuration;
+  },
+) {
+  const hashIndex = path.indexOf("#");
+  const hash = hashIndex >= 0 ? path.slice(hashIndex) : "";
+  const pathWithoutHash = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+  const [pathname, search = ""] = pathWithoutHash.split("?", 2);
+  const params = new URLSearchParams(search);
 
-  return `${path}${separator}${key}=${encodeURIComponent(message)}`;
+  params.set(key, message);
+
+  if (extra?.registrationLink) {
+    params.set("registrationLink", extra.registrationLink);
+  }
+
+  if (extra?.registrationLinkExpiresAt) {
+    params.set("registrationLinkExpiresAt", extra.registrationLinkExpiresAt);
+  }
+
+  if (extra?.registrationLinkDuration) {
+    params.set("registrationLinkDuration", extra.registrationLinkDuration);
+  }
+
+  const query = Array.from(params.entries())
+    .map(([paramKey, paramValue]) => `${encodeURIComponent(paramKey)}=${encodeURIComponent(paramValue)}`)
+    .join("&");
+
+  return `${pathname}${query ? `?${query}` : ""}${hash}`;
 }
 
 function getAdminActionFeedbackCleanPath(url: URL) {
@@ -4642,6 +4765,9 @@ function getAdminActionFeedbackCleanPath(url: URL) {
 
   cleanUrl.searchParams.delete("status");
   cleanUrl.searchParams.delete("error");
+  cleanUrl.searchParams.delete("registrationLink");
+  cleanUrl.searchParams.delete("registrationLinkExpiresAt");
+  cleanUrl.searchParams.delete("registrationLinkDuration");
 
   return `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`;
 }
@@ -4723,4 +4849,34 @@ function registrationDurationSeconds(duration: RegistrationLinkDuration) {
     case "1d":
       return 24 * 60 * 60;
   }
+}
+
+export function formatRegistrationLinkDurationLabel(duration: RegistrationLinkDuration) {
+  switch (duration) {
+    case "30m":
+      return "30 minutes";
+    case "1h":
+      return "1 hour";
+    case "3h":
+      return "3 hours";
+    case "12h":
+      return "12 hours";
+    case "1d":
+      return "1 day";
+  }
+}
+
+export function formatRegistrationLinkExpiryFeedback(
+  expiresAt: string,
+  duration: RegistrationLinkDuration,
+) {
+  return `Expires ${formatDateTime(expiresAt)} (${formatRegistrationLinkDurationLabel(duration)}).`;
+}
+
+function parseRegistrationLinkDuration(value: string | null): RegistrationLinkDuration | undefined {
+  if (!value) return undefined;
+
+  return registrationLinkDurations.includes(value as RegistrationLinkDuration)
+    ? value as RegistrationLinkDuration
+    : undefined;
 }

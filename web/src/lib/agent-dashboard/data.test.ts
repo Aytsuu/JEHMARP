@@ -22,6 +22,7 @@ function createQueryBuilder(response: MockResponse = emptyResponse) {
     eq: vi.fn(() => builder),
     in: vi.fn(() => builder),
     is: vi.fn(() => builder),
+    gt: vi.fn(() => builder),
     not: vi.fn(() => builder),
     maybeSingle: vi.fn(() => Promise.resolve({
       data: response.data[0] ?? null,
@@ -118,5 +119,71 @@ describe("agent dashboard data", () => {
     const result = await loadAgentOrder({ cookies: {}, request: {} } as never, order.id);
 
     expect(result?.invoice).toEqual([invoice]);
+  });
+
+  it("loads only customers assigned to the signed-in agent and excludes the agent identity record", async () => {
+    const agentId = "agent-1";
+    const agentCustomerId = "agent-customer-1";
+    const profile = {
+      first_name: "Test",
+      last_name: "Customer",
+      display_name: "Test Customer",
+      email: "test@example.com",
+      phone_number: "09171234567",
+      address: "Manila",
+    };
+    const createCustomerRow = (id: string) => ({
+      id,
+      profile_id: `profile-${id}`,
+      tracking_number: `TN-${id}`,
+      assigned_agent_id: agentId,
+      is_reseller: false,
+      credit_limit: 1000,
+      credit_limit_exceeded: false,
+      created_at: "2026-07-03T00:00:00.000Z",
+      updated_at: "2026-07-03T00:00:00.000Z",
+      profile,
+    });
+
+    const customersBuilder = createQueryBuilder({
+      data: [createCustomerRow("customer-1"), createCustomerRow(agentCustomerId)],
+      error: null,
+    });
+    const agentBuilder = createQueryBuilder({
+      data: [{
+        id: agentId,
+        user_id: "user-1",
+        customer_id: agentCustomerId,
+        employee_id: null,
+        status: "active",
+        created_at: "2026-07-03T00:00:00.000Z",
+        updated_at: "2026-07-03T00:00:00.000Z",
+        profile,
+      }],
+      error: null,
+    });
+    const emptyBuilder = createQueryBuilder();
+    const from = vi.fn((table: string) => {
+      if (table === "customer") return customersBuilder;
+      if (table === "agent") return agentBuilder;
+      return emptyBuilder;
+    });
+
+    createSupabaseServerClient.mockReturnValue({
+      from,
+      auth: {
+        getUser: () => Promise.resolve({
+          data: { user: { id: "user-1", email: "agent@example.com" } },
+          error: null,
+        }),
+      },
+    });
+
+    const { loadAgentDashboardData } = await import("./data");
+    const result = await loadAgentDashboardData({ cookies: {}, request: {} } as never, "user-1");
+
+    expect(customersBuilder.eq).toHaveBeenCalledWith("assigned_agent_id", agentId);
+    expect(result.customers).toHaveLength(1);
+    expect(result.customers[0]?.id).toBe("customer-1");
   });
 });

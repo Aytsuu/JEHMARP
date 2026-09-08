@@ -28,7 +28,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
 <html lang="en" style="font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" href="/favicon.ico" />
     <link rel="preconnect" href="https://fonts.googleapis.com" transition:persist />
@@ -77,7 +77,6 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
           animation: none !important;
         }
 
-        .agent-mobile-header,
         .agent-mobile-nav {
           view-transition-name: none;
         }
@@ -108,6 +107,18 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         ];
         if (primaryRoutes.includes(location.pathname)) {
           document.body.classList.add("dashboard-body--agent-mobile-primary");
+        }
+
+        if (window.matchMedia("(max-width: 47.99rem)").matches) {
+          const syncAgentViewportHeight = () => {
+            const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            document.documentElement.style.setProperty("--app-viewport-height", `${Math.round(height)}px`);
+          };
+
+          syncAgentViewportHeight();
+          window.visualViewport?.addEventListener("resize", syncAgentViewportHeight);
+          window.visualViewport?.addEventListener("scroll", syncAgentViewportHeight);
+          window.addEventListener("resize", syncAgentViewportHeight);
         }
       }
     </script>
@@ -250,6 +261,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
       import { initOrderStatusAutoSave } from "@/lib/client/order-status-auto-save";
       import { initTableActionMenus } from "@/lib/client/table-action-menu";
       import { initAdminOrderBulkPdf } from "@/lib/client/admin-order-bulk-pdf";
+      import { initAdminOrderPendingCustomersModal } from "@/lib/client/admin-order-pending-customers-modal";
       import { initAdminOrdersFragmentTable } from "@/lib/client/admin-orders-fragment-table";
       import { clearDashboardFragmentCaches } from "@/lib/client/dashboard-fragment-cache";
       import { initFormSubmissionState } from "@/lib/client/form-submission-state";
@@ -303,7 +315,10 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
             ) as HTMLElement[];
 
             if (children.length === 0) {
-              maxWidth = Math.max(maxWidth, Math.ceil(cell.getBoundingClientRect().width));
+              const textContent = cell.textContent?.trim();
+              if (textContent) {
+                maxWidth = Math.max(maxWidth, Math.ceil(cell.scrollWidth));
+              }
               return;
             }
 
@@ -315,11 +330,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
               }
             });
 
-            maxWidth = Math.max(
-              maxWidth,
-              contentWidth + horizontalPadding,
-              Math.ceil(cell.scrollWidth),
-            );
+            maxWidth = Math.max(maxWidth, contentWidth + horizontalPadding);
           } finally {
             if (previousMaxWidth) {
               cell.style.maxWidth = previousMaxWidth;
@@ -512,15 +523,18 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
           }
 
           const widthPx = `${getSyncedTableColumnWidth(headerCell, bodyRows, columnIndex)}px`;
+          const isActionsColumn = headerCell.classList.contains(
+            "dashboard-table__actions-column",
+          );
           headerCell.style.width = widthPx;
           headerCell.style.minWidth = widthPx;
-          headerCell.style.maxWidth = "none";
+          headerCell.style.maxWidth = isActionsColumn ? widthPx : "none";
           for (const row of bodyRows) {
             const cell = row.children[columnIndex] as HTMLElement | undefined;
             if (cell) {
               cell.style.width = widthPx;
               cell.style.minWidth = widthPx;
-              cell.style.maxWidth = "none";
+              cell.style.maxWidth = isActionsColumn ? widthPx : "none";
             }
           }
         });
@@ -836,6 +850,7 @@ const dashboardPageTransitionName = getDashboardPageTransitionName();
         initTableActionMenus();
         initAdminOrdersFragmentTable();
         initAdminOrderBulkPdf();
+        initAdminOrderPendingCustomersModal();
       }
 
       document.addEventListener("DOMContentLoaded", initDashboardFeatures);

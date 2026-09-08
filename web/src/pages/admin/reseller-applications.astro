@@ -4,6 +4,7 @@ import AdminResellerApplications from "@/components/admin/AdminResellerApplicati
 import {
   formatAdminActionFeedback,
   getResellerApplicationStatuses,
+  markUnreadAdminResellerApplicationsRead,
 } from "@/lib/admin-dashboard/actions";
 import {
   loadAdminDashboardData,
@@ -26,6 +27,8 @@ const adminRoute = await requireAdminRoute(Astro);
 if (!adminRoute.ready) {
   return adminRoute.response;
 }
+
+await markUnreadAdminResellerApplicationsRead(Astro, adminRoute.userId);
 
 const resellerApplicationFilters = parseAdminResellerApplicationFilters(Astro.url);
 const resellerApplicationPagination = parseAdminPagination(Astro.url);

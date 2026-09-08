@@ -9,6 +9,8 @@ export type ActionMenuItem = {
   icon?: ActionMenuIcon;
   dataAction?: string;
   disabled?: boolean;
+  openAlertDialog?: string;
+  alertDialogForm?: string;
 };
 
 type Props = {
@@ -125,6 +127,8 @@ const triggerClasses = [
             role="menuitem"
             data-action-menu-item
             data-action={item.dataAction}
+            data-open-alert-dialog={item.openAlertDialog}
+            data-alert-dialog-form={item.alertDialogForm}
             disabled={item.disabled || undefined}
           >
             {icon === "external-pdf" && (

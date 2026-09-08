@@ -4,6 +4,7 @@ import {
   DEFAULT_DOCUMENT_NUMBERING,
   DEFAULT_DOCUMENT_PAYMENT,
   DEFAULT_NOTIFICATION_ROUTES,
+  DEFAULT_PRIVACY_NOTICE,
 } from "./defaults";
 import type {
   BusinessProfileSettings,
@@ -17,6 +18,7 @@ import type {
   PlatformSettingsPatch,
 } from "./types";
 import { notificationEvents } from "./types";
+import { normalizePrivacyNotice } from "./privacy-notice";
 
 function normalizeString(value: unknown, fallback = ""): string {
   return typeof value === "string" ? value.trim() : fallback;
@@ -158,6 +160,8 @@ export function normalizeDocumentNumbering(value: unknown): DocumentNumberingSet
   };
 }
 
+export { normalizePrivacyNotice } from "./privacy-notice";
+
 export function normalizePlatformSettings(value: unknown): PlatformSettings {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {
@@ -166,6 +170,7 @@ export function normalizePlatformSettings(value: unknown): PlatformSettings {
       defaults: { ...DEFAULT_DEFAULTS },
       notifications: normalizeNotifications(null),
       documentNumbering: { ...DEFAULT_DOCUMENT_NUMBERING },
+      privacyNotice: { ...DEFAULT_PRIVACY_NOTICE },
     };
   }
   const record = value as Record<string, unknown>;
@@ -184,6 +189,7 @@ export function normalizePlatformSettings(value: unknown): PlatformSettings {
     defaults: normalizeDefaults(record.defaults),
     notifications,
     documentNumbering: normalizeDocumentNumbering(record.documentNumbering),
+    privacyNotice: normalizePrivacyNotice(record.privacyNotice),
   };
 }
 
@@ -204,5 +210,8 @@ export function mergePlatformSettings(current: PlatformSettings, patch: Platform
     documentNumbering: patch.documentNumbering
       ? normalizeDocumentNumbering({ ...current.documentNumbering, ...patch.documentNumbering })
       : current.documentNumbering,
+    privacyNotice: patch.privacyNotice
+      ? normalizePrivacyNotice({ ...current.privacyNotice, ...patch.privacyNotice })
+      : current.privacyNotice,
   };
 }

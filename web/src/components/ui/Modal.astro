@@ -1,0 +1,65 @@
+---
+type Props = {
+  id: string;
+  title: string;
+  description?: string;
+};
+
+const { id, title, description } = Astro.props;
+const titleId = `${id}-title`;
+const descriptionId = description ? `${id}-description` : undefined;
+---
+
+<div
+  id={id}
+  class="dashboard-modal"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby={titleId}
+  aria-describedby={descriptionId}
+  aria-hidden="true"
+  data-dashboard-modal={id}
+>
+  <div class="dashboard-modal__backdrop" data-dashboard-modal-close></div>
+  <section class="dashboard-modal__panel" tabindex="-1" data-dashboard-modal-panel>
+    <header class="dashboard-modal__header">
+      <div class="dashboard-modal__header-copy">
+        <h2 id={titleId}>{title}</h2>
+        {description && <p id={descriptionId}>{description}</p>}
+      </div>
+      <button
+        type="button"
+        class="dashboard-modal__close"
+        data-dashboard-modal-close
+        aria-label="Close dialog"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.25"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </header>
+    <div class="dashboard-modal__body">
+      <slot />
+    </div>
+  </section>
+</div>
+
+<script>
+  import { initDashboardModals } from "@/lib/client/dashboard-modal";
+
+  initDashboardModals();
+  document.addEventListener("astro:after-swap", initDashboardModals);
+  document.addEventListener("astro:page-load", initDashboardModals);
+</script>

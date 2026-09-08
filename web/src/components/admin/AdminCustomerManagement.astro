@@ -7,6 +7,7 @@ import DashboardTablePagination from "@/components/dashboard/DashboardTablePagin
 import StatusBadge from "@/components/dashboard/StatusBadge.astro";
 import Popover from "@/components/ui/Popover.astro";
 import Button from "@/components/ui/Button.astro";
+import Picker from "@/components/ui/Picker.astro";
 import Sheet from "@/components/ui/Sheet.astro";
 import ViewButton from "@/components/ViewButton.astro";
 import type { AdminCustomerManagementData } from "@/lib/admin-dashboard/data";
@@ -28,25 +29,51 @@ const activeAgents = data.agents.filter((agent) => agent.status === "active");
 function formatCustomerType(customerType: (typeof customerTypes)[number]) {
   return customerType === "reseller" ? "Reseller" : "Retail";
 }
+
+function formatRegistrationAgentLabel(agent: (typeof activeAgents)[number]) {
+  return `${agent.display_name}${agent.employee_id ? ` (${agent.employee_id})` : ""}`;
+}
 ---
 
 <section id="admin-customers" class="admin-panel" aria-labelledby="admin-customers-title">
-  <Sheet id="create-customer-sheet" width="34rem">
+  <Sheet id="create-customer-sheet" width="42rem">
     <div slot="header" class="agent-create-sheet__header-copy">
       <h3 class="drawer-sheet__title" data-sheet-title>Create Customer</h3>
       <p class="agent-create-sheet__header-description">
         Add an existing customer record and set the unpaid-order credit cap used during order creation.
       </p>
     </div>
-    <form id="create-customer-form" method="post" class="admin-form agent-create-form" aria-label="Create customer" data-astro-reload>
+    <form id="create-customer-form" method="post" class="admin-form agent-create-form customer-create-form" aria-label="Create customer" data-astro-reload>
       <input type="hidden" name="action" value="save-customer" />
-      <div class="admin-form-grid agent-create-form__grid">
-        <label class="field-row"><span>First name</span><input name="firstName" required autocomplete="given-name" /></label>
-        <label class="field-row"><span>Last name</span><input name="lastName" required autocomplete="family-name" /></label>
-        <label class="field-row"><span>Phone number</span><input name="phoneNumber" required inputmode="tel" autocomplete="tel" /></label>
-        <label class="field-row"><span>Email</span><input name="email" type="email" autocomplete="email" /></label>
-        <label class="field-row">
-          <span>Assigned agent</span>
+      <div class="admin-form-grid agent-create-form__grid customer-create-form__grid">
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">First Name</span>
+          </span>
+          <input name="firstName" required autocomplete="given-name" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Last Name</span>
+          </span>
+          <input name="lastName" required autocomplete="family-name" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Phone Number</span>
+          </span>
+          <input name="phoneNumber" required inputmode="tel" autocomplete="tel" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Email</span>
+          </span>
+          <input name="email" type="email" autocomplete="email" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Assigned Agent</span>
+          </span>
           <select name="assignedAgentId">
             <option value="">None</option>
             {data.agents.map((agent) => (
@@ -57,12 +84,28 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             ))}
           </select>
         </label>
-        <label class="field-row"><span>Credit limit</span><input name="creditLimit" type="number" min="0" step="1" value={data.defaultCustomerCreditLimit} required /></label>
-        <label class="checkbox-row">
-          <input name="isReseller" type="checkbox" />
-          <span>Reseller customer</span>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Credit Limit</span>
+            <span class="field-row__description">Unpaid-order credit cap used during order creation.</span>
+          </span>
+          <input name="creditLimit" type="number" min="0" step="1" value={data.defaultCustomerCreditLimit} required />
         </label>
-        <label class="field-row"><span>Address</span><textarea name="address" required rows="3"></textarea></label>
+        <label class="checkbox-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Reseller?</span>
+            <span class="field-row__description">Uses reseller pricing when applicable.</span>
+          </span>
+          <span class="field-row__control customer-create-form__checkbox-control">
+            <input name="isReseller" type="checkbox" />
+          </span>
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Address</span>
+          </span>
+          <textarea name="address" required rows="3"></textarea>
+        </label>
       </div>
     </form>
     <div slot="footer" class="agent-create-sheet__footer">
@@ -70,19 +113,29 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
     </div>
   </Sheet>
 
-  <Sheet id="create-customer-registration-link-sheet" width="34rem">
+  <Sheet id="create-customer-registration-link-sheet" width="42rem">
     <div slot="header" class="agent-create-sheet__header-copy">
       <h3 class="drawer-sheet__title" data-sheet-title>Create Registration Link</h3>
       <p class="agent-create-sheet__header-description">
         Send a temporary customer registration link to selected agents. Customers can use the link until it expires.
       </p>
     </div>
-    <form id="create-customer-registration-link-form" method="post" class="admin-form agent-create-form" aria-label="Create customer registration link" data-astro-reload>
+    <form
+      id="create-customer-registration-link-form"
+      method="post"
+      class="admin-form agent-create-form customer-create-form"
+      aria-label="Create customer registration link"
+      data-customer-registration-link-form
+      data-astro-reload
+    >
       <input type="hidden" name="action" value="create-customer-registration-link" />
       <input type="hidden" name="baseUrl" value={Astro.url.origin} />
-      <div class="admin-form-grid agent-create-form__grid">
-        <label class="field-row">
-          <span>Duration</span>
+      <div class="admin-form-grid agent-create-form__grid customer-create-form__grid">
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Duration</span>
+            <span class="field-row__description">How long the registration link stays active.</span>
+          </span>
           <select name="duration" required>
             <option value="30m">30 minutes</option>
             <option value="1h">1 hour</option>
@@ -91,24 +144,57 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
             <option value="1d">1 day</option>
           </select>
         </label>
-        <fieldset class="customer-registration-link-agents">
-          <legend>Notify agents</legend>
-          {activeAgents.length === 0 ? (
-            <p class="empty-state">No active agents are available.</p>
-          ) : activeAgents.map((agent) => (
-            <label class="customer-registration-link-agents__option">
-              <input type="checkbox" name="agentId" value={agent.id} />
-              <span>
-                {agent.display_name}
-                {agent.employee_id ? ` (${agent.employee_id})` : ""}
-              </span>
-            </label>
-          ))}
-        </fieldset>
+        <div class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Notify Agents</span>
+            <span class="field-row__description">Optional. Choose which agents receive the registration link.</span>
+          </span>
+          <div class="field-row__control">
+            <Picker
+              multiple
+              disabled={activeAgents.length === 0}
+              placeholder="Search agents..."
+              searchLabel="Search agents"
+              toggleAriaLabel="Show agents"
+              summaryText="Search or select agents to notify."
+              emptyMessage={activeAgents.length === 0
+                ? "No active agents are available."
+                : "No matching agents found."}
+              showSummary={false}
+              showPagination={false}
+            />
+            <div data-selected-registration-agent-inputs hidden></div>
+            <template data-registration-agent-picker-template>
+              {activeAgents.map((agent) => {
+                const label = formatRegistrationAgentLabel(agent);
+                return (
+                  <label
+                    class="order-customer-picker__option ui-picker__option--checkbox"
+                    data-ui-picker-option
+                    data-ui-picker-option-value={agent.id}
+                    data-ui-picker-option-label={label}
+                    data-ui-picker-option-search={label.toLowerCase()}
+                  >
+                    <input
+                      type="checkbox"
+                      class="ui-picker__option-checkbox"
+                      value={agent.id}
+                      data-ui-picker-option-checkbox
+                    />
+                    <span class="order-customer-picker__option-name">{agent.display_name}</span>
+                    {agent.employee_id && (
+                      <span class="order-customer-picker__option-type">{agent.employee_id}</span>
+                    )}
+                  </label>
+                );
+              })}
+            </template>
+          </div>
+        </div>
       </div>
     </form>
     <div slot="footer" class="agent-create-sheet__footer">
-      <button type="submit" form="create-customer-registration-link-form" disabled={activeAgents.length === 0}>Create link</button>
+      <button type="submit" form="create-customer-registration-link-form">Create link</button>
     </div>
   </Sheet>
 
@@ -117,7 +203,7 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
       <form
         method="get"
         action="/admin/customers"
-        class="order-filter-form"
+        class="order-filter-form order-filter-form--paired"
         data-customer-filter-form
         data-current-filter-query={filterQuery}
         aria-label="Filter customers"
@@ -148,19 +234,20 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
       <div class="order-management-toolbar__actions">
         <Button
           type="button"
-          class="order-management-toolbar__create"
-          data-open-create-sheet
-          data-sheet-target="#create-customer-sheet"
-        >
-          Create Customer
-        </Button>
-        <Button
-          type="button"
+          variant="outlined"
           class="order-management-toolbar__create"
           data-open-create-sheet
           data-sheet-target="#create-customer-registration-link-sheet"
         >
           Create Registration Link
+        </Button>
+        <Button
+          type="button"
+          class="order-management-toolbar__create"
+          data-open-create-sheet
+          data-sheet-target="#create-customer-sheet"
+        >
+          Create Customer
         </Button>
       </div>
     </div>
@@ -424,6 +511,44 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
 
 <script>
   import { initDashboardFragmentTable } from "@/lib/client/dashboard-fragment-table";
+  import { initUiPicker } from "@/lib/client/ui-picker";
+
+  function initRegistrationLinkPicker() {
+    const form = document.querySelector<HTMLFormElement>("[data-customer-registration-link-form]");
+    if (!form) return null;
+
+    const hiddenInputContainer = form.querySelector<HTMLElement>(
+      "[data-selected-registration-agent-inputs]",
+    );
+    const optionTemplate = form.querySelector<HTMLTemplateElement>(
+      "[data-registration-agent-picker-template]",
+    );
+    if (!optionTemplate) return null;
+
+    return initUiPicker({
+      root: form,
+      optionTemplate,
+      multiple: true,
+      hiddenInputContainer,
+      hiddenInputName: "agentId",
+    });
+  }
+
+  function initCustomerRegistrationLinkForm() {
+    const form = document.querySelector<HTMLFormElement>("[data-customer-registration-link-form]");
+    if (!form || form.dataset.customerRegistrationLinkInitialized === "true") return;
+    form.dataset.customerRegistrationLinkInitialized = "true";
+
+    initRegistrationLinkPicker();
+  }
+
+  function ensureRegistrationLinkPickerOnSheetOpen() {
+    const picker = document.querySelector<HTMLElement>(
+      "[data-customer-registration-link-form] [data-customer-picker]",
+    );
+    if (!picker || picker.dataset.uiPickerInitialized === "true") return;
+    initRegistrationLinkPicker();
+  }
 
   function initAdminCustomerFilters() {
     initDashboardFragmentTable({
@@ -441,7 +566,21 @@ function formatCustomerType(customerType: (typeof customerTypes)[number]) {
 
   document.addEventListener("DOMContentLoaded", initAdminCustomerFilters);
   document.addEventListener("astro:after-swap", initAdminCustomerFilters);
+  document.addEventListener("DOMContentLoaded", initCustomerRegistrationLinkForm);
+  document.addEventListener("astro:after-swap", initCustomerRegistrationLinkForm);
+  document.addEventListener("astro:page-load", initCustomerRegistrationLinkForm);
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest('[data-sheet-target="#create-customer-registration-link-sheet"]')) return;
+      window.requestAnimationFrame(ensureRegistrationLinkPickerOnSheetOpen);
+    },
+    true,
+  );
   if (document.readyState === "complete" || document.readyState === "interactive") {
     initAdminCustomerFilters();
+    initCustomerRegistrationLinkForm();
   }
 </script>

@@ -1,67 +1,26 @@
 ﻿---
+import AgentMultiCustomerOrderDetail from "@/components/agent/AgentMultiCustomerOrderDetail.astro";
 import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
-import AgentOrderAttachCustomerSheet from "@/components/agent-order/AgentOrderAttachCustomerSheet.astro";
-import AgentOrderDistributionSummaryCard from "@/components/agent/AgentOrderDistributionSummaryCard.astro";
-import AgentOrderCalculationSummary from "@/components/agent/AgentOrderCalculationSummary.astro";
-import DashboardTableBoard from "@/components/dashboard/DashboardTableBoard.astro";
-import DashboardTableActionsHeader from "@/components/dashboard/DashboardTableActionsHeader.astro";
-import DashboardTableNumberHeader from "@/components/dashboard/DashboardTableNumberHeader.astro";
-import OrderDetailNav from "@/components/dashboard/OrderDetailNav.astro";
-import StatusBadge from "@/components/dashboard/StatusBadge.astro";
-import ViewButton from "@/components/ViewButton.astro";
-import Tab from "@/components/ui/Tab.astro";
-import TabPanel from "@/components/ui/TabPanel.astro";
-import Tabs from "@/components/ui/Tabs.astro";
-import { dashboardTableRowNumber } from "@/lib/admin-dashboard/pagination";
 import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
-import {
-  loadAgentDashboardData,
-  type AgentOrder,
-} from "@/lib/agent-dashboard/data";
+import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
 import { requireAgentRoute } from "@/lib/agent-dashboard/page";
 import {
   agentOrderCommissionTotal,
-  agentOrderPaymentStatus,
   agentOrderRemittanceTotal,
   agentOrderTotal,
-  formatCurrency,
-  formatDate,
-  fullName,
-  orderExpectedCommission,
   orderPaymentTotal,
-  orderTotal,
 } from "@/lib/agent-dashboard/view";
 import {
   buildAttachCustomerProductOptions,
   canAttachCustomerToAgentOrder,
-  formatAgentOrderDistributionStatus,
-  formatPendingIndicator,
-  getAgentOrderProductDistribution,
-  sumPendingCustomerOrderAmount,
 } from "@/lib/agent-order-distribution";
-import { autoCapitalize, formatOrderSource } from "@/lib/formatters";
 import { manilaDateInputValue, manilaTimeInputValue } from "@/lib/datetime";
-import {
-  buildOrderDetailNavEntries,
-  formatOrderCode,
-} from "@/lib/order-detail-nav";
+import { formatOrderCode } from "@/lib/order-detail-nav";
 
 export const prerender = false;
 
 const orderDetailTabIds = ["products", "customers"] as const;
 type OrderDetailTabId = (typeof orderDetailTabIds)[number];
-
-function orderQuantityKey(order: AgentOrder): "partial_quantity" | "final_quantity" {
-  return order.invoice.length > 0 ? "final_quantity" : "partial_quantity";
-}
-
-function pendingAgentPaymentTotal(order: AgentOrder) {
-  return (order.agent_received_payment ?? []).reduce((sum, payment) => {
-    return payment.status === "pending_admin_confirmation"
-      ? sum + payment.amount
-      : sum;
-  }, 0);
-}
 
 const agentRoute = await requireAgentRoute(Astro);
 
@@ -83,83 +42,49 @@ if (!agentOrder) {
 }
 
 const feedback = formatAgentActionFeedback(Astro.url);
-const agentOrderPaymentState = agentOrderPaymentStatus(agentOrder);
 const canAttachCustomer = canAttachCustomerToAgentOrder(agentOrder);
 const totalAmount = agentOrderTotal(agentOrder);
-const pendingCustomerOrderAmount = sumPendingCustomerOrderAmount(agentOrder);
-const attachCustomerProducts = buildAttachCustomerProductOptions({
-  agentOrder,
-  products: data.products,
-});
-const customerBalanceById = data.orders.reduce<Record<string, number>>((balances, order) => {
-  if (!order.customer_id) return balances;
-
-  const balance = Math.max(orderTotal(order, "final_quantity") - orderPaymentTotal(order), 0);
-  if (balance <= 0) return balances;
-
-  return {
-    ...balances,
-    [order.customer_id]: (balances[order.customer_id] ?? 0) + balance,
-  };
-}, {});
-const attachedCustomerIds = agentOrder.customer_order.flatMap((order) =>
-  order.customer_id ? [order.customer_id] : [],
-);
-const paymentNoticeByCustomerId = data.orders.reduce<Record<string, "unpaid" | "partial">>((notices, order) => {
-  const paymentNotice = order.payment_status === "unpaid" || order.payment_status === "partial"
-    ? order.payment_status
-    : null;
-
-  if (!order.customer_id || !paymentNotice) {
-    return notices;
-  }
-
-  return {
-    ...notices,
-    [order.customer_id]: notices[order.customer_id] === "unpaid"
-      ? "unpaid"
-      : paymentNotice,
-  };
-}, {});
-const attachCustomerCustomers = data.customers
-  .filter((customer) => !attachedCustomerIds.includes(customer.id))
-  .map((customer) => ({
-  id: customer.id,
-  label: fullName(customer),
-  firstName: customer.first_name,
-  lastName: customer.last_name,
-  phoneNumber: customer.phone_number,
-  email: customer.email ?? "",
-  address: customer.address,
-  balance: customerBalanceById[customer.id] ?? 0,
-  creditLimit: customer.credit_limit,
-  creditExceeded: customer.credit_limit_exceeded,
-  paymentNotice: paymentNoticeByCustomerId[customer.id] ?? null,
-}));
 const totalPaid = agentOrder.customer_order.reduce(
   (sum, order) => sum + orderPaymentTotal(order),
   0,
 );
-const totalPendingAgentReceived = agentOrder.customer_order.reduce(
-  (sum, order) => sum + pendingAgentPaymentTotal(order),
-  0,
-);
 const totalCommission = agentOrderCommissionTotal(agentOrder);
 const totalRemittance = agentOrderRemittanceTotal(agentOrder);
-const orderSummaryPendingAmount = pendingCustomerOrderAmount > 0
-  ? pendingCustomerOrderAmount
-  : null;
-const agentOrderCode = formatOrderCode(agentOrder.id);
-const agentOrderNavigationEntries = buildOrderDetailNavEntries({
-  orders: data.agentOrders,
-  currentOrderId: agentOrder.id,
-  buildHref: (entry) => `/agent/orders/multi-customers/${entry.id}`,
+const remittanceBalance = Math.max(totalRemittance - totalPaid, 0);
+const canRecordRemittance = remittanceBalance > 0 && agentOrder.order_status !== "pending_order";
+const attachCustomerProducts = buildAttachCustomerProductOptions({
+  agentOrder,
+  products: data.products,
 });
+const agentOrderCode = formatOrderCode(agentOrder.id);
 const todayDate = manilaDateInputValue();
 const todayTime = manilaTimeInputValue();
 const productCount = agentOrder.agent_order_item.length;
 const customerCount = agentOrder.customer_order.length;
 const requestedOrderDetailTab = Astro.url.searchParams.get("tab");
+
+const orderStatusCounts = agentOrder.customer_order.reduce(
+  (counts, order) => {
+    if (order.order_status === "pending") {
+      counts.pending += 1;
+      return counts;
+    }
+
+    if (order.payment_status === "paid") {
+      counts.paid += 1;
+      return counts;
+    }
+
+    if (order.payment_status === "partial") {
+      counts.partial += 1;
+      return counts;
+    }
+
+    counts.unpaid += 1;
+    return counts;
+  },
+  { pending: 0, unpaid: 0, partial: 0, paid: 0 },
+);
 
 function isOrderDetailTabActive(tab: OrderDetailTabId) {
   return (
@@ -173,787 +98,29 @@ function isOrderDetailTabActive(tab: OrderDetailTabId) {
 
 <AgentRecordPageLayout
   title={`${agentOrderCode} - JEHMARP`}
-  description="Agent order cluster details."
+  description="Agent distribution order details."
   heading={agentOrderCode}
   backUrl="/agent/orders"
   backLabel="Back to orders"
   feedback={feedback}
   dashboardData={data}
 >
-  <OrderDetailNav
-    slot="heading-title"
-    currentCode={agentOrderCode}
-    entries={agentOrderNavigationEntries}
-    menuLabel="Other distribution orders"
-    titleClass="admin-notifications-page__title"
-  />
-  <ul slot="heading-meta" class="record-meta" aria-label="Agent order dates">
-    <li class="record-meta__item">
-      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-        <line x1="16" y1="2" x2="16" y2="6"></line>
-        <line x1="8" y1="2" x2="8" y2="6"></line>
-        <line x1="3" y1="10" x2="21" y2="10"></line>
-      </svg>
-      <span class="record-meta__text">{formatDate(agentOrder.created_at)}</span>
-    </li>
-    <li class="record-meta__item">
-      <svg class="record-meta__icon" viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9"></circle>
-        <path d="M12 7v5l3 2"></path>
-      </svg>
-      <span class="record-meta__text">Release {formatDate(agentOrder.release_date ?? null)}</span>
-    </li>
-  </ul>
-
-  <div slot="heading-aside" class="record-heading-badges">
-    <StatusBadge
-      kind="order"
-      status={agentOrder.order_status}
-      label={autoCapitalize(agentOrder.order_status)}
-    />
-    <StatusBadge
-      kind="payment"
-      status={agentOrderPaymentState}
-      label={autoCapitalize(agentOrderPaymentState)}
-    />
-  </div>
-
-  <div
-    class="agent-record-content flex max-w-full flex-col gap-4 md:gap-8"
-    data-agent-order-detail
-  >
-    <AgentOrderDistributionSummaryCard
-      paid={totalPaid}
-      commission={totalCommission}
-      grossTotal={totalAmount}
-      primaryLabel="Remittance"
-      primaryAmount={totalRemittance}
-      pendingAcceptanceAmount={orderSummaryPendingAmount}
-      summaryLabel="Order calculation"
-    />
-
-    <Tabs
-      ariaLabel="Agent order sections"
-      listClass="ui-tabs__list--stretch md:hidden"
-      panelsClass="agent-order-tab-panels flex flex-col gap-8"
-    >
-      <Tab slot="tabs" target="products" active={isOrderDetailTabActive("products")}>
-        Products ({productCount})
-      </Tab>
-      <Tab slot="tabs" target="customers" active={isOrderDetailTabActive("customers")}>
-        Customers ({customerCount})
-      </Tab>
-
-      <TabPanel
-        slot="panels"
-        target="products"
-        active={isOrderDetailTabActive("products")}
-        variant="plain"
-        class="record-section agent-order-tab-panel"
-        aria-label={`Products (${productCount})`}
-      >
-          {
-            productCount === 0 ? (
-              <p class="empty-state">
-                No products have been added to this agent order yet.
-              </p>
-            ) : (
-              <>
-                <div class="grid gap-3 md:hidden">
-                  {agentOrder.agent_order_item.map((item) => {
-                    const unitPrice = item.product?.default_price ?? 0;
-                    const distribution = getAgentOrderProductDistribution(
-                      agentOrder,
-                      item.product_id,
-                    );
-
-                    return (
-                      <article class="agent-order-detail-card rounded-xl border border-gray-200 bg-white p-4">
-                        <div class="flex items-start justify-between gap-3">
-                          <div class="min-w-0">
-                            <h3 class="text-[0.95rem] font-bold text-gray-900">
-                              {item.product?.name ?? "Missing product"}
-                            </h3>
-                            <p class="mt-0.5 text-[0.82rem] text-gray-500">
-                              {formatCurrency(unitPrice)} /{" "}
-                              {item.product?.unit_label ?? "unit"}
-                            </p>
-                          </div>
-                          <strong class="shrink-0 text-[0.95rem] font-bold text-gray-900">
-                            {formatCurrency(item.quantity * unitPrice)}
-                          </strong>
-                        </div>
-                        <dl class="mt-3 grid grid-cols-1 gap-2.5">
-                          <div>
-                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
-                              Quantity
-                            </dt>
-                            <dd class="text-[0.9rem] font-semibold text-gray-900">
-                              {item.quantity} {item.product?.unit_label ?? ""}
-                              {
-                                distribution.pendingQuantityIncrease > 0 && (
-                                  <span class="pending-indicator">
-                                    {formatPendingIndicator(
-                                      distribution.pendingQuantityIncrease,
-                                      (value) => `${value} ${item.product?.unit_label ?? ""}`,
-                                    )}
-                                  </span>
-                                )
-                              }
-                            </dd>
-                          </div>
-                          <div>
-                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
-                              Details
-                            </dt>
-                            <dd class="text-[0.9rem] font-semibold text-gray-900">
-                              {item.add_details ?? "N/A"}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
-                              Commission
-                            </dt>
-                            <dd class="text-[0.9rem] font-semibold text-gray-900">
-                              {formatCurrency(item.agent_commission_amount)}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
-                              Distribution
-                            </dt>
-                            <dd class="text-[0.9rem] font-semibold text-gray-900">
-                              {formatAgentOrderDistributionStatus({
-                                remainingQuantity: distribution.remainingQuantity,
-                                unitLabel: item.product?.unit_label ?? "unit",
-                              })}
-                            </dd>
-                          </div>
-                        </dl>
-                      </article>
-                    );
-                  })}
-                </div>
-
-                <DashboardTableBoard class="dashboard-table-board--record-detail hidden md:flex">
-                  <table class="agent-customers-table agent-order-products-table dashboard-table">
-                    <thead>
-                      <tr>
-                        <DashboardTableNumberHeader />
-                        <th scope="col">Product</th>
-                        <th scope="col">Quantity</th>
-                        <th scope="col">Details</th>
-                        <th scope="col">Total</th>
-                        <th scope="col">Commission</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {agentOrder.agent_order_item.map((item, index) => {
-                        const unitPrice = item.product?.default_price ?? 0;
-                        const distribution = getAgentOrderProductDistribution(
-                          agentOrder,
-                          item.product_id,
-                        );
-
-                        return (
-                          <tr>
-                            <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
-                            <td>
-                              {item.product?.name ?? "Missing product"}
-                              <span class="agent-order-products-table__meta">
-                                {formatCurrency(unitPrice)} /{" "}
-                                {item.product?.unit_label ?? "unit"}
-                              </span>
-                            </td>
-                            <td>
-                              <span>
-                                {item.quantity} {item.product?.unit_label ?? ""}
-                              </span>
-                              {
-                                distribution.pendingQuantityIncrease > 0 && (
-                                  <span class="pending-indicator">
-                                    {formatPendingIndicator(
-                                      distribution.pendingQuantityIncrease,
-                                      (value) => `${value} ${item.product?.unit_label ?? ""}`,
-                                    )}
-                                  </span>
-                                )
-                              }
-                              <span class="agent-order-products-table__meta">
-                                {formatAgentOrderDistributionStatus({
-                                  remainingQuantity: distribution.remainingQuantity,
-                                  unitLabel: item.product?.unit_label ?? "unit",
-                                })}
-                              </span>
-                            </td>
-                            <td>{item.add_details ?? "N/A"}</td>
-                            <td>{formatCurrency(item.quantity * unitPrice)}</td>
-                            <td>{formatCurrency(item.agent_commission_amount)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </DashboardTableBoard>
-              </>
-            )
-          }
-        </TabPanel>
-
-        <TabPanel
-          slot="panels"
-          target="customers"
-          active={isOrderDetailTabActive("customers")}
-          variant="plain"
-          class="record-section agent-order-tab-panel"
-          aria-label={`Customers (${customerCount})`}
-        >
-          <div class="customer-orders-table-toolbar flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div class="customer-orders-table-toolbar__summary hidden md:flex">
-              <span>Pending admin confirmation</span>
-              <strong>{formatCurrency(totalPendingAgentReceived)}</strong>
-            </div>
-            <div class="customer-orders-table-toolbar__actions flex w-full md:w-auto">
-              <button
-                type="button"
-                class="btn-table-manage customer-orders-table-toolbar__add-customer inline-flex items-center justify-center gap-2"
-                data-open-create-sheet
-                data-sheet-target="#agent-order-attach-customer-sheet"
-                disabled={!canAttachCustomer}
-                title={canAttachCustomer
-                  ? undefined
-                  : "Completed and paid agent orders cannot accept new customers."}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.25"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M12 5v14"></path>
-                  <path d="M5 12h14"></path>
-                </svg>
-                <span class="hidden md:inline">Add Customer</span>
-                <span class="sr-only md:hidden">Add Customer</span>
-              </button>
-            </div>
-          </div>
-
-          {
-            customerCount === 0 ? (
-              <p class="empty-state">No customer orders have been attached yet.</p>
-            ) : (
-              <form
-                method="post"
-                class="agent-payment-bulk-form flex flex-col gap-4"
-                data-agent-payment-bulk-form
-              >
-                <input
-                  type="hidden"
-                  name="action"
-                  value="record-agent-payment-distribution"
-                />
-                <div data-selected-payment-order-inputs hidden></div>
-
-                <div class="agent-payment-bulk-panel grid grid-cols-1 gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 md:grid-cols-2 lg:grid-cols-4">
-                  <label class="grid gap-1">
-                    <span>Total received</span>
-                    <input
-                      type="number"
-                      name="amount"
-                      min="0.01"
-                      step="0.01"
-                      required
-                    />
-                  </label>
-                  <label class="grid gap-1">
-                    <span>Method</span>
-                    <select
-                      name="paymentMethod"
-                      required
-                    >
-                      <option value="">Select method</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Check">Check</option>
-                    </select>
-                  </label>
-                  <label class="grid gap-1">
-                    <span>Payment Terms</span>
-                    <select name="paymentTerms" required>
-                      <option value="">Select payment terms</option>
-                      <option value="Cash on Delivery (COD)">Cash on Delivery (COD)</option>
-                      <option value="Bank Transfer">Bank Transfer</option>
-                      <option value="Gcash">Gcash</option>
-                    </select>
-                  </label>
-                  <label class="grid gap-1">
-                    <span>Date</span>
-                    <input
-                      type="date"
-                      name="paymentDate"
-                      value={todayDate}
-                      required
-                    />
-                  </label>
-                  <label class="grid gap-1">
-                    <span>Time</span>
-                    <input
-                      type="time"
-                      name="paymentTime"
-                      value={todayTime}
-                      required
-                    />
-                  </label>
-                  <label class="grid gap-1">
-                    <span>Reference</span>
-                    <input type="text" name="referenceNumber" />
-                  </label>
-                  <label class="agent-payment-bulk-panel__notes grid gap-1 md:col-span-2">
-                    <span>Notes</span>
-                    <textarea name="notes" rows="2"></textarea>
-                  </label>
-                  <button
-                    type="submit"
-                    class="agent-payment-bulk-panel__submit w-full normal-case md:col-span-2 lg:col-span-1"
-                  >
-                    Record selected payments
-                  </button>
-                </div>
-
-                <div class="grid gap-3 md:hidden">
-                  {agentOrder.customer_order.map((order) => {
-                    const quantityKey = orderQuantityKey(order);
-                    const grossTotal = orderTotal(order, quantityKey);
-                    const orderCommission = orderExpectedCommission(order);
-                    const orderPaid = orderPaymentTotal(order);
-                    const pendingAgentReceived = pendingAgentPaymentTotal(order);
-                    const remainingBalance = Math.max(
-                      grossTotal - orderPaid - pendingAgentReceived,
-                      0,
-                    );
-                    const canRecordPayment = remainingBalance > 0;
-                    const isPendingOrder = order.order_status === "pending";
-                    const customerName = order.customer
-                      ? fullName(order.customer)
-                      : "Guest";
-                    const orderPendingIndicator = isPendingOrder;
-
-                    return (
-                      <article class="agent-order-detail-card rounded-xl border border-gray-200 bg-white p-4">
-                        <label class="mb-3 inline-flex items-center gap-2 text-[0.82rem] font-semibold text-gray-600">
-                          <input
-                            type="checkbox"
-                            value={order.id}
-                            data-payment-order-checkbox
-                            disabled={!canRecordPayment}
-                            aria-label={`Select ${customerName}`}
-                            class="h-4 w-4 accent-gray-900"
-                          />
-                          <span>Select for payment</span>
-                        </label>
-                        <div class="flex items-start justify-between gap-3">
-                          <div class="min-w-0">
-                            <h3 class="text-[0.95rem] font-bold text-gray-900">{customerName}</h3>
-                            <p class="mt-0.5 text-[0.82rem] text-gray-500">
-                              {formatDate(order.created_at)} · {formatOrderSource(order.source)}
-                            </p>
-                          </div>
-                          <div class="flex shrink-0 flex-wrap justify-end gap-1">
-                            <StatusBadge
-                              kind="order"
-                              status={order.order_status}
-                              label={autoCapitalize(order.order_status)}
-                            />
-                            <StatusBadge
-                              kind="payment"
-                              status={order.payment_status}
-                              label={autoCapitalize(order.payment_status)}
-                            />
-                          </div>
-                        </div>
-                        <div class="mt-3">
-                          <AgentOrderCalculationSummary
-                            paid={orderPaid}
-                            commission={orderCommission}
-                            grossTotal={grossTotal}
-                            summaryLabel={`${customerName} order calculation`}
-                            awaitingAcceptance={orderPendingIndicator}
-                            variant="customer"
-                            compact
-                          />
-                        </div>
-                        {
-                          pendingAgentReceived > 0 && (
-                            <dl class="mt-3 grid grid-cols-1 gap-2.5">
-                              <div>
-                                <dt class="text-[0.72rem] font-bold uppercase tracking-wide text-gray-400">
-                                  Pending confirmation
-                                </dt>
-                                <dd class="text-[0.9rem] font-semibold text-gray-900">
-                                  {formatCurrency(pendingAgentReceived)}
-                                </dd>
-                              </div>
-                            </dl>
-                          )
-                        }
-                        <div class="mt-3 flex justify-end">
-                          <ViewButton href={`/agent/orders/${order.id}`} />
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-
-                <DashboardTableBoard class="dashboard-table-board--record-detail hidden md:flex">
-                  <table class="agent-customers-table agent-order-customer-orders-table dashboard-table">
-                    <thead>
-                      <tr>
-                        <DashboardTableNumberHeader />
-                        <th scope="col" class="dashboard-table__select-column">
-                          <span class="sr-only">Select</span>
-                        </th>
-                        <th scope="col">Date Created</th>
-                        <th scope="col">Customer</th>
-                        <th scope="col">Source</th>
-                        <th scope="col">Order Status</th>
-                        <th scope="col">Payment Status</th>
-                        <th scope="col">Order calculation</th>
-                        <th scope="col">Agent received</th>
-                        <DashboardTableActionsHeader />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {agentOrder.customer_order.map((order, index) => {
-                        const quantityKey = orderQuantityKey(order);
-                        const grossTotal = orderTotal(order, quantityKey);
-                        const orderCommission = orderExpectedCommission(order);
-                        const orderPaid = orderPaymentTotal(order);
-                        const pendingAgentReceived = pendingAgentPaymentTotal(order);
-                        const remainingBalance = Math.max(
-                          grossTotal - orderPaid - pendingAgentReceived,
-                          0,
-                        );
-                        const canRecordPayment = remainingBalance > 0;
-                        const isPendingOrder = order.order_status === "pending";
-                        const orderPendingIndicator = isPendingOrder;
-
-                        return (
-                          <tr>
-                            <td class="dashboard-table__number-column">{dashboardTableRowNumber(null, index)}</td>
-                            <td class="dashboard-table__select-column">
-                              <input
-                                type="checkbox"
-                                value={order.id}
-                                data-payment-order-checkbox
-                                disabled={!canRecordPayment}
-                                aria-label={`Select ${order.customer ? fullName(order.customer) : "guest order"}`}
-                              />
-                            </td>
-                            <td>{formatDate(order.created_at)}</td>
-                            <td>
-                              {order.customer ? fullName(order.customer) : "Guest"}
-                            </td>
-                            <td>{formatOrderSource(order.source)}</td>
-                            <td>
-                              <StatusBadge
-                                kind="order"
-                                status={order.order_status}
-                                label={autoCapitalize(order.order_status)}
-                              />
-                            </td>
-                            <td>
-                              <StatusBadge
-                                kind="payment"
-                                status={order.payment_status}
-                                label={autoCapitalize(order.payment_status)}
-                              />
-                            </td>
-                            <td>
-                              <AgentOrderCalculationSummary
-                                paid={orderPaid}
-                                commission={orderCommission}
-                                grossTotal={grossTotal}
-                                summaryLabel="Customer order calculation"
-                                awaitingAcceptance={orderPendingIndicator}
-                                variant="customer"
-                                compact
-                              />
-                            </td>
-                            <td>
-                              <span class="agent-received-payment">
-                                <strong>{formatCurrency(pendingAgentReceived)}</strong>
-                                <span>Pending admin confirmation</span>
-                              </span>
-                            </td>
-                            <td class="dashboard-table__actions-column">
-                              <ViewButton href={`/agent/orders/${order.id}`} />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </DashboardTableBoard>
-              </form>
-            )
-          }
-        </TabPanel>
-      </Tabs>
-  </div>
-
-  <AgentOrderAttachCustomerSheet
-    agentOrderId={agentOrder.id}
-    customers={attachCustomerCustomers}
-    products={attachCustomerProducts}
-    mode="agent"
+  <AgentMultiCustomerOrderDetail
+    agentOrder={agentOrder}
+    agentOrderCode={agentOrderCode}
+    productCount={productCount}
+    customerCount={customerCount}
+    paid={totalPaid}
+    commission={totalCommission}
+    grossTotal={totalAmount}
+    receivable={totalRemittance}
+    remittanceBalance={remittanceBalance}
+    orderStatusCounts={orderStatusCounts}
     canAttachCustomer={canAttachCustomer}
+    canRecordRemittance={canRecordRemittance}
+    attachCustomerProducts={attachCustomerProducts}
+    todayDate={todayDate}
+    todayTime={todayTime}
+    isOrderDetailTabActive={isOrderDetailTabActive}
   />
 </AgentRecordPageLayout>
-
-<script>
-  function initAgentPaymentBulkForm() {
-    const bulkPaymentForm = document.querySelector<HTMLFormElement>(
-      "[data-agent-payment-bulk-form]",
-    );
-    if (!bulkPaymentForm || bulkPaymentForm.dataset.agentPaymentBulkInitialized === "true") {
-      return;
-    }
-    bulkPaymentForm.dataset.agentPaymentBulkInitialized = "true";
-
-    const selectedOrderInputContainer = bulkPaymentForm.querySelector<HTMLElement>(
-      "[data-selected-payment-order-inputs]",
-    );
-    const selectedOrderIds: string[] = [];
-
-    const syncSelectedOrderInputs = () => {
-      if (!selectedOrderInputContainer) return;
-
-      selectedOrderInputContainer.replaceChildren(
-        ...selectedOrderIds.map((selectedOrderId) => {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = "orderId";
-          input.value = selectedOrderId;
-          return input;
-        }),
-      );
-    };
-
-    bulkPaymentForm.addEventListener("change", (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLInputElement)) return;
-      if (!target.matches("[data-payment-order-checkbox]")) return;
-
-      const existingIndex = selectedOrderIds.indexOf(target.value);
-
-      if (target.checked && existingIndex === -1) {
-        selectedOrderIds.push(target.value);
-      }
-
-      if (!target.checked && existingIndex !== -1) {
-        selectedOrderIds.splice(existingIndex, 1);
-      }
-
-      syncSelectedOrderInputs();
-    });
-  }
-
-  initAgentPaymentBulkForm();
-  document.addEventListener("astro:after-swap", initAgentPaymentBulkForm);
-</script>
-
-<style>
-  .record-heading-badges {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.45rem;
-  }
-
-  .record-section {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .agent-order-tab-panel[hidden] {
-    display: none;
-  }
-
-  .customer-orders-table-toolbar {
-    border: 1px solid rgba(17, 24, 39, 0.1);
-    border-radius: 0.75rem;
-    background: #ffffff;
-    padding: 0.85rem 1rem;
-  }
-
-  .customer-orders-table-toolbar__summary {
-    min-width: 0;
-    flex-direction: column;
-    gap: 0.15rem;
-  }
-
-  .customer-orders-table-toolbar__summary span {
-    color: rgba(17, 24, 39, 0.58);
-    font-size: 0.78rem;
-    font-weight: 700;
-  }
-
-  .customer-orders-table-toolbar__summary strong {
-    color: #111827;
-    font-size: 1.05rem;
-    line-height: 1.2;
-  }
-
-  .customer-orders-table-toolbar__add-customer:disabled {
-    opacity: 0.55;
-  }
-
-  .pending-indicator {
-    margin-left: 0.35rem;
-    color: #b45309;
-    font-size: 0.82em;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-
-  .agent-order-products-table {
-    min-width: 760px;
-  }
-
-  .agent-order-products-table__meta {
-    display: block;
-    margin-top: 0.2rem;
-    font-size: 0.8rem;
-    color: var(--color-brand-muted-black);
-  }
-
-  .agent-order-customer-orders-table {
-    min-width: 1180px;
-  }
-
-  .agent-order-customer-orders-table th:first-child,
-  .agent-order-customer-orders-table td:first-child {
-    width: 4.5rem;
-    text-align: center;
-  }
-
-  .agent-order-customer-orders-table td :global(.order-calculation-summary) {
-    min-width: 12rem;
-  }
-
-  .agent-received-payment {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
-
-  .agent-received-payment strong {
-    color: #111827;
-    font-size: 0.95rem;
-  }
-
-  .agent-received-payment span {
-    color: rgba(17, 24, 39, 0.58);
-    font-size: 0.78rem;
-    line-height: 1.35;
-  }
-
-  .agent-payment-bulk-panel label span {
-    color: rgba(17, 24, 39, 0.58);
-    font-size: 0.74rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0;
-  }
-
-  .agent-payment-bulk-panel input,
-  .agent-payment-bulk-panel textarea,
-  .agent-payment-bulk-panel select {
-    width: 100%;
-    min-width: 0;
-    border: 1px solid rgba(17, 24, 39, 0.14);
-    border-radius: 0.5rem;
-    background: #ffffff;
-    color: #111827;
-    padding: 0.5rem 0.65rem;
-    font: inherit;
-    font-size: 0.88rem;
-  }
-
-  .agent-payment-bulk-panel textarea {
-    resize: vertical;
-  }
-
-  .agent-payment-bulk-panel__submit {
-    min-height: 2.55rem;
-    border: 0;
-    border-radius: 0.5rem;
-    background: #111827;
-    color: #ffffff;
-    padding: 0.45rem 0.75rem;
-    font: inherit;
-    font-size: 0.82rem;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .agent-payment-bulk-panel button:disabled {
-    opacity: 0.55;
-  }
-
-  .agent-order-customer-orders-table input:disabled {
-    cursor: not-allowed;
-    opacity: 0.55;
-  }
-
-  .agent-order-customer-orders-table input[type="checkbox"] {
-    width: 1rem;
-    height: 1rem;
-    margin: 0;
-    accent-color: #111827;
-  }
-
-  @media (max-width: 767px) {
-    .record-heading-badges {
-      justify-content: flex-start;
-    }
-
-    .customer-orders-table-toolbar__add-customer {
-      width: 2.35rem;
-      min-width: 2.35rem;
-      padding: 0;
-    }
-  }
-
-  @media (min-width: 768px) {
-    .agent-order-tab-panel {
-      display: block !important;
-    }
-
-    .agent-order-tab-panel[hidden] {
-      display: block !important;
-    }
-
-    .agent-payment-bulk-panel {
-      grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
-      align-items: end;
-    }
-
-    .agent-payment-bulk-panel__notes {
-      grid-column: span 2;
-    }
-
-    .agent-payment-bulk-panel__submit {
-      width: auto;
-    }
-  }
-</style>

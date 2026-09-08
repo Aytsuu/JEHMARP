@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  attachCustomerBlockMessage,
   buildAgentOrderProductDistributions,
+  buildDistributionCustomerOrderStatusCounts,
   canAttachCustomerToAgentOrder,
   canDecreaseAgentOrderItemQuantity,
   formatAgentOrderDistributionStatus,
@@ -107,6 +109,10 @@ describe("agent-order-distribution", () => {
       order_status: "pending_order",
       customer_order: [],
     })).toBe(false);
+    expect(attachCustomerBlockMessage({
+      order_status: "pending_order",
+      customer_order: [],
+    })).toBe("This distribution order is awaiting admin approval.");
 
     expect(canAttachCustomerToAgentOrder({
       order_status: "closed",
@@ -125,5 +131,19 @@ describe("agent-order-distribution", () => {
       order_status: "processing",
       customer_order: [{ payment_status: "paid" }],
     })).toBe(true);
+  });
+
+  it("builds mutually exclusive distribution customer order status counts", () => {
+    expect(buildDistributionCustomerOrderStatusCounts([
+      { order_status: "pending", payment_status: "unpaid" },
+      { order_status: "processing", payment_status: "paid" },
+      { order_status: "processing", payment_status: "partial" },
+      { order_status: "processing", payment_status: "unpaid" },
+    ])).toEqual({
+      pending: 1,
+      unpaid: 1,
+      partial: 1,
+      paid: 1,
+    });
   });
 });

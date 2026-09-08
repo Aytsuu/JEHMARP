@@ -110,6 +110,18 @@ export function getDashboardSidebarCategories(isAdmin: boolean): DashboardSideba
       ];
 }
 
+export const SIDEBAR_UNREAD_BADGE_MAX = 99;
+
+export function formatSidebarUnreadCount(count: number): string {
+  if (!Number.isFinite(count) || count <= 0) {
+    return "0";
+  }
+
+  return count > SIDEBAR_UNREAD_BADGE_MAX
+    ? `${SIDEBAR_UNREAD_BADGE_MAX}+`
+    : String(count);
+}
+
 export type DashboardSidebarUnreadBadge =
   | {
       count: number;

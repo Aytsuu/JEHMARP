@@ -1,8 +1,11 @@
 import { resetFormSubmissionState } from "@/lib/client/form-submission-state";
 import { getOrderCreditLimitWarning } from "@/lib/client/order-credit-limit";
-import { initOrderCustomerPicker } from "@/lib/client/order-customer-picker";
+import { initOrderCustomerPicker, type InitOrderCustomerPickerOptions } from "@/lib/client/order-customer-picker";
+import { calculateOrderItemsTotal } from "@/lib/client/order-total";
 
 const defaultNewCustomerCreditLimit = 1000;
+
+type OrderCustomerPickerController = ReturnType<typeof initOrderCustomerPicker>;
 
 function formatCurrencyForClient(value: number) {
   return new Intl.NumberFormat("en-PH", {
@@ -40,15 +43,11 @@ function formatCompactCurrencyForClient(value: number) {
 export function initAdminCreateOrderSheet() {
   const form = document.querySelector<HTMLFormElement>("#create-order-form");
   if (!form || form.dataset.orderSheetInitialized === "true") return;
-  form.dataset.orderSheetInitialized = "true";
   const orderForm = form;
 
   const orderItems = form.querySelector<HTMLElement>("[data-order-items]");
   const orderItemTemplate = form.querySelector<HTMLTemplateElement>("[data-order-item-template]");
   const addOrderItemButton = form.querySelector<HTMLButtonElement>("[data-add-order-item]");
-  const orderTotalValues = Array.from(
-    document.querySelectorAll<HTMLElement>("#create-order-sheet [data-order-total-value]"),
-  );
   const releaseDateInput = form.querySelector<HTMLInputElement>("[data-release-date]");
   const releaseTimeInput = form.querySelector<HTMLInputElement>("[data-release-time]");
   const downpaymentAmountInput = form.querySelector<HTMLInputElement>("[data-downpayment-amount]");
@@ -59,46 +58,42 @@ export function initAdminCreateOrderSheet() {
   const newCustomerFields = form.querySelector<HTMLElement>("[data-new-customer-fields]");
   const isResellerCheckbox = form.querySelector<HTMLInputElement>("[data-customer-is-reseller]");
 
-  const profilePicker = initOrderCustomerPicker({
-    scope: form,
-    apiEndpoint: "/admin/order-target-profiles.json",
-    profileScope: "customer-agent",
-    cacheKey: "admin-order-target-profiles-v1",
-    newCustomerFields,
-    showPaymentNotice: true,
-    agentIdInput: agentOrderAgentInput,
-    onChange: () => {
-      refreshAgentOrderMode();
-    },
-  });
+  // Declared before init because picker onChange runs during initOrderCustomerPicker.
+  // eslint-disable-next-line prefer-const -- assigned after options; must stay undefined during init callback
+  let profilePicker: OrderCustomerPickerController | undefined;
 
   function selectedCustomerIsReseller() {
-    return profilePicker.isSelectedCustomerReseller();
+    return profilePicker?.isSelectedCustomerReseller()
+      ?? isResellerCheckbox?.checked
+      ?? false;
   }
 
   function calculateOrderTotal() {
-    return Array.from(orderForm.querySelectorAll<HTMLElement>("[data-order-item-row]")).reduce((total, row) => {
+    const items = Array.from(orderForm.querySelectorAll<HTMLElement>("[data-order-item-row]")).map((row) => {
       const select = row.querySelector<HTMLSelectElement>("[data-order-product-select]");
       const quantityInput = row.querySelector<HTMLInputElement>("input[name='quantity']");
       const selectedOption = select?.selectedOptions?.[0];
-      const quantity = Number(quantityInput?.value ?? 0);
-      const unitPrice = Number(
-        selectedCustomerIsReseller()
-          ? selectedOption?.dataset.productResellerPrice
-          : selectedOption?.dataset.productRetailPrice,
-      );
 
-      if (!Number.isFinite(quantity) || !Number.isFinite(unitPrice)) return total;
+      return {
+        quantity: Number(quantityInput?.value ?? 0),
+        unitPrice: Number(
+          selectedCustomerIsReseller()
+            ? selectedOption?.dataset.productResellerPrice
+            : selectedOption?.dataset.productRetailPrice,
+        ),
+      };
+    });
 
-      return total + quantity * unitPrice;
-    }, 0);
+    return calculateOrderItemsTotal(items);
   }
 
   function updateOrderTotal() {
     const formatted = formatCurrencyForClient(calculateOrderTotal());
-    orderTotalValues.forEach((node) => {
-      node.textContent = formatted;
-    });
+    document
+      .querySelectorAll<HTMLElement>("#create-order-sheet [data-order-total-value]")
+      .forEach((node) => {
+        node.textContent = formatted;
+      });
   }
 
   function refreshAgentOrderMode() {
@@ -122,6 +117,21 @@ export function initAdminCreateOrderSheet() {
     updateOrderTotal();
   }
 
+  const profilePickerOptions: InitOrderCustomerPickerOptions = {
+    scope: form,
+    apiEndpoint: "/admin/order-target-profiles.json",
+    profileScope: "customer-agent",
+    cacheKey: "admin-order-target-profiles-v1",
+    newCustomerFields,
+    showPaymentNotice: true,
+    agentIdInput: agentOrderAgentInput,
+    onChange: () => {
+      refreshAgentOrderMode();
+    },
+  };
+
+  profilePicker = initOrderCustomerPicker(profilePickerOptions);
+
   function daysUntilReleaseDate() {
     if (!releaseDateInput?.value) return null;
 
@@ -136,7 +146,7 @@ export function initAdminCreateOrderSheet() {
   function shouldConfirmCreditLimit() {
     if (agentOrderAgentInput?.value) return null;
 
-    const selectedCustomer = profilePicker.getSelectedCustomerProfile();
+    const selectedCustomer = profilePicker?.getSelectedCustomerProfile();
     const orderTotal = calculateOrderTotal();
     const downpaymentAmount = Number(downpaymentAmountInput?.value ?? 0);
 
@@ -255,4 +265,5 @@ export function initAdminCreateOrderSheet() {
 
   refreshAgentOrderMode();
   updateOrderTotal();
+  form.dataset.orderSheetInitialized = "true";
 }

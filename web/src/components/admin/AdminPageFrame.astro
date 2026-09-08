@@ -1,6 +1,7 @@
 ---
 import type { AdminDashboardData } from "@/lib/admin-dashboard/data";
 import type { AdminActionFeedback } from "@/lib/admin-dashboard/actions";
+import AdminRegistrationLinkFeedback from "@/components/admin/AdminRegistrationLinkFeedback.astro";
 import PageAvailabilityNotice from "@/components/dashboard/PageAvailabilityNotice.astro";
 import RouteBackButton from "@/components/dashboard/RouteBackButton.astro";
 import {
@@ -72,7 +73,21 @@ const isPageReady = pageAvailability.status === "ready";
     </header>
 
     {
-      feedback?.status && (
+      feedback?.registrationLink
+      && feedback?.status
+      && feedback?.registrationLinkExpiresAt
+      && feedback?.registrationLinkDuration && (
+        <AdminRegistrationLinkFeedback
+          message={feedback.status}
+          registrationLink={feedback.registrationLink}
+          expiresAt={feedback.registrationLinkExpiresAt}
+          duration={feedback.registrationLinkDuration}
+        />
+      )
+    }
+    {
+      feedback?.status
+      && !feedback?.registrationLink && (
         <p class="status-message" role="status">
           {feedback.status}
         </p>

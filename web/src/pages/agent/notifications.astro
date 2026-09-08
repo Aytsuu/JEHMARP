@@ -1,5 +1,6 @@
 ---
 import AgentNotifications from "@/components/agent/AgentNotifications.astro";
+import AgentNotificationToolbar from "@/components/agent/AgentNotificationToolbar.astro";
 import AgentRecordPageLayout from "@/components/agent/AgentRecordPageLayout.astro";
 import { formatAgentActionFeedback } from "@/lib/agent-dashboard/actions";
 import { loadAgentDashboardData } from "@/lib/agent-dashboard/data";
@@ -21,9 +22,9 @@ const feedback = formatAgentActionFeedback(Astro.url);
   title="Agent Notifications - JEHMARP"
   description="Order reviews and commission alert updates."
   heading="Notifications"
-  intro="Check status updates on submitted orders, commission payouts, and customer activity flags."
   feedback={feedback}
   dashboardData={data}
 >
+  <AgentNotificationToolbar slot="heading-aside" />
   <AgentNotifications data={data} />
 </AgentRecordPageLayout>

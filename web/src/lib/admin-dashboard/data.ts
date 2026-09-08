@@ -542,6 +542,14 @@ export type AdminOrderTableRow = {
   pending_customer_order_count: number | null;
 };
 
+export type AdminDistributionPendingCustomerOrder = {
+  id: string;
+  customer_label: string;
+  created_at: string;
+  total_amount: number;
+  href: string;
+};
+
 export type AdminSalesTableRow = {
   id: string;
   created_at: string;
@@ -713,14 +721,25 @@ export type AdminActivityManagementData = {
   pagination: AdminPaginatedResult<AdminActivityTableRow>["pagination"];
 };
 
+export type AdminAgentRemittanceRecord = {
+  payment: AdminAgentReceivedPayment;
+  order: Pick<AdminOrder, "id" | "sale_date" | "created_at">;
+};
+
 export type AdminAgentDetailsData = {
   agent: AdminAgent;
   assignedCustomers: AdminCustomer[];
   customerOrders: AdminOrder[];
   previousCustomerOrders: AdminOrder[];
   agentOrders: AdminAgentOrder[];
+  agentRemittanceRecords: AdminAgentRemittanceRecord[];
   remainingBalance: number;
   agentRemainingBalance: number;
+};
+
+export type AdminCustomerDetailsData = {
+  customer: AdminCustomer;
+  customerOrders: AdminOrder[];
 };
 
 export async function loadAdminDashboardData(
@@ -903,6 +922,52 @@ export async function loadAdminCustomerRecord(customerId: string): Promise<Admin
     : null;
 }
 
+export async function loadAdminCustomerDetailsData(
+  customerId: string,
+): Promise<AdminCustomerDetailsData | null> {
+  const supabase = createSupabaseAdminClient();
+  const customer = await loadAdminCustomerRecord(customerId);
+
+  if (!customer) {
+    return null;
+  }
+
+  const customerOrders = await loadOrdersForCustomers(supabase, [customerId]);
+
+  return {
+    customer,
+    customerOrders,
+  };
+}
+
+export async function loadDistributionPendingCustomerOrders(
+  distributionOrderId: string,
+): Promise<AdminDistributionPendingCustomerOrder[]> {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.rpc("list_distribution_pending_customer_orders", {
+    target_order_id: distributionOrderId,
+  });
+
+  if (error) {
+    throwLoadError("Unable to load pending customer orders.", error);
+  }
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === "object")
+    .map((row) => ({
+      id: String(row.id ?? ""),
+      customer_label: String(row.customer_label ?? "Customer"),
+      created_at: String(row.created_at ?? ""),
+      total_amount: Number(row.total_amount ?? 0),
+      href: String(row.href ?? ""),
+    }))
+    .filter((row) => row.id.length > 0);
+}
+
 export async function agentHasDistributionOrders(agentId: string) {
   const supabase = createSupabaseAdminClient();
   const { count, error } = await supabase
@@ -1060,7 +1125,7 @@ export async function loadAdminAgentDetailsData(
   const assignedCustomers = (await loadCustomersForAgent(supabase, agentId))
     .filter((customer) => customer.id !== agentCustomerId);
   const promotedCustomerId = agent.promoted_from_customer_id ?? null;
-  const [customerOrders, agentOrders, agentCustomerOrders, previousCustomerOrders] = await Promise.all([
+  const [assignedCustomerOrders, agentOrders, agentCustomerOrders, previousCustomerOrders, agentRemittanceRecords] = await Promise.all([
     loadOrdersForCustomers(supabase, assignedCustomers.map((customer) => customer.id)),
     loadAgentOrdersForAgent(supabase, agentId),
     agentCustomerId
@@ -1069,7 +1134,9 @@ export async function loadAdminAgentDetailsData(
     promotedCustomerId
       ? loadOrdersForCustomers(supabase, [promotedCustomerId], { includeConverted: true })
       : Promise.resolve([]),
+    loadAgentRemittanceRecordsForAgent(supabase, agentId),
   ]);
+  const customerOrders = mergeAdminOrdersById(assignedCustomerOrders, agentCustomerOrders);
 
   return {
     agent,
@@ -1077,7 +1144,8 @@ export async function loadAdminAgentDetailsData(
     customerOrders,
     previousCustomerOrders,
     agentOrders,
-    remainingBalance: customerOrders.reduce(
+    agentRemittanceRecords,
+    remainingBalance: assignedCustomerOrders.reduce(
       (total, order) => total + adminOrderRemainingBalance(order),
       0,
     ),
@@ -1457,6 +1525,76 @@ async function loadCustomersForAgent(
   );
 }
 
+const adminAgentRemittanceSelect = `
+  id,
+  order_id,
+  agent_id,
+  amount,
+  payment_method,
+  payment_terms,
+  payment_date,
+  reference_number,
+  notes,
+  status,
+  confirmed_at,
+  created_at,
+  updated_at,
+  order:order_id (
+    id,
+    sale_date,
+    created_at
+  )
+`;
+
+async function loadAgentRemittanceRecordsForAgent(
+  supabase: SupabaseAdminClient,
+  agentId: string,
+): Promise<AdminAgentRemittanceRecord[]> {
+  const { data, error } = await supabase
+    .from("agent_received_payment")
+    .select(adminAgentRemittanceSelect)
+    .eq("agent_id", agentId)
+    .order("created_at", { ascending: false });
+
+  if (error) throwLoadError("Unable to load agent remittance records.", error);
+
+  return (data ?? []).flatMap((row) => {
+    const payment = row as AdminAgentReceivedPayment & {
+      order?: Pick<AdminOrder, "id" | "sale_date" | "created_at"> | Pick<AdminOrder, "id" | "sale_date" | "created_at">[] | null;
+    };
+    const orderRelation = payment.order;
+    const resolvedOrder = resolveRelation(orderRelation);
+
+    if (!resolvedOrder?.id) {
+      return [];
+    }
+
+    return [{
+      payment: {
+        id: String(payment.id),
+        order_id: String(payment.order_id),
+        agent_id: String(payment.agent_id),
+        amount: Number(payment.amount),
+        payment_method: payment.payment_method,
+        payment_terms: payment.payment_terms,
+        payment_date: payment.payment_date,
+        reference_number: payment.reference_number,
+        notes: payment.notes,
+        status: payment.status,
+        confirmed_at: payment.confirmed_at,
+        created_at: payment.created_at,
+        updated_at: payment.updated_at,
+        agent: null,
+      },
+      order: {
+        id: String(resolvedOrder.id),
+        sale_date: resolvedOrder.sale_date ?? null,
+        created_at: String(resolvedOrder.created_at),
+      },
+    }];
+  });
+}
+
 async function loadOrdersForCustomers(
   supabase: SupabaseAdminClient,
   customerIds: string[],
@@ -1592,6 +1730,21 @@ export async function loadOrders(
     : orders;
 
   return filteredOrders.slice(0, limit);
+}
+
+function mergeAdminOrdersById(...orderGroups: AdminOrder[][]) {
+  const byId = new Map<string, AdminOrder>();
+
+  for (const orders of orderGroups) {
+    for (const order of orders) {
+      byId.set(order.id, order);
+    }
+  }
+
+  return [...byId.values()].sort(
+    (left, right) =>
+      new Date(right.created_at).getTime() - new Date(left.created_at).getTime(),
+  );
 }
 
 function adminOrderRemainingBalance(order: AdminOrder) {

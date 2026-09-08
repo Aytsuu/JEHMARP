@@ -53,4 +53,21 @@ describe("sendCustomerTrackingNumberEmail", () => {
       }),
     );
   });
+
+  it("uses an explicit from address when Resend from env is unset", async () => {
+    const fetcher = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })));
+
+    vi.stubEnv("PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_test_key");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test_key");
+    vi.stubEnv("RESEND_API_KEY", "resend_test_key");
+    vi.stubEnv("RESELLER_PRICE_LIST_FROM", "");
+
+    await expect(
+      sendCustomerTrackingNumberEmail("maria@example.com", context, {
+        fetch: fetcher as typeof fetch,
+        from: "JEHMARP <orders@jehmarp.example>",
+      }),
+    ).resolves.toEqual({ status: "sent" });
+  });
 });

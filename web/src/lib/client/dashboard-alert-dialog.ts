@@ -1,4 +1,10 @@
+import {
+  getFormAlertDialogTriggerButton,
+  setFormSubmittingState,
+} from "./form-submission-state";
+
 const OPEN_BODY_CLASS = "alert-dialog-is-open";
+const pendingAlertDialogTriggers = new WeakMap<HTMLElement, HTMLButtonElement>();
 
 function getDialogId(dialog: HTMLElement) {
   return dialog.dataset.alertDialog ?? dialog.id;
@@ -35,6 +41,12 @@ function openAlertDialog(dialog: HTMLElement, trigger: HTMLElement) {
     delete dialog.dataset.alertDialogPendingForm;
   }
 
+  if (trigger instanceof HTMLButtonElement) {
+    pendingAlertDialogTriggers.set(dialog, trigger);
+  } else {
+    pendingAlertDialogTriggers.delete(dialog);
+  }
+
   portalAlertDialogToBody(dialog);
   dialog.classList.add("alert-dialog--open");
   dialog.setAttribute("aria-hidden", "false");
@@ -57,6 +69,7 @@ function closeAlertDialog(dialog: HTMLElement) {
   dialog.classList.remove("alert-dialog--open");
   dialog.setAttribute("aria-hidden", "true");
   delete dialog.dataset.alertDialogPendingForm;
+  pendingAlertDialogTriggers.delete(dialog);
   document.body.classList.remove(OPEN_BODY_CLASS);
   dashboardWindow.alertDialogPreviousFocus?.focus();
   dashboardWindow.alertDialogPreviousFocus = null;
@@ -70,6 +83,12 @@ function closeOpenAlertDialogs() {
     });
 }
 
+function getHiddenFormSubmitButton(form: HTMLFormElement) {
+  return form.querySelector<HTMLButtonElement>(
+    'button[type="submit"]:not([data-alert-dialog-form])',
+  );
+}
+
 function submitPendingAlertDialogForm(dialog: HTMLElement) {
   const formId = dialog.dataset.alertDialogPendingForm;
   if (!formId) {
@@ -81,7 +100,22 @@ function submitPendingAlertDialogForm(dialog: HTMLElement) {
     return false;
   }
 
-  form.requestSubmit();
+  const trigger =
+    pendingAlertDialogTriggers.get(dialog) ??
+    getFormAlertDialogTriggerButton(form);
+  const hiddenSubmitButton = getHiddenFormSubmitButton(form);
+
+  if (hiddenSubmitButton) {
+    form.requestSubmit(hiddenSubmitButton);
+  } else {
+    form.requestSubmit();
+  }
+
+  if (form.dataset.isSubmitting !== "true") {
+    setFormSubmittingState(form, trigger);
+  }
+
+  pendingAlertDialogTriggers.delete(dialog);
   return true;
 }
 
@@ -114,6 +148,33 @@ function bindAlertDialog(dialog: HTMLElement) {
   });
 }
 
+export function openAlertDialogFromTrigger(trigger: HTMLElement) {
+  const dialogId = trigger.dataset.openAlertDialog;
+  if (!dialogId) {
+    return false;
+  }
+
+  if (
+    trigger instanceof HTMLButtonElement &&
+    trigger.disabled
+  ) {
+    return false;
+  }
+
+  if (trigger.getAttribute("aria-disabled") === "true") {
+    return false;
+  }
+
+  const dialog = document.getElementById(dialogId);
+  if (!(dialog instanceof HTMLElement) || !dialog.matches("[data-alert-dialog]")) {
+    return false;
+  }
+
+  bindAlertDialog(dialog);
+  openAlertDialog(dialog, trigger);
+  return true;
+}
+
 export function initDashboardAlertDialogs() {
   const dashboardWindow = window as Window & {
     dashboardAlertDialogsInitialized?: boolean;
@@ -138,19 +199,8 @@ export function initDashboardAlertDialogs() {
       return;
     }
 
-    const dialogId = openTrigger.dataset.openAlertDialog;
-    if (!dialogId) {
-      return;
-    }
-
-    const dialog = document.getElementById(dialogId);
-    if (!(dialog instanceof HTMLElement) || !dialog.matches("[data-alert-dialog]")) {
-      return;
-    }
-
     event.preventDefault();
-    bindAlertDialog(dialog);
-    openAlertDialog(dialog, openTrigger);
+    openAlertDialogFromTrigger(openTrigger);
   });
 
   document.addEventListener("keydown", (event) => {

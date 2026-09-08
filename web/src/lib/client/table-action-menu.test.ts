@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { initDashboardAlertDialogs } from "./dashboard-alert-dialog";
 import {
   closeActiveTableActionMenu,
   computeFloatingMenuPosition,
@@ -209,5 +210,45 @@ describe("initTableActionMenus", () => {
     expect(
       addEventListenerSpy.mock.calls.filter(([eventName]) => eventName === "click"),
     ).toHaveLength(0);
+  });
+
+  it("opens alert dialogs from action menu items", () => {
+    document.body.innerHTML = `
+      <div class="table-action-menu" data-table-action-menu>
+        <button type="button" data-table-action-menu-trigger aria-expanded="false">Actions</button>
+        <div class="table-action-menu__content" data-table-action-menu-content hidden>
+          <button
+            type="button"
+            class="table-action-menu__item"
+            data-open-alert-dialog="convert-order-dialog"
+            data-alert-dialog-form="convert-order-form"
+          >
+            Distribute Order
+          </button>
+        </div>
+      </div>
+      <form id="convert-order-form"></form>
+      <div
+        id="convert-order-dialog"
+        class="alert-dialog"
+        data-alert-dialog="convert-order-dialog"
+        aria-hidden="true"
+      >
+        <div data-alert-dialog-panel>
+          <button type="button" data-alert-dialog-cancel>Cancel</button>
+          <button type="button" data-alert-dialog-confirm>Confirm</button>
+        </div>
+      </div>
+    `;
+
+    initDashboardAlertDialogs();
+    initTableActionMenus();
+
+    document.querySelector<HTMLButtonElement>("[data-table-action-menu-trigger]")?.click();
+    document.querySelector<HTMLButtonElement>(".table-action-menu__item")?.click();
+
+    const dialog = document.getElementById("convert-order-dialog");
+    expect(dialog?.classList.contains("alert-dialog--open")).toBe(true);
+    expect(dialog?.dataset.alertDialogPendingForm).toBe("convert-order-form");
   });
 });

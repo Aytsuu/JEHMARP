@@ -25,7 +25,7 @@ import {
 } from "@/lib/admin-dashboard/customer-record";
 import {
   agentHasDistributionOrders,
-  loadAdminCustomerRecord,
+  loadAdminCustomerDetailsData,
   loadAdminDashboardData,
 } from "@/lib/admin-dashboard/data";
 import {
@@ -50,25 +50,30 @@ if (!adminRoute.ready) {
 
 const { customerId } = Astro.params;
 
-let data = await loadAdminDashboardData();
-const customer =
-  data.customers.find((entry) => entry.id === customerId) ??
-  (customerId ? await loadAdminCustomerRecord(customerId) : null);
-
-if (!customer) {
+if (!customerId) {
   return Astro.redirect("/admin/customers", 302);
 }
 
-if (customerId) {
-  await markAdminRegularCheckNotificationsReadForCustomer(
-    Astro,
-    customerId,
-    adminRoute.userId,
-    data.orders,
-    data.customers,
-  );
-  data = await loadAdminDashboardData();
+let [data, detailData] = await Promise.all([
+  loadAdminDashboardData(),
+  loadAdminCustomerDetailsData(customerId),
+]);
+
+if (!detailData) {
+  return Astro.redirect("/admin/customers", 302);
 }
+
+const customer = detailData.customer;
+const customerOrders = detailData.customerOrders;
+
+await markAdminRegularCheckNotificationsReadForCustomer(
+  Astro,
+  customerId,
+  adminRoute.userId,
+  customerOrders,
+  data.customers,
+);
+data = await loadAdminDashboardData();
 
 const activeTab = parseCustomerRecordTab(Astro.url.searchParams.get("tab"));
 const orderFilters = parseAdminOrderFilters(Astro.url);
@@ -78,10 +83,6 @@ function paginateCustomerTabRecords<T>(tab: CustomerRecordTab, records: T[]) {
   const page = activeTab === tab ? pagination.page : 1;
   return paginateCustomerRecords(records, page, pagination.pageSize);
 }
-
-const customerOrders = data.orders.filter(
-  (order) => order.customer_id === customerId,
-);
 const assignedAgent =
   data.agents.find((agent) => agent.id === customer.assigned_agent_id) ?? null;
 const linkedAgent = data.agents.find(

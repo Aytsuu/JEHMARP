@@ -1,7 +1,8 @@
 ---
 import AdminSettingsPageLayout from "@/components/admin/AdminSettingsPageLayout.astro";
-import AdminSettingsAccountsSecurity from "@/components/admin/settings/AdminSettingsAccountsSecurity.astro";
 import AdminSettingsGeneral from "@/components/admin/settings/AdminSettingsGeneral.astro";
+import AdminSettingsPrivacy from "@/components/admin/settings/AdminSettingsPrivacy.astro";
+import AdminSettingsAccountsSecurity from "@/components/admin/settings/AdminSettingsAccountsSecurity.astro";
 import { formatAdminActionFeedback } from "@/lib/admin-dashboard/actions";
 import { loadAdminDashboardData, loadAdminSettingsAgents } from "@/lib/admin-dashboard/data";
 import { requireAdminRoute } from "@/lib/admin-dashboard/page";
@@ -13,7 +14,12 @@ export const prerender = false;
 const adminRoute = await requireAdminRoute(Astro);
 if (!adminRoute.ready) return adminRoute.response;
 
-const activeTab = Astro.url.searchParams.get("tab") === "accounts" ? "accounts" : "general";
+const activeTab = (() => {
+  const tab = Astro.url.searchParams.get("tab");
+  if (tab === "accounts") return "accounts";
+  if (tab === "privacy") return "privacy";
+  return "general";
+})();
 const feedback = formatAdminActionFeedback(Astro.url);
 const [data, settings, agents] = await Promise.all([
   loadAdminDashboardData(),
@@ -42,6 +48,17 @@ const [data, settings, agents] = await Promise.all([
       hidden={activeTab !== "general"}
     >
       <AdminSettingsGeneral settings={settings} />
+    </div>
+    <div
+      class:list={[
+        "admin-settings-page__tab-panel",
+        activeTab === "privacy" && "is-active",
+      ]}
+      data-admin-settings-tab-panel="privacy"
+      role="tabpanel"
+      hidden={activeTab !== "privacy"}
+    >
+      <AdminSettingsPrivacy settings={settings} />
     </div>
     <div
       class:list={[

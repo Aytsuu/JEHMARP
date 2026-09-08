@@ -5,8 +5,13 @@ import PublicContactPageContent from "@/components/public-website/PublicContactP
 import { getPublicEnv } from "@/lib/env";
 import { getPublicPageContent } from "@/lib/public-website/content";
 import { getContactInquiryFeedback } from "@/lib/public-website/contact-inquiries";
+import { getPrivacyCollectionContext } from "@/lib/public-website/privacy-collection-notice";
+import { loadPlatformSettings } from "@/lib/platform-settings";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const content = await getPublicPageContent(Astro, "contact");
+const settings = await loadPlatformSettings(createSupabaseAdminClient());
+const privacyContext = getPrivacyCollectionContext(settings);
 const title = content.page?.title ?? "Contact";
 const { turnstileSiteKey } = getPublicEnv();
 const feedback = getContactInquiryFeedback(Astro.url);
@@ -18,6 +23,8 @@ const feedback = getContactInquiryFeedback(Astro.url);
       content={content}
       feedback={feedback}
       turnstileSiteKey={turnstileSiteKey ?? null}
+      privacyHref={privacyContext.privacyHref}
+      requirePrivacyAcknowledgement={privacyContext.requireAcknowledgement}
     />
   </PageShell>
 </Layout>

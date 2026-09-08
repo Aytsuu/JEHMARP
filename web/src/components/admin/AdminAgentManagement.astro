@@ -26,22 +26,45 @@ const skeletonRows = Array.from({ length: 6 });
 ---
 
 <section id="admin-agents" class="admin-panel" aria-labelledby="admin-agents-title">
-  <Sheet id="create-agent-sheet" width="34rem">
+  <Sheet id="create-agent-sheet" width="42rem">
     <div slot="header" class="agent-create-sheet__header-copy">
       <h3 class="drawer-sheet__title" data-sheet-title>Create Agent</h3>
       <p class="agent-create-sheet__header-description">
         Add the agent's profile details. Email and temporary password are only needed when the agent should be able to log in.
       </p>
     </div>
-    <form id="create-agent-form" method="post" class="admin-form agent-create-form" aria-label="Create agent" data-astro-reload>
+    <form id="create-agent-form" method="post" class="admin-form agent-create-form agent-sheet-create-form" aria-label="Create agent" data-astro-reload>
       <input type="hidden" name="action" value="create-agent" />
-      <div class="admin-form-grid agent-create-form__grid">
-        <label class="field-row"><span>Employee ID</span><input name="employeeId" autocomplete="off" /></label>
-        <label class="field-row"><span>First name</span><input name="firstName" required autocomplete="given-name" /></label>
-        <label class="field-row"><span>Last name</span><input name="lastName" required autocomplete="family-name" /></label>
-        <label class="field-row"><span>Email</span><input name="email" type="email" autocomplete="email" /></label>
-        <label class="field-row">
-          <span>Contact number</span>
+      <div class="admin-form-grid agent-create-form__grid agent-sheet-create-form__grid">
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Employee ID</span>
+          </span>
+          <input name="employeeId" autocomplete="off" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">First Name</span>
+          </span>
+          <input name="firstName" required autocomplete="given-name" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Last Name</span>
+          </span>
+          <input name="lastName" required autocomplete="family-name" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Email</span>
+          </span>
+          <input name="email" type="email" autocomplete="email" />
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Contact Number</span>
+            <span class="field-row__description">11-digit mobile number.</span>
+          </span>
           <input
             name="contact"
             type="tel"
@@ -54,8 +77,19 @@ const skeletonRows = Array.from({ length: 6 });
             data-digits-only
           />
         </label>
-        <label class="field-row"><span>Address</span><textarea name="address" required rows="3" autocomplete="street-address"></textarea></label>
-        <label class="field-row"><span>Temporary password</span><input name="password" type="password" minlength="8" autocomplete="new-password" /></label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Address</span>
+          </span>
+          <textarea name="address" required rows="3" autocomplete="street-address"></textarea>
+        </label>
+        <label class="field-row field-row--split">
+          <span class="field-row__meta">
+            <span class="field-row__label">Temporary Password</span>
+            <span class="field-row__description">Only needed when the agent should be able to log in.</span>
+          </span>
+          <input name="password" type="password" minlength="8" autocomplete="new-password" />
+        </label>
       </div>
     </form>
     <div slot="footer" class="agent-create-sheet__footer">
@@ -68,7 +102,7 @@ const skeletonRows = Array.from({ length: 6 });
       <form
         method="get"
         action="/admin/agents"
-        class="order-filter-form"
+        class="order-filter-form order-filter-form--paired"
         data-agent-filter-form
         data-current-filter-query={filterQuery}
         aria-label="Filter agents"
