@@ -6,7 +6,6 @@ import {
   formatSalesInvoiceModeOfPaymentLine,
   formatOrderSlipModeOfDeliveryLine,
   formatOrderSlipPaymentTermsLine,
-  formatTemplateCheckboxLine,
   getDocumentHeaderBrandLines,
 } from "@/lib/platform-settings/document-templates";
 import type { DocumentLayoutOptions } from "@/lib/platform-settings/types";

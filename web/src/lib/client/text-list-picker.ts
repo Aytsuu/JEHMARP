@@ -47,11 +47,15 @@ function initTextListPicker(picker: HTMLElement) {
   }
 
   picker.dataset.textListPickerInitialized = "true";
-  const badgesContainer = picker.querySelector<HTMLElement>("[data-text-list-picker-badges]");
-  const input = picker.querySelector<HTMLInputElement>("[data-text-list-picker-input]");
-  if (!badgesContainer || !input) {
+
+  const badgesContainerEl = picker.querySelector<HTMLElement>("[data-text-list-picker-badges]");
+  const inputEl = picker.querySelector<HTMLInputElement>("[data-text-list-picker-input]");
+  if (!badgesContainerEl || !inputEl) {
     return;
   }
+
+  const badgesContainer: HTMLElement = badgesContainerEl;
+  const input: HTMLInputElement = inputEl;
 
   function focusInput() {
     input.focus();

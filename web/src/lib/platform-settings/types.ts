@@ -99,6 +99,12 @@ export type PlatformSettings = {
   documentTemplates: DocumentTemplateSettings;
 };
 
+export type DocumentTemplateSettingsPatch = {
+  header?: Partial<DocumentHeaderSettings>;
+  orderSlip?: Partial<OrderSlipTemplateSettings>;
+  salesInvoice?: Partial<SalesInvoiceTemplateSettings>;
+};
+
 export type PlatformSettingsPatch = {
   businessProfile?: Partial<BusinessProfileSettings>;
   documentPayment?: Partial<DocumentPaymentSettings>;
@@ -106,7 +112,7 @@ export type PlatformSettingsPatch = {
   notifications?: Partial<NotificationsSettings>;
   documentNumbering?: Partial<DocumentNumberingSettings>;
   privacyNotice?: Partial<PrivacyNoticeSettings>;
-  documentTemplates?: Partial<DocumentTemplateSettings>;
+  documentTemplates?: DocumentTemplateSettingsPatch;
 };
 
 export type DocumentLogoImage = {

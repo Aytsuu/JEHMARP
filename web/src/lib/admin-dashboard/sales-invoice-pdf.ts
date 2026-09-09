@@ -1,7 +1,7 @@
 import type { DocumentLayoutOptions } from "@/lib/order-documents/layout";
 import { buildSalesInvoiceLayout } from "@/lib/order-documents/layout";
 import type { DocumentOrder, DocumentOrderItem } from "@/lib/order-documents/view";
-import { buildPdfDocument, documentTableTopY, pdfPageWidth } from "@/lib/order-documents/pdf-document";
+import { buildPdfDocument, documentTableTopY } from "@/lib/order-documents/pdf-document";
 import { drawPdfLabeledField } from "@/lib/order-documents/pdf-fields";
 import { drawDocumentPageHeader } from "@/lib/order-documents/pdf-header";
 import {
@@ -13,7 +13,6 @@ import {
   type PdfTextOptions,
 } from "@/lib/order-documents/pdf-text";
 
-const pageWidth = pdfPageWidth;
 const marginX = 40;
 const rightMargin = 555;
 const secondColumnX = 310;
